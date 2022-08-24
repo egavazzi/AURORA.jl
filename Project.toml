@@ -1,0 +1,8 @@
+name = "Aurora"
+uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
+authors = ["Etienne <etienne.gavazzi@uit.no>"]
+version = "0.1.0"
+
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+MATLAB = "10e44e05-a98a-55b3-a45b-ba969058deb6"
