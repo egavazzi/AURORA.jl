@@ -11,7 +11,7 @@ h_atm, nN2, nO2, nO, ne, Te, E, dE,
     secondary_e_N2, secondary_e_O2, secondary_e_O,
     θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims);
 
-##
+## Plot densities
 f1 = Figure()
 ax11 = Axis(f1[1,1], xlabel = "(m⁻³)", ylabel = "height (km)", 
           title = "MSIS neutral density", xscale = log10, xticks = LogTicks(LinearTicks(9)))
@@ -28,7 +28,7 @@ xlims!(1e8, 1e13)
 ylims!(85, 400)
 display(f1)
 
-##
+## Plot excitation thresholds
 f2 = Figure()
 ax21 = Axis(f2[1,1], ylabel = "Excitation energy (eV)", title = "N₂")
 ax22 = Axis(f2[1,2], title = "O₂")
@@ -45,9 +45,12 @@ end
 [xlims!(X, 0, 1) for X in [ax21, ax22, ax23]]
 display(f2)
 
-##
+## Plot the energy grid
 f3 = Figure()
 ax31 = Axis(f3[1,1], xlabel = "energy (eV)", ylabel = "energy bin size (eV)",
           title = "Energy variation of energy bin size")
 scatterlines!(E, dE, color = :red)
 display(f3)
+
+## Plot cross-sections and back-scattering ratios.
+# This will have to be done, eventually... But it is not the most important atm
