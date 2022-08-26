@@ -1,5 +1,9 @@
 module Aurora
 
-greet() = print("Hello World!")
+using MATLAB
+
+include("setup.jl")
+
+export setup
 
 end # module
