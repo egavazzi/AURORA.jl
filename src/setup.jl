@@ -38,9 +38,10 @@ function setup(top_altitude, θ_lims)
     nN2(end-5:end-3) = (erf((1:-1:-1)'/2)+1)/2.*nN2(end-5:end-3);
     "
     h_atm = @mget h_atm;
-    nO = @mget nO;
     nN2 = @mget nN2;
     nO2 = @mget nO2;
+    nO = @mget nO;
+    n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO);
 
     ## Loading n_e(z) and Te as estimated from EISCAT observations
     mat"
@@ -62,7 +63,8 @@ function setup(top_altitude, θ_lims)
     "
     N2_levels = @mget N2_levels;
     O2_levels = @mget O2_levels;
-    O_levels = @mget O_levels; 
+    O_levels = @mget O_levels;
+    E_levels_neutrals = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels);
 
     ## Energy grid
     mat"
@@ -82,16 +84,18 @@ function setup(top_altitude, θ_lims)
     σ_N2 = @mget XsN2;
     σ_O2 = @mget XsO2;
     σ_O = @mget XsO;
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
 
-    ## Pre-calculations of cascadning electron-spectra for ionizations
+    ## Pre-calculations of cascading electron-spectra for ionizations
     mat"
     S2ndO = O_e_2nd_dist(E,E(end),O_levels(end,1),'c',AURORA_root_directory);
     S2ndO2 = O2_e_2nd_dist(E,E(end),O2_levels(end,1),'c',AURORA_root_directory);
     S2ndN2 = N2_e_2nd_dist(E,E(end),N2_levels(end,1),'c',AURORA_root_directory);
-    "
-    secondary_e_O = vec(@mget S2ndO);
-    secondary_e_O2 = vec(@mget S2ndO2);
+    "    
     secondary_e_N2 = vec(@mget S2ndN2);
+    secondary_e_O2 = vec(@mget S2ndO2);
+    secondary_e_O = vec(@mget S2ndO);
+    secondary_e = (secondary_e_N2 = secondary_e_N2, secondary_e_O2 = secondary_e_O2, secondary_e_O = secondary_e_O);
 
     ## X-streams beam-to-beam calculations
     theta_lims2do = reshape(Vector(θ_lims), 1, :);
@@ -108,14 +112,12 @@ function setup(top_altitude, θ_lims)
     Pmu2mup = @mget Pmu2mup; # Great name
     θ_to_BeamWeight = @mget theta2beamW;
     BeamWeight = vec(@mget BeamW);
-    μ_scatterings = (Pmu2mup, θ_to_BeamWeight, BeamWeight);
+    μ_scatterings = (Pmu2mup = Pmu2mup, θ_to_BeamWeight = θ_to_BeamWeight, BeamWeight = BeamWeight);
 
     ## Closing the MATLAB session
     close(s1)
 
-    return h_atm, nN2, nO2, nO, ne, Te, E, dE, 
-        N2_levels, O2_levels, O_levels, 
-        σ_N2, σ_O2, σ_O,
-        secondary_e_N2, secondary_e_O2, secondary_e_O,
+    return h_atm, n_neutrals, ne, Te, E, dE, 
+        E_levels_neutrals, σ_neutrals, secondary_e,
         θ_lims, μ_lims, μ_center, μ_scatterings
 end
