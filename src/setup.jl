@@ -5,8 +5,9 @@ It calls a lot of functions from the original MATLAB code.
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 - `θ_lims`: range of angles for the limits of our electron beams, i.e 180:-10:0
+- `E_max`: upper limit for the energy grid
 """
-function setup(top_altitude, θ_lims)
+function setup(top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
     s1 = MSession();
     mat"
@@ -75,6 +76,10 @@ function setup(top_altitude, θ_lims)
     E = vec(@mget E);
     dE = vec(@mget dE);
 
+    iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
+    E = E[1:iE_max];                        # crop E accordingly
+    dE = dE[1:iE_max];                      # crop dE accordingly
+
     ## Collision cross-sections
     mat"
     [XsO,xs_fcnO] =   get_all_xs('O',E+dE/2);
@@ -109,10 +114,25 @@ function setup(top_altitude, θ_lims)
     μ_lims = vec(@mget mu_lims);
     μ_center = vec(@mget c_o_mu);
 
-    Pmu2mup = @mget Pmu2mup; # Great name
+    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
     θ_to_BeamWeight = @mget theta2beamW;
-    BeamWeight = vec(@mget BeamW);
-    μ_scatterings = (Pmu2mup = Pmu2mup, θ_to_BeamWeight = θ_to_BeamWeight, BeamWeight = BeamWeight);
+
+    # This beam weight is calculated in a continuous way
+    BeamWeight_continuous = 2π .* vec(@mget BeamW);
+    # Whereas this one is calculated in a discrete way. This is to ensure the conservation of the number of e-
+    # when calculating the scatterings, as these calculations are discretized in pitch angle (around 721
+    # different angles) which leads to a slightly different normalization factor
+    BeamWeight_discrete = sum(θ_to_BeamWeight, dims=2); 
+    BeamWeight_discrete[μ_center .< 0] = 2π .* BeamWeight_discrete[μ_center .< 0] ./ sum(BeamWeight_discrete[μ_center .< 0]);
+    BeamWeight_discrete[μ_center .> 0] = 2π .* BeamWeight_discrete[μ_center .> 0] ./ sum(BeamWeight_discrete[μ_center .> 0]);
+
+    # Here we normalize θ_to_BeamWeight, as it is supposed to be a relative weighting matrix with the relative
+    # contribution from withing each beam. It means that when summing up along each beam, we should get 1
+    θ_to_BeamWeight = θ_to_BeamWeight ./ repeat(sum(θ_to_BeamWeight, dims=2), 1, size(θ_to_BeamWeight, 2));
+
+
+
+    μ_scatterings = (Pmu2mup = Pmu2mup, θ_to_BeamWeight = θ_to_BeamWeight, BeamWeight_continuous = BeamWeight_continuous, BeamWeight_discrete = BeamWeight_discrete);
 
     ## Closing the MATLAB session
     close(s1)
