@@ -555,6 +555,12 @@ git-tree-sha1 = "e263657fe013cb02450c5d4210d2c50a354a5e08"
 uuid = "10e44e05-a98a-55b3-a45b-ba969058deb6"
 version = "0.8.3"
 
+[[deps.MKL]]
+deps = ["Artifacts", "Libdl", "LinearAlgebra", "MKL_jll"]
+git-tree-sha1 = "e1ad60943045f666863e9112701bc77fd19d946b"
+uuid = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
+version = "0.5.0"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
 git-tree-sha1 = "e595b205efd49508358f7dc670a940c790204629"
