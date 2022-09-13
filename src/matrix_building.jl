@@ -85,11 +85,43 @@ function make_B(n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, 
                     # E_levels[i1,1] is smaller than the width in energy in the energy bin.
                     # That is, when dE[iE] > E_levels[i1,1], only the fraction
                     # E_levels[i1,1]/dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
-                    B[:, i3, i2] .= @view(B[:, i2, i3]) .+ n .* σ[i1, iE] .* B2B_inelastic[i2, i3] .* 
+                    B[:, i2, i3] .= @view(B[:, i2, i3]) .+ n .* σ[i1, iE] .* B2B_inelastic[i2, i3] .* 
                                                     max(0, 1 - E_levels[i1, 1] ./ dE[iE]);
                 end
             end
         end
     end
     return B
+end
+
+function make_D(E, dE, θ_lims)
+    θ_lims = deg2rad.(θ_lims)
+    nE = 3
+    nθ = 3
+    # n_ti = 701
+    # n_thi = 401
+    D_e = zeros(length(E), length(θ_lims) -1)
+    for iE in length(E):-1:1
+        v = range(v_of_E(E[iE]), v_of_E(E[iE] + dE[iE]), length=nE)
+        for iθ in 1:(length(θ_lims) - 1)
+            θa = θ_lims[iθ]
+            θb = θ_lims[iθ + 1]
+            if θ_lims[iθ] == π/2
+                θa = θ_lims[iθ] * 0.8 + 0.2 * θ_lims[iθ + 1]
+            end
+            if θ_lims[iθ + 1] == π/2
+                θb = θ_lims[iθ] * 0.2 + 0.8 * θ_lims[iθ + 1]
+            end
+            θ = range(θa, θb, length=nθ)
+            # θ4i = range(minimum(θ), maximum(θ), n_thi)
+            v_par = [A * cos(B) for A in v, B in θ]
+            t_arrival = 500e3 ./ v_par
+            at_a = (maximum(t_arrival) + minimum(t_arrival)) / 2
+            dt_a = (maximum(t_arrival) - minimum(t_arrival))
+            D = (dt_a / 4)^2 / at_a
+            
+            D_e[iE, iθ] = abs(D)
+        end
+    end
+    return D_e
 end
