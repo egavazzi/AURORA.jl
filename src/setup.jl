@@ -7,6 +7,8 @@ It calls a lot of functions from the original MATLAB code.
 - `θ_lims`: range of angles for the limits of our electron beams, i.e 180:-10:0
 - `E_max`: upper limit for the energy grid
 """
+
+using MATLAB
 function setup(top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
     s1 = MSession();
