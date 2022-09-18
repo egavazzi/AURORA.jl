@@ -11,13 +11,13 @@ function loss_to_thermal_electrons(E, ne, Te)
 
         Ee = kB / qₑ * Te;
 
-        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee) .^ 2.36 ./ E .^ .44 / v_of_E(E)));
+        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee)) .^ 2.36 ./ E .^ .44 / v_of_E(E));
 
         Le[E .< Ee] .= 0;
     else
         Ee = 8.618e-5 * Te;
 
-        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee) .^ 2.36 ./ E .^ .44 / v_of_E(E)));
+        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee)) .^ 2.36 ./ E .^ .44 / v_of_E(E));
         Le[E .< Ee] .= 0;
     end
     return Le
@@ -47,15 +47,17 @@ function make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
         for i2 in 2:size(σ, 1)      # Loop over the different collisions, because
             A = A + n * σ[i2, iE];  # they have different cross sections
         end
-
-        # add losses due to electron-electron collisions
-        A = A + loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE];
     end
+
+    # add losses due to electron-electron collisions
+    A = A + loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE];
+    
     return A
 end
 
 function make_B(n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, dE, iE, Pmu2mup, BeamWeight_relative, finer_θ)
     B = zeros(length(n_neutrals[1]), size(Pmu2mup, 3), size(Pmu2mup, 3));
+    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(n_neutrals));
     # Loop over the neutral species
     for i in 1:length(n_neutrals)
         n = n_neutrals[i];                  # Neutral density
@@ -71,27 +73,31 @@ function make_B(n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, 
         B2B_inelastic = beams2beams(phase_fcn_i, Pmu2mup, BeamWeight_relative);
 
         # add scattering from elastic collisions
-        for i1 in size(B2B_elastic, 1):-1:1
-            for i2 in size(B2B_elastic, 2):-1:1
+        for i1 in axes(B2B_elastic, 1)
+            for i2 in axes(B2B_elastic, 2)
                 B[:, i1, i2] .= @view(B[:, i1, i2]) .+ n .* σ[1, iE] .* B2B_elastic[i1, i2];
             end
         end
-
+        
         # add scattering from inelastic and ionization collisions
         for i1 in 2:size(σ, 1)
-            for i2 in size(B2B_inelastic, 1):-1:1
-                for i3 in size(B2B_inelastic, 2):-1:1
-                    # The second factor corrects for the case where the energy loss
-                    # E_levels[i1,1] is smaller than the width in energy in the energy bin.
+            for i2 in axes(B2B_inelastic, 1)
+                for i3 in axes(B2B_inelastic, 2)
+                    # The last factor corrects for the case where the energy loss
+                    # E_levels[i1, 1] is smaller than the width in energy of the energy bin.
                     # That is, when dE[iE] > E_levels[i1,1], only the fraction
-                    # E_levels[i1,1]/dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
+                    # E_levels[i1,1] / dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
                     B[:, i2, i3] .= @view(B[:, i2, i3]) .+ n .* σ[i1, iE] .* B2B_inelastic[i2, i3] .* 
                                                     max(0, 1 - E_levels[i1, 1] ./ dE[iE]);
                 end
             end
         end
+
+        # Save the inelastic B2B matrices for the future energy degradations (update of Q) 
+        # calculations
+        B2B_inelastic_neutrals[i] = copy(B2B_inelastic);
     end
-    return B
+    return B, B2B_inelastic_neutrals
 end
 
 function make_D(E, dE, θ_lims)
