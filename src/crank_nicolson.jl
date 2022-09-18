@@ -104,7 +104,6 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top)
     
     i_t = 1
     Ie_finer = Ie[:, 1]
-    cache = similar(Ie_finer)
     for i_t_finer in 2:length(t_finer)
         I_top_bottom = (Ie_top[:, i_t] * [0, 1]')'
         Q_local = (Q[:, i_t] .+ Q[:, i_t + 1]) / 2
