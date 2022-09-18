@@ -105,7 +105,7 @@ function DCSO(θ, Energy)
         B = [exp(sum(Elog[1:5] .* CoeffA1[1:5]))];
         Etta = exp(sum(Elog[1:3] .* CoeffEt1[1:3]));
     else
-        B = [2.0 - exp(sum(Elog[1:2] .* CoeffB1[1:2]))];
+        B = [1.0 - exp(sum(Elog[1:2] .* CoeffB1[1:2]))];
         Etta = 1.3198 - exp(sum(Elog[1:2] .* CoeffEt2[1:2]));
     end
 
@@ -124,7 +124,8 @@ function DCSO(θ, Energy)
         x = 4.4549 - 0.003114 * Energy - 0.4663 * Elog[2];
         x = exp(x);
         x2 = x.*x;
-        Funθ = θ ./ (x2 - 8100) .* (x2 .- 8100 .+ x*180 .* (1 .- θ ./ π));
+        # Funθ = θ ./ (x2 - 8100) .* (x2 .- 8100 .+ x*180 .* (1 .- θ ./ π));
+        Funθ = θ ./ (x2 - 8100) .* (x2 .- 8100 .+ x*180 .* (1 .- θ ./ 3.14159265));
     else
         Funθ = θ;
     end
