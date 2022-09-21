@@ -1,4 +1,10 @@
+# ignore the documentation
 docs/*
 .github/*
 
+
+# ignore the sysimage
 JuliaSysimage.so
+
+# ignore the cascading files
+Cascading*.mat
