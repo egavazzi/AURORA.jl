@@ -63,12 +63,12 @@ function make_B(n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, 
         n = n_neutrals[i];                  # Neutral density
         σ = σ_neutrals[i];                  # Array with collision cross sections
         E_levels = E_levels_neutrals[i];    # Array with collision enery levels and number of secondary e-
-        phase_fcn = phase_fcn_neutrals[i];  # Tuple with two phase function arrays, the first for elastic collisions 
-                                            # and the second for inelastic collisions
+        phase_fcn = phase_fcn_neutrals[i];   # Tuple with two phase function arrays, the first for elastic collisions 
+                                                    # and the second for inelastic collisions
 
         # Convert to 3D the scattering probabilities that are in 1D
-        phase_fcn_e = convert_phase_fcn_to_3D(phase_fcn[1], finer_θ);
-        phase_fcn_i = convert_phase_fcn_to_3D(phase_fcn[2], finer_θ);
+        phase_fcn_e = convert_phase_fcn_to_3D(phase_fcn[1][:, iE], finer_θ);
+        phase_fcn_i = convert_phase_fcn_to_3D(phase_fcn[2][:, iE], finer_θ);
         B2B_elastic = beams2beams(phase_fcn_e, Pmu2mup, BeamWeight_relative);
         B2B_inelastic = beams2beams(phase_fcn_i, Pmu2mup, BeamWeight_relative);
 
