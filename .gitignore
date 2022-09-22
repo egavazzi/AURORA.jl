@@ -8,3 +8,6 @@ JuliaSysimage.so
 
 # ignore the cascading files
 Cascading*.mat
+
+# ignore the data folder
+data/*
