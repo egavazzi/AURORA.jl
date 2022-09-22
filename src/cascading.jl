@@ -33,18 +33,21 @@ let Q = [], E4Q , E_ionizations
             cascading_files = readdir(pkgdir(Aurora, "e_cascading_data", "N2"))
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
-                    filename = string(pkgdir(Aurora, "e_cascading_data", "N2"), "/",cascading_files[i1])
-                    file = matopen(filename)
-                    E4Q = read(file, "E4Q")
-                    close(file)
-                    if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
-                        println("Loading cascading-matrices from file: ", cascading_files[i1])
+                    try
+                        filename = string(pkgdir(Aurora, "e_cascading_data", "N2"), "/",cascading_files[i1])
                         file = matopen(filename)
-                        Q = read(file, "Q")
-                        E_ionizations = read(file, "E_ionizations")
+                        E4Q = read(file, "E4Q")
                         close(file)
-                        found_them = 1
-                    break
+                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
+                            println("Loading cascading-matrices from file: ", cascading_files[i1])
+                            file = matopen(filename)
+                            Q = read(file, "Q")
+                            E_ionizations = read(file, "E_ionizations")
+                            close(file)
+                            found_them = 1
+                        break
+                        end
+                    catch
                     end
                 end
             end
@@ -149,20 +152,23 @@ let Q = [], E4Q , E_ionizations
             found_them = 0
             cascading_files = readdir(pkgdir(Aurora, "e_cascading_data", "O2"))
             for i1 in eachindex(cascading_files)
-                if !isdir(cascading_files[i1])
-                    filename = string(pkgdir(Aurora, "e_cascading_data", "O2"), "/",cascading_files[i1])
-                    file = matopen(filename)
-                    E4Q = read(file, "E4Q")
-                    close(file)
-                    if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
-                        println("Loading cascading-matrices from file: ", cascading_files[i1])
+                try
+                    if !isdir(cascading_files[i1])
+                        filename = string(pkgdir(Aurora, "e_cascading_data", "O2"), "/",cascading_files[i1])
                         file = matopen(filename)
-                        Q = read(file, "Q")
-                        E_ionizations = read(file, "E_ionizations")
+                        E4Q = read(file, "E4Q")
                         close(file)
-                        found_them = 1
-                    break
+                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
+                            println("Loading cascading-matrices from file: ", cascading_files[i1])
+                            file = matopen(filename)
+                            Q = read(file, "Q")
+                            E_ionizations = read(file, "E_ionizations")
+                            close(file)
+                            found_them = 1
+                        break
+                        end
                     end
+                catch
                 end
             end
             if found_them == 0
@@ -284,18 +290,21 @@ let Q = [], E4Q , E_ionizations
             cascading_files = readdir(pkgdir(Aurora, "e_cascading_data", "O"))
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
-                    filename = string(pkgdir(Aurora, "e_cascading_data", "O"), "/",cascading_files[i1])
-                    file = matopen(filename)
-                    E4Q = read(file, "E4Q")
-                    close(file)
-                    if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
-                        println("Loading cascading-matrices from file: ", cascading_files[i1])
+                    try
+                        filename = string(pkgdir(Aurora, "e_cascading_data", "O"), "/",cascading_files[i1])
                         file = matopen(filename)
-                        Q = read(file, "Q")
-                        E_ionizations = read(file, "E_ionizations")
+                        E4Q = read(file, "E4Q")
                         close(file)
-                        found_them = 1
-                    break
+                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary) 
+                            println("Loading cascading-matrices from file: ", cascading_files[i1])
+                            file = matopen(filename)
+                            Q = read(file, "Q")
+                            E_ionizations = read(file, "E_ionizations")
+                            close(file)
+                            found_them = 1
+                        break
+                        end
+                    catch
                     end
                 end
             end
