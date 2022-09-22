@@ -15,10 +15,9 @@ function d2M(z)
     return D2M
 end
 
-function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top)
-    # Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
-    Ie = zeros(length(h_atm) * length(μ), length(t))
-
+function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
+    Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
+    # Ie = zeros(length(h_atm) * length(μ), length(t))
 
     dt = t[2] - t[1]
     dz = h_atm[2] - h_atm[1] # smallest value of dz
@@ -103,7 +102,8 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top)
                             length(h_atm):length(h_atm):(length(μ)*length(h_atm))))
     
     i_t = 1
-    Ie_finer = Ie[:, 1]
+    Ie[:, 1] = I0
+    Ie_finer = I0
     for i_t_finer in 2:length(t_finer)
         I_top_bottom = (Ie_top[:, i_t] * [0, 1]')'
         Q_local = (Q[:, i_t] .+ Q[:, i_t + 1]) / 2
@@ -116,6 +116,6 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top)
             Ie[:, i_t] = Ie_finer
         end
     end
-    Ie[Ie .< 0] .= 0;
+    Ie[Ie .< 0] .= 0; # the fluxes should never be negative
     return Ie
 end
