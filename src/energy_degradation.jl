@@ -257,8 +257,10 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
                     cascading_neutrals, E, dE, iE, BeamWeight_discrete, μ_center)
 
     # e-e collisions
-    @view(Q[:, :, iE - 1]) .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE], 
-                                        outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
+    if iE > 1
+        @view(Q[:, :, iE - 1]) .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE], 
+                                            outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
+    end
 
     # Loop over the species
     for i in 1:length(n_neutrals)
