@@ -21,6 +21,8 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_l
     end
 end
 
+using MAT
+using Printf
 function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, savedir, i)
 	t_run = collect(t .+ t[end] * (n_loop - 1))
 

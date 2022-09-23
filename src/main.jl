@@ -1,5 +1,4 @@
 using MAT
-using Printf
 using ProgressMeter
 using Dates
 
