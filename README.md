@@ -3,6 +3,13 @@
 This is a julia implementation of the following time-dependent model of electron transport in the ionosphere : 
 https://github.com/egavazzi/AURORA
 
+<br /> 
+
+## Installation
+I should probably explain things here very soon
+
+<br />
+
 ## Documentation
 [![][docs-dev-img]][docs-dev-url]
 
