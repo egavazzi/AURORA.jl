@@ -1,5 +1,7 @@
+using MATLAB
+
 """
-This is the setup function. Loading the atmosphere, the energy grid, collision cross-sections, ... \\
+This is the setup function, loading the atmosphere, the energy grid, the collision cross-sections, ... \\
 It calls a lot of functions from the original MATLAB code.
 
 # Inputs
@@ -7,8 +9,6 @@ It calls a lot of functions from the original MATLAB code.
 - `θ_lims`: range of angles for the limits of our electron beams, i.e 180:-10:0
 - `E_max`: upper limit for the energy grid (in eV)
 """
-
-using MATLAB
 function setup(top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
     s1 = MSession();
