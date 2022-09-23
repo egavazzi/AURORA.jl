@@ -1,6 +1,6 @@
 # ignore the documentation
-docs/*
-.github/*
+docs/build/*
+# .github/*
 
 
 # ignore the sysimage
