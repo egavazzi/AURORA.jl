@@ -9,5 +9,6 @@ JuliaSysimage.so
 # ignore the cascading files
 Cascading*.mat
 
-# ignore the data folder
+# ignore the data folders (but not data/ itself)
 data/*
+!data/.gitkeep
