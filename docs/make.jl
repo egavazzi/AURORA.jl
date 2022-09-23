@@ -10,6 +10,6 @@ makedocs(
                 "Home" => "index.md"
                 ])
 
-# deploydocs(;
-#     repo="github.com/egavazzi/Aurora.jl",
-#     )
+deploydocs(;
+    repo="github.com/egavazzi/Aurora.jl",
+    )
