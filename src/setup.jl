@@ -2,7 +2,7 @@ using MATLAB
 
 """
 This is the setup function, loading the atmosphere, the energy grid, the collision cross-sections, ... \\
-It calls a lot of functions from the original MATLAB code.
+It calls a lot of functions from the original MATLAB code. 
 
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
