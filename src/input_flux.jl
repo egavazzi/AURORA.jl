@@ -1,7 +1,7 @@
 using MAT
 
 function Ie_top_from_file(filename, μ_center, t, E, n_loop)
-    Ie_top = Array{Float64}(undef, length(μ_center), length(t), length(E))
+    Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
 
     file = matopen(filename)
     Ie_top_raw = read(file, "Ie_total")
