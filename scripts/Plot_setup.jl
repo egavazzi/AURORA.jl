@@ -7,7 +7,7 @@ altitude_max = 400;
 
 h_atm, n_neutrals, ne, Te, E, dE, 
     E_levels_neutrals, σ_neutrals, secondary_e,
-    θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims);
+    θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims, E_max);
 
 ## Plot densities
 f1 = Figure()
@@ -32,13 +32,13 @@ ax21 = Axis(f2[1,1], ylabel = "Excitation energy (eV)", title = "N₂")
 ax22 = Axis(f2[1,2], title = "O₂")
 ax23 = Axis(f2[1,3], title = "O")
 for i in eachindex(E_levels_neutrals.N2_levels[:,1])
-lines!(ax21, [0, 1], N2_levels[i, 1].*[1, 1], linewidth = 2)
+lines!(ax21, [0, 1], E_levels_neutrals.N2_levels[i, 1].*[1, 1], linewidth = 2)
 end
 for i in eachindex(E_levels_neutrals.O2_levels[:,1])
-lines!(ax22, [0, 1], O2_levels[i, 1].*[1, 1], linewidth = 2)
+lines!(ax22, [0, 1], E_levels_neutrals.O2_levels[i, 1].*[1, 1], linewidth = 2)
 end
 for i in eachindex(E_levels_neutrals.O_levels[:,1])
-lines!(ax23, [0, 1], O_levels[i, 1].*[1, 1], linewidth = 2)
+lines!(ax23, [0, 1], E_levels_neutrals.O_levels[i, 1].*[1, 1], linewidth = 2)
 end
 [xlims!(X, 0, 1) for X in [ax21, ax22, ax23]]
 display(f2)

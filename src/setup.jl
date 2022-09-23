@@ -5,7 +5,7 @@ It calls a lot of functions from the original MATLAB code.
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 - `θ_lims`: range of angles for the limits of our electron beams, i.e 180:-10:0
-- `E_max`: upper limit for the energy grid
+- `E_max`: upper limit for the energy grid (in eV)
 """
 
 using MATLAB
