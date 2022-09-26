@@ -1,13 +1,45 @@
 using MATLAB
 
 """
-This is the setup function, loading the atmosphere, the energy grid, the collision cross-sections, ... \\
+    setup(top_altitude, θ_lims, E_max)
+
+Load the atmosphere, the energy grid, the collision cross-sections, ... \\
 It calls a lot of functions from the original MATLAB code. 
+
+# Calling
+`h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center, 
+μ_scatterings = setup(altitude_max, θ_lims, E_max);`
+
 
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
-- `θ_lims`: range of angles for the limits of our electron beams, i.e 180:-10:0
+- `θ_lims`: range of angles for the limits of our electron beams (e.g. 180:-10:0), where 
+    180° corresponds to field aligned down, and 0° field aligned up
 - `E_max`: upper limit for the energy grid (in eV)
+
+# Outputs
+- `h_atm`: altitude (m), vector [nZ]
+- `ne`: e- densities (m³), vector [nZ]
+- `Te`: e- temperatures (K), vector [nZ]
+- `E`: energy grid (eV), vector [nE]
+- `dE`: energy bin sizes(eV), vector [nE]
+- `n_neutrals`: neutral densities (m³), Tuple of vectors ([nZ], ..., [nZ])
+- `E_levels_neutrals`: collisions energy levels and number of secondary e- produced, 
+    Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
+- `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ..., 
+    [n`_`levels x nE])
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beams + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
+- `μ_scatterings`: Tuple with several of the scattering informations, namely
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight_continuous, 
+    BeamWeight_discrete)`
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
+    + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x 
+        n_beams]
+    + `BeamWeight_continuous`: solid angle for each stream (ster), vector [n_beams]
+    + `BeamWeight_discrete`: solid angle for each stream (ster), but calculated in a discrete way, 
+        vector [n_beams]
 """
 function setup(top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
@@ -129,6 +161,6 @@ function setup(top_altitude, θ_lims, E_max)
     close(s1)
 
     return h_atm, ne, Te, E, dE, 
-        n_neutrals, E_levels_neutrals, σ_neutrals, secondary_e,
+        n_neutrals, E_levels_neutrals, σ_neutrals,
         θ_lims, μ_lims, μ_center, μ_scatterings
 end
