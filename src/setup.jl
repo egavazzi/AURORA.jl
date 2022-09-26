@@ -93,17 +93,6 @@ function setup(top_altitude, θ_lims, E_max)
     σ_O = @mget XsO;
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
 
-    ## Pre-calculations of cascading electron-spectra for ionizations
-    mat"
-    S2ndO = O_e_2nd_dist(E,E(end),O_levels(end,1),'c',AURORA_root_directory);
-    S2ndO2 = O2_e_2nd_dist(E,E(end),O2_levels(end,1),'c',AURORA_root_directory);
-    S2ndN2 = N2_e_2nd_dist(E,E(end),N2_levels(end,1),'c',AURORA_root_directory);
-    "    
-    secondary_e_N2 = vec(@mget S2ndN2);
-    secondary_e_O2 = vec(@mget S2ndO2);
-    secondary_e_O = vec(@mget S2ndO);
-    secondary_e = (secondary_e_N2 = secondary_e_N2, secondary_e_O2 = secondary_e_O2, secondary_e_O = secondary_e_O);
-
     ## X-streams beam-to-beam calculations
     theta_lims2do = reshape(Vector(θ_lims), 1, :);
     @mput theta_lims2do
@@ -139,7 +128,7 @@ function setup(top_altitude, θ_lims, E_max)
     ## Closing the MATLAB session
     close(s1)
 
-    return h_atm, n_neutrals, ne, Te, E, dE, 
-        E_levels_neutrals, σ_neutrals, secondary_e,
+    return h_atm, ne, Te, E, dE, 
+        n_neutrals, E_levels_neutrals, σ_neutrals, secondary_e,
         θ_lims, μ_lims, μ_center, μ_scatterings
 end

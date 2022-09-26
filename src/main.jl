@@ -7,8 +7,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     # Get atmosphere
     println("Calling Matlab for the setup...")
-    h_atm, n_neutrals, ne, Te, E, dE, 
-        E_levels_neutrals, σ_neutrals, secondary_e,
+    h_atm, ne, Te, E, dE,
+        n_neutrals, E_levels_neutrals, σ_neutrals,
         θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims, E_max);
 
     # Initialise

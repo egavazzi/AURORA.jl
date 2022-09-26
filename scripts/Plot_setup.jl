@@ -5,8 +5,8 @@ altitude_max = 400;
 θ_lims = 180:-10:0;
 
 
-h_atm, n_neutrals, ne, Te, E, dE, 
-    E_levels_neutrals, σ_neutrals, secondary_e,
+h_atm, ne, Te, E, dE,
+    n_neutrals, E_levels_neutrals, σ_neutrals,
     θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims, E_max);
 
 ## Plot densities
