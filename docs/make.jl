@@ -7,7 +7,8 @@ makedocs(
         sitename="Aurora.jl",
         modules =[Aurora],
         pages = [
-                "Home" => "index.md"
+                "Home" => "index.md",
+                "Manual" => "manual.md"
                 ])
 
 deploydocs(;
