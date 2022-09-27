@@ -11,7 +11,7 @@ $> julia
 ```julia-repl
 julia> using Pkg
 julia> Pkg.activate(".")
-julia> Pkg.instantiate()
+julia> Pkg.instantiate() # this might take a while...
 ```
 
 4. *Aurora.jl* is now ready to use!
@@ -40,5 +40,28 @@ Aurora/
     └── cascading.jl
     └── setup.jl
     └── ...
-
 ```
+The folder `data/` contains the subfolders where simulation results are saved.
+
+The folder `docs/` contains all the necessary scripts to power this documentation.
+
+The folder `e_cascading_data/` is where the cascading data produced by the simulations are saved for future use by the program itself. The cascading data are saved by species in the subfolders `N2/`, `O2/` and `O/`. You should not need to venture into this folder.
+
+The folder `scripts/` contains the scripts for the user to start the simulations and plot some of the results.
+
+The folder `src/` contains the source code of the model.
+
+## Get started
+!!! warning "Activating the Aurora environment"
+    To be able to use Aurora.jl, the repository environment needs to be activated. This can be done for example by starting Julia from the *Aurora/* folder using the command
+    ```
+    $> julia --project=.
+    ```
+
+The idea is to use  using `Control_script.jl` to control the simulations. You can open the script, change the parameters of the simulation, and save it. Then, you can start the simulation with the command:
+```julia-repl
+julia> include("scripts/Control_script.jl")
+```
+The results will be saved in a folder under `data/` along with the parameters used to run the simulation.
+
+
