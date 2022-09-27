@@ -21,7 +21,7 @@ julia> Pkg.activate(".")
 julia> Pkg.instantiate()
 ```
 
-5. *Aurora.jl* is now ready to use! More on that in the **Documentation**
+4. *Aurora.jl* is now ready to use! More on that in the **Documentation**
 
 
 ## Documentation
