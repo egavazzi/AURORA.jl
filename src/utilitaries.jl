@@ -28,7 +28,7 @@ function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, save
 
 	savefile = string(savedir, "/", (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
-		write(file, "Ie", Ie)
+		write(file, "Ie_ztE", Ie)
 		write(file, "E", E)
 		write(file, "t_run", t_run)
 		write(file, "mu_lims", μ_lims)

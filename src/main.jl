@@ -3,7 +3,7 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file)
+function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, input_file)
 
     # Get atmosphere
     println("Calling Matlab for the setup...")
@@ -30,10 +30,14 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     # Create the folder to save the data to
     savedir = string(pkgdir(Aurora, "data"), "/",
-                            Dates.format(now(), "yyyymmdd-HHMM"))
+                    root_savedir, "/",
+                    Dates.format(now(), "yyyymmdd-HHMM"))
     print("\n")
-    println(@bold "Results will be save at $savedir")
+    println(@bold "Results will be saved at $savedir")
     print("\n")
+    if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
+        mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
+    end
     mkdir(savedir)
     # And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file, savedir)
