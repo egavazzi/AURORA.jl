@@ -30,24 +30,21 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     # Create the folder to save the data to
     savedir = string(pkgdir(Aurora, "data"), "/",
-                    root_savedir, "/",
-                    Dates.format(now(), "yyyymmdd-HHMM"))
-    print("\n")
-    println(@bold "Results will be saved at $savedir")
-    print("\n")
+                    root_savedir, "/", Dates.format(now(), "yyyymmdd-HHMM"))
+    print("\n", @bold "Results will be saved at $savedir \n")
     if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
         mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
     end
     mkdir(savedir)
     # And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file, savedir)
-
+    save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
 
 
     ## Looping over n_loop
     for i in 1:n_loop
-
+<
         D = make_D(E, dE, θ_lims);
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]

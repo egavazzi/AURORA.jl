@@ -6,6 +6,10 @@ function v_of_E(E)
 	return v
 end
 
+
+## ====================================================================================== ##
+
+
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file, savedir)
 	savefile = string(savedir, "/", "parameters.txt")
     open(savefile, "w") do f
@@ -20,6 +24,21 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_l
         write(f, "input_file = $input_file")
     end
 end
+
+
+using MAT
+function save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
+    savefile = string(savedir, "/", "neutral_atm.mat")
+    file = matopen(savefile, "w")
+        write(file, "h_atm", h_atm)
+        write(file, "nN2", n_neutrals.nN2)
+        write(file, "nO2", n_neutrals.nO2)
+        write(file, "nO", n_neutrals.nO)
+        write(file, "ne", ne)
+        write(file, "Te", Te)
+    close(file)
+end
+
 
 using MAT
 using Printf
@@ -39,9 +58,7 @@ function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, save
 end
 
 
-
-## ============================================================================================== ##
-
+## ====================================================================================== ##
 
 
 using Interpolations
