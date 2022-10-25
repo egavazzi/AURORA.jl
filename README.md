@@ -23,6 +23,7 @@ julia> Pkg.instantiate()
 
 4. *Aurora.jl* is now ready to use! More on that in the **Documentation**
 
+<br />
 
 ## Documentation
 [![][docs-dev-img]][docs-dev-url]
