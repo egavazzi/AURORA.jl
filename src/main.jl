@@ -3,7 +3,7 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, input_file)
+function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, INPUT_OPTIONS)
 
     # Get atmosphere
     println("Calling Matlab for the setup...")
@@ -17,7 +17,14 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
     # Load incoming flux
-    Ie_top = Ie_top_from_file(input_file, μ_center, t, E, n_loop);
+    if INPUT_OPTIONS.input_type == "from_file"
+        Ie_top = Ie_top_from_file(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
+    elseif INPUT_OPTIONS.input_type == "flickering"
+        Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, 
+                                    μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
+                                    INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f, 
+                                    INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
+    end
 
     # Make a finer θ for the scattering calculations
     finer_θ = range(0, π, length=721);
@@ -37,14 +44,13 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     end
     mkdir(savedir)
     # And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file, savedir)
+    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
 
 
     ## Looping over n_loop
     for i in 1:n_loop
-<
         D = make_D(E, dE, θ_lims);
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
@@ -75,6 +81,5 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # Save results for the n_loop
         save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, savedir, i)
     end
-
 
 end

@@ -6,11 +6,35 @@ function v_of_E(E)
 	return v
 end
 
+using HCubature
+"""
+    mu_avg(θ_lims)
+
+Calculate the cosinus of the center of each pitch-angle beams delimited by θ_lims. This is
+for isotropically distributed fluxes within each beam, i.e the fluxes are weighted by sin(θ)
+
+# Calling
+`μ_center = mu_avg(θ_lims) `
+
+# Inputs
+- `θ_lims` : pitch-angle limits of all the beams, range or vector [n_beams + 1]
+
+# Outputs
+- `μ_center` : cosine of the center of all the pitch-angle beams, vector [n_beams + 1]
+"""
+function mu_avg(θ_lims)
+    μ_center = zeros(length(θ_lims) - 1)
+    for i in eachindex(μ_center)
+        μ_center[i] = hcubature(x -> cosd.(x) .* sind.(x), [θ_lims[i]], [θ_lims[i + 1]])[1][1] ./
+                      hcubature(x -> sind.(x), [θ_lims[i]], [θ_lims[i + 1]])[1][1]
+    end
+    return μ_center
+end
 
 ## ====================================================================================== ##
 
 
-function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, input_file, savedir)
+function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, INPUT_OPTIONS, savedir)
 	savefile = string(savedir, "/", "parameters.txt")
     open(savefile, "w") do f
         write(f, "altitude_max = $altitude_max \n")
@@ -21,7 +45,7 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_l
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
-        write(f, "input_file = $input_file")
+        write(f, "input_options = $INPUT_OPTIONS")
     end
 end
 
@@ -73,4 +97,12 @@ function interp2(X, Y, V, Xq, Yq)
     knots = (X,Y)
     itp = interpolate(knots, V, Gridded(Linear()))
     itp[Xq, Yq]
+end
+
+
+## ====================================================================================== ##
+
+
+function square(x)
+    ifelse(mod2pi(x) < π, 1.0, -1.0)
 end
