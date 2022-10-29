@@ -66,6 +66,9 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     ## Looping over n_loop
     for i in 1:n_loop
+        Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
+        Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
+        
         D = make_D(E, dE, θ_lims);
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
