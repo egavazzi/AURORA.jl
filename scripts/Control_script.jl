@@ -7,10 +7,12 @@ altitude_max = 400;         # (km) top altitude of the ionosphere
 E_max = 1000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith 
 
-t = 0:0.01:1;           # (s) time-array over which data will be saved
-n_loop = 1;                 # number of loops to run
+t = 0:0.01:0.5;           # (s) time-array over which data will be saved
+n_loop = 2;                 # number of loops to run
 
-root_savedir = "tests2/"
+root_savedir = "test_folder"    # name for the root folder where data will be saved (data/root_savedir/)
+name_savedir = "flickering"     # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
+                                # if left empty, the folder will be named using the current date and time (ex: data/root_savedir/20221029-1058/...)
 
 ## Choose the input type ("from_file" or "flickering")
 # input_type = "from_file";
@@ -29,4 +31,4 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 ## Run the simulation
 # calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, input_file)
 
-calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, INPUT_OPTIONS)
+calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, name_savedir, INPUT_OPTIONS)

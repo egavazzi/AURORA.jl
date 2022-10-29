@@ -3,7 +3,7 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, INPUT_OPTIONS)
+function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, name_savedir, INPUT_OPTIONS)
 
     # Get atmosphere
     println("Calling Matlab for the setup...")
@@ -35,18 +35,33 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
 
+
     # Create the folder to save the data to
-    savedir = string(pkgdir(Aurora, "data"), "/",
-                    root_savedir, "/", Dates.format(now(), "yyyymmdd-HHMM"))
+    # if name_savedir is empty or contains only "space" characters, it uses the current 
+    # date and time as a name
+    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir) 
+        savedir = string(pkgdir(Aurora, "data"), "/",
+                        root_savedir, "/", Dates.format(now(), "yyyymmdd-HHMM"))
+    # if name_savedir is not empty, then it uses it as a name
+    else
+        savedir = string(pkgdir(Aurora, "data"), "/",
+                        root_savedir, "/", name_savedir)
+    end
+    if isdir(savedir) # check if the name_savedir exists
+        print("\n", @bold @red "WARNING!")
+        print(@bold " '$savedir' ") 
+        println(@bold @red "already exists, the experiment is aborted.")
+        return
+    end
     print("\n", @bold "Results will be saved at $savedir \n")
     if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
         mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
     end
     mkdir(savedir)
+
     # And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
-
 
 
     ## Looping over n_loop
