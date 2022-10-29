@@ -66,8 +66,8 @@ end
 
 using MAT
 using Printf
-function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, savedir, i)
-	t_run = collect(t .+ t[end] * (n_loop - 1))
+function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, savedir)
+	t_run = collect(t .+ t[end] * (i - 1))
 
 	savefile = string(savedir, "/", (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")

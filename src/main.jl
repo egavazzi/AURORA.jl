@@ -79,7 +79,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         I0 = Ie[:, end, :]
 
         # Save results for the n_loop
-        save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, n_loop, savedir, i)
+        save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, savedir)
     end
 
 end
