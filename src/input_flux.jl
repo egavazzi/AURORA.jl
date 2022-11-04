@@ -26,7 +26,7 @@ end
 
 
 function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete, IeE_tot, z₀, E_min, f, Beams, modulation)
-    Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
+    Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
     qₑ = 1.602176620898e-19
     i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
     
