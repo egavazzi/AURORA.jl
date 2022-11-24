@@ -1,6 +1,6 @@
 using MAT
 
-function Ie_top_from_file(t, E, n_loop, μ_center, filename)
+function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
     Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
 
     file = matopen(filename)
@@ -23,6 +23,33 @@ function Ie_top_from_file(t, E, n_loop, μ_center, filename)
 
     return Ie_top
 end
+
+
+
+function Ie_top_from_file(t, E, n_loop, filename)
+    Nt = (n_loop - 1) * (length(t) - 1) + length(t)
+
+    # load the file
+    file = matopen(filename)
+        Ie_top_raw = read(file, "Ie_total")
+    close(file)
+
+    if size(Ie_top_raw, 2) == 1
+        # for constant input flux (e.g. first run), we need to resize the matrix from
+        # [n_μ, 1, n_E] to [n_μ, n_t, n_E]
+        Ie_top = repeat(Ie_top_raw, outer=(1, Nt, 1))[:, :, 1:length(E)]
+    elseif size(Ie_top_raw, 2) == Nt
+        Ie_top = Ie_top_raw[:, :, 1:length(E)]
+    else
+        println("Problem : the number of time steps in the precipitating flux from $filename
+            (n_t = ", size(Ie_top_raw, 2), ") does not match the number of time steps of the
+            simulation you want to run (n_t = $Nt)")
+        return nothing
+    end
+
+    return Ie_top
+end
+
 
 
 function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete, IeE_tot, z₀, E_min, f, Beams, modulation)

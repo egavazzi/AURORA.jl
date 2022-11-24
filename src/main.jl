@@ -5,20 +5,22 @@ using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, name_savedir, INPUT_OPTIONS)
 
-    # Get atmosphere
+    ## Get atmosphere
     println("Calling Matlab for the setup...")
     h_atm, ne, Te, E, dE,
         n_neutrals, E_levels_neutrals, σ_neutrals,
         θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims, E_max);
 
-    # Initialise
+    ## Initialise
     Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
     Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
-    # Load incoming flux
-    if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
+    ## Load incoming flux
+    if INPUT_OPTIONS.input_type == "from_old_matlab_file"
+        Ie_top = Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
+    elseif INPUT_OPTIONS.input_type == "from_file"
+        Ie_top = Ie_top_from_file(t, E, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
         Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, 
                                     μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
@@ -26,9 +28,9 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                     INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
     end
 
-    # Make a finer θ for the scattering calculations
+    ## Make a finer θ for the scattering calculations
     finer_θ = range(0, π, length=721);
-    # Calculate the phase functions and put them in a Tuple
+    ## Calculate the phase functions and put them in a Tuple
     phaseN2e, phaseN2i = phase_fcn_N2(finer_θ, E);
     phaseO2e, phaseO2i = phase_fcn_O2(finer_θ, E);
     phaseOe, phaseOi = phase_fcn_O(finer_θ, E);
@@ -36,30 +38,36 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
 
 
-    # Create the folder to save the data to
-    # if name_savedir is empty or contains only "space" characters, it uses the current 
-    # date and time as a name
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir) 
-        savedir = string(pkgdir(Aurora, "data"), "/",
-                        root_savedir, "/", Dates.format(now(), "yyyymmdd-HHMM"))
-    # if name_savedir is not empty, then it uses it as a name
-    else
-        savedir = string(pkgdir(Aurora, "data"), "/",
-                        root_savedir, "/", name_savedir)
+    ## Create the folder to save the data to
+    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir) 
+        # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
+        root_savedir = "backup"
     end
+    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
+        # if name_savedir is empty or contains only "space" characters, we use the current 
+        # date and time as a name
+        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
+    end
+
+    savedir = string(pkgdir(Aurora, "data"), "/", root_savedir, "/", name_savedir)
+
     if isdir(savedir) # check if the name_savedir exists
         print("\n", @bold @red "WARNING!")
         print(@bold " '$savedir' ") 
-        println(@bold @red "already exists, the experiment is aborted.")
-        return
+        println(@bold @red "already exists, any results stored in it will be overwritten.")
+        # println(@bold @red "already exists, the experiment is aborted.")
+        # return
+    else
+        if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
+            mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
+        end
+        mkdir(savedir)
     end
-    print("\n", @bold "Results will be saved at $savedir \n")
-    if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
-        mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
-    end
-    mkdir(savedir)
 
-    # And save the simulation parameters in it
+    print("\n", @bold "Results will be saved at $savedir \n")
+
+
+    ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
