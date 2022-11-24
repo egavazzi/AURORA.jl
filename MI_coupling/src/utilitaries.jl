@@ -43,22 +43,31 @@ function load_fzvzmu_parallel(path_to_vlasov_initial_file, path_to_vlasov_simula
     return fzvzmu
 end
 
-function load_fzvzmu_serial(path_to_vlasov_initial_file, path_to_vlasov_simulation, index_specie)
-    dDir = readdir(joinpath(path_to_vlasov_simulation, "outp"), join=true)
-    fzvzmu_files = dDir[contains.(dDir, "fzvzmu")]
-    
+function load_fzvzmu_serial(path_to_vlasov_initial_file, path_to_vlasov_simulation, index_specie, first_run=0)
+    if first_run != 0 
+        # in that case we will load only the initial file (not sure this is relevant here...)
+        fzvzmu_files = []
+    else
+        # find the fzvzmuXXXX.mat files
+        dDir = readdir(joinpath(path_to_vlasov_simulation, "outp"), join=true)
+        fzvzmu_files = dDir[contains.(dDir, "fzvzmu")]
+    end
+    # load the initial fzvzmuXXXX.mat file
     initial_file = matopen(path_to_vlasov_initial_file)
         fzvzmustruct = read(initial_file, "fzvzmustruct")
     close(initial_file)
-    
+
+    # initialise fzvzmu [n_files x Nvz x Nmu x Nz]
     Nvz = size(fzvzmustruct["f"][1], 1)
     Nmu = size(fzvzmustruct["f"][1], 2)
     Nz  = size(fzvzmustruct["f"][1], 3)
     fzvzmu = zeros(length(fzvzmu_files) + 1, Nvz, Nmu, Nz)
 
+    # save the initial fzvzmu into the array
     fzvzmu[1, :, :, :] = fzvzmustruct["f"][index_specie]
     println("Loading fzvzmu 1/", size(fzvzmu, 1)," done")
 
+    # and save the other fzvzmu into the array
     for i in eachindex(fzvzmu_files)
         file = matopen(fzvzmu_files[i])
             fzvzmustruct = read(file, "fzvzmustruct")
@@ -69,6 +78,43 @@ function load_fzvzmu_serial(path_to_vlasov_initial_file, path_to_vlasov_simulati
 
     return fzvzmu
 end
+
+function load_fzvzmuIB_serial(path_to_vlasov_initial_file, path_to_vlasov_simulation, index_specie, first_run=0)
+    if first_run != 0 
+        # in that case we will load only the initial file
+        fzvzmu_files = []
+    else
+        # find the fzvzmuIBXXXX.mat files
+        dDir = readdir(joinpath(path_to_vlasov_simulation, "outp"), join=true)
+        fzvzmu_files = dDir[contains.(dDir, "fzvzmuIB")]
+    end
+    # load the initial fzvzmuIBXXXX.mat file
+    initial_file = matopen(path_to_vlasov_initial_file)
+        fzvzmustruct = read(initial_file, "fzvzmustruct")
+    close(initial_file)
+
+    # initialise fzvzmu [n_files x Nvz x Nmu x Nz]
+    Nvz = size(fzvzmustruct["f"][1], 1)
+    Nmu = size(fzvzmustruct["f"][1], 2)
+    Nz  = size(fzvzmustruct["f"][1], 3)
+    fzvzmu = zeros(length(fzvzmu_files) + 1, Nvz, Nmu, Nz)
+
+    # save the initial fzvzmu into the array
+    fzvzmu[1, :, :, :] = fzvzmustruct["f"][index_specie]
+    println("Loading fzvzmu 1/", size(fzvzmu, 1)," done")
+
+    # and save the other fzvzmu into the array
+    for i in eachindex(fzvzmu_files)
+        file = matopen(fzvzmu_files[i])
+            fzvzmustruct = read(file, "fzvzmustruct")
+        close(file)
+        fzvzmu[i + 1, :, :, :] = fzvzmustruct["f"][index_specie]
+        println("Loading fzvzmu ", i + 1,"/", size(fzvzmu, 1), " done")
+    end
+
+    return fzvzmu
+end
+
 
 function load_Bfield(path_to_vlasov_simulation)
     file = matopen(joinpath(path_to_vlasov_simulation, "outp", "Bfield.mat"))
