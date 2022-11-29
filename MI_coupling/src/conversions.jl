@@ -33,7 +33,7 @@ function convert_M_to_I(path_to_vlasov_initial_file, path_to_vlasov_simulation,
     ## Refine μ_mag_grid (using gridded interpolation)
     G = interpolate((eachindex(μ_mag_grid), ), μ_mag_grid, Gridded(Linear()))
     μ_mag_grid_finer = G(1:1/HMR_MU:length(μ_mag_grid))
-    Δμ_mag_finer = 1/HMR_MU .* Δμ_mag; 
+    Δμ_mag_finer = 1/HMR_MU .* Δμ_mag;
     Δμ_mag_finer = repeat(Δμ_mag_finer, inner=HMR_MU)
     μ_mag_finer = μ_mag_grid_finer[2:end] - 0.5 * Δμ_mag_finer
     ## Make E-grid
@@ -51,7 +51,7 @@ function convert_M_to_I(path_to_vlasov_initial_file, path_to_vlasov_simulation,
     #  p = Progress(Nt, desc=string("Converting the function distribution"))
     Bz = B[index_z]
     for i_t in 1:Nt # Loop over time
-        Ie_temp = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer, 
+        Ie_temp = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer,
                             E, μ_pitch, Bz, m, HMR_VZ, HMR_MU, fzvzmu[i_t, :, :, 1])
         for i_μ in 1:length(μ_pitch)
             Ie[i_μ, i_t, :] = Ie_temp[:, i_μ]
@@ -64,7 +64,7 @@ end
 
 
 """
-    function convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer, 
+    function convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer,
     E, μ_pitch, Bz, m, HMR_VZ, HMR_MU, fzvzmu)
 
 This function converts a particle function distribution fzvzmu (#e⁻/m⁶/s³) into a particle flux Ie (#e⁻/m²/s)
@@ -73,10 +73,10 @@ The function distribution fzvzmu is defined along a magnetic field line and over
 The particle flux Ie is defined along a magnetic field line and over an (Energy, pitch_angle)-grid
 
 # Calling
-`Ie = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer, 
+`Ie = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer,
 E, μ_pitch, Bz, m, HMR_VZ, HMR_MU, fzvzmu)`
 """
-function convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer, 
+function convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer,
             E, μ_pitch, Bz, m, HMR_VZ, HMR_MU, fzvzmu)
     Ie = zeros(length(E), length(μ_pitch))
     fzvzmu_finer = repeat(fzvzmu, inner=(HMR_VZ, HMR_MU))
@@ -87,7 +87,7 @@ function convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δ
     # Calculate the coordinates in the (E, μ_pitch)-grid of all the points in the (vz, μ_mag)-finer grid
     μ_pitch_local = [-sign(X) * cos(atan(sqrt(2 * Bz / m * Y) / X)) for X in vz_finer, Y in μ_mag_finer]
     E_local = [0.5 * m * (X^2 + 2 * Bz / m * Y) / 1.6e-19 for X in vz_finer, Y in μ_mag_finer]
-    idx_pitch = findnearestindex.(Ref(μ_pitch), μ_pitch_local) 
+    idx_pitch = findnearestindex.(Ref(μ_pitch), μ_pitch_local)
     idx_energy = findnearestindex.(Ref(E), E_local)
 
     for i in eachindex(vz_finer)
@@ -140,7 +140,7 @@ function convert_I_to_M(path_to_vlasov_simulation, path_to_aurora_simulation,
     Δvz = particle[index_specie].dvz
     μ_mag = particle[index_specie].mu
     Δμ_mag = particle[index_specie].dmu
-    ## Resize E-grid 
+    ## Resize E-grid
     iE_max = findmin(abs.(E_grid .- E_max))[2];  # find the index for the upper limit of the energy grid
     E_grid = E_grid[1:iE_max]                   # crop E accordingly
     ΔE = diff(E_grid); ΔE = [ΔE; ΔE[end]]
@@ -158,11 +158,11 @@ function convert_I_to_M(path_to_vlasov_simulation, path_to_aurora_simulation,
     μ_pitch_grid_finer = cosd.(θ_lims_finer)
     μ_pitch_finer = mu_avg(θ_lims_finer)
     BeamW = Vector{Float64}(undef, length(μ_pitch_grid) - 1)
-    for i_μ in eachindex(BeamW) #(length(μ_pitch_grid)-1):-1:1
+    for i_μ in eachindex(BeamW)
         BeamW[i_μ] = 2 * π * abs(quadgk(sin, acos(μ_pitch_grid[i_μ]), acos(μ_pitch_grid[i_μ + 1]))[1])
     end
     BeamW_finer = Vector{Float64}(undef, length(μ_pitch_grid_finer) - 1)
-    for i_μ in eachindex(BeamW_finer) #(length(μ_pitch_grid_finer)-1):-1:1
+    for i_μ in eachindex(BeamW_finer)
         BeamW_finer[i_μ] = 2 * π * abs(quadgk(sin, acos(μ_pitch_grid_finer[i_μ]), acos(μ_pitch_grid_finer[i_μ + 1]))[1])
     end
 
@@ -171,9 +171,9 @@ function convert_I_to_M(path_to_vlasov_simulation, path_to_aurora_simulation,
     f_out2 = zeros(Nt, Nvz, Nmu)
     p = Progress(Nt, desc=string("Converting the e⁻ fluxes"))
     Threads.@threads for i_t in 1:Nt # Loop over time
-        f_out1[i_t, :, :] = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamW, BeamW_finer, vz, μ_mag, Δvz, Δμ_mag, 
+        f_out1[i_t, :, :] = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamW, BeamW_finer, vz, μ_mag, Δvz, Δμ_mag,
                                         Bz, m, HMR_MU, HMR_E, Ie1[:, i_t, :])
-        f_out2[i_t, :, :] = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamW, BeamW_finer, vz, μ_mag, Δvz, Δμ_mag, 
+        f_out2[i_t, :, :] = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamW, BeamW_finer, vz, μ_mag, Δvz, Δμ_mag,
                                         Bz, m, HMR_MU, HMR_E, Ie2[:, i_t, :])
         next!(p)
     end
@@ -188,7 +188,7 @@ end
 
 
 """
-    convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag, 
+    convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag,
     Bz, m, HMR_MU, HMR_E, Ie)
 
 This function converts a particle flux Ie (#e⁻/m²/s) into a function distribution fzvzmu (#e⁻/m⁶/s³)
@@ -197,12 +197,12 @@ The function distribution fzvzmu is defined along a magnetic field line and over
 The particle flux Ie is defined along a magnetic field line and over an (Energy, pitch_angle)-grid
 
 # Calling
-`fzvzmu = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag, 
+`fzvzmu = convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag,
 Bz, m, HMR_MU, HMR_E, Ie)`
 """
-function convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag, 
+function convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_finer, vz, μ_mag, Δvz, Δμ_mag,
     Bz, m, HMR_MU, HMR_E, Ie)
-    
+
     fzvzmu = zeros(length(vz), length(μ_mag))
     Ie_finer = Ie ./ (BeamWeight ./ sum(BeamWeight))
     Ie_finer = repeat(Ie_finer ./ HMR_E, inner=(HMR_MU, HMR_E))
@@ -225,5 +225,3 @@ function convert_Ie_to_fzvzmu(E_finer, μ_pitch_finer, BeamWeight, BeamWeight_fi
     end
     return fzvzmu
 end
-
-

@@ -69,7 +69,11 @@ using Printf
 function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, savedir)
 	t_run = collect(t .+ t[end] * (i - 1))
 
-	savefile = string(savedir, "/", (@sprintf "IeFlickering-%02d.mat" i))
+    # if !isdir(joinpath(savedir, "IeFlickering"))
+    #     mkdir(joinpath(savedir, "IeFlickering"))
+    # end
+	# savefile = joinpath(savedir, "IeFlickering", (@sprintf "IeFlickering-%02d.mat" i))
+    savefile = joinpath(savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
 		write(file, "Ie_ztE", Ie)
 		write(file, "E", E)
