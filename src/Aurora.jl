@@ -27,11 +27,13 @@ include("../MI_coupling/src/utilitaries.jl")
 include("../MI_coupling/src/ketchup_conversion.jl")
 include("../MI_coupling/src/conversions.jl")
 include("../MI_coupling/src/make_Ie_from_ketchup.jl")
+include("../MI_coupling/src/make_f_from_Aurora.jl")
 
 export load_fzvzmu_parallel, load_fzvzmu_serial, load_fzvzmuIB_serial, load_Bfield
 export findnearestindex
 export read_input
 export convert_fzvzmu_to_Ie, convert_M_to_I, convert_Ie_to_fzvzmu, convert_I_to_M
 export make_Ie_from_ketchup
+export make_f_from_Aurora
 
 end
