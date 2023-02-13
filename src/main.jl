@@ -3,13 +3,14 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, root_savedir, name_savedir, INPUT_OPTIONS)
+function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop,
+    path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
 
     ## Get atmosphere
     println("Calling Matlab for the setup...")
     h_atm, ne, Te, E, dE,
         n_neutrals, E_levels_neutrals, σ_neutrals,
-        θ_lims, μ_lims, μ_center, μ_scatterings = setup(altitude_max, θ_lims, E_max);
+        θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
 
     ## Initialise
     Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
@@ -22,9 +23,9 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     elseif INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(t, E, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, 
+        Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm,
                                     μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
-                                    INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f, 
+                                    INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f,
                                     INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
     end
 
@@ -39,12 +40,12 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
 
     ## Create the folder to save the data to
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir) 
+    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
         # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
         root_savedir = "backup"
     end
     if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        # if name_savedir is empty or contains only "space" characters, we use the current 
+        # if name_savedir is empty or contains only "space" characters, we use the current
         # date and time as a name
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
@@ -53,7 +54,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     if isdir(savedir) # check if the name_savedir exists
         print("\n", @bold @red "WARNING!")
-        print(@bold " '$savedir' ") 
+        print(@bold " '$savedir' ")
         println(@bold @red "already exists, any results stored in it will be overwritten.")
         # println(@bold @red "already exists, the experiment is aborted.")
         # return
@@ -76,7 +77,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     for i in 1:n_loop
         Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
         Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
-        
+
         D = make_D(E, dE, θ_lims);
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
@@ -85,17 +86,17 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # Looping over energy
         for iE in length(E):-1:1
             A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
-            
-            B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals, 
+
+            B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
                                                 phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
                                                 μ_scatterings.BeamWeight_relative, finer_θ);
 
             # Compute the flux of e-
-            Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]), 
+            Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals, 
+            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
                         cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight_discrete, μ_center)
 
             next!(p)
