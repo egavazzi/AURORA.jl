@@ -67,7 +67,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
             mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
         end
-        mkdir(savedir)
+        mkpath(savedir)
     end
 
     print("\n", @bold "Results will be saved at $savedir \n")
