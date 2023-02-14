@@ -27,6 +27,11 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                     μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
                                     INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f,
                                     INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
+    elseif INPUT_OPTIONS.input_type == "constant_onset"
+        Ie_top = Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm,
+                                μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
+                                INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
+                                INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
     end
 
     ## Make a finer θ for the scattering calculations

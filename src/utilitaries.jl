@@ -31,6 +31,7 @@ function mu_avg(θ_lims)
     return μ_center
 end
 
+
 ## ====================================================================================== ##
 
 
@@ -110,3 +111,31 @@ end
 function square(x)
     ifelse(mod2pi(x) < π, 1.0, -1.0)
 end
+
+
+## ====================================================================================== ##
+
+# function from Björn for smooth input onset
+function f_smooth_transition(x, a = 0, b = 1)
+    if (b - a) == 0
+        y = 1
+        return y
+    end
+
+    x = (x - a) / (b - a)
+    psi0P = psi(x)
+    psi1N = psi(1 - x)
+
+    y = psi0P / (psi0P + psi1N)
+
+    return y
+end
+
+function psi(x)
+    PSI = exp(-1 / x)
+    if x <= 0
+        PSI = 0
+    end
+    return PSI
+end
+f_smooth_transition(0, 1, 0)

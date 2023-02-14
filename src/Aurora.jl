@@ -10,10 +10,10 @@ include("cascading.jl")
 include("energy_degradation.jl")
 
 export setup
-export Ie_top_from_file, Ie_top_flickering
+export Ie_top_from_file, Ie_top_flickering, Ie_top_constant
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 export loss_to_thermal_electrons, beams2beams, make_A, make_B, make_D
-export v_of_E, mu_avg, save_parameters, save_results
+export v_of_E, mu_avg, save_parameters, save_results, f_smooth_transition
 export d2M, Crank_Nicolson, Crank_Nicolson_Optimized
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!

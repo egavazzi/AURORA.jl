@@ -83,3 +83,56 @@ function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discre
 
     return Ie_top
 end
+
+
+
+# Not sure about that one...
+function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight_discrete, I0, z₀, E0, dE0, Beams)
+    Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
+
+    z = z₀ * 1e3 - h_atm[end]   # distance between the source and the top of the ionosphere
+    t_tot = t[1]:Float64(t.step):(t[end] * n_loop)
+    t_shift₀ = z ./ (abs.(μ_center[Beams[1]]) * v_of_E(E[end]))
+
+    for i_μ in eachindex(μ_center[Beams])
+        for iE in eachindex(E)
+            t_shift = z ./ (abs.(μ_center[Beams[i_μ]]) .* v_of_E.(E[iE]))
+            t_shifted = t_tot .- (t_shift .- t_shift₀)
+
+            Ie_top[i_μ, :, iE] = I0 * exp(- (E[iE] - E0)^2 / dE0^2) .*
+                                    (t_shifted .> 0) .*
+                                    BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+        end
+    end
+
+    return Ie_top
+end
+
+
+
+function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete, IeE_tot, z₀, E_min, Beams, t0, t1)
+    Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
+    qₑ = 1.602176620898e-19
+    i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
+
+    z = z₀ * 1e3 - h_atm[end]   # distance between the source and the top of the ionosphere
+    t_tot = t[1]:Float64(t.step):(t[end] * n_loop)
+    t_shift₀ = z ./ (abs.(μ_center[Beams[1]]) * v_of_E(E[end]))
+
+    for i_μ in eachindex(μ_center[Beams])
+        for iE in eachindex(E)
+            t_shift = z ./ (abs.(μ_center[Beams[i_μ]]) .* v_of_E.(E[iE]))
+            t_shifted = t_tot .- (t_shift .- t_shift₀)
+
+            IePnL = IeE_tot ./ qₑ ./
+                    sum((E[i_Emin:end] .+ dE[i_Emin:end] ./ 2) .* dE[i_Emin:end]) .* dE
+
+            Ie_top[i_μ, :, iE] = IePnL[iE] .* f_smooth_transition.(t_shifted, t0, t1) .*
+                                                (E[iE] > E[i_Emin]) .*
+                                                BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+
+        end
+    end
+
+    return Ie_top
+end
