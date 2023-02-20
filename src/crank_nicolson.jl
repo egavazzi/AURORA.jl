@@ -136,7 +136,7 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
 end
 
 
-
+using KLU
 function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
     # Ie = zeros(length(h_atm) * length(μ), length(t))
@@ -246,11 +246,9 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     Ie[:, 1] = I0
     Ie_finer = I0
     b = similar(Ie_finer)
-    prob = LinearProblem(Mlhs, Ie_finer)
-    linsolve = init(prob)
-    sol1 = solve(linsolve)
 
-
+    # klu!(AAA, Mlhs)
+    AAA = klu(Mlhs)
 
     for i_t_finer in 2:length(t_finer)
         I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
@@ -258,12 +256,9 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
         Q_local[index_top_bottom] = I_top_bottom[:]
 
         mul!(b, Mrhs, Ie_finer)
-        b .+= Q_local
-
-        linsolve = LinearSolve.set_b(sol1.cache, b)
-        sol2 = solve(linsolve)
-
-        Ie_finer = sol2.u
+        Ie_finer .= b
+        Ie_finer .+= Q_local
+        ldiv!(AAA, Ie_finer)
 
         if rem(i_t_finer, CFL_factor) == 1 || CFL_factor == 1
             i_t = i_t + 1
