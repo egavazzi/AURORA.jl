@@ -13,8 +13,6 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
 
     ## Initialise
-    Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
-    Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
     ## Load incoming flux
