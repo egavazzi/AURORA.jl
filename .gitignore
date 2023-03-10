@@ -12,3 +12,6 @@ Cascading*.mat
 # ignore the data folders (but not data/ itself)
 data/*
 !data/.gitkeep
+
+# ignore the profiles
+profiles/*
