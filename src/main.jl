@@ -3,8 +3,8 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop,
-    path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
+function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
+    n_loop, path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
 
     ## Get atmosphere
     println("Calling Matlab for the setup...")
@@ -14,6 +14,13 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+
+    ## CFL criteria
+    # The time grid over which the simulation is run needs to be fine enough to ensure that
+    # the results are correct. Here we check the CFL criteria and reduce the time grid
+    # accordingly
+    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max))
+    # TODO: fix properly the time sampling of incoming data from file
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -70,9 +77,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     print("\n", @bold "Results will be saved at $savedir \n")
 
-
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop, INPUT_OPTIONS, savedir)
+    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
 
@@ -109,7 +115,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         I0 = Ie[:, end, :]
 
         # Save results for the n_loop
-        save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, savedir)
+        save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     end
 
 end

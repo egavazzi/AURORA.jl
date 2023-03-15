@@ -139,29 +139,6 @@ end
 using KLU
 function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
-    # Ie = zeros(length(h_atm) * length(μ), length(t))
-
-    dt = t[2] - t[1]
-    dz = h_atm[2] - h_atm[1] # smallest value of dz
-
-    # The Courant-Freidrichs-Lewy (CFL) number normally hase to be small (<4) to ensure numerical
-    # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
-    # should be careful about numerical accuracy though.
-    # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
-    # on the results, while reducing computational time tremendously
-    CFL = v * dt / dz
-    n_factors = 2 .^ collect(0:22)
-    iFactor = 1
-    # This while loop effectively reduces dt by a factor of 2 at each iteration and check if the new
-    # CFL is < 64. If not, it continues reducing dt.
-    t_finer = t
-    while (CFL > 64) && (iFactor < length(n_factors))
-        t_finer = range(t[1], t[end], length(t) * n_factors[iFactor] + 1 - n_factors[iFactor])
-        dt = t_finer[2] - t_finer[1]
-        CFL = v * dt / dz
-        iFactor += 1
-    end
-    CFL_factor = n_factors[max(1, iFactor - 1)]
 
     # Spatial differentiation matrices, for up and down streams
     # Here we tuck on a fictious height one tick below lowest height and on tick above highest
@@ -174,6 +151,7 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
                         1 =>  1 ./ (2 .* diff(h4diffd[1:end-1])))
 
     # Temporal differentiation matrix
+    dt = t[2] - t[1]
     Ddt = Diagonal([1 ./ (v * dt) for i in h_atm])
 
     # Diffusion operator
@@ -250,7 +228,7 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     # klu!(AAA, Mlhs)
     AAA = klu(Mlhs)
 
-    for i_t_finer in 2:length(t_finer)
+    for i_t in 1:length(t) - 1
         I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
         Q_local = (@view(Q[:, i_t]) .+ @view(Q[:, i_t + 1])) ./ 2
         Q_local[index_top_bottom] = I_top_bottom[:]
@@ -260,10 +238,7 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
         Ie_finer .+= Q_local
         ldiv!(AAA, Ie_finer)
 
-        if rem(i_t_finer, CFL_factor) == 1 || CFL_factor == 1
-            i_t = i_t + 1
-            Ie[:, i_t] = Ie_finer
-        end
+        Ie[:, i_t + 1] = Ie_finer
     end
     Ie[Ie .< 0] .= 0; # the fluxes should never be negative
     return Ie
