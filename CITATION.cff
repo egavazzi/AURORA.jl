@@ -12,5 +12,5 @@ authors:
     family-names: Gustavsson
 repository-code: 'https://github.com/egavazzi/Aurora.jl'
 license: GPL-3.0
-version: v0.1.0
+version: 0.1.0
 date-released: '2023-04-07'
