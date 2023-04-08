@@ -1,4 +1,5 @@
 # Aurora.jl
+[![][docs-dev-img]][docs-dev-url]
 
 This is a julia implementation of the following time-dependent model of electron transport in the ionosphere : 
 https://github.com/egavazzi/AURORA
@@ -26,8 +27,7 @@ julia> Pkg.instantiate()
 <br />
 
 ## Documentation
-[![][docs-dev-img]][docs-dev-url]
-
+The documentation is available [here](https://egavazzi.github.io/Aurora.jl/dev/).
 
 
 
