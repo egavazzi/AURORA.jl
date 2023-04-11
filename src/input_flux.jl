@@ -25,26 +25,69 @@ function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
 end
 
 
-
-function Ie_top_from_file(t, E, n_loop, filename)
+function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     Nt = (n_loop - 1) * (length(t) - 1) + length(t)
 
-    # load the file
+    ## load the file
     file = matopen(filename)
         Ie_top_raw = read(file, "Ie_total")
+        t_top = read(file, "t")
     close(file)
 
-    if size(Ie_top_raw, 2) == 1
-        # for constant input flux (e.g. first run), we need to resize the matrix from
+    ## check that Ie_top is matching our simulation grid
+    if size(Ie_top_raw, 1) != length(μ_center)
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the θ dimension.\
+        Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
+    end
+    if size(Ie_top_raw, 3) < length(E)
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the E dimension.\
+        Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
+        error_grid = 1
+    end
+
+    ## check the time grid of Ie_top
+    if length(t_top) == 1
+        # we assume constant input flux and resize the matrix from
         # [n_μ, 1, n_E] to [n_μ, n_t, n_E]
         Ie_top = repeat(Ie_top_raw, outer=(1, Nt, 1))[:, :, 1:length(E)]
-    elseif size(Ie_top_raw, 2) == Nt
-        Ie_top = Ie_top_raw[:, :, 1:length(E)]
     else
-        println("Problem : the number of time steps in the precipitating flux from $filename
-            (n_t = ", size(Ie_top_raw, 2), ") does not match the number of time steps of the
-            simulation you want to run (n_t = $Nt)")
-        return nothing
+        dt_top = t_top[2] - t_top[1]
+        dt = t[2] - t[1]
+        if dt_top > dt
+            # the resolution in Ie_top is coarser than our simulation, we need to repeat elements
+            dt_factor = dt_top / dt
+            if !(dt_factor ≈ round(dt_factor))
+                error("""Problem with the time resolution. The ratio of the dt of the \
+                incoming flux over the dt of the simulation is not an integer. \n
+                dt_incoming = $dt_top \n
+                dt_simulation = $dt \n
+                ratio = $dt_factor""")
+            end
+            dt_factor = round(Int, dt_factor)
+            Ie_top_raw = repeat(Ie_top_raw, inner=(1, dt_factor, 1))
+        elseif dt_top < dt
+            # the resolution in Ie_top is finer than our simulation, we need to drop elements
+            dt_factor = dt / dt_top
+            if !(dt_factor ≈ round(dt_factor))
+                error("""Problem with the time resolution. The ratio of the dt of the \
+                simulation over the dt of the incoming flux is not an integer. \n
+                dt_incoming = $dt_top \n
+                dt_simulation = $dt \n
+                ratio = $dt_factor""")
+            end
+            dt_factor = round(Int, dt_factor)
+            Ie_top_raw = Ie_top_raw[:, 1:dt_factor:end, :]
+        end
+
+        if size(Ie_top_raw, 2) > Nt
+            # in that case the array is too long and we need to cut it
+            Ie_top_raw = Ie_top_raw[:, 1:Nt, :]
+        elseif size(Ie_top_raw, 2) < Nt
+            # in that case the array is too short and we fill it with zeros
+            missing_data = zeros(length(μ_center), Nt - size(Ie_top_raw, 2), size(Ie_top_raw, 3))
+            Ie_top_raw = cat(Ie_top_raw, missing_data; dims=2)
+        end
+        Ie_top = Ie_top_raw[:, :, 1:length(E)]
     end
 
     return Ie_top
