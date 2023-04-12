@@ -31,7 +31,7 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     ## load the file
     file = matopen(filename)
         Ie_top_raw = read(file, "Ie_total")
-        t_top = read(file, "t")
+        t_top = read(file, "t_top")
     close(file)
 
     ## check that Ie_top is matching our simulation grid
