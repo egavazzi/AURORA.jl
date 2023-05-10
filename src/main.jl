@@ -19,7 +19,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
-    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max))
+    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max), 4)
     # TODO: fix properly the time sampling of incoming data from file
 
     ## Load incoming flux
@@ -116,6 +116,117 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
         # Save results for the n_loop
         save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
+    end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+function calculate_e_transport2(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
+    n_loop, path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
+
+    h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals,
+    θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
+
+    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+
+    t = [CFL_criteria(t_sampling, h_atm, v_of_E(E[i]), 4)[1] for i in eachindex(E)]
+    CFL_factor = [CFL_criteria(t_sampling, h_atm, v_of_E(E[i]), 4)[2] for i in eachindex(E)]
+
+    ## Load incoming flux
+    Ie_top = Ie_top_constant2(t, E, dE, n_loop, μ_center, h_atm,
+                                μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
+                                INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
+                                INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
+
+
+    ## Make a finer θ for the scattering calculations
+    finer_θ = range(0, π, length=721);
+    ## Calculate the phase functions and put them in a Tuple
+    phaseN2e, phaseN2i = phase_fcn_N2(finer_θ, E);
+    phaseO2e, phaseO2i = phase_fcn_O2(finer_θ, E);
+    phaseOe, phaseOi = phase_fcn_O(finer_θ, E);
+    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
+    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
+
+
+
+    ## Create the folder to save the data to
+    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
+        # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
+        root_savedir = "backup"
+    end
+    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
+        # if name_savedir is empty or contains only "space" characters, we use the current
+        # date and time as a name
+        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
+    end
+
+    savedir = string(pkgdir(Aurora, "data"), "/", root_savedir, "/", name_savedir)
+
+    if isdir(savedir) # check if the name_savedir exists
+        print("\n", @bold @red "WARNING!")
+        print(@bold " '$savedir' ")
+        println(@bold @red "already exists, any results stored in it will be overwritten.")
+        # println(@bold @red "already exists, the experiment is aborted.")
+        # return
+    else
+        if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
+            mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
+        end
+        mkpath(savedir)
+    end
+
+    print("\n", @bold "Results will be saved at $savedir \n")
+
+    ## And save the simulation parameters in it
+    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
+    save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
+
+
+
+    for i in 1:n_loop
+        Q  = [zeros(length(h_atm) * length(μ_center), length(t[iE])) for iE in eachindex(E)];
+        Ie = [zeros(length(h_atm) * length(μ_center), length(t[iE])) for iE in eachindex(E)];
+
+        D = make_D(E, dE, θ_lims);
+        # Extract the top flux for the current loop
+        Ie_top_local = [Ie_top[iE][:, (1 + (i - 1) * (length(t[iE]) - 1)) : (length(t[iE]) + (i - 1) * (length(t[iE]) - 1))] for iE in eachindex(E)]
+
+        # Looping over energy
+        p = Progress(length(E), desc=string("Calculating flux for loop ", i, "/", n_loop))
+        for iE in length(E):-1:1
+            A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
+
+            B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
+                                                phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
+                                                μ_scatterings.BeamWeight_relative, finer_θ);
+
+            # Compute the flux of e-
+            Ie[iE][:, :] = Crank_Nicolson_Optimized(t[iE], h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                                                            A, B, D[iE, :], Q[iE][:, :], Ie_top_local[iE][:, :], I0[:, iE]);
+            # 0.028401 seconds (3.76 k allocations: 46.271 MiB, 15.74% gc time)
+
+            # Update the cascading of e-
+            update_Q2!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
+                            cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight_discrete, μ_center, CFL_factor)
+                            # 0.897071 seconds (144.07 k allocations: 228.009 MiB, 1.48% gc time)
+            next!(p)
+        end
+        # Update the starting e- flux profile
+        I0 = [Ie[iE][:, end] for iE in eachindex(E)]
+        I0 = reduce(hcat, I0)
+
+        # Save results for the n_loop
+        save_results2(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     end
 
 end

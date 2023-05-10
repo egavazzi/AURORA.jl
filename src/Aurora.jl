@@ -18,6 +18,10 @@ export d2M, Crank_Nicolson, Crank_Nicolson_Optimized
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!
 
+export make_big_B2B_matrix
+export Ie_top_constant2, change_of_time_grid, update_Q2!, calculate_e_transport2
+
+
 include("main.jl")
 export calculate_e_transport
 

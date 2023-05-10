@@ -33,6 +33,34 @@ function CFL_criteria(t, h_atm, v, CFL_number=64)
 end
 
 
+
+
+function change_of_time_grid(time_from, time_to, CFL_factor_from, CFL_factor_to)
+    ratio_CFL = CFL_factor_from / CFL_factor_to
+    T_to_T = zeros(length(time_from), length(time_to))
+    for i_from in axes(T_to_T, 1)
+        for i_to in axes(T_to_T, 2)
+            i_to_grid = (i_to - 1) * ratio_CFL + 1
+            # We change the grid point indexes to be able to use the "distance" method in
+            # the if/elseif statements below.
+            # Example:
+            # we go from
+            #       1       2       3       4       5       # to_grid
+            #       1   2   3   4   5   6   7   8   9       # from_grid
+            # to
+            #       1       3       5       7       9       # to_grid
+            #       1   2   3   4   5   6   7   8   9       # from_grid
+            if abs(i_to_grid - i_from) < (ratio_CFL / 2)
+                T_to_T[i_from, i_to] = 1    # then transfer everything
+            elseif abs(i_to_grid - i_from) == (ratio_CFL / 2)
+                T_to_T[i_from, i_to] = 1/2  # split it over the two time grid points
+            end
+        end
+    end
+    return(T_to_T)
+end
+
+
 using HCubature
 """
     mu_avg(θ_lims)
@@ -84,6 +112,7 @@ end
 
 
 ## ====================================================================================== ##
+
 
 using LibGit2
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
@@ -139,6 +168,37 @@ function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_facto
 		write(file, "h_atm", h_atm)
 		write(file, "I0", I0)
 		write(file, "mu_scatterings", μ_scatterings)
+	close(file)
+end
+
+
+function save_results2(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
+    # Extract the time array for the current loop
+	t_run = collect(t[1][1] .+ t[1][end] * (i - 1))
+
+    # Reduce t_run and Ie to match the t_sampling
+    t_run = t_run[1:CFL_factor[1]:end]
+    Ie_save = [Ie[iE][:, 1:CFL_factor[iE]:end] for iE in eachindex(E)]
+    Ie_save = reduce(hcat, I0)
+
+    savefile = joinpath(savedir, (@sprintf "IeFlickering-%02d.mat" i))
+	file = matopen(savefile, "w")
+		write(file, "Ie_ztE", Ie_save)
+		write(file, "E", E)
+		write(file, "t_run", t_run)
+		write(file, "mu_lims", μ_lims)
+		write(file, "h_atm", h_atm)
+		write(file, "I0", I0)
+		write(file, "mu_scatterings", μ_scatterings)
+	close(file)
+end
+
+
+# "optional" function used to save Q for check
+function save_Q(Q, i, savedir)
+    savefile = joinpath(savedir, (@sprintf "Qmatrix-%02d.mat" i))
+	file = matopen(savefile, "w")
+		write(file, "Q", Q)
 	close(file)
 end
 
