@@ -174,12 +174,16 @@ end
 
 function save_results2(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     # Extract the time array for the current loop
-	t_run = collect(t[1][1] .+ t[1][end] * (i - 1))
+	t_run = collect(t[1] .+ t[1][end] * (i - 1))
 
     # Reduce t_run and Ie to match the t_sampling
     t_run = t_run[1:CFL_factor[1]:end]
-    Ie_save = [Ie[iE][:, 1:CFL_factor[iE]:end] for iE in eachindex(E)]
-    Ie_save = reduce(hcat, I0)
+    n_μ = length(μ_lims) - 1
+    n_z = length(h_atm)
+    Ie_save = Array{Float64}(undef, n_μ * n_z, length(t_run), length(E))
+    for iE in eachindex(E)
+        Ie_save[:, :, iE] .= Ie[iE][:, 1:CFL_factor[iE]:end]
+    end
 
     savefile = joinpath(savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
@@ -231,6 +235,7 @@ end
 
 ## ====================================================================================== ##
 
+
 # function from Björn for smooth input onset
 function f_smooth_transition(x, a = 0, b = 1)
     if (b - a) == 0
@@ -255,3 +260,14 @@ function psi(x)
     return PSI
 end
 f_smooth_transition(0, 1, 0)
+
+
+## ====================================================================================== ##
+
+
+function makemat(buffer::AbstractVector, m, n, k)
+    mnk = m*n*k
+    mnk ≤ length(buffer) || error("buffer size exceeded")
+    mymat = reshape(view(buffer, 1:mnk), m, n, k)
+    return mymat
+end
