@@ -163,7 +163,7 @@ end
 ################
 
 
-function add_inelastic_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, B2B_inelastic, E, dE, iE, CFL_factor)
+function add_inelastic_collisions2!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
     Ie_degraded = similar(Ie) #Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
 
     # Multiply each element of B2B with n (density vector) and resize to get a matrix that can
@@ -207,8 +207,7 @@ function add_inelastic_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, B2B_inelas
 
                 # and finally calculate the flux of degrading e-
                 Threads.@threads for i_u in findall(x -> x != 0, partition_fraction)
-                    T_to_T = change_of_time_grid(t[iE], t[i_degrade[i_u]], CFL_factor[iE], CFL_factor[i_degrade[i_u]]);
-                    Q[i_degrade[i_u]] .+=  (Ie_degraded .* partition_fraction[i_u]) * T_to_T
+                    @view(Q[:, :, i_degrade[i_u]]) .+=  Ie_degraded .* partition_fraction[i_u]
                 end
             end
         end
@@ -216,7 +215,7 @@ function add_inelastic_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, B2B_inelas
 end
 
 
-function add_ionization_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center, CFL_factor)
+function add_ionization_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center)
     Ionization = similar(Ie)#Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
     Ionizing = similar(Ie)#Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
     density_matrix = repeat(n, length(μ_center), length(t[iE]))
@@ -267,13 +266,8 @@ function add_ionization_collisions2!(Q, Ie, h_atm, t, n, σ, E_levels, cascading
 
                 # and finally add this to the flux of degrading e-
                 Threads.@threads for iI in 1:(iE - 1)
-                    if CFL_factor[iE] == CFL_factor[iI]
-                    Q[iI] .+= (Ionization .* secondary_e_spectra[iI] .+ Ionizing .* primary_e_spectra[iI])
-                    else
-                        T_to_T = change_of_time_grid(t[iE], t[iI], CFL_factor[iE], CFL_factor[iI]);
-                        Q[iI] .+= (Ionization .* secondary_e_spectra[iI] .+
-                                            Ionizing .* primary_e_spectra[iI]) * T_to_T
-                    end
+                    @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
+                                            Ionizing .* primary_e_spectra[iI]
                 end
             end
         end
@@ -282,14 +276,16 @@ end
 
 
 function update_Q2!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, BeamWeight_discrete, μ_center, CFL_factor)
+    cascading_neutrals, E, dE, iE, BeamWeight_discrete, μ_center, CFL_factor, buffer)
+
+    # Q_local = zeros(length(h_atm) * length(μ_center), length(t[iE]), length(E[1:iE]));
+    Q_local = makemat(buffer, length(h_atm) * length(μ_center), length(t[iE]), length(E[1:iE]));
+    fill!(Q_local, 0.0);
 
     # e-e collisions
-    if iE > 1
-        T_to_T = change_of_time_grid(t[iE], t[iE - 1], CFL_factor[iE], CFL_factor[iE - 1]);
-        Q[iE - 1] .+=   repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
-                                        outer = (length(μ_center), length(t[iE]))) .*
-                                Ie[iE] * T_to_T
+    @views if iE > 1
+        (Q_local[:, :, iE - 1]) .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+                                    outer = (length(μ_center), length(t[iE]))) .* Ie[iE];
     end
 
     # Loop over the species
@@ -300,7 +296,16 @@ function update_Q2!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_n
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th specie
 
-        add_inelastic_collisions2!(Q, Ie[iE], h_atm, t, n, σ, E_levels, B2B_inelastic, E, dE, iE, CFL_factor)
-        add_ionization_collisions2!(Q, Ie[iE], h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center, CFL_factor)
+        add_inelastic_collisions2!(Q_local, Ie[iE], h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        add_ionization_collisions2!(Q_local, Ie[iE], h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center)
+    end
+
+    Threads.@threads for iE_local in 1:(iE - 1)
+        if CFL_factor[iE] == CFL_factor[iE_local]
+        Q[iE_local] .+= Q_local[:, :, iE_local]
+        else
+            T_to_T = change_of_time_grid(t[iE], t[iE_local], CFL_factor[iE], CFL_factor[iE_local]);
+            @views Q[iE_local] .+= Q_local[:, :, iE_local] * T_to_T
+        end
     end
 end

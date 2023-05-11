@@ -191,7 +191,7 @@ function calculate_e_transport2(altitude_max, θ_lims, E_max, B_angle_to_zenith,
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
-
+    buffer_Q = zeros(length(h_atm) * length(μ_center) * length(t[end]) * length(E)) # As large as needed for maximal case
 
     for i in 1:n_loop
         Q  = [zeros(length(h_atm) * length(μ_center), length(t[iE])) for iE in eachindex(E)];
@@ -217,7 +217,8 @@ function calculate_e_transport2(altitude_max, θ_lims, E_max, B_angle_to_zenith,
 
             # Update the cascading of e-
             update_Q2!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                            cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight_discrete, μ_center, CFL_factor)
+                            cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight_discrete, μ_center, CFL_factor, buffer_Q)
+
                             # 0.897071 seconds (144.07 k allocations: 228.009 MiB, 1.48% gc time)
             next!(p)
         end
