@@ -6,10 +6,10 @@ title: Aurora.jl
 message: 'If you use this software, please cite it as below.'
 type: software
 authors:
-  - given-names: Etienne
-    family-names: Gavazzi
   - given-names: Björn
     family-names: Gustavsson
+  - given-names: Etienne
+    family-names: Gavazzi
 repository-code: 'https://github.com/egavazzi/Aurora.jl'
 license: GPL-3.0
 version: 0.1.0
