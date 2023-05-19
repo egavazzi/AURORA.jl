@@ -160,7 +160,7 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
 
     # Building the CN matrices
     Nz = length(h_atm)
-    row_l = Vector{Int64}()
+    row_l = Vector{Int64}() # maybe using sizehint could help?
     col_l = Vector{Int64}()
     val_l = Vector{Float64}()
     row_r = Vector{Int64}()

@@ -1,4 +1,4 @@
-# This is the Aurora.jl documentation
+# This is the AURORA.jl documentation
 
 Welcome to the documentation
 

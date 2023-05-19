@@ -60,7 +60,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
 
-    savedir = string(pkgdir(Aurora, "data"), "/", root_savedir, "/", name_savedir)
+    savedir = string(pkgdir(AURORA, "data"), "/", root_savedir, "/", name_savedir)
 
     if isdir(savedir) # check if the name_savedir exists
         print("\n", @bold @red "WARNING!")
@@ -69,8 +69,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # println(@bold @red "already exists, the experiment is aborted.")
         # return
     else
-        if ~isdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # check if the root_savedir exists
-            mkdir(string(pkgdir(Aurora, "data"), "/", root_savedir)) # if not, creates it
+        if ~isdir(string(pkgdir(AURORA, "data"), "/", root_savedir)) # check if the root_savedir exists
+            mkdir(string(pkgdir(AURORA, "data"), "/", root_savedir)) # if not, creates it
         end
         mkpath(savedir)
     end

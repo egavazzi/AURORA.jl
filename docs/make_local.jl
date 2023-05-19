@@ -7,12 +7,12 @@ push!(LOAD_PATH, "../src/")
 using Pkg
 Pkg.activate("../")
 
-using Aurora
+using AURORA
 using Documenter
 
 makedocs(
-        sitename="Aurora.jl",
-        modules =[Aurora],
+        sitename="AURORA.jl",
+        modules =[AURORA],
         pages = [
                 "Home" => "index.md",
                 "Manual" => "manual.md"

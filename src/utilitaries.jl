@@ -88,7 +88,7 @@ end
 using LibGit2
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
 	savefile = string(savedir, "/", "parameters.txt")
-    commit_hash = LibGit2.head(pkgdir(Aurora))
+    commit_hash = LibGit2.head(pkgdir(AURORA))
     open(savefile, "w") do f
         write(f, "altitude_max = $altitude_max \n")
         write(f, "θ_lims = $θ_lims \n")

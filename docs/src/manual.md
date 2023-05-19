@@ -7,19 +7,19 @@
 $> julia
 ```
 
-3. Then, **activate** the repository and download the packages required by *Aurora.jl* using the commands:
+3. Then, **activate** the repository and download the packages required by *AURORA.jl* using the commands:
 ```julia-repl
 julia> using Pkg
 julia> Pkg.activate(".")
 julia> Pkg.instantiate() # this might take a while...
 ```
 
-4. *Aurora.jl* is now ready to use!
+4. *AURORA.jl* is now ready to use!
 
 ## Folder structure
 The code is structured as follow
 ```
-Aurora/
+AURORA/
 ├── data/
 │   └── 20220926/...
 │   └── ...
@@ -52,8 +52,8 @@ The folder `scripts/` contains the scripts for the user to start the simulations
 The folder `src/` contains the source code of the model.
 
 ## Get started
-!!! warning "Activating the Aurora environment"
-    To be able to use Aurora.jl, the repository environment needs to be activated. This can be done for example by starting Julia from the *Aurora/* folder using the command
+!!! warning "Activating the AURORA environment"
+    To be able to use AURORA.jl, the repository environment needs to be activated. This can be done for example by starting Julia from the *AURORA/* folder using the command
     ```
     $> julia --project=.
     ```

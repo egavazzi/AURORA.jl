@@ -1,4 +1,4 @@
-# Aurora.jl
+# AURORA.jl
 [![][docs-dev-img]][docs-dev-url]
 
 This is a julia implementation of the following time-dependent model of electron transport in the ionosphere : 
@@ -15,23 +15,23 @@ https://github.com/egavazzi/AURORA
 $> julia
 ```
 
-3. Then, **activate** the repository and download the packages required by *Aurora.jl* using the commands:
+3. Then, **activate** the repository and download the packages required by *AURORA.jl* using the commands:
 ```julia-repl
 julia> using Pkg
 julia> Pkg.activate(".")
 julia> Pkg.instantiate()
 ```
 
-4. *Aurora.jl* is now ready to use! More on that in the **Documentation**
+4. *AURORA.jl* is now ready to use! More on that in the **Documentation**
 
 <br />
 
 ## Documentation
-The documentation is available [here](https://egavazzi.github.io/Aurora.jl/dev/).
+The documentation is available [here](https://egavazzi.github.io/AURORA.jl/dev/).
 
 
 
 
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-dev-url]: https://egavazzi.github.io/Aurora.jl/dev/
+[docs-dev-url]: https://egavazzi.github.io/AURORA.jl/dev/

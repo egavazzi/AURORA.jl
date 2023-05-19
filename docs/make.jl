@@ -1,16 +1,16 @@
 push!(LOAD_PATH, "../src/")
 
-using Aurora
+using AURORA
 using Documenter
 
 makedocs(
-        sitename="Aurora.jl",
-        modules =[Aurora],
+        sitename="AURORA.jl",
+        modules =[AURORA],
         pages = [
                 "Home" => "index.md",
                 "Manual" => "manual.md"
                 ])
 
 deploydocs(;
-    repo="github.com/egavazzi/Aurora.jl",
+    repo="github.com/egavazzi/AURORA.jl",
     )

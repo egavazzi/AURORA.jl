@@ -1,5 +1,5 @@
 # This script converts Ie into fzvzv⟂ over altitude and time.
-using Aurora
+using AURORA
 using Printf
 using MAT
 

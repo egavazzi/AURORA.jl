@@ -1,5 +1,5 @@
 ## This is the control script from where simulations are run
-using Aurora
+using AURORA
 
 ## Setting parameters
 altitude_max = 500;         # (km) top altitude of the ionosphere
@@ -21,7 +21,7 @@ name_savedir = ""   # name for the actual data folder of the current experiment 
 # INPUT_OPTIONS = (;input_type, input_file);
 
 # input_type = "from_file"
-# input_file = "/mnt/data/etienne/Julia/Aurora/data/MI_coupling/1.27e7-1/Ie_precipitating.mat"
+# input_file = "/mnt/data/etienne/Julia/AURORA/data/MI_coupling/1.27e7-1/Ie_precipitating.mat"
 # INPUT_OPTIONS = (;input_type, input_file);
 
 # input_type = "flickering";

@@ -1,10 +1,10 @@
 """
 This script controls the MI coupling.
-It calls Aurora.jl, ketchup, and some MatLab functions from AURORA
+It calls AURORA.jl, ketchup, and some MatLab functions from AURORA
 """
 
 using MATLAB
-using Aurora
+using AURORA
 
 current_folder = pwd()
 
@@ -12,8 +12,8 @@ current_folder = pwd()
 path_to_vlasov_initial_file = "/mnt/data/etienne/ketchup/MI_coupling/l7/1.27e7/Nz_3000_420to480s/outp/fzvzmuIB2400000.mat"
 path_to_vlasov_simulation = "/mnt/data/etienne/ketchup/MI_coupling/l7/1.27e7/Nz_3000_420to480s/"
 path_to_next_vlasov_simulation = "/mnt/data/etienne/ketchup/MI_coupling/l7/1.27e7_MI/0.3s-1"
-# Path to Aurora simulation
-path_to_aurora_simulation = "/mnt/data/etienne/Julia/Aurora/data/MI_coupling/1.27e7-2s_1/"
+# Path to AURORA simulation
+path_to_aurora_simulation = "/mnt/data/etienne/Julia/AURORA/data/MI_coupling/1.27e7-2s_1/"
 
 
 ## 1. Convert .dat ketchup results to .mat
@@ -23,7 +23,7 @@ mat"cd path_to_vlasov_simulation"
 mat"ketchup_b6conv" # run ketchup_b6conv.m in a Matlab engine
 # cd(current_folder)
 
-## 2. Convert fzvzmu from ketchup into Ie that can be used in Aurora.jl
+## 2. Convert fzvzmu from ketchup into Ie that can be used in AURORA.jl
 index_specie = 1
 HMR_VZ = 20         # How Much do you want to Reduce vz
 HMR_MU = 20         # How Much do you want to Reduce μ_mag
@@ -48,7 +48,7 @@ cd(path_to_aurora_simulation)
     close(file)
 cd(current_folder)
 
-## 3. Calculate the ionospheric response using Aurora.jl
+## 3. Calculate the ionospheric response using AURORA.jl
 altitude_max = 400;         # (km) top altitude of the ionosphere
 θ_lims = 180:-10:0;         # (°) angle-limits for the electron beams
 E_max = 7000;               # (eV) upper limit to the energy grid
@@ -68,7 +68,7 @@ calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t, n_loop
                         name_savedir, INPUT_OPTIONS)
 
 ## 4. Extract Ie at the top of the ionosphere
-mat"cd /mnt/data/etienne/Julia/Aurora/data/MI_coupling/"
+mat"cd /mnt/data/etienne/Julia/AURORA/data/MI_coupling/"
 mat"current_folder = pwd"
 mat"make_all_Ie_top_MI"
 
@@ -85,7 +85,7 @@ if !isdir(path_to_next_vlasov_simulation)
     cd(current_folder)
 end
 
-## 6. Convert Ie from Aurora.jl to fzvzmu that can be used in ketchup
+## 6. Convert Ie from AURORA.jl to fzvzmu that can be used in ketchup
 
 index_specie = 1
 HMR_MU = 20

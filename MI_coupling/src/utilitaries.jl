@@ -15,7 +15,7 @@ function load_fzvzmu_parallel(path_to_vlasov_initial_file, path_to_vlasov_simula
     addprocs(NPROCS - 1)
     # instantiate environment in all processes
     @everywhere @eval begin
-        using Pkg; Pkg.activate("/mnt/data/etienne/Julia/Aurora");
+        using Pkg; Pkg.activate("/mnt/data/etienne/Julia/AURORA");
     end
     # load the dependencies in all processes
     @everywhere @eval using MAT, SharedArrays
@@ -44,7 +44,7 @@ function load_fzvzmu_parallel(path_to_vlasov_initial_file, path_to_vlasov_simula
 end
 
 function load_fzvzmu_serial(path_to_vlasov_initial_file, path_to_vlasov_simulation, index_specie, first_run=0)
-    if first_run != 0 
+    if first_run != 0
         # in that case we will load only the initial file (not sure this is relevant here...)
         fzvzmu_files = []
     else
@@ -80,7 +80,7 @@ function load_fzvzmu_serial(path_to_vlasov_initial_file, path_to_vlasov_simulati
 end
 
 function load_fzvzmuIB_serial(path_to_vlasov_initial_file, path_to_vlasov_simulation, index_specie, first_run=0)
-    if first_run != 0 
+    if first_run != 0
         # in that case we will load only the initial file
         fzvzmu_files = []
     else
@@ -137,7 +137,7 @@ function load_Bfield(path_to_vlasov_simulation)
     for index_species in 1:Nspecies
         val_for_species = [] # initialise
         for i_line in eachindex(val)
-            if val[i_line][index_species] isa Matrix 
+            if val[i_line][index_species] isa Matrix
                 # this is because Matlab save vectors as matrices, and we should not have matrices here
                 push!(val_for_species, vec(val[i_line][index_species]))
             else
@@ -171,22 +171,22 @@ function findnearestindex(X, Y)
         if idx1 < idx2
             return idx1
         else
-            return idx2 
+            return idx2
         end
-        
+
     # case when Y is smaller than the minimum value of X (to avoid out of bound error)
     elseif idx1 < 1 || idx2 < 1
         if idx1 > idx2
             return idx1
         else
-            return idx2 
+            return idx2
         end
         print(b)
     # normal case when Y is contained inside the values of X
     else
         if abs(X[idx1] - Y) < abs(X[idx2] - Y)
-            return idx1 
-        else 
+            return idx1
+        else
             return idx2
         end
     end

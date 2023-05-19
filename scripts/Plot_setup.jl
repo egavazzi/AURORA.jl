@@ -1,5 +1,5 @@
 using CairoMakie
-using Aurora
+using AURORA
 
 altitude_max = 400;
 θ_lims = 180:-10:0;

@@ -1,4 +1,4 @@
-module Aurora
+module AURORA
 
 include("setup.jl")
 include("input_flux.jl")
