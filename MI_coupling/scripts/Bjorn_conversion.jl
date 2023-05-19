@@ -22,7 +22,7 @@ for i in eachindex(directories[directories_to_process])
     # loop through the IeFlickering files
     for j in eachindex(files[files_to_process])
         fzvzvperp, E_grid, t_run, h_atm, μ_pitch_grid,
-            vz, Δvz, vperp, Δvperp = make_f_from_Aurora(files[files_to_process][j], HMR_E, HMR_MU);
+            vz, Δvz, vperp, Δvperp = make_f_from_AURORA(files[files_to_process][j], HMR_E, HMR_MU);
 
         save_file = joinpath(savedir, (@sprintf( "fzvzvperp-%02d.mat", j)))
         f = matopen(save_file, "w")

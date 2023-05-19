@@ -5,7 +5,7 @@ using ProgressMeter
 
 
 # conservation of Ie and fzvzvperp ✅
-function make_f_from_Aurora(path_to_file, HMR_E, HMR_MU)
+function make_f_from_AURORA(path_to_file, HMR_E, HMR_MU)
     m_e = 9.109e-31 # electron mass (kg)
     ## Extracting Ie
     file = matopen(path_to_file)
