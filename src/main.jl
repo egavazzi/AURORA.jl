@@ -26,7 +26,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
         Ie_top = Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     elseif INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(t, E, n_loop, INPUT_OPTIONS.input_file)
+        Ie_top = Ie_top_from_file(t, E, μ_center, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
         Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm,
                                     μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
