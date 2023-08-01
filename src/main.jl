@@ -4,13 +4,12 @@ using Dates
 using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
+    n_loop, path_to_AURORA_matlab, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
 
     ## Get atmosphere
     println("Calling Matlab for the setup...")
-    h_atm, ne, Te, E, dE,
-        n_neutrals, E_levels_neutrals, σ_neutrals,
-        θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
+    h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
+    μ_scatterings = setup_new(path_to_AURORA_matlab, altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
