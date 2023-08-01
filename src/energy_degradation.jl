@@ -16,7 +16,7 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
 end
 
 function update_Q_obselete!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, BeamWeight_discrete, μ_center)
+                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center)
 
     # e-e collisions
     @view(Q[:, :, iE - 1]) .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
@@ -98,7 +98,7 @@ function update_Q_obselete!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_
                             max.(0, repeat(n, 1, length(t)) .*
                             (σ[i_level, iE] *
                             Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) *
-                            BeamWeight_discrete[i_μ] / sum(BeamWeight_discrete))
+                            BeamWeight[i_μ] / sum(BeamWeight))
                     end
 
                     # Calculate the spectra of the secondary e-
@@ -191,7 +191,7 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
     end
 end
 
-function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center)
+function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
     Ionization = Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
 
     for i_level = 2:size(E_levels, 1)
@@ -210,7 +210,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
                         max.(0, repeat(n, 1, length(t)) .*
                         (σ[i_level, iE] .*
                         @view(Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE])) .*
-                        BeamWeight_discrete[i_μ] / sum(BeamWeight_discrete))
+                        BeamWeight[i_μ] / sum(BeamWeight))
                 end
 
                 # Calculate the spectra of the secondary e-
@@ -254,7 +254,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 end
 
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, BeamWeight_discrete, μ_center)
+                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center)
 
     # e-e collisions
     if iE > 1
@@ -271,6 +271,6 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th specie
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
-        add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight_discrete, μ_center)
+        add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
     end
 end

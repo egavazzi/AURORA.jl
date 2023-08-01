@@ -33,14 +33,11 @@ It calls a lot of functions from the original MATLAB code.
 - `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
 - `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
-    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight_continuous,
-    BeamWeight_discrete)`
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
     + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
     + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
         n_beams]
-    + `BeamWeight_continuous`: solid angle for each stream (ster), vector [n_beams]
-    + `BeamWeight_discrete`: solid angle for each stream (ster), but calculated in a discrete way,
-        vector [n_beams]
+    + `BeamWeight`: solid angle for each stream (ster), vector [n_beams]
 """
 function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
@@ -149,21 +146,14 @@ function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     BeamWeight_relative = @mget theta2beamW;
 
     # This beam weight is calculated in a continuous way
-    BeamWeight_continuous = 2π .* vec(@mget BeamW);
-    # Whereas this one is calculated in a discrete way. This is to ensure the conservation of the number of e-
-    # when calculating the scatterings, as these calculations are discretized in pitch angle (around 721
-    # different angles) which leads to a slightly different normalization factor
-    BeamWeight_discrete = sum(BeamWeight_relative, dims=2);
-    BeamWeight_discrete[μ_center .< 0] = 2π .* BeamWeight_discrete[μ_center .< 0] ./ sum(BeamWeight_discrete[μ_center .< 0]);
-    BeamWeight_discrete[μ_center .> 0] = 2π .* BeamWeight_discrete[μ_center .> 0] ./ sum(BeamWeight_discrete[μ_center .> 0]);
-
+    BeamWeight = 2π .* vec(@mget BeamW);
     # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
     # contribution from withing each beam. It means that when summing up along each beam, we should get 1
     BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
 
 
 
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight_continuous = BeamWeight_continuous, BeamWeight_discrete = BeamWeight_discrete);
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
 
     ## Closing the MATLAB session
     close(s1)
@@ -210,14 +200,11 @@ but there are still some calls to the original MATLAB code.
 - `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
 - `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
-    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight_continuous,
-    BeamWeight_discrete)`
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
     + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
     + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
         n_beams]
-    + `BeamWeight_continuous`: solid angle for each stream (ster), vector [n_beams]
-    + `BeamWeight_discrete`: solid angle for each stream (ster), but calculated in a discrete way,
-        vector [n_beams]
+    + `BeamWeight`: solid angle for each stream (ster), vector [n_beams]
 """
 function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
@@ -259,37 +246,28 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     @mput theta_lims2do
     mat"
     theta_lims2do = double(theta_lims2do);
-    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
-    c_o_mu = mu_avg(mu_lims);
+    [Pmu2mup, theta2beamW, BeamW, mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
     "
-    θ_lims = vec(@mget theta_lims2do);
-    μ_lims = vec(@mget mu_lims);
-    μ_center = vec(@mget c_o_mu);
+    μ_lims = cosd.(θ_lims);
+    μ_center = mu_avg(θ_lims);
 
     Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
     BeamWeight_relative = @mget theta2beamW;
 
     # This beam weight is calculated in a continuous way
-    BeamWeight_continuous = 2π .* vec(@mget BeamW);
-    # Whereas this one is calculated in a discrete way. This is to ensure the conservation of the number of e-
-    # when calculating the scatterings, as these calculations are discretized in pitch angle (around 721
-    # different angles) which leads to a slightly different normalization factor
-    BeamWeight_discrete = sum(BeamWeight_relative, dims=2);
-    BeamWeight_discrete[μ_center .< 0] = 2π .* BeamWeight_discrete[μ_center .< 0] ./ sum(BeamWeight_discrete[μ_center .< 0]);
-    BeamWeight_discrete[μ_center .> 0] = 2π .* BeamWeight_discrete[μ_center .> 0] ./ sum(BeamWeight_discrete[μ_center .> 0]);
+    BeamWeight = 2π .* vec(@mget BeamW);
     # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
-    # contribution from withing each beam. It means that when summing up along each beam, we should get 1
+    # contribution from within each beam. It means that when summing up along each beam, we should get 1
     BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
 
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight_continuous = BeamWeight_continuous, BeamWeight_discrete = BeamWeight_discrete);
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
 
     ## Closing the MATLAB session
     close(s1)
 
     return h_atm, ne, Te, E, dE,
     n_neutrals, E_levels_neutrals, σ_neutrals,
-    θ_lims, μ_lims, μ_center, μ_scatterings
+    μ_lims, μ_center, μ_scatterings
 end
 
 
