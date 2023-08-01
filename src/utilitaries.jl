@@ -87,7 +87,7 @@ end
 
 using LibGit2
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
-	savefile = string(savedir, "/", "parameters.txt")
+	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = LibGit2.head(pkgdir(AURORA))
     open(savefile, "w") do f
         write(f, "altitude_max = $altitude_max \n")
@@ -108,7 +108,7 @@ end
 
 using MAT
 function save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
-    savefile = string(savedir, "/", "neutral_atm.mat")
+    savefile = joinpath(savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
         write(file, "h_atm", h_atm)
         write(file, "nN2", n_neutrals.nN2)
@@ -147,18 +147,36 @@ end
 
 
 using Interpolations
+"""
+    interp1(X, V, Xq)
 
+Mimic the function interp1 from Matlab (linear interpolation).
+
+# Calling
+`Vq = interp1(X, V, Xq)`
+
+# Inputs
+- `X`: sample points
+- `V`: corresponding values to the sample points
+- `Xq`: coordinates of the query points
+
+# Outputs
+- `Vq`: interpolated values
+"""
 function interp1(X, V, Xq)
-    knots = (X,)
-    itp = interpolate(knots, V, Gridded(Linear()))
-    itp[Xq]
+    itp = interpolate((X, ), V, Gridded(Linear()))
+    return itp[Xq]
 end
 
-function interp2(X, Y, V, Xq, Yq)
-    knots = (X,Y)
-    itp = interpolate(knots, V, Gridded(Linear()))
-    itp[Xq, Yq]
-end
+# """
+#     interp2(X, Y, V, Xq, Yq)
+
+# Mimic the function interp2 from Matlab (linear interpolation).
+# """
+# function interp2(X, Y, V, Xq, Yq)
+#     itp = interpolate((X, Y), V, Gridded(Linear()))
+#     return itp[Xq, Yq]
+# end
 
 
 ## ====================================================================================== ##

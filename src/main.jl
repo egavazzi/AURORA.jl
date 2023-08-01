@@ -46,7 +46,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     phaseO2e, phaseO2i = phase_fcn_O2(finer_θ, E);
     phaseOe, phaseOi = phase_fcn_O(finer_θ, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
-    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
+    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
 
     ## Create the folder to save the data to
@@ -60,7 +60,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
 
-    savedir = string(pkgdir(AURORA, "data"), "/", root_savedir, "/", name_savedir)
+    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
 
     if isdir(savedir) # check if the name_savedir exists
         print("\n", @bold @red "WARNING!")
@@ -69,8 +69,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # println(@bold @red "already exists, the experiment is aborted.")
         # return
     else
-        if ~isdir(string(pkgdir(AURORA, "data"), "/", root_savedir)) # check if the root_savedir exists
-            mkdir(string(pkgdir(AURORA, "data"), "/", root_savedir)) # if not, creates it
+        if ~isdir(pkgdir(AURORA, "data", root_savedir)) # check if the root_savedir exists
+            mkdir(pkgdir(AURORA, "data", root_savedir)) # if not, creates it
         end
         mkpath(savedir)
     end

@@ -34,7 +34,7 @@ let Q = [], E4Q , E_ionizations
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
                     try
-                        filename = string(pkgdir(AURORA, "e_cascading_data", "N2"), "/",cascading_files[i1])
+                        filename = pkgdir(AURORA, "e_cascading_data", "N2", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -109,10 +109,10 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = string(pkgdir(AURORA, "e_cascading_data", "N2"), "/",
-                                    "CascadingSpecN2ionization_",
+                filename = pkgdir(AURORA, "e_cascading_data", "N2",
+                                    string("CascadingSpecN2ionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
-                                    ".mat")
+                                    ".mat"))
                 file = matopen(filename, "w")
                 write(file, "Q", Q)
                 write(file, "E4Q", E4Q)
@@ -138,6 +138,7 @@ let Q = [], E4Q , E_ionizations
     end
 end
 
+
 let Q = [], E4Q , E_ionizations
     global function cascading_O2(E_secondary, E_primary, E_ionization, s_or_c)
 
@@ -154,7 +155,7 @@ let Q = [], E4Q , E_ionizations
             for i1 in eachindex(cascading_files)
                 try
                     if !isdir(cascading_files[i1])
-                        filename = string(pkgdir(AURORA, "e_cascading_data", "O2"), "/",cascading_files[i1])
+                        filename = pkgdir(AURORA, "e_cascading_data", "O2", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -229,10 +230,10 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = string(pkgdir(AURORA, "e_cascading_data", "O2"), "/",
-                                    "CascadingSpecO2ionization_",
+                filename = pkgdir(AURORA, "e_cascading_data", "O2",
+                                    string("CascadingSpecO2ionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
-                                    ".mat")
+                                    ".mat"))
                 file = matopen(filename, "w")
                 write(file, "Q", Q)
                 write(file, "E4Q", E4Q)
@@ -258,6 +259,7 @@ let Q = [], E4Q , E_ionizations
         end
     end
 end
+
 
 let Q = [], E4Q , E_ionizations
     global function cascading_O(E_secondary, E_primary, E_ionization, s_or_c)
@@ -291,7 +293,7 @@ let Q = [], E4Q , E_ionizations
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
                     try
-                        filename = string(pkgdir(AURORA, "e_cascading_data", "O"), "/",cascading_files[i1])
+                        filename = pkgdir(AURORA, "e_cascading_data", "O", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -380,10 +382,10 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = string(pkgdir(AURORA, "e_cascading_data", "O"), "/",
-                                    "CascadingSpecOionization_",
+                filename = pkgdir(AURORA, "e_cascading_data", "O",
+                                    string("CascadingSpecOionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
-                                    ".mat")
+                                    ".mat"))
                 file = matopen(filename, "w")
                 write(file, "Q", Q)
                 write(file, "E4Q", E4Q)
