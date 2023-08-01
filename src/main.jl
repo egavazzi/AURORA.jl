@@ -62,7 +62,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
 
-    if isdir(savedir) # check if the name_savedir exists
+    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
+        # throw a warning if name_savedir exists and if it already contains results
         print("\n", @bold @red "WARNING!")
         print(@bold " '$savedir' ")
         println(@bold @red "already exists, any results stored in it will be overwritten.")
