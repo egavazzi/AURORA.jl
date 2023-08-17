@@ -39,7 +39,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     end
 
     ## Make a finer θ for the scattering calculations
-    finer_θ = range(0, π, length=721);
+    finer_θ = deg2rad.(0:(180/n_dirs):360); finer_θ = finer_θ[1:end-1]
+
     ## Calculate the phase functions and put them in a Tuple
     phaseN2e, phaseN2i = phase_fcn_N2(finer_θ, E);
     phaseO2e, phaseO2i = phase_fcn_O2(finer_θ, E);
