@@ -241,26 +241,12 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     σ_O = @mget XsO;
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
 
-    ## X-streams beam-to-beam calculations
-    theta_lims2do = reshape(Vector(θ_lims), 1, :);
-    @mput theta_lims2do
-    mat"
-    theta_lims2do = double(theta_lims2do);
-    [Pmu2mup, theta2beamW, BeamW, mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    "
+    ## Load/calculate the scattering matrices
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
-
-    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
-    BeamWeight_relative = @mget theta2beamW;
-
-    # This beam weight is calculated in a continuous way
-    BeamWeight = 2π .* vec(@mget BeamW);
-    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
-    # contribution from within each beam. It means that when summing up along each beam, we should get 1
-    BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
-
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
+    Pmu2mup, _, BeamWeight_relative, θ₁ =  load_scattering_matrices(θ_lims, 720)
+    BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, θ₁ = θ₁);
 
     ## Closing the MATLAB session
     close(s1)
