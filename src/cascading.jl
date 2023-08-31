@@ -3,20 +3,22 @@ using HCubature
 using ProgressMeter
 using MAT
 
-function is_cascading_loaded(Q, E4Q, E_secondary)
-    # check1: is Q empty? if yes we have to load
-    check1 = isempty(Q)
 
-    # check2: are E4Q and E_secondary the same? if not we have to load
-    check2 = !all(E4Q[1:min(length(E_secondary), length(E4Q))]
-                == E_secondary[1:min(length(E_secondary), length(E4Q))])
+# function is_cascading_loaded(Q, E4Q, E_secondary)
+#     # check1: is Q empty? if yes we have to load
+#     check1 = isempty(Q)
 
-    # check3: is E_secondary larger than E4Q? if yes we have to load
-    # (note that the opposite (E4Q > E_secondary) is not a problem)
-    check3 = size(E_secondary, 2) > size(E4Q, 2)
+#     # check2: are E4Q and E_secondary the same? if not we have to load
+#     check2 = E4Q[1:min(length(E_secondary), length(E4Q))] !=
+#                 E_secondary[1:min(length(E_secondary), length(E4Q))]
 
-    return check1, check2, check3
-end
+#     # check3: is E_secondary larger than E4Q? if yes we have to load
+#     # (note that the opposite (E4Q > E_secondary) is not a problem)
+#     check3 = length(E_secondary) > length(E4Q)
+
+#     return check1, check2, check3
+# end
+
 
 let Q = [], E4Q , E_ionizations
     global function cascading_N2(E_secondary, E_primary, E_ionization, s_or_c)
@@ -27,7 +29,7 @@ let Q = [], E4Q , E_ionizations
 
         E_hat = 11.4
         # if check1 || check2 || check3
-        if isempty(Q) || !all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+        if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
             cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "N2"))
@@ -38,7 +40,7 @@ let Q = [], E4Q , E_ionizations
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
-                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+                        if length(E_secondary) <= length(E4Q) && E4Q[1:length(E_secondary)] == E_secondary
                             println("Loading cascading-matrices from file: ", cascading_files[i1])
                             file = matopen(filename)
                             Q = read(file, "Q")
@@ -148,7 +150,7 @@ let Q = [], E4Q , E_ionizations
 
         E_hat = 15.2
         # if check1 || check2 || check3
-        if isempty(Q) || !all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+        if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
             cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "O2"))
@@ -159,7 +161,7 @@ let Q = [], E4Q , E_ionizations
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
-                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+                        if length(E_secondary) <= length(E4Q) && E4Q[1:length(E_secondary)] == E_secondary
                             println("Loading cascading-matrices from file: ", cascading_files[i1])
                             file = matopen(filename)
                             Q = read(file, "Q")
@@ -286,7 +288,7 @@ let Q = [], E4Q , E_ionizations
         # check1, check2, check3 = is_cascading_loaded(Q, E4Q, E_secondary)
 
         # if check1 || check2 || check3
-        if isempty(Q) || !all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+        if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
             cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "O"))
@@ -297,7 +299,7 @@ let Q = [], E4Q , E_ionizations
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
-                        if all(E4Q[1:min(length(E_secondary), length(E4Q))] == E_secondary)
+                        if length(E_secondary) <= length(E4Q) && E4Q[1:length(E_secondary)] == E_secondary
                             println("Loading cascading-matrices from file: ", cascading_files[i1])
                             file = matopen(filename)
                             Q = read(file, "Q")
