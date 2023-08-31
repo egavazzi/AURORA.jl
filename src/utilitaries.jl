@@ -44,7 +44,7 @@ for isotropically distributed fluxes within each beam, i.e the fluxes are weight
 `μ_center = mu_avg(θ_lims) `
 
 # Inputs
-- `θ_lims` : pitch-angle limits of all the beams, range or vector [n_beams + 1]
+- `θ_lims` : pitch-angle limits *in degrees* of all the beams, range or vector [n_beams + 1]
 
 # Outputs
 - `μ_center` : cosine of the center of all the pitch-angle beams, vector [n_beams + 1]
