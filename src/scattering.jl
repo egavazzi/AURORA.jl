@@ -115,12 +115,12 @@ directly loaded. Otherwise, they are calculated and saved to a file.
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
 function load_scattering_matrices(θ_lims, n_direction=720)
-    scattering_files = readdir(pkgdir(AURORA, "e_scattering_data"))
+    scattering_files = readdir(pkgdir(AURORA, "internal_data", "e_scattering"))
     found_them = 0
     for i1 in eachindex(scattering_files)
         if !isdir(scattering_files[i1])
             try
-                filename = pkgdir(AURORA, "e_scattering_data", scattering_files[i1])
+                filename = pkgdir(AURORA, "internal_data", "e_scattering", scattering_files[i1])
                 file = matopen(filename)
                 θ_lims_file = read(file, "theta_lims")
                 n_direction_file = read(file, "n_direction")
@@ -148,7 +148,7 @@ function load_scattering_matrices(θ_lims, n_direction=720)
         Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = rotating(θ_lims, n_direction)
 
         # Save the results for future use
-        filename = pkgdir(AURORA, "e_scattering_data",
+        filename = pkgdir(AURORA, "internal_data", "e_scattering",
                             string(length(θ_lims) - 1, "_streams_",
                             Dates.format(now(), "yyyymmdd-HHMMSS"),
                             ".mat"))
