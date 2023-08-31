@@ -11,8 +11,8 @@ t_sampling = 0:0.001:0.1;           # (s) time-array over which data will be sav
 n_loop = 1;                 # number of loops to run
 
 path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/" # path to Matlab executable
-msis_file = pkdgir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
-iri_file = pkdgir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
+msis_file = pkgdir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
+iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
 
 root_savedir = ""   # name for the root folder where data will be saved (data/root_savedir/)
 name_savedir = ""   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
