@@ -7,7 +7,11 @@ docs/build/*
 JuliaSysimage.so
 
 # ignore the cascading files
-Cascading*.mat
+e_cascading_data/*/Cascading*.mat
+
+# ignore the scattering files
+e_scattering_data/*
+!e_scattering_data/.gitkeep
 
 # ignore the data folders (but not data/ itself)
 data/*
