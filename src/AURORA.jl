@@ -8,6 +8,7 @@ include("matrix_building.jl")
 include("crank_nicolson.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
+include("scattering.jl")
 
 export setup, setup_new
 export Ie_top_from_file, Ie_top_flickering, Ie_top_constant
@@ -17,6 +18,7 @@ export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,
 export d2M, Crank_Nicolson, Crank_Nicolson_Optimized
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!
+export rotating, load_scattering_matrices
 
 include("main.jl")
 export calculate_e_transport
