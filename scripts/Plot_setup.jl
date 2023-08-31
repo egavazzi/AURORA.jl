@@ -11,8 +11,8 @@ path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/"    # path to Ma
 # h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
 # μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
 
-msis_file = "/home/etienne/Documents/Julia/Aurora.jl/internal_data/data_neutrals/msis20181207.txt"
-iri_file = "/home/etienne/Documents/Julia/Aurora.jl/internal_data/data_electron/iri20181207.txt"
+msis_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_neutrals/msis20181207.txt"
+iri_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_electron/iri20181207.txt"
 h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 μ_scatterings = setup_new(path_to_AURORA_matlab, altitude_max, θ_lims, E_max, msis_file, iri_file);
 
