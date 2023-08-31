@@ -14,8 +14,8 @@ It calls a lot of functions from the original MATLAB code.
 # Inputs
 - `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
-- `θ_lims`: range of angles for the limits of our electron beams (e.g. 180:-10:0), where
-    180° corresponds to field aligned down, and 0° field aligned up
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
+    corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
@@ -29,15 +29,15 @@ It calls a lot of functions from the original MATLAB code.
     Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
 - `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ...,
     [n`_`levels x nE])
-- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beams + 1]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
     μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
     + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
     + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
-        n_beams]
-    + `BeamWeight`: solid angle for each stream (ster), vector [n_beams]
+        n_beam]
+    + `BeamWeight`: solid angle for each stream (ster), vector [n_beam]
 """
 function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
@@ -179,8 +179,8 @@ but there are still some calls to the original MATLAB code.
 # Inputs
 - `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
-- `θ_lims`: range of angles for the limits of our electron beams (e.g. 180:-10:0), where
-    180° corresponds to field aligned down, and 0° field aligned up
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
+    corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
 - `msis_file`: path to the msis file to use
 - `E_max`: path to the iri file to use
@@ -196,15 +196,15 @@ but there are still some calls to the original MATLAB code.
     Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
 - `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ...,
     [n`_`levels x nE])
-- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beams + 1]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
     μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
     + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
     + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
-        n_beams]
-    + `BeamWeight`: solid angle for each stream (ster), vector [n_beams]
+        n_beam]
+    + `BeamWeight`: solid angle for each stream (ster), vector [n_beam]
 """
 function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
