@@ -1,5 +1,4 @@
 using Rotations
-using GLMakie
 using AURORA
 using ProgressMeter
 using MAT
