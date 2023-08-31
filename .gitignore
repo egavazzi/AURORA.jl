@@ -11,7 +11,7 @@ internal_data/e_cascading/*/Cascading*.mat
 
 # ignore the scattering files
 internal_data/e_scattering/*
-internal_data/!e_scattering/.gitkeep
+!internal_data/e_scattering/.gitkeep
 
 # ignore the data folders (but not data/ itself)
 data/*
