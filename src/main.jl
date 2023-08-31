@@ -96,7 +96,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
             B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
                                                 phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
-                                                μ_scatterings.BeamWeight_relative, finer_θ);
+                                                μ_scatterings.BeamWeight_relative, μ_scatterings.θ₁);
 
             # Compute the flux of e-
             Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
