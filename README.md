@@ -10,7 +10,7 @@ https://github.com/egavazzi/AURORA
 
 1. Clone the repository (e.g. with Git) or download and extract the .zip (available under the green _**code**_ button)
 
-2. Open a terminal, go in the folder where the code is installed, and start Julia with the command:
+2. Open a terminal, **go in the folder where the code is installed**, and start Julia with the command:
 ```
 $> julia
 ```
