@@ -1,15 +1,14 @@
 % This script is here to control and call all the make_all_* scripts.
 %
 % - RunDirs: 
-% The simulation folder to analyse/plot.
+%   The simulation folder to analyse/plot.
 %       exemple: RunDirs = {'Alfven_536s'}
-% Several folders can be analysed (if they have the same root).
+%   Several folders can be analysed (if they have the same root).
 %       exemple: RunDirs = {'Alfven_536s', 'Alfven_325s'}
 %
 % - results_dir: 
-% Root of the RunDirs folder(s).
+%   Root of the RunDirs folder(s).
 %       exemple: results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/"
-
 
 
 results_dir = ""
