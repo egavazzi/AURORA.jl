@@ -15,3 +15,13 @@ data/*
 
 # ignore the profiles
 profiles/*
+
+
+
+
+# ignore internal_data for the moment
+internal_data/*
+
+
+# local files
+local_files_no_git/*
