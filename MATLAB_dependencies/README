@@ -1,0 +1,253 @@
+WARNING: This code is depreciated. Check https://github.com/egavazzi/AURORA.jl for an updated version. It is faster, has more functionalities, less bugs and is in active development.
+
+
+
+
+
+
+=========================================================================
+=========================================================================
+=========================================================================
+=========================================================================
+
+
+
+
+
+
+
+
+
+AURORA Version 1.0 20191106
+===========================
+
+AURORA is a time-dependent multi-stream electron transport code,
+suitable for modeling ionospheric electron-fluxes during periods of
+rapidly varying electron-precipitation. Tools for calculating the
+volume and column excitation and ionisation-rates are included.
+
+1 Outline:
+----------
+This is a time-dependent multi-stream discrete-ordinate
+electron-transport code, that solves the time-dependent electron
+transport problem by integrating the coupled transport equations (for
+the give number of pitch-angle-streams) using the Crank-Nicholson
+scheme modified to use up-stream spatial differences. For a more
+detailed description see AURORA_Documentation.pdf in the Documentation
+directory. 
+
+2, Installation:
+----------------
+1, Put the .zip-file where it suits you, typically in the directory
+   where you have your personal matlab-files, projects and toolboxes.
+2, Unpack it: unzip AURORA.zip
+3, To Use the code in matlab it is necessary to have the matlab-path
+   set. This can be done by changing the working directory to the
+   AURORA directory (in unix this would be something like: 
+   cd /home/myname/matlab/AURORA) and then run add_AURORA at the
+   command-line. If one wants to start matlab to always be ready to
+   use AURORA the convenient way would be to add the AURORA-directory
+   to the matlab-path in the personal startup.m and then call
+   add_AURORA later in that file. This would be done something like
+   this in a unix-like environment:
+   addpath('/home/myname/matlab/AURORA','-end')
+   add_AURORA
+
+3, Requirements:
+----------------
+The time-dependent multi-stream electron transport requires some
+memory to run. The code calculates the electron flux as a function of
+time (n_t time-steps), altitude (n_z steps in distance along B),
+energy (n_E energy intervals) for a finite number of
+pitch-angle-streams (n_mu), this results in a matrix with total size
+of: [(n_z * n_mu) x n_t x n_E ], and during the calculations another
+equal-sized array is needed. With typical sizes this requires two
+arrays of size (400 * 10) x 210 x 1000, i.e. approximately 2 x 1e9
+doubles, this put some constraints on how small computers one can use
+for this. Further, the resulting electron-fluxes will be saved to
+disk, which also requires some disk-space. The example-script,
+Loop_finalRun_PnL_flickering10beams.m produces approximately 70 GB of
+data, results for one 10-stream calculation covering 0.7 s with 3.3 ms
+time-resolution, with peak-energy of 7 keV takes 3.5 GB. Given that,
+some patience is needed, since the calculations takes some time.
+
+4, Use
+------
+Typical use is to run the electron transport from a script like
+Loop_finalRun_PnL_flickering10beams.m to produce electron-fluxes. This
+script illustrates the electron-transport-calculation-part well. The
+first step is set-up-calculations, specifying atmospheric
+density-profiles, collision-cross-sections, phase-functions,
+secondary-electron-spectra etc. For cleanliness of the calculations
+the energy-grid should be smaller than the smallest
+ionisation-threshold, i.e. less than 12 eV. Then the precipitating
+electron-spectra has to be specified. The electron-precipitation is
+stored as function-handles, @(t,E), for each pitch-angle-stream in a
+cell-array. Then the time-dependent multi-stream electron-transport
+commences. For computational efficiency it is preferable to split the
+calculations into shorter time-slice, in order to keep the
+variable-sizes small enough to avoid unnecessary swapping to disk. To
+keep everything neat and tidy it is advisable to save input-data and
+results in one directory for each run as is done in the
+Loop_finalRun_PnL_flickering10beams.m example-script, where one
+directory is generated for each input-precipitation-spectra. 
+
+To help reproducible work additional scripts for working with the
+electron-transport results are made: make_all_Q_lambda.m,
+make_all_I_lambda.m, make_all_IQ_lambda_plots.m,
+make_all_animations.m, make_all_Ie_top.m and make_all_IeEnQion.m. 
+
+MAKE_ALL_Q_LAMBDA.M is a script that loops through directories with
+results and calculates the time-altitude variation of
+excitation/emission-rates for a number of emissions (currently 4278,
+6730 7774 and 8446 and excitation of O1S and O1D), and saves them to
+file. 
+
+MAKE_ALL_I_LAMBDA.M is a script that integrates the column-emission
+(excitation) rates (taking photon-time-of-flight) into account, this
+script also loops into sub-directories and does the calculations in
+each results-directory.
+
+MAKE_ALL_IQ_LAMBDA_PLOTS.M is a script that produces plots of
+altitude-time variation of volume-emission(excitation)-rates and
+time-variation of normalised column-emission(excitation)-rates, for
+all results-directories in a list of sub-directories. 
+
+MAKE_ALL_ANIMATIONS.M is a script that produces animations of the
+electron-fluxes, (three movies with cuts through the Ie(z,t,E) volume
+with the fluxes for each pitch-angle-stream in sub-plots, and one with
+time-variation of energy - pitch-angle-distribution at 4
+altitudes). This script also loops through results-directories.
+
+MAKE_ALL_IE_TOP.M is a script that extracts the electron-fluxes at the
+highest altitude, providing a convenient means to generate checks on
+the primary electron-spectra. This script also loops through
+results-directories. 
+
+Typical organised working with AURORA goes like this, with the
+example-run from the Flickering-aurora modeling:
+
+>> mkdir('/some/useful/storage/AURORA/RunDir-Ex1')
+>> cd /some/useful/storage/AURORA/RunDir-Ex1
+>> Loop_first_example_AURORA
+>> % ...some time later...
+>> results_dir = '/some/usefule/storage/AURORA/';
+>> RunDirs = {'RunDir-Ex1'};
+>> make_all_Q_lambda
+>> make_all_I_lambda
+>> make_all_IQ_lambda_plots
+>> cxmax = 12;
+>> make_all_animations
+>> % If necessary to check the primary electron-fluxes:
+>> % make_all_Ie_top
+
+First time the set-up-script is run it pre-calculates the
+pitch-angle-2-pitch-angle arrays, and the energy-degradation
+distribution-array for primary electrons causing ionisation. These two
+steps takes some time. Therefore the results are saved in
+e_s_bd_180_170_150_120_100_90_80_60_30_10_0.mat (for the
+pitch-angle-scattering arrays), and CascadingSpecN2ionization.mat
+CascadingSpecO2ionization.mat and CascadingSpecOionization.mat. These
+will be constant for all runs as long as the pitch-angle-distribution
+remains fixed (for the pitch-angle-2-pitch-angle arrays) and the
+energy-grid remains constant (for the CascadingSpecXionization.mat). 
+Therefore it is worthwhile to keep track of those files once suitable
+pitch-angle-limits and energy-grids are decided on. The
+AURORA-distribution contains a file for the pitch-angle arrays, for
+pitch-angle limits of 0, 10, 30, 60, 80, 90, 100, 120, 150, 170, 180
+degrees and files for cascading for the energy-grid set up in
+setup4etrptd10streams.m.
+
+The make_all_*.m scripts then allows batch-processing of
+electron-transport-results. These scripts look through all directories
+in the RunDirs cell-array that exists in results_dir, and tries to
+perform their tasks. These scripts are written such that they will
+look through all directories in the RunDirs variable (that should be a
+cell-array with directory-names) that lies in/under the directory
+specified with the variable results_dir. The make_all_Q_lambda script
+requires some time to run when there are a large number of directories
+with results, therefore it will attempt to make some cunning checks
+and skip directories that has already been processed. The
+make_all_I_lambda.m script is not time-consuming enough to warrant
+such capability, it will convert the altitude-time variations of
+volume emission and excitation-rates to column emission and
+excitation-rates. The make_all_Q_lambda.m make_all_I_lambda.m and
+make_all_IQ_lambda_plots.m should be run in that order, since they
+depend on the results from the scripts in that order. The
+make_all_IQ_lambda_plots.m script will produce figures of the volume
+emission-rates and normalised column emission(excitation) rates in a
+directory 'Figures', this is currently hard-coded on line 20 in the
+script. The make_all_animations script is producing animations
+(uncompressed .avi-files) of the electron flux variation with
+altitude-energy-time. As currently written the script is tailored for
+the 10-stream-setup used in the Loop-examples. For other pitch-angle
+set-ups other sub-plot layouts might be preferable. To adjust the
+sub-plot-layout the variable to modify is: spp, at line 29 in the
+script. To change the figure-size the variable to modify is: figPwide,
+on line 33. Alternatively the user might prefer the more square
+figure-size of: figPsquare.
+
+5, Results
+----------
+
+AURORA produces results. If the time-dependent multi-stream electron
+transport function Ie_Mstream_tz_2_aurora is called at the
+matlab-prompt it will produce an array with size 
+[(n_z * n_mu) x n_t x n_E], with the electron-fluxes in e^- per
+energy-bin per m^2 per s. If run in a script like the Loop_*.m scripts
+the results are saved to disk. Typical files in a results-directory
+after post-processing with the make_all* scripts are:
+
+-----------------------------------------------------------------------
+ Size  filename                 contents           saved by
+-----------------------------------------------------------
+  15K  neutral_atm.mat          neutral atmosphere Loop_finalRun_PnL_flickering10beams
+  271  curr_par.mat             precipitation pars Loop_finalRun_PnL_flickering10beams
+ 246M  IeFlickering-01.mat      e-fluxes and other Loop_finalRun_PnL_flickering10beams
+ 248M  IeFlickering-02.mat      related parameters Loop_finalRun_PnL_flickering10beams
+ 248M  IeFlickering-03.mat      energy, height,    Loop_finalRun_PnL_flickering10beams
+ 248M  IeFlickering-04.mat      time pitch-angle   Loop_finalRun_PnL_flickering10beams
+ 248M  IeFlickering-05.mat      limits and scat-   Loop_finalRun_PnL_flickering10beams
+ 247M  IeFlickering-06.mat      tering matrices    Loop_finalRun_PnL_flickering10beams
+ 248M  IeFlickering-07.mat                         Loop_finalRun_PnL_flickering10beams
+ 6.9M  Qzt_all_L.mat            column excitation  make_all_Q_lambda.m
+ 7.2K  J.mat                    electrical current make_all_Q_lambda.m
+  14M  IeztE_3DEzoft.avi        differential flux  make_all_animations.m
+  19M  IeztE_3DtzofE.avi        animations with    make_all_animations.m
+ 7.2M  IeztE_3DtEofz.avi        different scans    make_all_animations.m
+  12M  IeztE_pitchangledist.avi and layouts        make_all_animations.m
+ 6.3M  Ie_top.mat               e-fluxes at top    make_all_Ie_top.m
+  18K  I_lambda_of_t.mat        column intensities make_all_I_lambda.m
+----------------------------------------------------------------------
+For a total disk-space of ~1.8G, the total size varies with the peak
+energy of the precipitation.
+
+6, Primary electron spectra
+---------------------------
+
+For the primary electron-spectra there are a couple defined in the
+e_spectra directory. Currently the spectra are defined, potentially
+with some modulation, at the source-altitude from which
+energy-dependent time-of-flight velocity-dispersion is applied down to
+the top of the ionosphere. This should be possible to adapt to
+arbitrary flux-variations, for example based on in-situ observations.
+
+N, AURORA the name
+------------------
+The right to name this toolbox fell as is the tradition to my nearest
+office-neighbour and he decided to use his right utilising his native
+tongue to produce a rather extensive and exhaustive single-word-name:
+
+Aikariippuvuusmonivirtaelektronikuljetusmatriisilaboratorio-
+laskentaohjelmistokokonaisuus, 
+
+which I have been informed "rolls very smoothly of the tongue". To
+pander to a wider audience I have decided to shortened this to:
+
+AURORA
+
+i.e.:
+
+AikariippUvuusmoniviRtaelektrOnikuljetusmatriisilaboRatorio-
+laskentaohjelmistokokonAisuus, 
+
