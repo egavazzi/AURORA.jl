@@ -224,7 +224,7 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     s1 = MSession();
     @mput path_to_AURORA_matlab
     mat"
-    addpath(path_to_AURORA_matlab)
+    addpath(genpath(path_to_AURORA_matlab))
     cd(path_to_AURORA_matlab)
     "
 
