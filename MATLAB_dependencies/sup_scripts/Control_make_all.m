@@ -12,8 +12,8 @@
 
 
 
-results_dir = "/mnt/data/etienne/TEST/AURORA.jl/data/testing_changes"
-RunDirs = {'20230925-1135'} 
+results_dir = ""
+RunDirs = {''} 
 %%
 make_all_Ie_top     % precipitation-spectra extraction at top
 make_all_Ie_top_MI  % precipitation-spectra extraction at top and top-1
