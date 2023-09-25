@@ -1,14 +1,20 @@
-using CairoMakie
 using AURORA
+using CairoMakie
+CairoMakie.activate!()
 
-altitude_max = 400;
+altitude_max = 700;
 θ_lims = 180:-10:0;
+E_max = 3000
+
 path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/"    # path to Matlab executable
 
+# h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
+# μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
 
-h_atm, ne, Te, E, dE,
-    n_neutrals, E_levels_neutrals, σ_neutrals,
-    θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
+msis_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_neutrals/msis20181207.txt"
+iri_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_electron/iri20181207.txt"
+h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+μ_scatterings = setup_new(path_to_AURORA_matlab, altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 ## Plot densities
 f1 = Figure()
@@ -18,13 +24,13 @@ lines!(n_neutrals.nN2, h_atm/1e3, linewidth = 2, label = "N₂")
 lines!(n_neutrals.nO2, h_atm/1e3, linestyle = :dash, linewidth = 2, color = :red, label = "O₂")
 lines!(n_neutrals.nO, h_atm/1e3, linestyle = :dashdot, linewidth = 2, label = "O")
 xlims!(1e12, 1e20)
-ylims!(85, 400)
+ylims!(85, 700)
 axislegend("Densities", position = :rt)
 ax12 = Axis(f1[1,2], xlabel = "(m⁻³)", ylabel = "height (km)",
         title = "electron density", xscale = log10)
 lines!(ne, h_atm/1e3, linewidth = 2)
 xlims!(1e8, 1e13)
-ylims!(85, 400)
+ylims!(85, 700)
 display(f1)
 
 ## Plot excitation thresholds

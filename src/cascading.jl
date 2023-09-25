@@ -32,11 +32,11 @@ let Q = [], E4Q , E_ionizations
         if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
-            cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "N2"))
+            cascading_files = readdir(pkgdir(AURORA, "internal_data", "e_cascading", "N2"))
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
                     try
-                        filename = pkgdir(AURORA, "e_cascading_data", "N2", cascading_files[i1])
+                        filename = pkgdir(AURORA, "internal_data", "e_cascading", "N2", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -111,7 +111,7 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = pkgdir(AURORA, "e_cascading_data", "N2",
+                filename = pkgdir(AURORA, "internal_data", "e_cascading", "N2",
                                     string("CascadingSpecN2ionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
                                     ".mat"))
@@ -153,11 +153,11 @@ let Q = [], E4Q , E_ionizations
         if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
-            cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "O2"))
+            cascading_files = readdir(pkgdir(AURORA, "internal_data", "e_cascading", "O2"))
             for i1 in eachindex(cascading_files)
                 try
                     if !isdir(cascading_files[i1])
-                        filename = pkgdir(AURORA, "e_cascading_data", "O2", cascading_files[i1])
+                        filename = pkgdir(AURORA, "internal_data", "e_cascading", "O2", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -232,7 +232,7 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = pkgdir(AURORA, "e_cascading_data", "O2",
+                filename = pkgdir(AURORA, "internal_data", "e_cascading", "O2",
                                     string("CascadingSpecO2ionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
                                     ".mat"))
@@ -291,11 +291,11 @@ let Q = [], E4Q , E_ionizations
         if isempty(Q) || length(E_secondary) > length(E4Q) || E4Q[1:length(E_secondary)] != E_secondary
             # then we try to find a cascading spectra file with matching energy grid E_secondary
             found_them = 0
-            cascading_files = readdir(pkgdir(AURORA, "e_cascading_data", "O"))
+            cascading_files = readdir(pkgdir(AURORA, "internal_data", "e_cascading", "O"))
             for i1 in eachindex(cascading_files)
                 if !isdir(cascading_files[i1])
                     try
-                        filename = pkgdir(AURORA, "e_cascading_data", "O", cascading_files[i1])
+                        filename = pkgdir(AURORA, "internal_data", "e_cascading", "O", cascading_files[i1])
                         file = matopen(filename)
                         E4Q = read(file, "E4Q")
                         close(file)
@@ -384,7 +384,7 @@ let Q = [], E4Q , E_ionizations
                 end
 
                 # Save the results for future use
-                filename = pkgdir(AURORA, "e_cascading_data", "O",
+                filename = pkgdir(AURORA, "internal_data", "e_cascading", "O",
                                     string("CascadingSpecOionization_",
                                     Dates.format(now(), "yyyymmdd-HHMMSS"),
                                     ".mat"))

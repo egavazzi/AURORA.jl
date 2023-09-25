@@ -1,7 +1,7 @@
 using MATLAB
 
 """
-    setup(top_altitude, θ_lims, E_max)
+    setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
 
 Load the atmosphere, the energy grid, the collision cross-sections, ... \\
 It calls a lot of functions from the original MATLAB code.
@@ -12,9 +12,10 @@ It calls a lot of functions from the original MATLAB code.
 
 
 # Inputs
+- `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
-- `θ_lims`: range of angles for the limits of our electron beams (e.g. 180:-10:0), where
-    180° corresponds to field aligned down, and 0° field aligned up
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
+    corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
@@ -28,18 +29,15 @@ It calls a lot of functions from the original MATLAB code.
     Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
 - `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ...,
     [n`_`levels x nE])
-- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beams + 1]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beams + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beams]
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
-    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight_continuous,
-    BeamWeight_discrete)`
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
     + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
     + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
-        n_beams]
-    + `BeamWeight_continuous`: solid angle for each stream (ster), vector [n_beams]
-    + `BeamWeight_discrete`: solid angle for each stream (ster), but calculated in a discrete way,
-        vector [n_beams]
+        n_beam]
+    + `BeamWeight`: solid angle for each stream (ster), vector [n_beam]
 """
 function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     ## Creating a MATLAB session
@@ -122,7 +120,7 @@ function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
 
     ## Collision cross-sections
     mat"
-    [XsO,xs_fcnO] =   get_all_xs('O',E+dE/2);
+    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
     [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
     [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
     "
@@ -148,21 +146,14 @@ function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     BeamWeight_relative = @mget theta2beamW;
 
     # This beam weight is calculated in a continuous way
-    BeamWeight_continuous = 2π .* vec(@mget BeamW);
-    # Whereas this one is calculated in a discrete way. This is to ensure the conservation of the number of e-
-    # when calculating the scatterings, as these calculations are discretized in pitch angle (around 721
-    # different angles) which leads to a slightly different normalization factor
-    BeamWeight_discrete = sum(BeamWeight_relative, dims=2);
-    BeamWeight_discrete[μ_center .< 0] = 2π .* BeamWeight_discrete[μ_center .< 0] ./ sum(BeamWeight_discrete[μ_center .< 0]);
-    BeamWeight_discrete[μ_center .> 0] = 2π .* BeamWeight_discrete[μ_center .> 0] ./ sum(BeamWeight_discrete[μ_center .> 0]);
-
+    BeamWeight = 2π .* vec(@mget BeamW);
     # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
     # contribution from withing each beam. It means that when summing up along each beam, we should get 1
     BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
 
 
 
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight_continuous = BeamWeight_continuous, BeamWeight_discrete = BeamWeight_discrete);
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
 
     ## Closing the MATLAB session
     close(s1)
@@ -170,4 +161,203 @@ function setup(path_to_AURORA_matlab, top_altitude, θ_lims, E_max)
     return h_atm, ne, Te, E, dE,
         n_neutrals, E_levels_neutrals, σ_neutrals,
         θ_lims, μ_lims, μ_center, μ_scatterings
+end
+
+
+"""
+    setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
+
+Load the atmosphere, the energy grid, the collision cross-sections, ... \\
+It is a partial rework of the `setup` function. Some parts are implemented in pure Julia,
+but there are still some calls to the original MATLAB code.
+
+# Calling
+`h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
+μ_scatterings = setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file);`
+
+
+# Inputs
+- `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
+- `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
+    corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
+- `E_max`: upper limit for the energy grid (in eV)
+- `msis_file`: path to the msis file to use
+- `E_max`: path to the iri file to use
+
+# Outputs
+- `h_atm`: altitude (m), vector [nZ]
+- `ne`: e- densities (m³), vector [nZ]
+- `Te`: e- temperatures (K), vector [nZ]
+- `E`: energy grid (eV), vector [nE]
+- `dE`: energy bin sizes(eV), vector [nE]
+- `n_neutrals`: neutral densities (m³), Tuple of vectors ([nZ], ..., [nZ])
+- `E_levels_neutrals`: collisions energy levels and number of secondary e- produced,
+    Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
+- `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ...,
+    [n`_`levels x nE])
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
+- `μ_scatterings`: Tuple with several of the scattering informations, namely
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
+    n`_`direction]
+    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x
+    n`_`direction]
+    + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
+    + `theta1`: scattering angles used in the calculations. Vector [n_direction]
+"""
+function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
+    h_atm = make_altitude_grid(top_altitude)
+    E, dE = make_energy_grid(E_max)
+    n_neutrals = load_neutral_densities(msis_file, h_atm)
+    ne, Te = load_electron_properties(iri_file, h_atm)
+    E_levels_neutrals = load_excitation_threshold()
+
+
+    ## Collision cross-sections
+    # Translating all of this to Julia is a big task. So for now we still use the
+    # Matlab code. # TO DO: translate that part
+
+    # Creating a MATLAB session
+    s1 = MSession();
+    @mput path_to_AURORA_matlab
+    mat"
+    addpath(path_to_AURORA_matlab,'-end')
+    add_AURORA
+    cd(path_to_AURORA_matlab)
+    "
+
+    @mput E
+    @mput dE
+    mat"
+    E = E';
+    dE = dE';
+    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
+    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
+    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
+    "
+    σ_N2 = @mget XsN2;
+    σ_O2 = @mget XsO2;
+    σ_O = @mget XsO;
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
+
+    ## Load/calculate the scattering matrices
+    μ_lims = cosd.(θ_lims);
+    μ_center = mu_avg(θ_lims);
+    BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
+    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
+
+    ## Closing the MATLAB session
+    close(s1)
+
+    return h_atm, ne, Te, E, dE,
+    n_neutrals, E_levels_neutrals, σ_neutrals,
+    μ_lims, μ_center, μ_scatterings
+end
+
+
+function make_altitude_grid(top_altitude)
+    Δz(n) = 150 .+
+            150 / 200 * (0:(n - 1)) .+
+            1.2 * exp.(((0:(n - 1)) .- 150) / 17)
+    h_atm = 100e3 .+ cumsum(Δz(331)) .- Δz(1)
+    i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
+    h_atm = h_atm[1:i_zmax]
+    return h_atm
+end
+
+function make_energy_grid(E_max)
+    E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
+    E = cumsum(E_function.(0:2000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
+    E = E[1:iE_max];                        # crop E accordingly
+    dE = diff(E); dE = [dE; dE[end]]
+    return E, dE
+end
+
+using PyCall
+using SpecialFunctions
+using DelimitedFiles
+using Term
+function load_neutral_densities(msis_file, h_atm)
+    # data_msis = readdlm(msis_file, skipstart=24) # old msis
+    # z_msis = data_msis[:, 1] # old msis
+    data_msis = readdlm(msis_file, skipstart=20) # new msis
+    z_msis = data_msis[:, 6] # new msis
+    # We check that importing functions from python works. If not, throw error
+    try
+        pyimport_conda("scipy.interpolate", "scipy");
+    catch error_pythonimport
+        @error "AURORA.jl calls the 'interpolate' function from the 'scipy' python package
+        for the setup. However, the " * @bold("importation of the function failed") * ".
+
+        This is probably due to the 'scipy' package not being found by julia. Read
+        more about what to do in the error message below.
+
+        If you are unfamiliar with python, we recommend to follow the alternative consisting
+        in using a Julia-specific Python distribution via the Conda.jl package:
+        set ENV[\"PYTHON\"]=\"\", run Pkg.build(\"PyCall\"), and re-launch Julia.
+
+        If you have questions or don't
+        manage to fix the problem, you can open an issue at " *
+        @italic("https://github.com/egavazzi/AURORA.jl/issues") * ".
+        "
+        println()
+        rethrow(error_pythonimport)
+    end
+    # import interpolate function from python
+    pyinterpolate = pyimport_conda("scipy.interpolate", "scipy");
+    msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
+    msis_interpolated = msis_interpolator(h_atm / 1e3)
+
+    # nO = msis_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³ # old msis
+	# nN2 = msis_interpolated[:, 3] * 1e6 # from cm⁻³ to m⁻³ # old msis
+	# nO2 = msis_interpolated[:, 4] * 1e6 # from cm⁻³ to m⁻³ # old msis
+    nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³ # new msis
+	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³ # new msis
+	nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³ # new msis
+
+	nO[end-2:end] .= 0
+	nN2[end-2:end] .= 0
+	nO2[end-2:end] .= 0
+    erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
+	nO[end-5:end-3] .= erf_factor .* nO[end-5:end-3]
+	nN2[end-5:end-3] .= erf_factor .* nN2[end-5:end-3]
+	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
+
+    n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
+    return n_neutrals
+end
+
+using PyCall
+function load_electron_properties(iri_file, h_atm)
+    # data_iri = readdlm(iri_file, skipstart=40) # old iri
+    data_iri = readdlm(iri_file, skipstart=32) # new iri
+    z_iri = data_iri[:, 1]
+    pypchip = pyimport_conda("scipy.interpolate", "scipy"); # import interpolate function from python
+    iri_interpolator = pypchip.PchipInterpolator(z_iri, data_iri);
+    iri_interpolated = iri_interpolator(h_atm / 1e3)
+
+    # ne = iri_interpolated[:, 2] # old iri
+    ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³ # new iri
+	ne[h_atm .< 82e3] .= 1
+	Te = iri_interpolated[:, 6]
+	Te[Te .== -1] .= 350
+    return ne, Te
+end
+
+function load_excitation_threshold()
+    file_N2_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "N2_levels.dat")
+	file_O2_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "O2_levels.dat")
+	file_O_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "O_levels.dat")
+
+	N2_levels = readdlm(file_N2_levels, comments=true, comment_char='%')
+	O2_levels = readdlm(file_O2_levels, comments=true, comment_char='%')
+	O_levels = readdlm(file_O_levels, comments=true, comment_char='%')
+
+	E_levels_neutrals = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels)
+    return E_levels_neutrals
 end

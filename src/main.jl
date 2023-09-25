@@ -4,13 +4,12 @@ using Dates
 using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, path_to_AURORA_matlab, root_savedir, name_savedir, INPUT_OPTIONS)
+    n_loop, path_to_AURORA_matlab, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
 
     ## Get atmosphere
     println("Calling Matlab for the setup...")
-    h_atm, ne, Te, E, dE,
-        n_neutrals, E_levels_neutrals, σ_neutrals,
-        θ_lims, μ_lims, μ_center, μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
+    h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup_new(path_to_AURORA_matlab, altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -29,22 +28,20 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         Ie_top = Ie_top_from_file(t, E, μ_center, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
         Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm,
-                                    μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
+                                    μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                     INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f,
                                     INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
         Ie_top = Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm,
-                                μ_scatterings.BeamWeight_discrete, INPUT_OPTIONS.IeE_tot,
+                                μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
     end
 
-    ## Make a finer θ for the scattering calculations
-    finer_θ = range(0, π, length=721);
     ## Calculate the phase functions and put them in a Tuple
-    phaseN2e, phaseN2i = phase_fcn_N2(finer_θ, E);
-    phaseO2e, phaseO2i = phase_fcn_O2(finer_θ, E);
-    phaseOe, phaseOi = phase_fcn_O(finer_θ, E);
+    phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
+    phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
+    phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
@@ -99,7 +96,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
             B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
                                                 phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
-                                                μ_scatterings.BeamWeight_relative, finer_θ);
+                                                μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
 
             # Compute the flux of e-
             Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
@@ -107,7 +104,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
             # Update the cascading of e-
             update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                        cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight_discrete, μ_center)
+                        cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center)
 
             next!(p)
         end

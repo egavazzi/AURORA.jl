@@ -95,7 +95,7 @@ end
 
 
 
-function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete, IeE_tot, z₀, E_min, f, Beams, modulation)
+function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot, z₀, E_min, f, Beams, modulation)
     Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
     qₑ = 1.602176620898e-19
     i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
@@ -115,11 +115,11 @@ function Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discre
                 if modulation == "sinus"
                     Ie_top[i_μ, :, iE] = IePnL[iE] .* (1 .- cos.(2*π*f/2 .* t_shifted) .^ 2) .*
                                                         (t_shifted .> 0) .* (E[iE] > E[i_Emin]) .*
-                                                        BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+                                                        BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
                 elseif modulation == "square"
                     Ie_top[i_μ, :, iE] = IePnL[iE] .* (1 .+ square.(2*π*f .* t_shifted .- π/2) ./ 2) .*
                                                         (t_shifted .> 0) .* (E[iE] > E[i_Emin]) .*
-                                                        BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+                                                        BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
                 end
         end
     end
@@ -130,7 +130,7 @@ end
 
 
 # Not sure about that one...
-function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight_discrete, I0, z₀, E0, dE0, Beams)
+function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight, I0, z₀, E0, dE0, Beams)
     Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
 
     z = z₀ * 1e3 - h_atm[end]   # distance between the source and the top of the ionosphere
@@ -144,7 +144,7 @@ function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight_discrete, I0
 
             Ie_top[i_μ, :, iE] = I0 * exp(- (E[iE] - E0)^2 / dE0^2) .*
                                     (t_shifted .> 0) .*
-                                    BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+                                    BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
         end
     end
 
@@ -153,7 +153,7 @@ end
 
 
 
-function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete, IeE_tot, z₀, E_min, Beams, t0, t1)
+function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot, z₀, E_min, Beams, t0, t1)
     Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
     qₑ = 1.602176620898e-19
     i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
@@ -172,7 +172,7 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight_discrete
 
             Ie_top[i_μ, :, iE] = IePnL[iE] .* f_smooth_transition.(t_shifted, t0, t1) .*
                                                 (E[iE] > E[i_Emin]) .*
-                                                BeamWeight_discrete[i_μ] ./ sum(BeamWeight_discrete[Beams])
+                                                BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
 
         end
     end

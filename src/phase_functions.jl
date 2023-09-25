@@ -5,7 +5,7 @@ function DCSN2(θ,Energy)
     CoeffEt1=vec([-9.06218 11.1088 -6.1393 1.43937 -0.149179 0.570119e-2 0.0]);
     CoeffB1=vec([3.481694 -0.47699  0.0]);
     CoeffB2=vec([-42.1667 13.79589 -1.123838]);
-    CoeffB3=vec([-35.49183 12.7418 -1.247576]); 
+    CoeffB3=vec([-35.49183 12.7418 -1.247576]);
     CoeffEt2=vec([1.590443 -0.207755 0.0]);
 
     Elog = [1.0, log(Energy)];
@@ -49,7 +49,7 @@ function DCSO2(θ, Energy)
     CoeffEt1=vec([0.02369 0.5232 -0.585 0.240122 -0.041798 0.2622e-2 0.0]);
     CoeffB1=vec([3.381 -0.4622 0.0]);
     CoeffB2=vec([-121.6 41.0 -3.447]);
-    CoeffB3=vec([-86.19 33.04 -3.259]); 
+    CoeffB3=vec([-86.19 33.04 -3.259]);
     CoeffEt2=vec([2.308 -0.3645 0.0]);
 
     Elog = [1.0, log(Energy)];
@@ -92,8 +92,8 @@ function DCSO(θ, Energy)
     CoeffA3=vec([-16.22 4.452  -0.3577  0.0  0.0  0.0  0.0]);
     CoeffEt1=vec([-4.008 1.017 -0.06066 0.0 0.0 0.0 0.0]);
     CoeffB1=vec([11.44 -1.986 0.0]);
-    
-    CoeffB3=vec([-19.04 5.805 -0.5186]); 
+
+    CoeffB3=vec([-19.04 5.805 -0.5186]);
     CoeffEt2=vec([3.291 -0.7007 0.0]);
 
     Elog = [1.0, log(Energy)];
@@ -217,10 +217,10 @@ function convert_phase_fcn_to_3D!(phase_fcn, θ)
     # The measurements of scattering probabilities that make up the phase function matrices were done
     # in a plane (2D). Problem with that is that the electrons scatter in the 3 dimensions, so only
     # a fraction of them are measured. This fraction depends on the scattering angle, as the e- will
-    # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the 
+    # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the
     # probability of scattering will be underestimated the more we approach angles around 90°. This
     # function is here to correct that.
-    phase_fcn = phase_fcn .* sin.(θ);       # we don't need the factors 2π and dθ as they are the same for all theta bins.
+    phase_fcn = phase_fcn .* abs.(sin.(θ));       # we don't need the factors 2π and dθ as they are the same for all theta bins.
     phase_fcn = phase_fcn ./ sum(phase_fcn);    # so that sum of probabilities = 1
 end
 
@@ -228,10 +228,10 @@ function convert_phase_fcn_to_3D(phase_fcn, θ)
     # The measurements of scattering probabilities that make up the phase function matrices were done
     # in a plane (2D). Problem with that is that the electrons scatter in the 3 dimensions, so only
     # a fraction of them are measured. This fraction depends on the scattering angle, as the e- will
-    # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the 
+    # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the
     # probability of scattering will be underestimated the more we approach angles around 90°. This
     # function is here to correct that.
-    phase_fcn = phase_fcn .* sin.(θ);       # we don't need the factors 2π and dθ as they are the same for all theta bins.
+    phase_fcn = phase_fcn .* abs.(sin.(θ));       # we don't need the factors 2π and dθ as they are the same for all theta bins.
     phase_fcn = phase_fcn ./ sum(phase_fcn);    # so that sum of probabilities = 1
     return phase_fcn
 end
