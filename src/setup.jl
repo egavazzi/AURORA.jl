@@ -244,8 +244,8 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     ## Load/calculate the scattering matrices
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
-    Pmu2mup, _, BeamWeight_relative, θ₁ =  load_scattering_matrices(θ_lims, 720)
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
+    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, θ₁ = θ₁);
 
     ## Closing the MATLAB session
@@ -279,13 +279,36 @@ end
 using PyCall
 using SpecialFunctions
 using DelimitedFiles
+using Term
 function load_neutral_densities(msis_file, h_atm)
     # data_msis = readdlm(msis_file, skipstart=24) # old msis
     # z_msis = data_msis[:, 1] # old msis
     data_msis = readdlm(msis_file, skipstart=20) # new msis
     z_msis = data_msis[:, 6] # new msis
-    pypchip = pyimport_conda("scipy.interpolate", "scipy"); # import interpolate function from python
-    msis_interpolator = pypchip.PchipInterpolator(z_msis, data_msis);
+    # We check that importing functions from python works. If not, throw error
+    try
+        pyimport_conda("scipy.interpolate", "scipy");
+    catch error_pythonimport
+        @error "AURORA.jl calls the 'interpolate' function from the 'scipy' python package
+        for the setup. However, the " * @bold("importation of the function failed") * ".
+
+        This is probably due to the 'scipy' package not being found by julia. Read
+        more about what to do in the error message below.
+
+        If you are unfamiliar with python, we recommend to follow the alternative consisting
+        in using a Julia-specific Python distribution via the Conda.jl package:
+        set ENV[\"PYTHON\"]=\"\", run Pkg.build(\"PyCall\"), and re-launch Julia.
+
+        If you have questions or don't
+        manage to fix the problem, you can open an issue at " *
+        @italic("https://github.com/egavazzi/AURORA.jl/issues") * ".
+        "
+        println()
+        rethrow(error_pythonimport)
+    end
+    # import interpolate function from python
+    pyinterpolate = pyimport_conda("scipy.interpolate", "scipy");
+    msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
     msis_interpolated = msis_interpolator(h_atm / 1e3)
 
     # nO = msis_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³ # old msis
