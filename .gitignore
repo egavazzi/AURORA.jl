@@ -24,5 +24,8 @@ profiles/*
 
 
 
+# ignore old e_cascading_data
+e_cascading_data/*
+
 # local files
 local_files_no_git/*
