@@ -21,9 +21,9 @@ if ~exist('RunDirs','var') || isempty(RunDirs)
   disp('Please enter one or several "RunDirs"')
   return
 end
-% if ~exist('movies2make')
-  movies2make = [1 0 0 0 0];
-% end
+if ~exist('movies2make')
+  movies2make = [1 1 1 1 1];
+end
 
 %% Check cxmax
 if ~exist('cxmax')
@@ -65,9 +65,9 @@ for i2 = 1:numel(RunDirs)
       [t,h_atm,E,mu_lims,IeZTE,mu_scatterings] = Ie_ztE_loader({dDir(iRF).name});
       dE = diff(E);dE(end+1) = dE(end);
       if abs(sum(2*pi*mu_scatterings{3}) - 4*pi) < 0.01
-        BeamW = 2*pi*mu_scatterings{3}; % works with old results
+        BeamW = 2*pi*mu_scatterings{3}; % works with old matlab results
       elseif abs(sum(mu_scatterings{3}) - 4*pi) < 0.01
-        BeamW = mu_scatterings{3}; % works with newer results
+        BeamW = mu_scatterings{3}; % works with newer matlab and julia results
       end
       if abs(sum(BeamW) - 4*pi) > 0.01 % because sum of mu_scattering should be = 4pi
         disp(" ")
@@ -86,7 +86,9 @@ for i2 = 1:numel(RunDirs)
         break
       end
       
-      theta_lims_2_plot = [180 160 130 110 90 70 50 20 0];
+      if ~exist("theta_lims_2_plot")
+        theta_lims_2_plot = [180 160 130 110 90 70 50 20 0];
+      end
       % make a string for the plot titles, based on the given array
       % theta_lims_2_plot
       mu_lims_2_plot = cosd(theta_lims_2_plot);
@@ -132,9 +134,12 @@ for i2 = 1:numel(RunDirs)
           % find the index of the streams to sum
           index1 = find(abs(mu_lims - mu_lims_2_plot(i1)) < 0.001);
           index2 = find(abs(mu_lims - mu_lims_2_plot(i1+1)) < 0.001);
-          if isempty(index1) || isempty(index2)
-            error(['Error : the pitch-angle to plot ', num2str(theta_lims_2_plot(i1)),...
-                    '° does not match any of the stream limits used in the simulation'])
+          if isempty(index1)
+            disp(['Error : the pitch-angle to plot ', num2str(theta_lims_2_plot(i1)),...
+                    '° does not match any of the stream limits used in the simulation.'])
+          elseif isempty(index2)
+            disp(['Error : the pitch-angle to plot ', num2str(theta_lims_2_plot(i1+1)),...
+                    '° does not match any of the stream limits used in the simulation.'])
           end
           % and sum them
           for i3 = index1:(index2-1)
@@ -144,8 +149,8 @@ for i2 = 1:numel(RunDirs)
           end
         end
       catch
-        disp(['Error : the pitch-angle to plot ', num2str(theta_lims_2_plot(i1)),...
-            '° does not match any of the stream limits used in the simulation'])
+%         disp(['Error : the pitch-angle to plot ', num2str(theta_lims_2_plot(i1)),...
+%             '° does not match any of the stream limits used in the simulation'])
       end  
       
       try

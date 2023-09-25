@@ -12,8 +12,8 @@
 
 
 
-results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/"
-RunDirs = {'Alfven_536s_correct_msis'} 
+results_dir = "/mnt/data/etienne/TEST/AURORA.jl/data/testing_changes"
+RunDirs = {'20230925-1135'} 
 %%
 make_all_Ie_top     % precipitation-spectra extraction at top
 make_all_Ie_top_MI  % precipitation-spectra extraction at top and top-1
@@ -23,5 +23,8 @@ make_all_I_lambda   % column-emission calculations
 %%
 make_all_IQ_lambda_plots    % volume/column-emission plots
 %%
-cxmax = 8               % parameter for colorbar limits
-make_all_animations     % electron-flux animation production
+cxmax = 10                % maximum value for the colorbar(s)
+movies2make = [0 0 0 1 0] % choose animations to make
+theta_lims_2_plot = [180 165 135 105 90 75 45 15 0] % as the name says
+
+make_all_animations       % electron-flux animation production
