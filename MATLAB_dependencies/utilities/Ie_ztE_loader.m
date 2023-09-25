@@ -144,7 +144,7 @@ function [mu_scatterings, E, t_run, mu_lims] = convert_from_julia(mu_scatterings
   if isa(mu_scatterings, 'struct')
     mu_scatterings_temp{1} = mu_scatterings.Pmu2mup;
     mu_scatterings_temp{2} = mu_scatterings.BeamWeight_relative;
-    mu_scatterings_temp{3} = mu_scatterings.BeamWeight_discrete;
+    mu_scatterings_temp{3} = mu_scatterings.BeamWeight;
 
     mu_scatterings = mu_scatterings_temp;
   end
