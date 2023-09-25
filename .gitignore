@@ -19,3 +19,10 @@ data/*
 
 # ignore the profiles
 profiles/*
+
+
+
+
+
+# local files
+local_files_no_git/*
