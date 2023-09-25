@@ -76,7 +76,7 @@ for i2 = 1:numel(RunDirs)
 		xlabel('time (s)')
 		ax = axis;
 		%         axis([ax(1:3) 300])
-		colorbar_labeled('"exc/m^3/s')
+		colorbar_labeled('#exc/m^3/s')
 		subplot(3,2,6)
 		pcolor(t(1:size(Q4278,2)),h_atm/1e3,QO1S),
 		title('O1S')
