@@ -39,9 +39,9 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     end
 
     ## Calculate the phase functions and put them in a Tuple
-    phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.θ₁, E);
-    phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.θ₁, E);
-    phaseOe, phaseOi = phase_fcn_O(μ_scatterings.θ₁, E);
+    phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
+    phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
+    phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
@@ -96,7 +96,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
             B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
                                                 phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
-                                                μ_scatterings.BeamWeight_relative, μ_scatterings.θ₁);
+                                                μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
 
             # Compute the flux of e-
             Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),

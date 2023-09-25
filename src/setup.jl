@@ -201,10 +201,12 @@ but there are still some calls to the original MATLAB code.
 - `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
 - `μ_scatterings`: Tuple with several of the scattering informations, namely
     μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
-    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam, matrix [721x721]
-    + `BeamWeight_relative`: relative contribution from within each beam, matrix [18 x
-        n_beam]
-    + `BeamWeight`: solid angle for each stream (ster), vector [n_beam]
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
+    n`_`direction]
+    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x
+    n`_`direction]
+    + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
+    + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
 function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
@@ -246,7 +248,7 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
     Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, θ₁ = θ₁);
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
 
     ## Closing the MATLAB session
     close(s1)
