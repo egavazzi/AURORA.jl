@@ -31,7 +31,6 @@ md"#### Load the setup"
 # ╔═╡ 7b36b57c-d26d-4c08-adf2-25747d542143
 # ╠═╡ show_logs = false
 begin
-	path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/" # path to Matlab executable
 	msis_file = pkgdir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
 	iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
 	altitude_max = 500;         # (km) top altitude of the ionosphere
@@ -39,7 +38,7 @@ begin
 	E_max = 7000;               # (eV) upper limit to the energy grid
 	
 	h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-	μ_scatterings = setup_new(path_to_AURORA_matlab, altitude_max, θ_lims, E_max, msis_file, iri_file);
+	μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 end
 
 # ╔═╡ 81ddbb69-8a55-4144-bbe9-ea916fc0b93e

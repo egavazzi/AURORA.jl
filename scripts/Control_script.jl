@@ -10,7 +10,6 @@ B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 t_sampling = 0:0.001:0.1;           # (s) time-array over which data will be saved
 n_loop = 1;                 # number of loops to run
 
-path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/" # path to Matlab executable
 msis_file = pkgdir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
 iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
 
@@ -47,4 +46,4 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Run the simulation
 calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-    path_to_AURORA_matlab, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
+    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
