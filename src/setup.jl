@@ -165,7 +165,7 @@ end
 
 
 """
-    setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
+    setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
 
 Load the atmosphere, the energy grid, the collision cross-sections, ... \\
 It is a partial rework of the `setup` function. Some parts are implemented in pure Julia,
@@ -173,11 +173,10 @@ but there are still some calls to the original MATLAB code.
 
 # Calling
 `h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
-μ_scatterings = setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file);`
+μ_scatterings = setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file);`
 
 
 # Inputs
-- `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
@@ -208,7 +207,7 @@ but there are still some calls to the original MATLAB code.
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_file, iri_file)
+function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
     E, dE = make_energy_grid(E_max)
     n_neutrals = load_neutral_densities(msis_file, h_atm)
@@ -221,10 +220,12 @@ function setup_new(path_to_AURORA_matlab, top_altitude, θ_lims, E_max, msis_fil
     # Matlab code. # TO DO: translate that part
 
     # Creating a MATLAB session
+    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
+
     s1 = MSession();
     @mput path_to_AURORA_matlab
     mat"
-    addpath(path_to_AURORA_matlab)
+    addpath(genpath(path_to_AURORA_matlab))
     cd(path_to_AURORA_matlab)
     "
 
