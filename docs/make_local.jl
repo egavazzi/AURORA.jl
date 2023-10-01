@@ -3,9 +3,9 @@ This script is to create the documentation locally on the user's machine.
 To use it, move into the docs/ folder, and type the command > include("make_local.jl")
 =#
 
-push!(LOAD_PATH, "../src/")
-using Pkg
-Pkg.activate("../")
+# push!(LOAD_PATH, "../src/")
+# using Pkg
+# Pkg.activate("../")
 
 using AURORA
 using Documenter
