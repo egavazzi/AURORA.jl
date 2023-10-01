@@ -11,10 +11,11 @@ using AURORA
 using Documenter
 
 makedocs(
-        sitename="AURORA.jl",
-        modules =[AURORA],
+        sitename = "AURORA.jl",
+        modules = [AURORA],
         pages = [
                 "Home" => "index.md",
                 "Manual" => "manual.md"
                 ],
-        format = Documenter.HTML(prettyurls = false))
+        format = Documenter.HTML(prettyurls = false),
+        warnonly = true)
