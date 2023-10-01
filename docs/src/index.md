@@ -7,5 +7,5 @@ Welcome to the documentation
 
 
 ```@docs
-setup
+setup_new
 ```
