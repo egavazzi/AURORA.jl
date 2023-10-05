@@ -193,6 +193,9 @@ end
 
 function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
     Ionization = Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
+    Ionizing = Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
+    n_repeated_over_μt = repeat(n, length(μ_center), length(t))
+    n_repeated_over_t = repeat(n, 1, length(t))
 
     for i_level = 2:size(E_levels, 1)
         if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
@@ -204,13 +207,13 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # ISOTROPIC SECONDARY ELECTRONS
 
-                Ionizing = repeat(n, length(μ_center), length(t)) .* (σ[i_level, iE] * @view(Ie[:, :, iE]));
+                Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
                 for i_μ in eachindex(μ_center)
                     Ionization[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :] .=
-                        max.(0, repeat(n, 1, length(t)) .*
+                        max.(0, n_repeated_over_t .*
                         (σ[i_level, iE] .*
                         @view(Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE])) .*
-                        BeamWeight[i_μ] / sum(BeamWeight))
+                        BeamWeight[i_μ] ./ sum(BeamWeight))
                 end
 
                 # Calculate the spectra of the secondary e-
@@ -240,13 +243,8 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 
                 # and finally add this to the flux of degrading e-
                 Threads.@threads for iI in 1:(iE - 1)
-
-                    @views(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
+                    @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
                                             Ionizing .* primary_e_spectra[iI]
-
-                    # if e_ionized_distribution[iI] == 0
-                    #     break
-                    # end
                 end
             end
         end
