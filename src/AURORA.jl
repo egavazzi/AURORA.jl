@@ -1,7 +1,7 @@
 module AURORA
 
 include("../internal_data/data_electron/e_N2_cross_sections.jl")
-export e_N2elastic, e_N2rot0_2
+export e_N2elastic, e_N2rot0_2, e_N2rot0_4, e_N2rot0_6, e_N2rot0_8, e_N2vib0_1
 
 include("setup.jl")
 include("input_flux.jl")
