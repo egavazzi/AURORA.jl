@@ -1,5 +1,6 @@
 using Dates
 using HCubature
+using Interpolations
 using ProgressMeter
 using MAT
 
@@ -271,8 +272,8 @@ let Q = [], E4Q , E_ionizations
         B_p = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
         A_p = [12.6, 13.7, 14.1, 14.0, 13.7]
         if (minimum(E_parameters) < E_primary) & (E_primary < maximum(E_parameters))
-            A = interp1(E_parameters, A_p, E_primary)
-            B = interp1(E_parameters, B_p, E_primary)
+            A = linear_interpolation(E_parameters, A_p)(E_primary)
+            B = linear_interpolation(E_parameters, B_p)(E_primary)
         elseif E_primary <= minimum(E_parameters)
             A = A_p[1]
             B = B_p[1]
@@ -350,8 +351,8 @@ let Q = [], E4Q , E_ionizations
 
                         #=== WHERE DOES THAT COME FROM ? ===#
                         if (minimum(E_parameters) < E_secondary[i2]) & (E_secondary[i2] < maximum(E_parameters))
-                            A = interp1(E_parameters, A_p, E_secondary[i2])
-                            B = interp1(E_parameters, B_p, E_secondary[i2])
+                            A = linear_interpolation(E_parameters, A_p)(E_secondary[i2])
+                            B = linear_interpolation(E_parameters, B_p)(E_secondary[i2])
                         elseif E_secondary[i2] <= minimum(E_parameters)
                             A = A_p[1]
                             B = B_p[1]

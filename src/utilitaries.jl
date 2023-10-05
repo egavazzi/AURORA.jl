@@ -146,42 +146,6 @@ end
 ## ====================================================================================== ##
 
 
-using Interpolations
-"""
-    interp1(X, V, Xq)
-
-Mimic the function interp1 from Matlab (linear interpolation).
-
-# Calling
-`Vq = interp1(X, V, Xq)`
-
-# Inputs
-- `X`: sample points
-- `V`: corresponding values to the sample points
-- `Xq`: coordinates of the query points
-
-# Outputs
-- `Vq`: interpolated values
-"""
-function interp1(X, V, Xq)
-    itp = interpolate((X, ), V, Gridded(Linear()))
-    return itp[Xq]
-end
-
-# """
-#     interp2(X, Y, V, Xq, Yq)
-
-# Mimic the function interp2 from Matlab (linear interpolation).
-# """
-# function interp2(X, Y, V, Xq, Yq)
-#     itp = interpolate((X, Y), V, Gridded(Linear()))
-#     return itp[Xq, Yq]
-# end
-
-
-## ====================================================================================== ##
-
-
 function square(x)
     ifelse(mod2pi(x) < π, 1.0, -1.0)
 end
