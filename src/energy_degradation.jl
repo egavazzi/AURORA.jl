@@ -191,6 +191,7 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
     end
 end
 
+using Polyester
 function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
     Ionization = Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
     Ionizing = Matrix{Float64}(undef, size(Ie,1), size(Ie,2))
@@ -242,9 +243,10 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 
 
                 # and finally add this to the flux of degrading e-
-                Threads.@threads for iI in 1:(iE - 1)
+                nbatch = Int(floor(iE / 6)) # will run on 7 threads, which seems to be optimal
+                @batch minbatch=nbatch for iI in 1:(iE - 1)
                     @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
-                                            Ionizing .* primary_e_spectra[iI]
+                                           Ionizing .* primary_e_spectra[iI]
                 end
             end
         end
