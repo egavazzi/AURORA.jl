@@ -16,7 +16,7 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
 end
 
 function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
-    Ie_degraded = Matrix{Float64}(undef, size(Q,1), size(Q,2))
+    Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
 
     # Multiply each element of B2B with n (density vector) and resize to get a matrix that can
     # be multiplied with Ie
@@ -76,19 +76,19 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
         if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
             # Find the energy bins where the e- in the current energy bin will degrade when losing
             # E_levels[i_level, 1] eV
-            i_degrade = intersect(  findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
-                                    findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
+                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # ISOTROPIC SECONDARY ELECTRONS
 
                 Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
-                for i_μ in eachindex(μ_center)
+                @views for i_μ in eachindex(μ_center)
                     Ionization[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :] .=
                         max.(0, n_repeated_over_t .*
-                        (σ[i_level, iE] .*
-                        @view(Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE])) .*
-                        BeamWeight[i_μ] ./ sum(BeamWeight))
+                             (σ[i_level, iE] .*
+                             Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
+                             BeamWeight[i_μ] ./ sum(BeamWeight))
                 end
 
                 # Calculate the spectra of the secondary e-
@@ -132,8 +132,8 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
                     cascading_neutrals, E, dE, iE, BeamWeight, μ_center)
 
     # e-e collisions
-    if iE > 1
-        @view(Q[:, :, iE - 1]) .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+    @views if iE > 1
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
                                             outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
     end
 
