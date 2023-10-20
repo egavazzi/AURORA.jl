@@ -243,7 +243,8 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 
 
                 # and finally add this to the flux of degrading e-
-                nbatch = Int(floor(iE / 6)) # will run on 7 threads, which seems to be optimal
+                Nthreads = 6 # will run on 6 threads, which seems to be optimal on my machine
+                nbatch = Int(floor(iE / Nthreads)) - 1
                 @batch minbatch=nbatch for iI in 1:(iE - 1)
                     @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
                                            Ionizing .* primary_e_spectra[iI]
