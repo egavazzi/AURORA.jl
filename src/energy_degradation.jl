@@ -66,7 +66,8 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
 end
 
 using Polyester
-function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
+function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads = 6)
+    # Nthreads is set to 6 by default as it seems to be optimal on my machine
     Ionization = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
     Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
@@ -117,8 +118,8 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 
 
                 # and finally add this to the flux of degrading e-
-                Nthreads = 6 # will run on 6 threads, which seems to be optimal on my machine
                 nbatch = Int(floor(iE / Nthreads)) - 1
+                nbatch < 1 ? nbatch = 1 : nothing
                 @batch minbatch=nbatch for iI in 1:(iE - 1)
                     @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
                                            Ionizing .* primary_e_spectra[iI]
@@ -129,7 +130,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 end
 
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center)
+                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center, Nthreads)
 
     # e-e collisions
     @views if iE > 1
@@ -146,6 +147,6 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th specie
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
-        add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
+        add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads)
     end
 end

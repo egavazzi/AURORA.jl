@@ -4,11 +4,14 @@ using AURORA
 ## Setting parameters
 altitude_max = 500;         # (km) top altitude of the ionosphere
 θ_lims = 180:-10:0;         # (°) angle-limits for the electron beams
-E_max = 7000;               # (eV) upper limit to the energy grid
+E_max = 3000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.001:0.1;           # (s) time-array over which data will be saved
+t_sampling = 0:0.001:0.01;   # (s) time-array over which data will be saved
 n_loop = 1;                 # number of loops to run
+
+Nthreads = 6;   # number of threads to be used for calculations of the energy_degradation
+                # 6 threads seems to be optimal on my machine (12th Gen Intel© Core™ i7-12800HX × 16 processor)
 
 msis_file = pkgdir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
 iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
@@ -46,4 +49,4 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Run the simulation
 calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
+    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, Nthreads)
