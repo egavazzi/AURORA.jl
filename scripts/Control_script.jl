@@ -4,7 +4,7 @@ using AURORA
 ## Setting parameters
 altitude_max = 500;         # (km) top altitude of the ionosphere
 θ_lims = 180:-10:0;         # (°) angle-limits for the electron beams
-E_max = 3000;               # (eV) upper limit to the energy grid
+E_max = 1000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
 t_sampling = 0:0.001:0.01;   # (s) time-array over which data will be saved

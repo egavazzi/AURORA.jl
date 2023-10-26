@@ -86,9 +86,11 @@ end
 ## ====================================================================================== ##
 
 using LibGit2
+using Pkg
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = LibGit2.head(pkgdir(AURORA))
+    version_AURORA = Pkg.TOML.parsefile(joinpath(pkgdir(@__MODULE__), "Project.toml"))["version"]
     open(savefile, "w") do f
         write(f, "altitude_max = $altitude_max \n")
         write(f, "θ_lims = $θ_lims \n")
@@ -101,7 +103,8 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
         write(f, "\n")
         write(f, "input_options = $INPUT_OPTIONS \n")
         write(f, "\n")
-        write(f, "commit_hash = $commit_hash")
+        write(f, "commit_hash = $commit_hash \n")
+        write(f, "version_AURORA = $version_AURORA")
     end
 end
 
