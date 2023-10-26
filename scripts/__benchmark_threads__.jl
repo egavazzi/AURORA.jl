@@ -81,6 +81,6 @@ end
 @btime test_serial(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
 # @btime test_turbo(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
 @btime test_threads(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
-@btime test_threads_chunks(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 10)
+@btime test_threads_chunks(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 6)
 @btime test_spawn(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
-@btime test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, 680, 6);
+@btime test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 6);
