@@ -130,7 +130,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 end
 
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center, Nthreads)
+                    cascading_neutrals, E, dE, iE, BeamWeight, μ_center, Nthreads = 6)
 
     # e-e collisions
     @views if iE > 1
