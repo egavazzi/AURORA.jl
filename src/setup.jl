@@ -10,7 +10,6 @@ It calls a lot of functions from the original MATLAB code.
 `h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
 μ_scatterings = setup(altitude_max, θ_lims, E_max);`
 
-
 # Inputs
 - `path_to_AURORA_matlab`: path to where the original Matlab AURORA package is installed
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
@@ -175,14 +174,13 @@ but there are still some calls to the original MATLAB code.
 `h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
 μ_scatterings = setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file);`
 
-
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
 - `msis_file`: path to the msis file to use
-- `E_max`: path to the iri file to use
+- `iri_file`: path to the iri file to use
 
 # Outputs
 - `h_atm`: altitude (m), vector [nZ]
@@ -210,25 +208,23 @@ but there are still some calls to the original MATLAB code.
 function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
     E, dE = make_energy_grid(E_max)
+    μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
     n_neutrals = load_neutral_densities(msis_file, h_atm)
     ne, Te = load_electron_properties(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
 
-
     ## Collision cross-sections
     # Translating all of this to Julia is a big task. So for now we still use the
-    # Matlab code. # TO DO: translate that part
-
+    # Matlab code.
+    # TO DO: translate that part
     # Creating a MATLAB session
     path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
-
     s1 = MSession();
     @mput path_to_AURORA_matlab
     mat"
     addpath(genpath(path_to_AURORA_matlab))
     cd(path_to_AURORA_matlab)
     "
-
     @mput E
     @mput dE
     mat"
@@ -242,15 +238,7 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     σ_O2 = @mget XsO2;
     σ_O = @mget XsO;
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
-
-    ## Load/calculate the scattering matrices
-    μ_lims = cosd.(θ_lims);
-    μ_center = mu_avg(θ_lims);
-    BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
-
-    ## Closing the MATLAB session
+    # Closing the MATLAB session
     close(s1)
 
     return h_atm, ne, Te, E, dE,
@@ -259,6 +247,20 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
 end
 
 
+"""
+    make_altitude_grid(top_altitude)
+
+Create an altitude grid based on the `top_altitude` given as input.
+
+# Calling
+`h_atm = make_altitude_grid(top_altitude)`
+
+# Inputs
+- `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+
+# Outputs
+- `h_atm`: altitude (m), vector [nZ]
+"""
 function make_altitude_grid(top_altitude)
     Δz(n) = 150 .+
             150 / 200 * (0:(n - 1)) .+
@@ -269,6 +271,21 @@ function make_altitude_grid(top_altitude)
     return h_atm
 end
 
+"""
+    make_energy_grid(E_max)
+
+Create an energy grid based on the maximum energy `E_max` given as input.
+
+# Calling
+`E, dE = make_energy_grid(E_max)`
+
+# Inputs
+- `E_max`: upper limit for the energy grid (in eV)
+
+# Outputs
+- `E`: energy grid (eV), vector [nE]
+- `dE`: energy bin sizes(eV), vector [nE]
+"""
 function make_energy_grid(E_max)
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
     E = cumsum(E_function.(0:2000, 0.15, 11.5, 0.05, 80)) .+ 1.9
@@ -276,6 +293,38 @@ function make_energy_grid(E_max)
     E = E[1:iE_max];                        # crop E accordingly
     dE = diff(E); dE = [dE; dE[end]]
     return E, dE
+end
+
+"""
+    make_scattering_matrices(θ_lims)
+
+Create an energy grid based on the maximum energy `E_max` given as input.
+
+# Calling
+`μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)`
+
+# Inputs
+- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+
+# Outputs
+- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
+- `μ_scatterings`: Tuple with several of the scattering informations, namely
+    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
+    n`_`direction]
+    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x
+    n`_`direction]
+    + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
+    + `theta1`: scattering angles used in the calculations. Vector [n_direction]
+"""
+function make_scattering_matrices(θ_lims)
+    μ_lims = cosd.(θ_lims);
+    μ_center = mu_avg(θ_lims);
+    BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
+    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
+    return μ_lims, μ_center, μ_scatterings
 end
 
 using PyCall
