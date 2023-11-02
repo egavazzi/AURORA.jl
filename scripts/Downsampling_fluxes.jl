@@ -28,7 +28,7 @@ for j in files_to_process
     new_dt = dt * downsampling
     println("The time-step of the new file will be ", new_dt, "s.")
     Ie = Ie[:, 1:downsampling:end, :]
-    t_run = t_run[:, 1:downsampling:end]
+    t_run = t_run[1:downsampling:end]
 
     # create new subdir if it doesn't exist
     new_subdir = "downsampled_" * string(downsampling) * "x"
@@ -59,3 +59,22 @@ end
 # X[X .∈ [0:new_dt:X[end]]]
 
 # X[mod.(X, 0.01) .== 0]
+
+# t_run = 0:0.001:0.1
+# t_run = (0:0.001:0.1) .+ 0.1
+# downsampling = 10
+
+# dt = diff(t_run)[1]
+# println("The time-step from simulation is ", dt, "s.")
+# new_dt = dt * 10
+# println("The time-step of the new file will be ", new_dt, "s.")
+# Ie = Ie[:, 1:downsampling:end, :]
+# t_new = t_run[1:downsampling:end]
+
+# Vector(t_run)
+
+
+# file = "/mnt/Ubuntu/home/etienne/Documents/Julia/AURORA.jl/data/backup/20231027-0958/downsampled_10x/IeFlickering-01d.mat"
+# X = matread(file)
+
+# X["t_run"]
