@@ -7,7 +7,25 @@ make_density_file(directory_to_process)
 
 
 
+"""
+    make_density_file(directory_to_process)
 
+This function reads into a folder `directory_to_process` containing results from an AURORA.jl
+simulation. It loads the particle flux `Ie` (#e⁻/m²/s), calculates the superthermal e-
+density `n_e` (#e⁻/m³) from it, and saves `n_e` into a new file `superthermal_e_density.mat`.
+
+The particle flux `Ie` is defined along a magnetic field line and over an (Energy, pitch_angle)-grid.
+The number density `n_e` calculated is given along a magnetic field line and over an energy
+grid. That way, we have the density of electrons with a certain energy at a specific
+altitude and time.
+
+# Calling
+`make_density_file(directory_to_process)`
+
+# Inputs
+- `directory_to_process`: relative path to the simulation folder to process. Example:
+"Visions2/Alfven_536s"
+"""
 function make_density_file(directory_to_process)
     ## Find the files to process
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
