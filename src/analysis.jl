@@ -97,7 +97,7 @@ altitude and time.
 - `E_middle_bin`: middle energy of the energy bins (eV), vector [nE]
 - `v`: velocity corresponding to the `E_middle_bin` (m/s), vector [nE]
 - `Ie`: electron flux (#e⁻/m²/s), 3D array [n_beam * nz, nt, nE]
-- `n_e`: will be filled with the densities (#e⁻/m³), empty 3D array [nz, nt, nE]
+- `n_e`: electron density (#e⁻/m³), **empty** 3D array [nz, nt, nE]
 """
 function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
     Threads.@threads for i_t in eachindex(t_run)
