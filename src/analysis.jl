@@ -44,7 +44,6 @@ function make_density_file(directory_to_process)
     t = t_run
     ## Calculate the densities
     for (i_file, file) in enumerate(files_to_process)
-        file = files_to_process[1]
         if i_file > 1
             fill!(n_e_local, 0.0)
         end
