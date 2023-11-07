@@ -4,7 +4,7 @@ using MAT
     make_density_file(directory_to_process)
 
 This function reads into a folder `directory_to_process` containing results from an AURORA.jl
-simulation. It loads the particle flux `Ie` (#e⁻/m²/s), calculates the superthermal e-
+simulation. It loads the particle flux `Ie` (#e⁻/cm²/s), calculates the superthermal e-
 density `n_e` (#e⁻/m³) from it, and saves `n_e` into a new file "superthermal\\_e\\_density.mat".
 
 The particle flux `Ie` is defined along a magnetic field line and over an (Energy, pitch\\_angle)-grid.
@@ -79,7 +79,7 @@ end
 """
     calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
 
-This function converts a particle flux `Ie` (#e⁻/m²/s) into a number density `n_e` (#e⁻/m³).
+This function converts a particle flux `Ie` (#e⁻/cm²/s) into a number density `n_e` (#e⁻/m³).
 
 The particle flux `Ie` is defined along a magnetic field line and over an (Energy, pitch\\_angle)-grid.
 The number density `n_e` calculated is given along a magnetic field line and over an energy
@@ -95,7 +95,7 @@ altitude and time.
 - `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
 - `E_middle_bin`: middle energy of the energy bins (eV), vector [nE]
 - `v`: velocity corresponding to the `E_middle_bin` (m/s), vector [nE]
-- `Ie`: electron flux (#e⁻/m²/s), 3D array [n_beam * nz, nt, nE]
+- `Ie`: electron flux (#e⁻/cm²/s), 3D array [n_beam * nz, nt, nE]
 - `n_e`: electron density (#e⁻/m³), **empty** 3D array [nz, nt, nE]
 """
 function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
@@ -103,7 +103,9 @@ function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, 
         for i_μ in 1:(length(μ_lims) - 1)
             for i_z in eachindex(h_atm)
                 for i_E in eachindex(E_middle_bin)
-                    n_e[i_z, i_t, i_E] += 1 / v[i_E] * Ie[(i_μ - 1) * length(h_atm) + i_z, i_t, i_E]
+                    n_e[i_z, i_t, i_E] += 1 / v[i_E] *
+                                            Ie[(i_μ - 1) * length(h_atm) + i_z, i_t, i_E] *
+                                            1e4 # to convert from cm² to m²
                 end
             end
         end
