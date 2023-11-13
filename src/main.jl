@@ -102,8 +102,13 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                                 μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
 
             # Compute the flux of e-
-            Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                            A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
+            if E[iE] > 50
+                Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                                    A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
+            else
+                Ie[:, :, iE] = Crank_Nicolson_no_propagation_lowE(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                                    A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
+            end
 
             # Update the cascading of e-
             update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
