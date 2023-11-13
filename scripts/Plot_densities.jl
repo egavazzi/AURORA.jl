@@ -23,11 +23,11 @@ data_neutral = matread(file_neutral)
 ne_background = data_neutral["ne"]
 
 ## Plot e- density
-fig = Figure()
+fig = Figure(resolution = (2000, 1200))
 # make slider to show and control i_t
 sl_time = Slider(fig[2, 1], range = 1:length(t), startvalue = 1)
 # make observables
-E_limit = 3
+E_limit = 50
 i_t = lift(sl_time.value) do Int; Int; end
 time = Observable(string(round(t[i_t[]], digits=3)) * "s")
 n_e_superthermal = Observable(dropdims(sum(n_e[:, i_t[], :], dims=2), dims=2))
@@ -40,7 +40,7 @@ ne_total = Observable(ne_background .+ n_e_superthermal[])
 ax1 = Axis(fig[1, 1], title = time, xlabel = "nₑ (m⁻³)", ylabel = "altitude (km)",
     yminorticksvisible = false, yminorgridvisible = false, yticks = 100:100:600,
     xminorticksvisible = true, xminorgridvisible = true, xminorticks = IntervalsBetween(9),
-    xscale = log10, xticks = LogTicks(4:8)
+    xscale = log10, xticks = LogTicks(4:10)
 )
 n_e_max = maximum(sum(n_e, dims=3))
 xlims!(ax1, 1e3, n_e_max * 10)
@@ -125,7 +125,7 @@ QOi = data["QOi"] .* 1e4
 QN2i = data["QN2i"] .* 1e4
 
 ## Plot e- density
-fig = Figure()
+fig = Figure(resolution=(800, 1600))
 # make slider to show and control i_t
 sl_time = Slider(fig[2, 1], range = 1:length(t), startvalue = 1)
 # make observables
