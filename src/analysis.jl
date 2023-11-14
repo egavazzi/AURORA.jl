@@ -19,6 +19,7 @@ altitude and time.
 - `directory_to_process`: relative path to the simulation folder to process. Example: "Visions2/Alfven_536s"
 """
 function make_density_file(directory_to_process)
+    println("Calculating the densities from integrating Ie.")
     ## Find the files to process
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
