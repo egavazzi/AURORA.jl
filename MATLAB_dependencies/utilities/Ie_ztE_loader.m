@@ -144,7 +144,14 @@ function [mu_scatterings, E, t_run, mu_lims] = convert_from_julia(mu_scatterings
   if isa(mu_scatterings, 'struct')
     mu_scatterings_temp{1} = mu_scatterings.Pmu2mup;
     mu_scatterings_temp{2} = mu_scatterings.BeamWeight_relative;
-    mu_scatterings_temp{3} = mu_scatterings.BeamWeight;
+    try
+      % Works with new versions of AURORA.jl (after Oct 2023)
+      mu_scatterings_temp{3} = mu_scatterings.BeamWeight;
+    catch
+      % If it fails, try with 'BeamWeight_discrete' which was the variable
+      % name used in old versions of AURORA.jl (before Oct 2023)
+      mu_scatterings_temp{3} = mu_scatterings.BeamWeight_discrete;
+    end
 
     mu_scatterings = mu_scatterings_temp;
   end
