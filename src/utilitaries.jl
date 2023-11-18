@@ -1,3 +1,17 @@
+"""
+    v_of_E(E)
+
+Calculate the velocity (in **m/s**) of an electron with energy `E` (in **eV**).
+
+# Calling
+`v = v_of_E(E)`
+
+# Input
+- `E` : energy in **eV**, can be a scalar, vector, range, ...
+
+# Output
+- `v` : velocity in **m/s**
+"""
 function v_of_E(E)
 	mₑ = 9.10939e-31;
 	qₑ = 1.6021773e-19;
