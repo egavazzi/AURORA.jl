@@ -34,11 +34,14 @@ fig = Figure(resolution = (900, 1200))
 # make slider to show and control i_t
 sl_time = Slider(fig[2, 1], range = 1:length(t), startvalue = 1)
 # make observables
-E_limit = Observable(50)
+E_limit = Observable(3)
 i_t = lift(sl_time.value) do Int; Int; end
 time = Observable(string(round(t[i_t[]], digits=3)) * "s")
 n_e_superthermal = Observable(dropdims(sum(n_e[:, i_t[], :], dims=2), dims=2))
-n_e_over = Observable(dropdims(sum(n_e[:, i_t[], E .> E_limit[]], dims=2), dims=2))
+n_e_over50 = Observable(dropdims(sum(n_e[:, i_t[], E .> 50], dims=2), dims=2))
+n_e_over12 = Observable(dropdims(sum(n_e[:, i_t[], E .> 12], dims=2), dims=2))
+n_e_over6 = Observable(dropdims(sum(n_e[:, i_t[], E .> 6], dims=2), dims=2))
+n_e_over = Observable(dropdims(sum(n_e[:, i_t[], E .< E_limit[]], dims=2), dims=2))
 n_e_under = Observable(dropdims(sum(n_e[:, i_t[], E .< E_limit[]], dims=2), dims=2))
 ratio_over = Observable(n_e_over[] ./ n_e_superthermal[])
 ratio_under = Observable(n_e_under[] ./ n_e_superthermal[])
@@ -47,16 +50,19 @@ ne_total = Observable(ne_background .+ n_e_superthermal[])
 ax1 = Axis(fig[1, 1], title = time, xlabel = "nₑ (m⁻³)", ylabel = "altitude (km)",
     yminorticksvisible = false, yminorgridvisible = false, yticks = 100:100:600,
     xminorticksvisible = true, xminorgridvisible = true, xminorticks = IntervalsBetween(9),
-    xscale = log10, xticks = LogTicks(4:14)
+    xscale = log10, xticks = LogTicks(1:14)
 )
 n_e_max = maximum(sum(n_e, dims=3))
-xlims!(ax1, 1e3, n_e_max * 10)
+xlims!(ax1, 1e1, n_e_max * 10)
 ylims!(50, h_atm[end] / 1e3 + 50)
 l_superthermal = lines!(n_e_superthermal, h_atm / 1e3)
-l_over = lines!(n_e_over, h_atm / 1e3)
-l_under = lines!(n_e_under, h_atm / 1e3)
-L1 = Legend(fig[0, 1], [l_superthermal, l_over, l_under],
-    ["total superthermal", "> $(E_limit[]) eV", "< $(E_limit[]) eV"], "Densities";
+l_over50 = lines!(n_e_over50, h_atm / 1e3; linestyle = :dash)
+l_over12 = lines!(n_e_over12, h_atm / 1e3; linestyle = :dash)
+l_over6 = lines!(n_e_over6, h_atm / 1e3; linestyle = :dash)
+l_over = lines!(n_e_over, h_atm / 1e3; linestyle = :dash)
+l_under = lines!(n_e_under, h_atm / 1e3; linestyle = :dot)
+L1 = Legend(fig[0, 1], [l_superthermal, l_over50, l_over12, l_over6, l_over, l_under],
+    ["total superthermal", "> 50 eV", "> 12 eV", "> 6 eV", "> $(E_limit[]) eV", "< $(E_limit[]) eV"], "Densities";
     tellheight=true, tellwidth=false)
 # AXIS 2 : density of background + superthermal
 ax2 = Axis(fig[1, 2], title = time, xlabel = "nₑ (m⁻³)", yticks=100:100:600,
@@ -105,6 +111,9 @@ end
 # make function to step in time
 function step!(n_e_superthermal, n_e_over, n_e_under, ratio_over, ratio_under, ne_total, E_limit, time, i_t)
     n_e_superthermal[] = dropdims(sum(n_e[:, i_t, :], dims=2), dims=2)
+    n_e_over50[] = dropdims(sum(n_e[:, i_t, E .> 50], dims=2), dims=2)
+    n_e_over12[] = dropdims(sum(n_e[:, i_t, E .> 12], dims=2), dims=2)
+    n_e_over6[] = dropdims(sum(n_e[:, i_t, E .> 6], dims=2), dims=2)
     n_e_over[] = dropdims(sum(n_e[:, i_t, E .> E_limit[]], dims=2), dims=2)
     n_e_under[] = dropdims(sum(n_e[:, i_t, E .< E_limit[]], dims=2), dims=2)
     ne_total[] = ne_background .+ n_e_superthermal[]
@@ -128,7 +137,7 @@ end
 display(fig)
 
 ##
-video_file = joinpath(full_path_to_directory, "electron_densities.mp4")
+video_file = joinpath(full_path_to_directory, "electron_densities_50-12-6-3eV.mp4")
 @time record(fig, video_file, 1:length(t); framerate = 60, backend = CairoMakie) do i_t
     Makie.set_close_to!(sl_time, i_t)
 end
