@@ -3,8 +3,8 @@ docs/build/*
 # .github/*
 
 
-# ignore the sysimage
-JuliaSysimage.so
+# ignore the new msis files
+internal_data/data_neutrals/msis*
 
 # ignore the cascading files
 internal_data/e_cascading/*/Cascading*.mat
