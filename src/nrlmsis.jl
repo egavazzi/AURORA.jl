@@ -10,7 +10,7 @@ using Printf
 ## TODO : add docstrings
 
 # Defaults to Visions2 launch conditions
-function retrieve_nrlmsis_file(;
+function find_nrlmsis_file(;
     year = 2018,
     month = 12,
     day = 7,
@@ -67,9 +67,6 @@ function retrieve_nrlmsis_file(;
     end
 end
 
-
-
-retrieve_nrlmsis_file(year = 2019);
 
 
 
