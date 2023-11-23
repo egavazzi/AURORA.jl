@@ -129,15 +129,14 @@ save the results in a new subfolder called`downsampled_10x`, inside the `directo
 `downsampling_fluxes(directory_to_process, downsampling_factor)`
 
 # Inputs
-- `directory_to_process`: relative path to the directory to process. Should start in `data` directory.
+- `directory_to_process`: absolute path to the directory to process.
 - `downsampling_factor`: downsampling factor for the time
 
 # Outputs
 The downsampled electron fluxes `Ie` will be saved in a subfolder inside the `directory_to_process`.
 """
 function downsampling_fluxes(directory_to_process, downsampling_factor)
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    files = readdir(full_path_to_directory, join=true)
+    files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
 
     for j in files_to_process
@@ -161,7 +160,7 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
 
         # create new subdir if it doesn't exist
         new_subdir = "downsampled_" * string(downsampling_factor) * "x"
-        full_path_to_new_subdir = joinpath(full_path_to_directory, new_subdir)
+        full_path_to_new_subdir = joinpath(directory_to_process, new_subdir)
         mkpath(full_path_to_new_subdir)
 
         # create new file

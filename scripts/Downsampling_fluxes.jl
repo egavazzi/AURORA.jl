@@ -4,14 +4,16 @@
 # `downsampled_Xx`. 'X' being the downsampling factor.
 #
 # - directory_to_process: relative path to the directory to process. Should start in `data`
-# directory. Example : `directory_to_process = "backup/20231123-0912"`
+# directory.
 #
 # - downsampling_factor: downsampling factor in time.
 
 using AURORA
 
 directory_to_process = "backup/20231123-0912"
+full_path_directory_to_process = pkgdir(AURORA, "data", directory_to_process)
+
 downsampling_factor = 10
 
 # calling the function that does the work
-downsampling_fluxes(directory_to_process, downsampling_factor)
+downsampling_fluxes(full_path_directory_to_process, downsampling_factor)
