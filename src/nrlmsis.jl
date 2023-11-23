@@ -191,7 +191,6 @@ function save_msis_data(nrlmsis_data, parameters)
         write(f, "time_type = Universal Time\n")
         write(f, "coordinate_type = Geographic\n")
         write(f, "\n")
-        write(f, "\n")
         # Then we write the data
         writedlm(f, nrlmsis_data)
     end

@@ -332,7 +332,7 @@ using SpecialFunctions
 using DelimitedFiles
 using Term
 function load_neutral_densities(msis_file, h_atm)
-    data_msis = readdlm(msis_file, skipstart=15)
+    data_msis = readdlm(msis_file, skipstart=14)
     z_msis = data_msis[:, 6]
     # We check that importing functions from python works. If not, throw error
     try
