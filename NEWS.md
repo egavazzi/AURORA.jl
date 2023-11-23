@@ -2,6 +2,7 @@
 
 ## v0.3.0
 - nrlmsis data are now automatically downloaded [#17](https://github.com/egavazzi/AURORA.jl/pull/17)
+- electron densities can be calculated from Ie and can be plotted. Ionization rates can be plotted too [#15](https://github.com/egavazzi/AURORA.jl/pull/15)
 
 ## v0.2.0
 - the input from file function now handles non-matching time arrays [#6](https://github.com/egavazzi/AURORA.jl/pull/6)
