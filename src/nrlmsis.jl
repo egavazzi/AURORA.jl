@@ -26,12 +26,11 @@ function find_nrlmsis_file(;
     data_neutrals_files = readdir(data_neutrals_directory)
     msis_files = data_neutrals_files[contains.(data_neutrals_files, "msis")]
     msis_files_fullpath = joinpath.(data_neutrals_directory, msis_files)
+    print("Looking for an msis file that matches the parameters...")
     found_it = 0
     file_to_load = ""
-    print("Looking for an msis file that matches the parameters...")
     for (i, file) in enumerate(msis_files_fullpath)
-        # Check that the file is not an old msis file
-        if msis_files[i][5] == '_'
+        if msis_files[i][5] == '_' # Check that the file is not an old msis file
             year_file = tryparse(Int, msis_files[i][6:9])
             month_file = tryparse(Int, msis_files[i][10:11])
             day_file = tryparse(Int, msis_files[i][12:13])
@@ -39,18 +38,20 @@ function find_nrlmsis_file(;
             minute_file = tryparse(Int, msis_files[i][17:18])
             # First we do a pre-check, to avoid loading files unnecessarily
             if all([year_file, month_file, day_file, hour_file, minute_file] .== [year, month, day, hour, minute])
-                parameters_file = load_parameters_msis(file)
                 parameters = (; year, month, day, hour, minute, lat, lon, height)
+                parameters_file = load_parameters_msis(file)
                 # Now we check if all the parameters are the same
                 if parameters == parameters_file
-                    println(" file found!")
+                    # If it is the case, that will be the file to load
                     found_it = 1
                     file_to_load = file
+                    println(" file found!")
                 end
             end
         end
     end
-    # If we did not find a file, download one
+
+    # If we did not find a file matching the parameters, we need to download one
     if found_it == 0
         println(" no file was found.")
         println("Starting to download msis data from https://kauai.ccmc.gsfc.nasa.gov/instantrun/nrlmsis/ ...")
@@ -66,11 +67,6 @@ function find_nrlmsis_file(;
         error("This is not normal, something is wrong with retrieve_nrlmsis_file()")
     end
 end
-
-
-
-
-
 
 
 function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
@@ -148,13 +144,12 @@ function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute 
         end
         println("Downloading the nrlmsis data ($i_query/$n_query).")
         # It seems like the nrlmsis server get capacity problems when we do multiple requests
-        # following each other in a short time. So the idea is to have a little sleep function
-        # here.
+        # following each other in a short time. So the idea here is to wait two seconds between
+        # each request
         sleep(2)
     end
 
     parameters = (; year, month, day, hour, minute, lat, lon, height)
-
     return nrlmsis_data, parameters
 end
 
@@ -201,6 +196,7 @@ function save_msis_data(nrlmsis_data, parameters)
         writedlm(f, nrlmsis_data)
     end
     println("File " * @bold("$filename") * " successfully created under " * @underline("$directory") * ".")
+
     return filename
 end
 
