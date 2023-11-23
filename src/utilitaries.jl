@@ -160,6 +160,19 @@ function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_facto
 end
 
 
+function rename_if_exists(savefile, file_extension)
+    if !isfile(savefile)
+        return savefile
+    end
+    counter = 1
+    while isfile(savefile[1:end-4] * "($counter)" * "$file_extension")
+        counter += 1
+    end
+    savefile = savefile[1:end-4] * "($counter)" * "$file_extension"
+    return savefile
+end
+
+
 ## ====================================================================================== ##
 
 

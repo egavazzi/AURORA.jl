@@ -13,7 +13,9 @@ n_loop = 1;                 # number of loops to run
 Nthreads = 6;   # number of threads to be used for calculations of the energy_degradation
                 # 6 threads seems to be optimal on my machine (12th Gen Intel© Core™ i7-12800HX × 16 processor)
 
-msis_file = pkgdir(AURORA, "internal_data/data_neutrals/msis20181207.txt") # path to the msis file
+msis_file = find_nrlmsis_file(
+    year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5, height=85:1:700
+    )
 iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
 
 root_savedir = ""   # name for the root folder where data will be saved (data/root_savedir/)

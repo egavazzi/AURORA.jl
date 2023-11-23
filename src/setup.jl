@@ -332,10 +332,8 @@ using SpecialFunctions
 using DelimitedFiles
 using Term
 function load_neutral_densities(msis_file, h_atm)
-    # data_msis = readdlm(msis_file, skipstart=24) # old msis
-    # z_msis = data_msis[:, 1] # old msis
-    data_msis = readdlm(msis_file, skipstart=20) # new msis
-    z_msis = data_msis[:, 6] # new msis
+    data_msis = readdlm(msis_file, skipstart=14)
+    z_msis = data_msis[:, 6]
     # We check that importing functions from python works. If not, throw error
     try
         pyimport_conda("scipy.interpolate", "scipy");
@@ -362,9 +360,6 @@ function load_neutral_densities(msis_file, h_atm)
     msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
     msis_interpolated = msis_interpolator(h_atm / 1e3)
 
-    # nO = msis_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³ # old msis
-	# nN2 = msis_interpolated[:, 3] * 1e6 # from cm⁻³ to m⁻³ # old msis
-	# nO2 = msis_interpolated[:, 4] * 1e6 # from cm⁻³ to m⁻³ # old msis
     nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³ # new msis
 	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³ # new msis
 	nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³ # new msis
