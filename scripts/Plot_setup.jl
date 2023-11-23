@@ -11,8 +11,11 @@ path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/"    # path to Ma
 # h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
 # μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
 
-msis_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_neutrals/msis20181207.txt"
-iri_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_electron/iri20181207.txt"
+msis_file = find_nrlmsis_file(
+    year=2018, month=12, day=7, hour=11, minute=15,
+    lat=76, lon=5, height=85:1:700
+    )
+iri_file = "/mnt/Ubuntu/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_electron/iri20181207.txt"
 h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
@@ -58,4 +61,4 @@ scatterlines!(E, dE, color = :red)
 display(f3)
 
 ## Plot cross-sections and back-scattering ratios.
-# This will have to be done, eventually... But it is not the most important atm
+# This will have to be done, eventually... But it is not the most important at the moment
