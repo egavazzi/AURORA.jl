@@ -29,7 +29,7 @@ include("main.jl")
 export calculate_e_transport
 
 include("analysis.jl")
-export make_density_file
+export make_density_file, downsampling_fluxes
 
 
 

@@ -77,6 +77,7 @@ function make_density_file(directory_to_process)
 end
 
 
+
 """
     calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
 
@@ -111,4 +112,70 @@ function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, 
             end
         end
     end
+end
+
+
+
+"""
+    downsampling_fluxes(directory_to_process, downsampling_factor)
+
+This function downsamples the electron fluxes `Ie` in time. So if `Ie` is given with a time
+step of 1ms, and we use a `downsampling_factor` of 10, this function will extract `Ie` with
+a time step of 10ms. It will then save the results in a new subfolder called
+`downsampled_10x`, inside the `directory_to_process`.
+
+# Calling
+`downsampling_fluxes(directory_to_process, downsampling_factor)`
+
+# Inputs
+- `directory_to_process`: relative path to the directory to process. Should start in `data` directory.
+- `downsampling_factor`: downsampling factor for the time
+
+# Outputs
+The downsampled electron fluxes `Ie` will be saved in a subfolder inside the `directory_to_process`.
+"""
+function downsampling_fluxes(directory_to_process, downsampling_factor)
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    files = readdir(full_path_to_directory, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+
+    for j in files_to_process
+        f = matopen(j)
+            Ie = read(f, "Ie_ztE") # [n_μ * nz, nt, nE]
+            E = read(f, "E")
+            t_run = read(f, "t_run")
+            μ_lims = read(f, "mu_lims")
+            h_atm = read(f, "h_atm")
+            I0 = read(f, "I0")
+            μ_scatterings = read(f, "mu_scatterings")
+        close(f)
+
+        # downsample the data
+        dt = diff(t_run)[1]
+        println("The time-step from simulation is ", dt, "s.")
+        new_dt = dt * downsampling_factor
+        println("The time-step of the new file will be ", new_dt, "s.")
+        Ie = Ie[:, 1:downsampling_factor:end, :]
+        t_run = t_run[1:downsampling_factor:end]
+
+        # create new subdir if it doesn't exist
+        new_subdir = "downsampled_" * string(downsampling_factor) * "x"
+        full_path_to_new_subdir = joinpath(full_path_to_directory, new_subdir)
+        mkpath(full_path_to_new_subdir)
+
+        # create new file
+        new_filename = splitdir(j)[2][1:end-4] * "d.mat" # add a 'd' after the number to indicate that it is downsampled
+        full_path_to_new_filename = joinpath(full_path_to_new_subdir, new_filename)
+        file = matopen(full_path_to_new_filename, "w")
+            write(file, "Ie_ztE", Ie)
+            write(file, "E", E)
+            write(file, "t_run", t_run)
+            write(file, "mu_lims", μ_lims)
+            write(file, "h_atm", h_atm)
+            write(file, "I0", I0)
+            write(file, "mu_scatterings", μ_scatterings)
+        close(file)
+    end
+
+    return nothing
 end
