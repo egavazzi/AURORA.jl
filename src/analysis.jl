@@ -119,10 +119,11 @@ end
 """
     downsampling_fluxes(directory_to_process, downsampling_factor)
 
-This function downsamples the electron fluxes `Ie` in time. So if `Ie` is given with a time
-step of 1ms, and we use a `downsampling_factor` of 10, this function will extract `Ie` with
-a time step of 10ms. It will then save the results in a new subfolder called
-`downsampled_10x`, inside the `directory_to_process`.
+This function extracts `Ie` from the simulation results in `directory_to_process` and
+downsample it in time.
+For example: if `Ie` is given with a time step of 1ms and we use a `downsampling_factor` of
+10, this function will extract the values of `Ie` with a time step of 10ms. It will then
+save the results in a new subfolder called`downsampled_10x`, inside the `directory_to_process`.
 
 # Calling
 `downsampling_fluxes(directory_to_process, downsampling_factor)`
