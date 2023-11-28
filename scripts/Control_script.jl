@@ -7,7 +7,7 @@ altitude_max = 500;         # (km) top altitude of the ionosphere
 E_max = 1000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.001:0.01;   # (s) time-array over which data will be saved
+t_sampling = 0:0.001:0.01;  # (s) time-array over which data will be saved
 n_loop = 1;                 # number of loops to run
 
 Nthreads = 6;   # number of threads to be used for calculations of the energy_degradation
@@ -21,6 +21,8 @@ iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # pat
 root_savedir = ""   # name for the root folder where data will be saved (data/root_savedir/)
 name_savedir = ""   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
                     # if left empty, the folder will be named using the current date and time (ex: data/root_savedir/20221029-1058/...)
+
+
 
 ## Choose the input type ("from_old_matlab_file", "from_file" or "flickering")
 # input_type = "from_old_matlab_file";
@@ -48,6 +50,8 @@ Beams = 1:2;                # beam numbers for the precipitation, starting with 
 t0 = 0;                     # (s) time of start for smooth transition
 t1 = 0;                     # (s) time of end for smooth transition
 INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+
+
 
 ## Run the simulation
 calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
