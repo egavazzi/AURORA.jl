@@ -11,8 +11,8 @@
 %       exemple: results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/"
 
 
-results_dir = ""
-RunDirs = {''} 
+results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/"
+RunDirs = {'Alfven_536s_correct_msis'} 
 %%
 make_all_Ie_top     % precipitation-spectra extraction at top
 make_all_Ie_top_MI  % precipitation-spectra extraction at top and top-1
@@ -22,8 +22,8 @@ make_all_I_lambda   % column-emission calculations
 %%
 make_all_IQ_lambda_plots    % volume/column-emission plots
 %%
-cxmax = 10                % maximum value for the colorbar(s)
-movies2make = [0 0 0 1 0] % choose animations to make
-theta_lims_2_plot = [180 165 135 105 90 75 45 15 0] % as the name says
+cxmax = 9                 % maximum value for the colorbar(s)
+movies2make = [1 0 0 0 0] % choose animations to make
+theta_lims_2_plot = [180 160 130 110 90 70 50 20 0] % as the name says
 
 make_all_animations       % electron-flux animation production
