@@ -2,7 +2,8 @@
 using BenchmarkTools
 n_E = 680;
 n_z = 5742;
-n_t = 51;
+# n_t = 51;
+n_t = 401;
 iE = 680;
 Q = zeros(n_z, n_t, n_E);
 Ionization = rand(size(Q, 1), size(Q, 2));
@@ -78,9 +79,11 @@ function test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spe
         end
     end
 end
+##
 @btime test_serial(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
 # @btime test_turbo(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
 @btime test_threads(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
 @btime test_threads_chunks(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 6)
 @btime test_spawn(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE)
-@btime test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 6);
+# @btime test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 6);
+@btime test_polyester(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 25);
