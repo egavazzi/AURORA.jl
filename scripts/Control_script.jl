@@ -14,9 +14,11 @@ Nthreads = 6;   # number of threads to be used for calculations of the energy_de
                 # 6 threads seems to be optimal on my machine (12th Gen Intel© Core™ i7-12800HX × 16 processor)
 
 msis_file = find_nrlmsis_file(
-    year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5, height=85:1:700
-    )
-iri_file = pkgdir(AURORA, "internal_data/data_electron/iri20181207.txt")   # path to the iri file
+    year=2019, month=12, day=7, hour=11, minute=15, lat=76, lon=5, height=85:1:700
+    );
+iri_file = find_iri_file(
+    year=2019, month=12, day=7, hour=11, minute=15, lat=76, lon=5, height=85:1:700
+    );
 
 root_savedir = ""   # name for the root folder where data will be saved (data/root_savedir/)
 name_savedir = ""   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
