@@ -360,9 +360,9 @@ function load_neutral_densities(msis_file, h_atm)
     msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
     msis_interpolated = msis_interpolator(h_atm / 1e3)
 
-    nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³ # new msis
-	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³ # new msis
-	nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³ # new msis
+    nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³
+	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
+	nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
 
 	nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
@@ -378,16 +378,13 @@ end
 
 using PyCall
 function load_electron_properties(iri_file, h_atm)
-    # data_iri = readdlm(iri_file, skipstart=40) # old iri
-    data_iri = readdlm(iri_file, skipstart=32) # new iri
+    data_iri = readdlm(iri_file, skipstart=41)
     z_iri = data_iri[:, 1]
     pypchip = pyimport_conda("scipy.interpolate", "scipy"); # import interpolate function from python
     iri_interpolator = pypchip.PchipInterpolator(z_iri, data_iri);
     iri_interpolated = iri_interpolator(h_atm / 1e3)
 
-    # ne = iri_interpolated[:, 2] # old iri
-    ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³ # new iri
-	ne[h_atm .< 82e3] .= 1
+    ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
 	Te = iri_interpolated[:, 6]
 	Te[Te .== -1] .= 350
     return ne, Te
