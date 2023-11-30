@@ -45,7 +45,7 @@ function find_nrlmsis_file(;
                     # If it is the case, that will be the file to load
                     found_it = 1
                     file_to_load = file
-                    println(" file found!")
+                    println(" found one!")
                 end
             end
         end
@@ -54,7 +54,6 @@ function find_nrlmsis_file(;
     # If we did not find a file matching the parameters, we need to download one
     if found_it == 0
         println(" no file was found.")
-        println("Starting to download msis data from https://kauai.ccmc.gsfc.nasa.gov/instantrun/nrlmsis/ ...")
         nrlmsis_data, parameters = download_msis_data(year, month, day, hour, minute, lat, lon, height)
         # and save it
         file_to_load = save_msis_data(nrlmsis_data, parameters)
@@ -64,13 +63,16 @@ function find_nrlmsis_file(;
     if found_it == 1
         return file_to_load
     else
-        error("This is not normal, something is wrong with retrieve_nrlmsis_file()")
+        error("This is not normal, something is wrong with find_nrlmsis_file()")
     end
 end
 
 
 function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     lat = 76, lon = 5, height = 85:1:700)
+
+    println("Starting to download msis data from https://kauai.ccmc.gsfc.nasa.gov/instantrun/nrlmsis/. It can take a few minutes (on the server side)...")
+
     # Initialize matrix
     nrlmsis_data = Matrix{any}
 
@@ -128,7 +130,7 @@ function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute 
             "_datelimit" => true,
         )
         body = JSON.json(body) # convert to JSON
-        output_file_link = HTTP.request("POST", url, headers, body)     # request results
+        output_file_link = HTTP.request("POST", url; headers, body, connect_timeout = 300)     # request results
         output_file_link = JSON.parse(String(output_file_link.body))    # from JSON to Julia
         output_file_link = output_file_link["txt"]                      # get only the link
 
@@ -194,7 +196,7 @@ function save_msis_data(nrlmsis_data, parameters)
         # Then we write the data
         writedlm(f, nrlmsis_data)
     end
-    println("File " * @bold("$filename") * " successfully created under " * @underline("$directory") * ".")
+    println("File " * @bold("$filename") * " created under " * @underline("$directory") * ".")
 
     return filename
 end
