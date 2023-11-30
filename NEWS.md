@@ -1,7 +1,8 @@
 # News
 
 ## v0.3.0
-- nrlmsis data are now automatically downloaded [#17](https://github.com/egavazzi/AURORA.jl/pull/17)
+- iri data are now automatically downloaded/loaded [#20](https://github.com/egavazzi/AURORA.jl/pull/20)
+- nrlmsis data are now automatically downloaded/loaded [#17](https://github.com/egavazzi/AURORA.jl/pull/17)
 - electron densities can be calculated from Ie and can be plotted. Ionization rates can be plotted too [#15](https://github.com/egavazzi/AURORA.jl/pull/15)
 - electron flux results from simulation can now be downsampled in time [#16](https://github.com/egavazzi/AURORA.jl/pull/16)
 
