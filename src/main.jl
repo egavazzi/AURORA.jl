@@ -4,7 +4,8 @@ using Dates
 using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, Nthreads = 6)
+    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, Nthreads = 6,
+    CFL_number = 64)
     # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
     # Nthreads is set to 6 by default as it seems to be optimal on my machine
 
@@ -21,7 +22,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
-    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max))
+    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max), CFL_number)
     # TODO: fix properly the time sampling of incoming data from file
 
     ## Load incoming flux
@@ -79,7 +80,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     print("\n", @bold "Results will be saved at $savedir \n")
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
+    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
+        Nthreads, CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
 
