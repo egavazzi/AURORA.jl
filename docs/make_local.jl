@@ -15,7 +15,11 @@ makedocs(
         modules = [AURORA],
         pages = [
                 "Home" => "index.md",
-                "Manual" => "manual.md"
+                "Manual" => [
+                    "Installation" => "manual_installation.md",
+                    "Get started" => "manual_get-started.md",
+                    "Folder structure" => "manual_folder-structure.md"
+                    ],
                 ],
         format = Documenter.HTML(prettyurls = false),
         warnonly = true)
