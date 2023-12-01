@@ -5,6 +5,7 @@
 - nrlmsis data are automatically downloaded/loaded [#17](https://github.com/egavazzi/AURORA.jl/pull/17)
 - electron densities can be calculated from Ie and can be plotted. Ionization rates can be plotted too [#15](https://github.com/egavazzi/AURORA.jl/pull/15)
 - electron flux results from simulation can be downsampled in time [#16](https://github.com/egavazzi/AURORA.jl/pull/16)
+- update docs about how to get started with simulations
 
 ## v0.2.0
 - the input from file function now handles non-matching time arrays [#6](https://github.com/egavazzi/AURORA.jl/pull/6)
