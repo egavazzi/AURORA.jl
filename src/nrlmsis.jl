@@ -198,7 +198,7 @@ function save_msis_data(nrlmsis_data, parameters)
     end
     println("File " * @bold("$filename") * " created under " * @underline("$directory") * ".")
 
-    return filename
+    return fullpath
 end
 
 function load_parameters_msis(nrlmsis_file)

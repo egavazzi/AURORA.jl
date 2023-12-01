@@ -192,7 +192,7 @@ function save_iri_data(iri_data, parameters)
     end
     println("File " * @bold("$filename") * " created under " * @underline("$directory") * ".")
 
-    return filename
+    return fullpath
 end
 
 function load_parameters_iri(iri_file)
