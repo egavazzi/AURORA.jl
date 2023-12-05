@@ -2,14 +2,15 @@
 docs/build/*
 # .github/*
 
-
 # ignore the new msis and iri files
 internal_data/data_neutrals/msis*
 internal_data/data_electron/iri*
 
-
 # ignore the cascading files
 internal_data/e_cascading/*/Cascading*.mat
+
+# ignore old e_cascading_data
+e_cascading_data/*
 
 # ignore the scattering files
 internal_data/e_scattering/*
@@ -26,8 +27,6 @@ profiles/*
 
 
 
-# ignore old e_cascading_data
-e_cascading_data/*
 
 # local files
 local_files_no_git/*
