@@ -393,7 +393,6 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
         add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads)
-        # add_ionization_collisions_threads!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads)
     end
 end
 
@@ -416,7 +415,6 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
-        # add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
         add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
         prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
