@@ -1,6 +1,7 @@
 using SparseArrays
 
 
+
 #################################################################################
 #                                   B2B matrix                                  #
 #################################################################################
@@ -20,6 +21,8 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
     return AB2B
 end
 
+
+
 #################################################################################
 #                               Inelastic collisions                            #
 #################################################################################
@@ -32,11 +35,11 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
     AB2B =  make_big_B2B_matrix(B2B_inelastic, n, h_atm)
     Ie_scatter = AB2B * @view(Ie[:, :, iE])
 
-    # Loop over the energy levels of the collisions with the i-th neutral specie
+    # Loop over the energy levels of the collisions with the i-th neutral species
     for i_level in 2:size(E_levels, 1)
         if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
             # The flux of e- degraded from energy bin [E[iE], E[iE] + dE[iE]] to any lower energy
-            # bin by excitation of the E_levels[i_level] state of the current specie.
+            # bin by excitation of the E_levels[i_level] state of the current species.
             # The second factor corrects for the case where the energy loss is maller than the width
             # in energy of the energy bin. That is, when dE[iE] > E_levels[i_level,1], only the
             # fraction E_levels[i_level,1] / dE[iE] is lost from the energy bin [E[iE], E[iE] + dE[iE]].
@@ -73,6 +76,63 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
         end
     end
 end
+
+using LoopVectorization
+function add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+    Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
+
+    # Multiply each element of B2B with n (density vector) and resize to get a matrix that can
+    # be multiplied with Ie
+    AB2B =  make_big_B2B_matrix(B2B_inelastic, n, h_atm)
+    Ie_scatter = AB2B * @view(Ie[:, :, iE])
+
+    # Loop over the energy levels of the collisions with the i-th neutral species
+    for i_level in 2:size(E_levels, 1)
+        if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
+            # The flux of e- degraded from energy bin [E[iE], E[iE] + dE[iE]] to any lower energy
+            # bin by excitation of the E_levels[i_level] state of the current species.
+            # The second factor corrects for the case where the energy loss is maller than the width
+            # in energy of the energy bin. That is, when dE[iE] > E_levels[i_level,1], only the
+            # fraction E_levels[i_level,1] / dE[iE] is lost from the energy bin [E[iE], E[iE] + dE[iE]].
+
+            Ie_degraded .= (σ[i_level, iE] * min(1, E_levels[i_level, 1] / dE[iE])) .* Ie_scatter
+
+            # Find the energy bins where the e- in the current energy bin will degrade when losing
+            # E_levels[i_level, 1] eV
+            i_degrade = intersect(  findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
+                                    findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+
+            partition_fraction = zeros(size(i_degrade)) # initialise
+            if !isempty(i_degrade) && i_degrade[1] < iE
+                # Distribute the degrading e- between those bins
+                partition_fraction[1] = min(1, (E[i_degrade[1]] .+ dE[i_degrade[1]] .-
+                                                E[iE] .+ E_levels[i_level, 1]) / dE[iE])
+                if length(i_degrade) > 2
+                    partition_fraction[2:end-1] = min.(1, dE[i_degrade[2:end-1]] / dE[iE])
+                end
+                partition_fraction[end] = min(1, (E[iE] .+ dE[iE] .- E[i_degrade[end]] .-
+                                                    E_levels[i_level, 1]) / dE[iE])
+                if i_degrade[end] == iE
+                    partition_fraction[end] = 0
+                end
+
+                # normalise
+                partition_fraction = partition_fraction / sum(partition_fraction)
+
+                # and finally calculate the flux of degrading e-
+                @turbo inline=false thread=true for i_u in eachindex(findall(x -> x != 0, partition_fraction))
+                    for j in axes(Q, 2)
+                        for k in axes(Q, 1)
+                            Q[k, j, i_degrade[i_u]] +=  max(0, Ie_degraded[k, j]) * partition_fraction[i_u]
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 
 #################################################################################
 #                               Ionization collisions                           #
@@ -329,14 +389,13 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         σ = σ_neutrals[i];                          # Array with collision cross sections
         E_levels = E_levels_neutrals[i];            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
-        cascading = cascading_neutrals[i];          # Cascading function for the current i-th specie
+        cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
         add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads)
         # add_ionization_collisions_threads!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads)
     end
 end
-
 
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight, μ_center,
@@ -355,14 +414,15 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         σ = σ_neutrals[i];                          # Array with collision cross sections
         E_levels = E_levels_neutrals[i];            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
-        cascading = cascading_neutrals[i];          # Cascading function for the current i-th specie
+        cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        # add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
         prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
     end
 
     add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
-        secondary_vector, primary_vector)
+                                secondary_vector, primary_vector)
 end
