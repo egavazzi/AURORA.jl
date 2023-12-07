@@ -60,9 +60,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # date and time as a name
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
-
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
         # throw a warning if name_savedir exists and if it already contains results
         print("\n", @bold @red "WARNING!")
@@ -76,14 +74,19 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         end
         mkpath(savedir)
     end
-
     print("\n", @bold "Results will be saved at $savedir \n")
+
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
         Nthreads, CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
+    # Initialize arrays for the ionization collisions part of the energy degradation
+    Ionization_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
+    Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
+    secondary_vector = [zeros(length(E)) for _ in 1:15]
+    primary_vector = [zeros(length(E)) for _ in 1:15]
 
     ## Looping over n_loop
     for i in 1:n_loop
@@ -108,8 +111,13 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                        cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center, Nthreads)
+            # update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
+            #             cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center, Nthreads)
+
+            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+                        B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
+                        μ_scatterings.BeamWeight, μ_center,
+                        Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
 
             next!(p)
         end
