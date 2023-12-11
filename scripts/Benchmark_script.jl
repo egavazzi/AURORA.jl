@@ -22,13 +22,11 @@ iri_file = find_iri_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
     );
 
-# root_savedir = "CFL_simulations"   # name for the root folder where data will be saved (data/root_savedir/)
-# name_savedir = "$(Int(E_max / 1000))keV_CFL-$CFL_number"   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
-                    # if left empty, the folder will be named using the current date and time (ex: data/root_savedir/20221029-1058/...)
-
-root_savedir = "Benchmark"   # name for the root folder where data will be saved (data/root_savedir/)
-name_savedir = "500km_$(E_max)eV_0-01s_megaturbo"   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
-# name_savedir = "TEST"   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
+# name for the root folder where data will be saved (data/root_savedir/)
+root_savedir = "Benchmark"
+# name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
+# if left empty, the folder will be named using the current date and time (ex: data/root_savedir/20221029-1058/...)
+name_savedir = "500km_$(E_max)eV_0-01s_megaturbo"
 
 # test rename_if_exists!() here ?
 
