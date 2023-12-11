@@ -25,7 +25,7 @@ function make_density_file(directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
 
-    ## Extracte simulation grid
+    ## Extract simulation grid
     f = matopen(files_to_process[1])
         E = read(f, "E")
         μ_lims = vec(read(f, "mu_lims"))
@@ -178,4 +178,49 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
     end
 
     return nothing
+end
+
+
+function load_results(directory_to_process)
+    ## Find the files to process
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    files = readdir(full_path_to_directory, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+
+    ## Extract simulation grid
+    f = matopen(files_to_process[1])
+        E = read(f, "E")
+        μ_lims = vec(read(f, "mu_lims"))
+        h_atm = read(f, "h_atm")
+        t_run = read(f, "t_run")
+        μ_scatterings = read(f, "mu_scatterings")
+    close(f)
+
+    n_z = length(h_atm)
+    n_μ = length(μ_lims) - 1
+    n_t = length(t_run)
+    n_E = length(E)
+
+    ## Initialize Ie and t to receive data
+    Ie = zeros(n_z * n_μ, n_t, n_E);
+    t = t_run
+
+    ## Extract Ie and t_run
+    for (i_file, file) in enumerate(files_to_process)
+        f = matopen(file)
+            Ie_local = read(f, "Ie_ztE") # [n_μ * nz, nt, nE]
+            t_run = read(f, "t_run")
+        close(f)
+
+        if i_file == 1
+            Ie .= Ie_local
+            t .= t_run
+        elseif i_file > 1
+            Ie = hcat(Ie, Ie_local[:, 2:end, :])
+            t = vcat(t, t_run[2:end])
+        end
+        println("File $i_file/", length(files_to_process), " loaded.")
+    end
+
+    return (; Ie, h_atm, t, E, μ_scatterings, μ_lims)
 end
