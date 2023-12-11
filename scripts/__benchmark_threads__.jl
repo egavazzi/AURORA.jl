@@ -123,7 +123,9 @@ using BenchmarkTools
 # n_E = 680;
 n_E = 680;
 n_z = 5742;
-n_t = 51;
+# n_z = 7000;
+n_t = 25;
+# iE = 680;
 iE = 680;
 Q = zeros(n_z, n_t, n_E);
 
@@ -197,11 +199,10 @@ end
 ##
 @benchmark test_bandwidth1(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 20) seconds=5
 @benchmark test_bandwidth_turbo(Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector,
-                                    Q, iE) seconds=5
-# @time test_bandwidth_turbo(Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector,
-#                                     Q, iE)
+                                    Q, iE) seconds=10
 
-
+# max size 5742*101*680 ~ 400 000 000 values (3 GiB)
+# max size 5742*101 ~ 575 000 values (4.4 MiB slices)
 
 
 
