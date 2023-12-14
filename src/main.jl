@@ -4,7 +4,7 @@ using Dates
 using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, Nthreads = 6,
+    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
     CFL_number = 64)
     # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
     # Nthreads is set to 6 by default as it seems to be optimal on my machine
@@ -111,9 +111,6 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            # update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-            #             cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center, Nthreads)
-
             update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                         μ_scatterings.BeamWeight, μ_center,
