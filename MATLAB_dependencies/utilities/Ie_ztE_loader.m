@@ -60,7 +60,10 @@ if numel(data_paths) == 1 % Simplest case with data from one directory
   else
     res_files = dir(fullfile(data_paths{1},'IeFl*.mat'));
   end
-  load(fullfile(data_paths{1},res_files(1).name))
+  filenames = {res_files.name};
+  [a, sorting_order] = natsort(filenames);
+  res_files = res_files(sorting_order);
+  load(fullfile(data_paths{1},res_files(1).name));
   [mu_scatterings, E, t_run, mu_lims] = convert_from_julia(mu_scatterings, E, t_run, mu_lims);
   IeZTE = Ie_ztE;
   t = t_run;
