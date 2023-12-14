@@ -1,6 +1,7 @@
 # News
 
 ## v0.3.0
+- big performance improvements, on the order of 5x faster [#21](https://github.com/egavazzi/AURORA.jl/pull/21)
 - iri data are automatically downloaded/loaded [#20](https://github.com/egavazzi/AURORA.jl/pull/20)
 - nrlmsis data are automatically downloaded/loaded [#17](https://github.com/egavazzi/AURORA.jl/pull/17)
 - electron densities can be calculated from Ie and can be plotted. Ionization rates can be plotted too [#15](https://github.com/egavazzi/AURORA.jl/pull/15)

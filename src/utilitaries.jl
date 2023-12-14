@@ -116,7 +116,7 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
-        write(f, "Nthreads = $Nthreads")
+        write(f, "Nthreads = $Nthreads \n")
         write(f, "CFL_number = $CFL_number")
         write(f, "\n")
         write(f, "input_options = $INPUT_OPTIONS \n")
