@@ -101,7 +101,8 @@ end
 
 using LibGit2
 using Pkg
-function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop, INPUT_OPTIONS, savedir)
+function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
+    n_loop, Nthreads, CFL_number, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = LibGit2.head(pkgdir(AURORA))
     version_AURORA = Pkg.TOML.parsefile(joinpath(pkgdir(@__MODULE__), "Project.toml"))["version"]
@@ -114,6 +115,9 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
         write(f, "t_sampling = $t_sampling \n")
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
+        write(f, "\n")
+        write(f, "Nthreads = $Nthreads \n")
+        write(f, "CFL_number = $CFL_number")
         write(f, "\n")
         write(f, "input_options = $INPUT_OPTIONS \n")
         write(f, "\n")
