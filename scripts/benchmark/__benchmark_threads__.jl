@@ -114,18 +114,17 @@ Q_save[:, :, 1]
 
 
 
+
+
 #################################################################################
 #                           several steps at once                               #
 #################################################################################
 
 ## investigating if adding all ionization to Q in one go is faster or not
 using BenchmarkTools
-# n_E = 680;
 n_E = 680;
 n_z = 5742;
-# n_z = 7000;
-n_t = 25;
-# iE = 680;
+n_t = 51;
 iE = 680;
 Q = zeros(n_z, n_t, n_E);
 
@@ -155,7 +154,7 @@ function test_bandwidth1(Ionization, Ionizing, secondary_e_spectra, primary_e_sp
     for n in 1:5 # number of E_levels in total
         nbatch = Int(floor(iE / Nthreads)) - 1 # will run on Nthreads threads, 6 seems to be optimal on my machine
         nbatch < 1 ? nbatch = 1 : nothing
-        @batch minbatch=nbatch for iI in 1:(iE - 1)
+        @inbounds @batch minbatch=nbatch for iI in 1:(iE - 1)
         # Threads.@threads for i in 1:Nthreads
         #     for iI in splitter(iE - 1, Nthreads, i)
                 @view(Q[:, :, iI]) .+= Ionization .* secondary_e_spectra[iI] .+
@@ -168,7 +167,7 @@ using LoopVectorization
 function test_bandwidth_turbo(Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector,
     Q, iE)
     for n in 1:1 # number of E_levels in total
-        # @turbo inline=false thread=20 for iI in 1:(iE - 1)
+        # @turbo inline=false thread=10 for iI in 1:(iE - 1)
         @tturbo inline=false for iI in 1:(iE - 1)
         # @inbounds Threads.@threads for iI in 1:(iE - 1)
             for j in axes(Q, 2)
@@ -198,11 +197,77 @@ function test_bandwidth_turbo(Ionization_matrix, Ionizing_matrix, secondary_vect
 end
 ##
 @benchmark test_bandwidth1(Ionization, Ionizing, secondary_e_spectra, primary_e_spectra, Q, iE, 20) seconds=5
-@benchmark test_bandwidth_turbo(Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector,
-                                    Q, iE) seconds=10
+b = @benchmark test_bandwidth_turbo($Ionization_matrix, $Ionizing_matrix, $secondary_vector, $primary_vector,
+                                    $Q, $iE) seconds=5
 
 # max size 5742*101*680 ~ 400 000 000 values (3 GiB)
 # max size 5742*101 ~ 575 000 values (4.4 MiB slices)
+
+
+
+
+
+
+
+
+
+
+
+#################################################################################
+#                    automatic investigation of ideal size of Q                 #
+#################################################################################
+##
+function test_size_Q(nt_to_benchmark)
+    benchmark_results = zeros(length(nt_to_benchmark), 2)
+
+    for (i, n_t) in enumerate(nt_to_benchmark)
+        n_E = 680;
+        iE = 680;
+        n_z = 5742;
+        # n_t = i * 50 + 1;
+        Q_local = zeros(n_z, n_t, n_E);
+        Ionization_matrix_local = [rand(size(Q_local, 1), size(Q_local, 2)) for _ in 1:15];
+        Ionizing_matrix_local = [rand(size(Q_local, 1), size(Q_local, 2)) for _ in 1:15];
+        secondary_vector_local = [rand(n_E) for _ in 1:15];
+        primary_vector_local = [rand(n_E) for _ in 1:15];
+
+        # println(size(Q_local))
+        b = @benchmark test_bandwidth_turbo($Ionization_matrix_local, $Ionizing_matrix_local, $secondary_vector_local, $primary_vector_local,
+                $Q_local, $iE) samples=200 seconds=20
+
+        display(b)
+
+        benchmark_results[i, 1] = mean(b).time * 1e-9   # convert from ns to s
+        benchmark_results[i, 2] = n_z * n_t
+    end
+
+    return benchmark_results
+end
+
+X = test_size_Q([11, 21, 41, 51, 101, 201, 401, 501, 601, 801, 1001]);
+
+##
+using CairoMakie
+f = Figure()
+ax = Axis(f[1, 1], xscale = identity)
+scatter!(ax, X[:, 2] ./ 5742, X[:, 1])
+f
+lines!(ax, [51, 1001], [X[4, 1], X[4, 1] * (1001 / 51)])
+lines!(ax, [41, 1001], [X[3, 1], X[3, 1] * (1001 / 41)])
+f
+##
+
+using AURORA
+h_atm = AURORA.make_altitude_grid(500)
+a, b = CFL_criteria(range(0, 0.35, 106)[1:11], h_atm, v_of_E(3000), 128)
+size(a)
+
+
+
+
+
+
+
 
 
 

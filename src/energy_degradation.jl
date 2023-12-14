@@ -349,7 +349,7 @@ function add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
     # split over groups of 5)
     for i_loop in 1:3
         idx = (i_loop - 1) * 5
-        @turbo inline=false thread=20 for iI in 1:(iE - 1)
+        @tturbo inline=false for iI in 1:(iE - 1)
             for j in axes(Q, 2)
                 for k in axes(Q, 1)
                     Q[k, j, iI] += Ionization_matrix[idx + 1][k, j] * secondary_vector[idx + 1][iI] +
