@@ -1,5 +1,8 @@
 # News
 
+## v0.3.1
+- fix bug https://github.com/egavazzi/AURORA.jl/issues/22
+
 ## v0.3.0
 - big performance improvements, on the order of 5x faster [#21](https://github.com/egavazzi/AURORA.jl/pull/21)
 - iri data are automatically downloaded/loaded [#20](https://github.com/egavazzi/AURORA.jl/pull/20)
