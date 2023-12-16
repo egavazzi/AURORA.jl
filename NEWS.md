@@ -1,6 +1,7 @@
 # News
 
 ## v0.3.1
+- better calculations of dt and CFL criteria, which yields some performance improvements
 - fix bug https://github.com/egavazzi/AURORA.jl/issues/22
 
 ## v0.3.0
