@@ -4,10 +4,10 @@ using AURORA
 ## Setting parameters
 altitude_max = 600;         # (km) top altitude of the ionosphere
 θ_lims = [180, 170, 150, 120, 100, 90, 80, 60, 30, 10, 0];         # (°) angle-limits for the electron beams
-E_max = 7000;               # (eV) upper limit to the energy grid
+E_max = 8000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.001:0.025;  # (s) time-array over which data will be saved
+t_sampling = 0:0.001:0.02;  # (s) time-array over which data will be saved
 n_loop = 100;                 # number of loops to run
 
 CFL_number = 128;
@@ -35,30 +35,34 @@ name_savedir = "experiment_1"   # name for the actual data folder of the current
 
 ## Choose the input type ("from_old_matlab_file", "from_file" or "flickering")
 # input_type = "from_old_matlab_file";
-# input_file = "/mnt/data/etienne/AURORA/MI_coupling/TIME2PLAY/conversion_1.27e7-1/Ie_incoming.mat";
-# INPUT_OPTIONS = (;input_type, input_file);
+    # input_file = "/mnt/data/etienne/AURORA/MI_coupling/TIME2PLAY/conversion_1.27e7-1/Ie_incoming.mat";
+    # INPUT_OPTIONS = (;input_type, input_file);
 
 # input_type = "from_file"
-# input_file = "/mnt/data/etienne/Julia/AURORA/data/MI_coupling/1.27e7-1/Ie_precipitating.mat"
-# INPUT_OPTIONS = (;input_type, input_file);
+    # input_file = "/mnt/data/etienne/Julia/AURORA/data/MI_coupling/1.27e7-1/Ie_precipitating.mat"
+    # INPUT_OPTIONS = (;input_type, input_file);
 
-input_type = "flickering";
-IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = 3000;                   # (km) altitude of the source
-E_min = 100;                # (eV) bottom energy of the FAB
-f = 5;                     # (Hz) frequence of the modulation
-Beams = 1;                # beam numbers for the precipitation, starting with field aligned down
-modulation = "sinus";       # type of the modulation ("square" or "sinus")
-INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+input_type = "from_file_pulsating"
+    input_file = "/mnt/data/bjorn/Campaigns/Pulsating-aurora/IeMaxTopAtm-01.mat"
+    INPUT_OPTIONS = (;input_type, input_file);
+
+# input_type = "flickering";
+    # IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
+    # z₀ = 3000;                   # (km) altitude of the source
+    # E_min = 100;                # (eV) bottom energy of the FAB
+    # f = 5;                     # (Hz) frequence of the modulation
+    # Beams = 1;                # beam numbers for the precipitation, starting with field aligned down
+    # modulation = "sinus";       # type of the modulation ("square" or "sinus")
+    # INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 
 # input_type = "constant_onset"
-# IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-# z₀ = altitude_max;          # (km) altitude of the source
-# E_min = E_max - 100;         # (eV) bottom energy of the FAB
-# Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
-# t0 = 0;                     # (s) time of start for smooth transition
-# t1 = 0;                     # (s) time of end for smooth transition
-# INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+    # IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
+    # z₀ = altitude_max;          # (km) altitude of the source
+    # E_min = E_max - 100;         # (eV) bottom energy of the FAB
+    # Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
+    # t0 = 0;                     # (s) time of start for smooth transition
+    # t1 = 0;                     # (s) time of end for smooth transition
+    # INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 
 
