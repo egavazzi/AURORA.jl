@@ -42,7 +42,6 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     if size(Ie_top_raw, 3) < length(E)
         error("""The incoming flux Ie_top is wrongly dimensioned. Check the E dimension.\
         Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
-        error_grid = 1
     end
 
     ## check the time grid of Ie_top
@@ -92,6 +91,87 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
 
     return Ie_top
 end
+
+
+
+function Ie_top_from_file_Silje(t, E, μ_center, n_loop, filename)
+    Nt = (n_loop - 1) * (length(t) - 1) + length(t)
+
+    ## load the file
+    file = matopen(filename)
+        Ie_top_raw = read(file, "IeMaxwellianPulsationOn") # size [μ, n_E, n_t]
+        t_top = read(file, "t")
+    close(file)
+
+    ## Resize the matrix from [μ, n_E, n_t] to [n_μ, n_E, n_t] by adding zeros to the empty bins
+    n_empy_bins = length(μ_center) - size(Ie_top_raw, 1)
+    Ie_top_raw = cat(Ie_top_raw, zeros(n_empy_bins, size(Ie_top_raw, 2), size(Ie_top_raw, 3)), dims=1)
+
+    ## Resize the matrix from [n_μ, n_E, n_t] to [n_μ, n_t, n_E]
+    Ie_top_raw = permutedims(Ie_top_raw, (1, 3, 2))
+
+    ## Cut the incoming flux to fit the energy grid
+    Ie_top_raw = Ie_top_raw[:, :, 1:length(E)]
+
+    ## check that Ie_top is matching our simulation grid
+    if size(Ie_top_raw, 1) != length(μ_center)
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the θ dimension.\
+        Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
+    end
+    if size(Ie_top_raw, 3) < length(E)
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the E dimension.\
+        Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
+    end
+
+    ## check the time grid of Ie_top
+    if length(t_top) == 1
+        # we assume constant input flux and resize the matrix from
+        # [n_μ, 1, n_E] to [n_μ, n_t, n_E]
+        Ie_top = repeat(Ie_top_raw, outer=(1, Nt, 1))[:, :, 1:length(E)]
+    else
+        dt_top = t_top[2] - t_top[1]
+        dt = t[2] - t[1]
+        if dt_top > dt
+            # the resolution in Ie_top is coarser than our simulation, we need to repeat elements
+            dt_factor = dt_top / dt
+            if !(dt_factor ≈ round(dt_factor))
+                error("""Problem with the time resolution. The ratio of the dt of the \
+                incoming flux over the dt of the simulation is not an integer. \n
+                dt_incoming = $dt_top \n
+                dt_simulation = $dt \n
+                ratio = $dt_factor""")
+            end
+            dt_factor = round(Int, dt_factor)
+            Ie_top_raw = repeat(Ie_top_raw, inner=(1, dt_factor, 1))
+        elseif dt_top < dt
+            # the resolution in Ie_top is finer than our simulation, we need to drop elements
+            dt_factor = dt / dt_top
+            if !(dt_factor ≈ round(dt_factor))
+                error("""Problem with the time resolution. The ratio of the dt of the \
+                simulation over the dt of the incoming flux is not an integer. \n
+                dt_incoming = $dt_top \n
+                dt_simulation = $dt \n
+                ratio = $dt_factor""")
+            end
+            dt_factor = round(Int, dt_factor)
+            Ie_top_raw = Ie_top_raw[:, 1:dt_factor:end, :]
+        end
+
+        if size(Ie_top_raw, 2) > Nt
+            # in that case the array is too long and we need to cut it
+            Ie_top_raw = Ie_top_raw[:, 1:Nt, :]
+        elseif size(Ie_top_raw, 2) < Nt
+            # in that case the array is too short and we fill it with zeros
+            missing_data = zeros(length(μ_center), Nt - size(Ie_top_raw, 2), size(Ie_top_raw, 3))
+            Ie_top_raw = cat(Ie_top_raw, missing_data; dims=2)
+        end
+        Ie_top = Ie_top_raw[:, :, 1:length(E)]
+    end
+
+    return Ie_top
+end
+
+
 
 
 
