@@ -79,7 +79,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
-        CFL_number, INPUT_OPTIONS, savedir)
+        Nthreads, CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
 
     # Initialize arrays for the ionization collisions part of the energy degradation
