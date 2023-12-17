@@ -21,27 +21,19 @@ function v_of_E(E)
 end
 
 function CFL_criteria(t, h_atm, v, CFL_number=64)
-    dt = t[2] - t[1]
-    dz = h_atm[2] - h_atm[1]
-
     # The Courant-Freidrichs-Lewy (CFL) number normally hase to be small (<4) to ensure numerical
     # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
     # should be careful about numerical accuracy though.
     # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
     # on the results, while reducing computational time tremendously
-    CFL = v * dt / dz
-    n_factors = 2 .^ collect(0:22)
-    iFactor = 1
-    # This while loop effectively reduces dt by a factor of 2 at each iteration and check if the new
-    # CFL is < 64. If not, it continues reducing dt.
-    t_finer = t
-    while (CFL > CFL_number) && (iFactor < length(n_factors))
-        t_finer = range(t[1], t[end], length(t) * n_factors[iFactor] + 1 - n_factors[iFactor])
-        dt = t_finer[2] - t_finer[1]
-        CFL = v * dt / dz
-        iFactor += 1
-    end
-    CFL_factor = n_factors[max(1, iFactor - 1)]
+    dt = t[2] - t[1]
+    dz = h_atm[2] - h_atm[1]
+    # Calculate the maximum dt that still satisfies the CFL criteria.
+    dt_max = CFL_number * dz / v
+    # Then find the smallest integer that dt can be divided to become smaller than dt_max.
+    CFL_factor = ceil(Int, dt / dt_max) # that integer is the CFL_factor
+    # Now make t_finer using the CFL_factor
+    t_finer = range(t[1], t[end], CFL_factor * (length(t) - 1) + 1)
 
     return t_finer, CFL_factor
 end
@@ -102,7 +94,7 @@ end
 using LibGit2
 using Pkg
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
-    n_loop, Nthreads, CFL_number, INPUT_OPTIONS, savedir)
+    n_loop, CFL_number, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = LibGit2.head(pkgdir(AURORA))
     version_AURORA = Pkg.TOML.parsefile(joinpath(pkgdir(@__MODULE__), "Project.toml"))["version"]
@@ -116,7 +108,6 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
-        write(f, "Nthreads = $Nthreads \n")
         write(f, "CFL_number = $CFL_number")
         write(f, "\n")
         write(f, "input_options = $INPUT_OPTIONS \n")
