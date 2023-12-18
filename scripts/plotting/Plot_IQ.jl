@@ -3,11 +3,13 @@
 
 using AURORA
 using MAT
-using CairoMakie
-CairoMakie.activate!(type = "svg")
+# using CairoMakie
+# CairoMakie.activate!(type = "svg")
+using GLMakie
+GLMakie.activate!()
 
 
-directory_to_plot = "Visions2/Alfven_536s_correct_msis_and_scattering"
+directory_to_plot = "Pulsating_aurora/experiment_1"
 
 
 
@@ -29,7 +31,7 @@ f = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
-            yminorticksvisible = true,
+            yminorticksvisible = true, limits=(nothing, (nothing, 400))
             ),
         Colorbar = (flip_vertical_label = true, vertical = true),
         Heatmap = (rasterize = true,),
@@ -40,28 +42,24 @@ f = with_theme(
     ax4278 = Axis(ga[1, 1]; title = "4278 Å", xticklabelsvisible = false, ylabel ="altitude (km)")
     hm4278 = heatmap!(t, h_atm, Q4278'; rasterize = true)
     cb4278 = Colorbar(ga[1, 2], hm4278; label = "photons/m³/s")
-    ylims!(nothing, 400)
     colgap!(ga, 10)
 
     gb = f[1, 2] = GridLayout()
     ax6730 = Axis(gb[1, 1]; title = "6730 Å", xticklabelsvisible = false, yticklabelsvisible = false)
     hm6730 = heatmap!(t, h_atm, Q6730')
     cb6730 = Colorbar(gb[1, 2], hm6730; label = "photons/m³/s")
-    ylims!(nothing, 400)
     colgap!(gb, 10)
 
     gc = f[2, 1] = GridLayout()
     ax7774 = Axis(gc[1, 1]; title = "7774 Å", xlabel = "time(s)", ylabel = "altitude (km)")
     hm7774 = heatmap!(t, h_atm, Q7774')
     cb7774 = Colorbar(gc[1, 2], hm7774; label = "photons/m³/s")
-    ylims!(nothing, 400)
     colgap!(gc, 10)
 
     gd = f[2, 2] = GridLayout()
     ax8446 = Axis(gd[1, 1]; title = "8446 Å", yticklabelsvisible = false, xlabel = "time (s)")
     hm8446 = heatmap!(t, h_atm, Q8446')
     cb8446 = Colorbar(gd[1, 2], hm8446; label = "photons/m³/s")
-    ylims!(nothing, 400)
     colgap!(gd, 10)
     return f
 end
