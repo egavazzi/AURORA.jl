@@ -3,12 +3,12 @@ using AURORA
 
 ## Setting parameters
 altitude_max = 600;         # (km) top altitude of the ionosphere
-θ_lims = [180, 170, 150, 120, 100, 90, 80, 60, 30, 10, 0];         # (°) angle-limits for the electron beams
+θ_lims = 180:-10:0          # (°) angle-limits for the electron beams
 E_max = 3000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
-t_sampling = range(0, 0.35, 106)[1:11];  # (s) time-array over which data will be saved
-n_loop = 6;                 # number of loops to run
+t_sampling = 0:0.001:0.1;   # (s) time-array over which data will be saved
+n_loop = 10;                # number of loops to run
 
 CFL_number = 128;
 
@@ -27,8 +27,8 @@ iri_file = find_iri_file(
     );
 
 
-root_savedir = "test_matlab_comparisons"   # name for the root folder where data will be saved (data/root_savedir/)
-name_savedir = "PnLh-05-3000-3kev-FA"   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
+root_savedir = ""   # name for the root folder where data will be saved (data/root_savedir/)
+name_savedir = ""   # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
                     # if left empty, the folder will be named using the current date and time (ex: data/root_savedir/20221029-1058/...)
 
 
