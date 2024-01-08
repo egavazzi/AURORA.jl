@@ -24,8 +24,7 @@ data/*
 profiles/*
 
 # ignore the control scripts
-scripts/Control_script.jl
-scripts/CFL_script.jl
+scripts/Control*.jl
 MATLAB_dependencies/Control_make_all.m
 
 
