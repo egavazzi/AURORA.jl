@@ -23,6 +23,11 @@ data/*
 # ignore the profiles
 profiles/*
 
+# ignore the control scripts
+scripts/Control_script.jl
+scripts/CFL_script.jl
+
+
 
 
 
