@@ -31,6 +31,8 @@ MATLAB_dependencies/Control_make_all.m
 
 
 
+# ignore matlab temporary files
+*.asv
 
 # local files
 local_files_no_git/*
