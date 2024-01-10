@@ -1,9 +1,9 @@
 using AURORA
 using MAT
 using CairoMakie
-# CairoMakie.activate!(type = "png")
+# CairoMakie.activate!()
 using GLMakie
-GLMakie.activate!(type = "png")
+GLMakie.activate!()
 
 
 directory_to_process1 = "CFL_simulations/7keV_CFL-128"
