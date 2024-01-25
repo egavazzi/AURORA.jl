@@ -12,5 +12,5 @@ authors:
     family-names: Gavazzi
 repository-code: 'https://github.com/egavazzi/AURORA.jl'
 license: GPL-3.0
-version: 0.1.0
-date-released: '2023-04-07'
+version: 0.3.1
+date-released: '2023-12-18'
