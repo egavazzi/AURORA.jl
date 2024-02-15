@@ -216,7 +216,7 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     ## Collision cross-sections
     # Translating all of this to Julia is a big task. So for now we still use the
     # Matlab code.
-    # TO DO: translate that part
+    # TODO: translate that part
     # Creating a MATLAB session
     path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
     s1 = MSession();
@@ -324,8 +324,51 @@ function make_scattering_matrices(θ_lims)
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
     Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
+
     return μ_lims, μ_center, μ_scatterings
 end
+
+
+# This function is here just for testing. It is not supposed to be used in production.
+function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
+    ## Creating a MATLAB session
+    s1 = MSession();
+    @mput path_to_AURORA_matlab
+    mat"
+    addpath(path_to_AURORA_matlab,'-end')
+    add_AURORA
+    cd(path_to_AURORA_matlab)
+    "
+
+    theta_lims2do = reshape(Vector(θ_lims), 1, :);
+    @mput theta_lims2do
+    mat"
+    theta_lims2do = double(theta_lims2do)
+    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
+    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
+    c_o_mu = mu_avg(mu_lims);
+    "
+    θ_lims = vec(@mget theta_lims2do);
+    μ_lims = vec(@mget mu_lims);
+    μ_center = vec(@mget c_o_mu);
+
+    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
+    BeamWeight_relative = @mget theta2beamW;
+
+    # This beam weight is calculated in a continuous way
+    BeamWeight = 2π .* vec(@mget BeamW);
+    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
+    # contribution from withing each beam. It means that when summing up along each beam, we should get 1
+    BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
+
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
+
+    ## Closing the MATLAB session
+    close(s1)
+
+    return μ_lims, μ_center, μ_scatterings
+end
+
 
 using PyCall
 using SpecialFunctions
