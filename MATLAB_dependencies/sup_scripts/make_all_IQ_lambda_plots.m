@@ -1,4 +1,4 @@
-cd%% Volume and Column intensity-plots
+%% Volume and Column intensity-plots
 % This script produces plots of altitude-time-variation of volume
 % emission-rates and time-variation of normalized
 % column-emission(excitation) intensity plots.
