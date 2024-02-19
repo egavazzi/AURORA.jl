@@ -25,7 +25,7 @@ profiles/*
 
 # ignore the control scripts
 scripts/Control*.jl
-MATLAB_dependencies/Control_make_all.m
+MATLAB_dependencies/Control_make_all*.m
 
 
 
