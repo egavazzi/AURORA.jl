@@ -27,7 +27,8 @@ profiles/*
 scripts/Control*.jl
 !scripts/Control_script.jl
 !scripts/Control_script_SteadyState.jl
-MATLAB_dependencies/Control_make_all.m
+MATLAB_dependencies/Control*
+!MATLAB_dependencies/Control_make_all.m
 
 
 
