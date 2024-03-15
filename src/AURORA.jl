@@ -31,7 +31,7 @@ include("main.jl")
 export calculate_e_transport
 
 include("steady_state.jl")
-export steady_state_transport
+export calculate_e_transport_steady_state
 
 include("analysis.jl")
 export make_density_file, downsampling_fluxes
