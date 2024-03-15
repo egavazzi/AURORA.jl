@@ -1,5 +1,7 @@
 # News
 
+- add a steady state version of the transport code [#24](https://github.com/egavazzi/AURORA.jl/pull/24/commits)
+
 ## v0.3.1
 - better calculations of dt and of the CFL factor, which yields performance improvements (see the [commit](https://github.com/egavazzi/AURORA.jl/commit/31274452819201eb28d64be530baf85cb521e291))
 - fix bug https://github.com/egavazzi/AURORA.jl/issues/22
