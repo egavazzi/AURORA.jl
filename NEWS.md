@@ -1,5 +1,6 @@
 # News
 
+- use a finer grid in altitude [#25](https://github.com/egavazzi/AURORA.jl/pull/25)
 - add a steady state version of the transport code [#24](https://github.com/egavazzi/AURORA.jl/pull/24/commits)
 
 ## v0.3.1

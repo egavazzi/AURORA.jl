@@ -264,8 +264,8 @@ Create an altitude grid based on the `top_altitude` given as input.
 function make_altitude_grid(top_altitude)
     Δz(n) = 150 .+
             150 / 200 * (0:(n - 1)) .+
-            1.2 * exp.(((0:(n - 1)) .- 150) / 17)
-    h_atm = 100e3 .+ cumsum(Δz(331)) .- Δz(1)
+            1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
+    h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
