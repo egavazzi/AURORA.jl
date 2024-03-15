@@ -35,20 +35,48 @@ IeEdown = zeros(numel(idx_z),numel(t));
 
 q_e = 1.602176620898e-19;     % elementary charge [C]
 
-for i_z = 1:numel(idx_z),
-  for i_mu = 1:numel(c_o_mu),
-    % keyboard
-    if c_o_mu(i_mu) > 0
-      J_up(i_z,:)  = J_up(i_z,:)  + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
-      IeEup(i_z,:) = IeEup(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1).*...
-                                                          squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
-    else
-      J_down(i_z,:)  = J_down(i_z,:) + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
-      IeEdown(i_z,:) = IeEdown(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1).*...
-                                                              squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
+if length(t) > 1
+  for i_z = 1:numel(idx_z),
+    for i_mu = 1:numel(c_o_mu),
+      % keyboard
+      if c_o_mu(i_mu) > 0
+        J_up(i_z,:)  = J_up(i_z,:)  + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
+        IeEup(i_z,:) = IeEup(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1).*...
+                                                            squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
+      else
+        J_down(i_z,:)  = J_down(i_z,:) + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
+  
+        IeEdown(i_z,:) = IeEdown(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1).*...
+                                                                squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)),2)';
+      end
     end
   end
+elseif length(t) == 1
+  for i_z = 1:numel(idx_z),
+      for i_mu = 1:numel(c_o_mu),
+        % keyboard
+        if c_o_mu(i_mu) > 0
+          J_up(i_z,:)  = J_up(i_z,:)  + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))';
+          IeEup(i_z,:) = IeEup(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1)' .*...
+                                                              squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))';
+        else
+          % disp(size(J_down))
+          % disp(size(Ie_ztE))
+          % disp(size((squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))))
+          % disp(size(sum(repmat(E,numel(t),1).*squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))'));
+          % disp(size(repmat(E, numel(t), 1)))
+          J_down(i_z,:)  = J_down(i_z,:) + abs(c_o_mu(i_mu))*sum(squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))';    
+          IeEdown(i_z,:) = IeEdown(i_z,:) + abs(c_o_mu(i_mu))*sum(repmat(E,numel(t),1)' .*...
+                                                                  squeeze(Ie_ztE(idx_z(i_z)+(i_mu-1)*numel(h_atm),:,:)))';
+        end
+      end
+  end
 end
+
+
+
+
+
 
 J_up   = q_e * J_up;
 J_down = q_e * J_down;
