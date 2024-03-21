@@ -70,7 +70,7 @@ display(GLMakie.Screen(), f)
 
 
 
-##
+## save plot as image
 savefile = joinpath(full_path_to_directory, "Qtz.png")
 save(savefile, f)
 
@@ -134,6 +134,13 @@ set_theme!()
 
 
 
+## save plot as image
+savefile = joinpath(full_path_to_directory, "It.png")
+save(savefile, f)
+
+savefile = joinpath(full_path_to_directory, "It.svg")
+save(savefile, f)
+##
 
 
 
