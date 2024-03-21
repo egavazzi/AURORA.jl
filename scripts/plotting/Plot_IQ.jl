@@ -3,18 +3,21 @@
 
 using AURORA
 using MAT
-# using CairoMakie
-# CairoMakie.activate!(type = "svg")
 using GLMakie
 GLMakie.activate!()
+# using CairoMakie
+# CairoMakie.activate!(type = "svg")
 
 
-directory_to_plot = "Pulsating_aurora/experiment_1"
+# directory to plot, give relative path starting under data (without `data/`)
+# directory_to_plot = "Visions2/Alfven_536s_left-half"
+# directory_to_plot = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/steady_state/test")
 
 
 
 ## Load the Q data (volume emission-rates)
-full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
+# full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
+full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
 Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
 data = matread(Q_file)
 Q4278 = data["Q4278"]
@@ -26,15 +29,17 @@ QO1S = data["QO1S"]
 h_atm = vec(data["h_atm"]) ./ 1e3    # convert to km
 t = vec(data["t"])
 
-## Plot
+
+
+## Plot Q data
 f = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
             yminorticksvisible = true, limits=(nothing, (nothing, 400))
             ),
-        Colorbar = (flip_vertical_label = true, vertical = true),
-        Heatmap = (rasterize = true,),
+            Heatmap = (rasterize = true,),
+            Colorbar = (flip_vertical_label = true, vertical = true),
         )
     ) do
     f = Figure(size = (1000, 800))
@@ -64,7 +69,9 @@ f = with_theme(
     return f
 end
 
-f
+display(GLMakie.Screen(), f)
+
+
 
 ##
 savefile = joinpath(full_path_to_directory, "Qtz.png")
@@ -72,6 +79,91 @@ save(savefile, f)
 
 savefile = joinpath(full_path_to_directory, "Qtz.svg")
 save(savefile, f)
+##
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Load the I data (column-integrated emission-rates)
+# full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
+I_file = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
+data = matread(I_file)
+I4278 = vec(data["I_4278"])
+I6730 = vec(data["I_6730"])
+I7774 = vec(data["I_7774"])
+I7774_O = vec(data["I_7774_O"])
+I7774_O2 = vec(data["I_7774_O2"])
+I8446 = vec(data["I_8446"])
+I8446_O = vec(data["I_8446_O"])
+I8446_O2 = vec(data["I_8446_O2"])
+IO1D = vec(data["I_O1D"])
+IO1S = vec(data["I_O1S"])
+t = vec(data["t"])
+
+
+
+## Plot the I data
+custom_theme = Theme(fontsize = 20, linewidth = 2)
+set_theme!(custom_theme)
+f = Figure(size = (1000, 800))
+ax = Axis(f[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "#exc/m²/s",
+          yscale = log10, limits = (t[1], t[end], 1e4, 1e11), xticks = t[1]:0.1:t[end],
+          yminorticksvisible = true, yminorgridvisible = true,
+          yminorticks = IntervalsBetween(9), yticksmirrored = true)
+ylims!(1e4, 1e11)
+lines!(t[2:end], I4278[2:end]; label = rich("I", subscript("4278")), color = :blue)
+lines!(t[2:end], I6730[2:end]; label = rich("I", subscript("6730")), color = :red)
+lines!(t, I7774; label = rich("I", subscript("7774")), color = RGBf(0.5, 0, 0))
+# lines!(t, I7774_O; label = rich("I", subscript("7774(O)")))
+# lines!(t, I7774_O2; label = rich("I", subscript("7774(O2)")))
+lines!(t, I8446; label = rich("I", subscript("8446")), color = :black)
+# lines!(t, I8446_O; label = rich("I", subscript("8446(O)")))
+# lines!(t, I8446_O2; label = rich("I", subscript("8446(O2)")))
+lines!(t, IO1D; label = rich("I", subscript("O(¹D)")), color = RGBf(1, 0.2, 0), linestyle = :dash)
+lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyle = :dash)
+# axislegend(ax, position = :lt)
+Legend(f[1, 2], ax; patchsize = [40, 20])
+display(GLMakie.Screen(), f)
+set_theme!()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ##
