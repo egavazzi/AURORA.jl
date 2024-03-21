@@ -25,7 +25,10 @@ profiles/*
 
 # ignore the control scripts
 scripts/Control*.jl
-MATLAB_dependencies/Control_make_all*.m
+!scripts/Control_script.jl
+!scripts/Control_script_SteadyState.jl
+MATLAB_dependencies/Control*.m
+!MATLAB_dependencies/Control_make_all.m
 
 
 
