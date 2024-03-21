@@ -9,15 +9,12 @@ GLMakie.activate!()
 # CairoMakie.activate!(type = "svg")
 
 
-# directory to plot, give relative path starting under data (without `data/`)
-# directory_to_plot = "Visions2/Alfven_536s_left-half"
-# directory_to_plot = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/steady_state/test")
+# directory to plot, absolute path
+full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
 
 
 
 ## Load the Q data (volume emission-rates)
-# full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
 Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
 data = matread(Q_file)
 Q4278 = data["Q4278"]
@@ -95,7 +92,6 @@ save(savefile, f)
 
 
 ## Load the I data (column-integrated emission-rates)
-# full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
 I_file = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
 data = matread(I_file)
 I4278 = vec(data["I_4278"])
