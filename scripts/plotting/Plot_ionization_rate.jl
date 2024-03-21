@@ -6,16 +6,14 @@ GLMakie.activate!()
 
 
 
-# directory_to_plot = "Visions2/Alfven_536s_correct_msis_and_scattering"
-# directory_to_plot = "Visions2/Alfven_536s_no_propagation_12eV"
-directory_to_plot = "Visions2/Alfven_536s_no_propagation_50eV"
+# full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/steady_state/test_AB-half-steps")
+full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s")
+# pkgdir(AURORA, "data", "Visions2/Alfven_536s_correct_msis_and_scattering")
 
 
 
 ## Plot Ionization rate
 # Read the data
-# full_path_to_directory = pkgdir(AURORA, "data", directory_to_plot)
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/steady_state/test_AB-half-steps")
 ionization_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
 data = matread(ionization_file)
 QO2i = data["QO2i"] .* 1e4 # the Q were calculated from Ie in m⁻², but we have Ie in cm⁻², so we need to multiply by 1e4
