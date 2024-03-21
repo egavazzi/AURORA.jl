@@ -4,13 +4,14 @@
 using AURORA
 using MAT
 using GLMakie
-GLMakie.activate!()
-# using CairoMakie
-# CairoMakie.activate!(type = "svg")
+# GLMakie.activate!()
+using CairoMakie
+CairoMakie.activate!()
 
 
 # directory to plot, absolute path
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
+# full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
+full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_correct_msis_and_scattering")
 
 
 
@@ -65,8 +66,8 @@ f = with_theme(
     colgap!(gd, 10)
     return f
 end
-
-display(GLMakie.Screen(), f)
+display(f)
+# display(GLMakie.Screen(), f)
 
 
 
@@ -129,8 +130,9 @@ lines!(t, IO1D; label = rich("I", subscript("O(¹D)")), color = RGBf(1, 0.2, 0),
 lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyle = :dash)
 # axislegend(ax, position = :lt)
 Legend(f[1, 2], ax; patchsize = [40, 20])
-display(GLMakie.Screen(), f)
 set_theme!()
+display(f)
+# display(GLMakie.Screen(), f)
 
 
 
