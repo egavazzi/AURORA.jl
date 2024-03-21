@@ -1,5 +1,6 @@
 # News
 
+- add scripts to plot I and Q in Julia [#26](https://github.com/egavazzi/AURORA.jl/pull/26)
 - use a finer grid in altitude [#25](https://github.com/egavazzi/AURORA.jl/pull/25)
 - add a steady state version of the transport code [#24](https://github.com/egavazzi/AURORA.jl/pull/24)
 
