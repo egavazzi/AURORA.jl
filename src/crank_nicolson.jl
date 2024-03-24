@@ -168,6 +168,7 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     val_r = Vector{Float64}()
     for i1 in axes(B, 2)
         for i2 in axes(B, 2)
+            # A_tmp = A
             # B_tmp = B[:, i1, i2]
             if μ[i1] < 0    # downward fluxes
                 A_tmp = (A .+ A[[2:end; end]]) ./ 2
@@ -193,13 +194,13 @@ function Crank_Nicolson_Optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
                 append!(val_r, tmp_rhs)
             else
                 if μ[i1] < 0    # downward fluxes
-                    tmp_lhs =   μ[i1] .* Ddz_Down .+ Ddt .+ Diagonal(A/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
-                    tmp_rhs = - μ[i1] .* Ddz_Down .+ Ddt .- Diagonal(A/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
+                    tmp_lhs =   μ[i1] .* Ddz_Down .+ Ddt .+ Diagonal(A_tmp/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
+                    tmp_rhs = - μ[i1] .* Ddz_Down .+ Ddt .- Diagonal(A_tmp/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
                     tmp_lhs[[1, end], :] .= 0
                     tmp_lhs[end, end] = 1
                 else            # upward fluxes
-                    tmp_lhs =   μ[i1] .* Ddz_Up .+ Ddt .+ Diagonal(A/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
-                    tmp_rhs = - μ[i1] .* Ddz_Up .+ Ddt .- Diagonal(A/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
+                    tmp_lhs =   μ[i1] .* Ddz_Up .+ Ddt .+ Diagonal(A_tmp/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
+                    tmp_rhs = - μ[i1] .* Ddz_Up .+ Ddt .- Diagonal(A_tmp/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
                     tmp_lhs[[1, end], :] .= 0
                     tmp_lhs[end, end-1:end] = [-1, 1]
                 end

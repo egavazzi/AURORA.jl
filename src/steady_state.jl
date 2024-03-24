@@ -26,6 +26,7 @@ function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top)
     val_l = Vector{Float64}()
     for i1 in axes(B, 2)
         for i2 in axes(B, 2)
+            # A_tmp = A
             # B_tmp = B[:, i1, i2]
             if μ[i1] < 0    # downward fluxes
                 A_tmp = (A .+ A[[2:end; end]]) ./ 2
