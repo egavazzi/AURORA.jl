@@ -1,0 +1,5 @@
+style = "sciml"
+margin = 92
+remove_extra_newlines = false
+always_use_return = false
+yas_style_nesting = true
