@@ -1,5 +1,6 @@
 # News
 
+- add a .JuliaFormatter.toml file for the inbuilt vscode Julia extension formatter
 - use half steps in height for A and B matrices in the CN [#28](https://github.com/egavazzi/AURORA.jl/pull/28)
 - make saving simulation data safer [#27](https://github.com/egavazzi/AURORA.jl/pull/27)
 - add scripts to plot I and Q in Julia [#26](https://github.com/egavazzi/AURORA.jl/pull/26)
