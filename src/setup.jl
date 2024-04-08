@@ -370,38 +370,21 @@ function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
 end
 
 
-using PyCall
-using SpecialFunctions
 using DelimitedFiles
+using PythonCall
+using SpecialFunctions
 using Term
 function load_neutral_densities(msis_file, h_atm)
     data_msis = readdlm(msis_file, skipstart=14)
     z_msis = data_msis[:, 6]
-    # We check that importing functions from python works. If not, throw error
-    try
-        pyimport_conda("scipy.interpolate", "scipy");
-    catch error_pythonimport
-        @error "AURORA.jl calls the 'interpolate' function from the 'scipy' python package
-        for the setup. However, the " * @bold("importation of the function failed") * ".
-
-        This is probably due to the 'scipy' package not being found by julia. Read
-        more about what to do in the error message below.
-
-        If you are unfamiliar with python, we recommend to follow the alternative consisting
-        in using a Julia-specific Python distribution via the Conda.jl package:
-        set ENV[\"PYTHON\"]=\"\", run Pkg.build(\"PyCall\"), and re-launch Julia.
-
-        If you have questions or don't
-        manage to fix the problem, you can open an issue at " *
-        @italic("https://github.com/egavazzi/AURORA.jl/issues") * ".
-        "
-        println()
-        rethrow(error_pythonimport)
-    end
     # import interpolate function from python
-    pyinterpolate = pyimport_conda("scipy.interpolate", "scipy");
+    pyinterpolate = pyimport("scipy.interpolate")
+    # create the interpolator
     msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
+    # interpolate the msis data over our h_atm grid
     msis_interpolated = msis_interpolator(h_atm / 1e3)
+    # the data needs to be converted from a Python array back to a Julia array
+    msis_interpolated = pyconvert(Array, msis_interpolated)
 
     nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³
 	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
@@ -419,17 +402,23 @@ function load_neutral_densities(msis_file, h_atm)
     return n_neutrals
 end
 
-using PyCall
+using PythonCall
 function load_electron_properties(iri_file, h_atm)
     data_iri = readdlm(iri_file, skipstart=41)
     z_iri = data_iri[:, 1]
-    pypchip = pyimport_conda("scipy.interpolate", "scipy"); # import interpolate function from python
-    iri_interpolator = pypchip.PchipInterpolator(z_iri, data_iri);
+    # import interpolate function from python
+    pyinterpolate = pyimport("scipy.interpolate")
+    # create the interpolator
+    iri_interpolator = pyinterpolate.PchipInterpolator(z_iri, data_iri);
+    # interpolate the iri data over our h_atm grid
     iri_interpolated = iri_interpolator(h_atm / 1e3)
+    # the data needs to be converted from a Python array back to a Julia array
+    iri_interpolated = pyconvert(Array, iri_interpolated)
 
     ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
 	Te = iri_interpolated[:, 6]
 	Te[Te .== -1] .= 350
+
     return ne, Te
 end
 
