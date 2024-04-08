@@ -1,6 +1,6 @@
-using PyCall
+using PythonCall
 
-function e_N2elastic(E) ✅
+function e_N2elastic(E) #✅
     cross_section = Vector{Float64}(undef, length(E))
     for ie in eachindex(E)
         if (E[ie] >= 1) & (E[ie] .< 1.733)
@@ -33,7 +33,7 @@ function e_N2elastic(E) ✅
     return cross_section
 end
 
-function e_N2rot0_2(E) ✅
+function e_N2rot0_2(E) #✅
     log10E = [-1.529205842868462, -1.401759744308854, -1.298455005566862,
         -1.229836683674959, -1.107192298263224, -0.930884014999626,
         -0.739165582563789, -0.534726081040409, -0.361197419278502,
@@ -58,11 +58,16 @@ function e_N2rot0_2(E) ✅
         -15.639548788652569, -15.655341886713167, -15.511449283499555,
         -15.414539270491499, -15.468521082957746, -15.552841968657781,
         -15.787812395596042]
-
-    pyinterpolate = pyimport_conda("scipy.interpolate", "scipy");
+    # import interpolate function from python
+    pyinterpolate = pyimport("scipy.interpolate")
     cross_section = 10 .^ pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(E));
-    cross_section = 10 .^ [pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(E[E .<= 10^log10E[end-1]]))
+    cross_section = 10 .^ [pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(E[E .<= 10^log10E[end-1]])),
                 pyinterpolate.interp1d(log10E[end-1:end], log10Xs[end-1:end], kind="linear", fill_value="extrapolate")(log10.(E[E .>= 10^log10E[end-1]]))]
+    # convert from a Python array back to a Julia array
+    cross_section = pyconvert.(Array, cross_section)
+    # merge the two parts
+    cross_section = vcat(cross_section[1], cross_section[2])
+
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 

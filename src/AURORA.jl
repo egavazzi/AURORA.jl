@@ -1,5 +1,6 @@
 module AURORA
 
+# AURORA functions
 include("../internal_data/data_electron/e_N2_cross_sections.jl")
 export e_N2elastic, e_N2rot0_2
 
@@ -35,7 +36,6 @@ export calculate_e_transport_steady_state
 
 include("analysis.jl")
 export make_density_file, downsampling_fluxes
-
 
 
 

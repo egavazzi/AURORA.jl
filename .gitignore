@@ -30,7 +30,8 @@ scripts/Control*.jl
 MATLAB_dependencies/Control*.m
 !MATLAB_dependencies/Control_make_all.m
 
-
+# ignore all the .CondaPkg files
+.CondaPkg/*
 
 
 
