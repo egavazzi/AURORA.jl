@@ -1,8 +1,8 @@
 module AURORA
 
 # AURORA functions
-# include("../internal_data/data_electron/e_N2_cross_sections.jl")
-# export e_N2elastic, e_N2rot0_2
+include("../internal_data/data_electron/e_N2_cross_sections.jl")
+export e_N2elastic, e_N2rot0_2
 
 include("setup.jl")
 include("nrlmsis.jl")
