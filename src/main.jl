@@ -61,6 +61,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
+    savedir = rename_if_exists(savedir)
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
         # throw a warning if name_savedir exists and if it already contains results
         print("\n", @bold @red "WARNING!")
@@ -178,6 +179,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
+    savedir = rename_if_exists(savedir)
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
         # throw a warning if name_savedir exists and if it already contains results
         print("\n", @bold @red "WARNING!")

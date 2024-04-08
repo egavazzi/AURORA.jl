@@ -155,16 +155,42 @@ function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_facto
 end
 
 
-function rename_if_exists(savefile, file_extension)
-    if !isfile(savefile)
-        return savefile
+"""
+    rename_if_exists(savefile)
+
+This function takes a string as an input. If a file or folder with that name *does not* exist,
+it returns the same string back. But if the folder or file already exists, it appends a
+number between parenthesis to the name string.
+
+For example, if the folder `foo/` already exist and `"foo"` is given as input, the
+function will return a string `"foo(1)"` as an output. Similarly, if a file `foo.txt`
+already exists and `"foo.txt"` is given as input, the function will return a string
+`"foo(1).txt"`. If the file `foo(1).txt` also already exist, the function will return a string
+`"foo(2).txt"`, etc...
+
+The function should support all types of extensions.
+
+# Calling
+`newsavefile = rename_if_exists(savefile)`
+"""
+function rename_if_exists(savefile)
+    if isfile(savefile) # if a file already exists with that name
+        file_extension = split(savefile, ".")[end]
+        length_extension = length(file_extension) + 1
+        counter = 1
+        while isfile(savefile[1:end - length_extension] * "($counter)" * ".$file_extension")
+            counter += 1
+        end
+        newsavefile = savefile[1:end - length_extension] * "($counter)" * ".$file_extension"
+    elseif isdir(savefile) # if a folder already exists with that name
+        counter = 1
+        while isdir(savefile * "($counter)")
+            counter += 1
+        end
+        newsavefile = savefile * "($counter)"
     end
-    counter = 1
-    while isfile(savefile[1:end-4] * "($counter)" * "$file_extension")
-        counter += 1
-    end
-    savefile = savefile[1:end-4] * "($counter)" * "$file_extension"
-    return savefile
+
+    return newsavefile
 end
 
 
