@@ -1,18 +1,5 @@
 module AURORA
 
-# Check if the "scipy" python package is installed in the local Conda environment. If not,
-# install it now as it is used by some functions. That check is centralized here so that we
-# don't need to have it in each function using scipy.
-using PythonCall
-import CondaPkg
-try
-    pyimport("scipy.interpolate")
-catch
-    CondaPkg.add("scipy")
-end
-
-
-
 # AURORA functions
 # include("../internal_data/data_electron/e_N2_cross_sections.jl")
 # export e_N2elastic, e_N2rot0_2
