@@ -188,6 +188,8 @@ function rename_if_exists(savefile)
             counter += 1
         end
         newsavefile = savefile * "($counter)"
+    else # there is no folder or file with that name
+        newsavefile = savefile
     end
 
     return newsavefile
