@@ -11,7 +11,6 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
 
     ## Get atmosphere
-    println("Calling Matlab for the setup...")
     h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
