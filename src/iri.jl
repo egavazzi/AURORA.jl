@@ -54,7 +54,8 @@ function find_iri_file(;
     # If we did not find a file matching the parameters, we need to download one
     if found_it == 0
         println(" no file was found.")
-        iri_data, parameters = download_iri_data(year, month, day, hour, minute, lat, lon, height)
+        # iri_data, parameters = download_iri_data(year, month, day, hour, minute, lat, lon, height)
+        iri_data, parameters = calculate_iri_data(year, month, day, hour, minute, lat, lon, height)
         # and save it
         file_to_load = save_iri_data(iri_data, parameters)
         found_it = 1
@@ -149,6 +150,37 @@ end
 
 
 
+using PythonCall
+function calculate_iri_data(year=2018, month=12, day=7, hour=11, minute=15,
+    lat = 76, lon = 5, height = 85:1:700)
+
+    print("Calculating iri data...")
+
+    datetime = pyimport("datetime")
+    time = datetime.datetime(year, month, day, hour, minute, 0)
+
+    # import iri2016 model from the Python package 'iri2016'
+    iri2016 = pyimport("iri2016.profile")
+    # run the model
+    iri_data = iri2016.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
+    # convert the Python Dataset to a DataArray
+    iri_data = iri_data.to_dataarray()
+    # convert from Python array to Julia array
+    iri_data = pyconvert(Array, iri_data) # of size (20, n_z, 1)
+    # change shape from (20, n_z, 1) to (n_z, 20)
+    iri_data = iri_data[:, :, 1]'
+    # add a column with the altitude
+    iri_data = hcat(Vector(height), iri_data)
+    # add a header with the name of columns
+    iri_data = vcat(["height(km)" "ne(m-3)" "Tn(K)" "Ti(K)" "Te(K)" "nO+(m-3)" "nH+(m-3)" "nHe+(m-3)" "nO2+(m-3)" "nNO+(m-3)" "nCI(m-3)" "nN+(m-3)" "NmF2" "hmF2" "NmF1" "hmF1" "NmE" "hmE" "TEC" "EqVertIonDrift" "foF2"], iri_data)
+
+    println(" done.")
+
+    parameters = (; year, month, day, hour, minute, lat, lon, height)
+    return iri_data, parameters
+end
+
+
 function save_iri_data(iri_data, parameters)
     # Unpack the parameters
     year = parameters.year
@@ -169,7 +201,7 @@ function save_iri_data(iri_data, parameters)
     filename = "iri_$year$month_str$day_str-$(hour_str)$(minute_str)_$(lat)N-$(lon)E.txt"
     directory = pkgdir(AURORA, "internal_data", "data_electron")
     fullpath = joinpath(directory, filename)
-    fullpath = rename_if_exists(fullpath, ".txt") # to avoid writing over files
+    fullpath = rename_if_exists(fullpath) # to avoid writing over files
     filename = splitpath(fullpath)[end] # update filename as fullpath has been updated
     # Write to the file
     open(fullpath, "w") do f

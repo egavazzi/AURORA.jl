@@ -426,8 +426,15 @@ end
 
 using PythonCall
 function load_electron_properties(iri_file, h_atm)
-    data_iri = readdlm(iri_file, skipstart=41)
-    z_iri = data_iri[:, 1]
+    # read the file and extract z-grid of the iri data
+    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
+        data_iri = readdlm(iri_file, skipstart=41)
+        z_iri = data_iri[:, 1]
+    else # new iri file calculated using iri2016 package
+        data_iri = readdlm(iri_file, skipstart=14)
+        z_iri = data_iri[:, 1]
+    end
+
     # import interpolate function from python
     pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
@@ -437,9 +444,16 @@ function load_electron_properties(iri_file, h_atm)
     # the data needs to be converted from a Python array back to a Julia array
     iri_interpolated = pyconvert(Array, iri_interpolated)
 
-    ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-	Te = iri_interpolated[:, 6]
-	Te[Te .== -1] .= 350
+    # extract electron density and temperature
+    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
+        ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
+	    Te = iri_interpolated[:, 6]
+	    Te[Te .== -1] .= 350
+    else # new iri file calculated using iri2016 package
+        ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
+	    Te = iri_interpolated[:, 5]
+	    Te[Te .== -1] .= 350
+    end
 
     return ne, Te
 end
