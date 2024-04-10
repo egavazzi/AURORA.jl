@@ -377,8 +377,19 @@ using PythonCall
 using SpecialFunctions
 using Term
 function load_neutral_densities(msis_file, h_atm)
+    # read the file without the headers
     data_msis = readdlm(msis_file, skipstart=14)
-    z_msis = data_msis[:, 6]
+
+    # extract the z-grid of the msis data
+    if msis_file[end-11:end-4] == "DOWNLOAD"
+        # old msis file downloaded using HTTP request
+        z_msis = data_msis[:, 6]
+    else
+        # new msis file calculated using pymsis
+        z_msis = data_msis[:, 1]
+        data_msis = data_msis[:, 1:5] # keep only data of interest (and also avoid NaN values)
+    end
+
     # import interpolate function from python
     pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
@@ -388,9 +399,18 @@ function load_neutral_densities(msis_file, h_atm)
     # the data needs to be converted from a Python array back to a Julia array
     msis_interpolated = pyconvert(Array, msis_interpolated)
 
-    nO = msis_interpolated[:, 9] * 1e6 # from cm⁻³ to m⁻³
-	nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
-	nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
+    # extract the neutral densities
+    if msis_file[end-11:end-4] == "DOWNLOAD"
+        # old msis file downloaded using HTTP request
+        nO = msis_interpolated[:, 9] * 1e6   # from cm⁻³ to m⁻³
+        nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
+        nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
+    else
+        # new msis file calculated using pymsis
+        nN2 = msis_interpolated[:, 3] # already in m⁻³
+        nO2 = msis_interpolated[:, 4] # already in m⁻³
+        nO = msis_interpolated[:, 5]  # already in m⁻³
+    end
 
 	nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
@@ -406,8 +426,15 @@ end
 
 using PythonCall
 function load_electron_properties(iri_file, h_atm)
-    data_iri = readdlm(iri_file, skipstart=41)
-    z_iri = data_iri[:, 1]
+    # read the file and extract z-grid of the iri data
+    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
+        data_iri = readdlm(iri_file, skipstart=41)
+        z_iri = data_iri[:, 1]
+    else # new iri file calculated using iri2016 package
+        data_iri = readdlm(iri_file, skipstart=14)
+        z_iri = data_iri[:, 1]
+    end
+
     # import interpolate function from python
     pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
@@ -417,9 +444,16 @@ function load_electron_properties(iri_file, h_atm)
     # the data needs to be converted from a Python array back to a Julia array
     iri_interpolated = pyconvert(Array, iri_interpolated)
 
-    ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-	Te = iri_interpolated[:, 6]
-	Te[Te .== -1] .= 350
+    # extract electron density and temperature
+    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
+        ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
+	    Te = iri_interpolated[:, 6]
+	    Te[Te .== -1] .= 350
+    else # new iri file calculated using iri2016 package
+        ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
+	    Te = iri_interpolated[:, 5]
+	    Te[Te .== -1] .= 350
+    end
 
     return ne, Te
 end

@@ -51,10 +51,11 @@ function find_nrlmsis_file(;
         end
     end
 
-    # If we did not find a file matching the parameters, we need to download one
+    # If we did not find a file matching the parameters, we need to calculate one
     if found_it == 0
         println(" no file was found.")
-        nrlmsis_data, parameters = download_msis_data(year, month, day, hour, minute, lat, lon, height)
+        # nrlmsis_data, parameters = download_msis_data(year, month, day, hour, minute, lat, lon, height)
+        nrlmsis_data, parameters = calculate_msis_data(year, month, day, hour, minute, lat, lon, height)
         # and save it
         file_to_load = save_msis_data(nrlmsis_data, parameters)
         found_it = 1
@@ -68,6 +69,44 @@ function find_nrlmsis_file(;
 end
 
 
+
+function load_parameters_msis(nrlmsis_file)
+    local data
+    # Loading the `parameters` section of the file
+    open(`head -n12 $nrlmsis_file`) do io
+        data = readdlm(io)
+    end
+    # Extracting the parameters
+    year = data[2, 3]
+    month = data[3, 3]
+    day = data[4, 3]
+    hour = data[5, 3]
+    minute = data[6, 3]
+    lat = data[7, 3]
+    lon = data[8, 3]
+    height_str = data[9, 4]
+    height_start = split(height_str, ":")[1]
+    height_step = split(height_str, ":")[2]
+    height_stop = split(height_str, ":")[3]
+    # height is loaded as a string
+    # We try to convert to Int64 and if it fails we try to Float64
+    try
+        height_start = parse(Int64, height_start)
+        height_step = parse(Int64, height_step)
+        height_stop = parse(Int64, height_stop)
+    catch
+        height_start = parse(Float64, height_start)
+        height_step = parse(Float64, height_step)
+        height_stop = parse(Float64, height_stop)
+    end
+    height = height_start:height_step:height_stop
+
+    parameters_file = (; year, month, day, hour, minute, lat, lon, height)
+    return parameters_file
+end
+
+
+# This method is depreciated. The HTTP request frequently has issues with the server.
 function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     lat = 76, lon = 5, height = 85:1:700)
 
@@ -155,6 +194,35 @@ function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute 
     return nrlmsis_data, parameters
 end
 
+
+using PythonCall
+function calculate_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
+    lat = 76, lon = 5, height = 85:1:700)
+
+    print("Calculating msis data...")
+
+    datetime = pyimport("datetime")
+    time = datetime.datetime(year, month, day, hour, minute, 0)
+
+    # import nrlmsis 2.1 model from the Python package 'pymsis'
+    msis = pyimport("pymsis.msis")
+    # run the model
+    nrlmsis_data = msis.run(time, Py(lon), Py(lat), Py(height), geomagnetic_activity=Py(-1))
+    # convert from Python array to Julia array
+    nrlmsis_data = pyconvert(Array, nrlmsis_data) # array of size (1, 1, 1, n_z, 11)
+    nrlmsis_data = dropdims(nrlmsis_data; dims = (1, 2, 3)) # convert to size (n_z, 11)
+    # add a column with the altitude
+    nrlmsis_data = hcat(Vector(height), nrlmsis_data)
+    # add a header with the name of columns
+    nrlmsis_data = vcat(["height(km)" "air(kg/m3)" "N2(m-3)" "O2(m-3)" "O(m-3)" "He(m-3)" "H(m-3)" "Ar(m-3)" "N(m-3)" "anomalousO(m-3)" "NO(m-3)" "T(K)"], nrlmsis_data)
+
+    println(" done.")
+
+    parameters = (; year, month, day, hour, minute, lat, lon, height)
+    return nrlmsis_data, parameters
+end
+
+
 function save_msis_data(nrlmsis_data, parameters)
     # Unpack the parameters
     year = parameters.year
@@ -175,7 +243,7 @@ function save_msis_data(nrlmsis_data, parameters)
     filename = "msis_$year$month_str$day_str-$(hour_str)$(minute_str)_$(lat)N-$(lon)E.txt"
     directory = pkgdir(AURORA, "internal_data", "data_neutrals")
     fullpath = joinpath(directory, filename)
-    fullpath = rename_if_exists(fullpath, ".txt") # to avoid writing over files
+    fullpath = rename_if_exists(fullpath) # to avoid writing over files
     filename = splitpath(fullpath)[end] # update filename as fullpath has been updated
     # Write to the file
     open(fullpath, "w") do f
@@ -201,40 +269,7 @@ function save_msis_data(nrlmsis_data, parameters)
     return fullpath
 end
 
-function load_parameters_msis(nrlmsis_file)
-    local data
-    # Loading the `parameters` section of the file
-    open(`head -n12 $nrlmsis_file`) do io
-        data = readdlm(io)
-    end
-    # Extracting the parameters
-    year = data[2, 3]
-    month = data[3, 3]
-    day = data[4, 3]
-    hour = data[5, 3]
-    minute = data[6, 3]
-    lat = data[7, 3]
-    lon = data[8, 3]
-    height_str = data[9, 4]
-    height_start = split(height_str, ":")[1]
-    height_step = split(height_str, ":")[2]
-    height_stop = split(height_str, ":")[3]
-    # height is loaded as a string
-    # We try to convert to Int64 and if it fails we try to Float64
-    try
-        height_start = parse(Int64, height_start)
-        height_step = parse(Int64, height_step)
-        height_stop = parse(Int64, height_stop)
-    catch
-        height_start = parse(Float64, height_start)
-        height_step = parse(Float64, height_step)
-        height_stop = parse(Float64, height_stop)
-    end
-    height = height_start:height_step:height_stop
 
-    parameters_file = (; year, month, day, hour, minute, lat, lon, height)
-    return parameters_file
-end
 
 
 
