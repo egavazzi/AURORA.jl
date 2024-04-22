@@ -11,8 +11,8 @@
 %       exemple: results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/"
 
 
-results_dir = "/mnt/data/etienne/Julia/AURORA.jl/data/CFL_simulations/"
-RunDirs = {'1keV_CFL-32'} 
+results_dir = "/Users/ost051/Documents/PhD/AURORA-20220613(1)/EtiennesVersion/AURORA.jl/data/tryout_ionprod/"
+RunDirs = {'1e5keV'} 
 %%
 make_all_Ie_top     % precipitation-spectra extraction at top
 make_all_Ie_top_MI  % precipitation-spectra extraction at top and top-1
