@@ -195,6 +195,7 @@ function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute 
 end
 
 
+using HTTP
 using PythonCall
 function calculate_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     lat = 76, lon = 5, height = 85:1:700)
@@ -204,8 +205,23 @@ function calculate_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
+
+
     # import nrlmsis 2.1 model from the Python package 'pymsis'
     msis = pyimport("pymsis.msis")
+
+    # Check if the SW-ALL.csv file is already downloaded or not. If it is not downloaded,
+    # download it. This is normally done by the pymsis package, but due to some issues with
+    # HTTP request and SSL certificates when calling the package from Julia, we do this
+    # action directly in Julia instead.
+    os = pyimport("os")
+    path_to_pymsis = os.path.dirname(msis.__file__)
+    path_to_pymsis = pyconvert(String, path_to_pymsis)
+    if isfile(joinpath(path_to_pymsis, "SW-All.csv")) == false
+        print(" downloading ap and F10.7 data from (https://celestrak.org/SpaceData/SW-All.csv)...")
+        HTTP.download("https://celestrak.org/SpaceData/SW-All.csv", path_to_pymsis)
+    end
+
     # run the model
     nrlmsis_data = msis.run(time, Py(lon), Py(lat), Py(height), geomagnetic_activity=Py(-1))
     # convert from Python array to Julia array
