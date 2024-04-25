@@ -1,5 +1,6 @@
 # News
 
+- add info to help debug segfault when calling Matlab [#33](https://github.com/egavazzi/AURORA.jl/pull/33)
 - use 'pymsis' and 'iri2016' python packages to get msis and iri data [#30](https://github.com/egavazzi/AURORA.jl/pull/30)
 - add a .JuliaFormatter.toml file for the inbuilt vscode Julia extension formatter
 - use half steps in height for A and B matrices in the CN [#28](https://github.com/egavazzi/AURORA.jl/pull/28)
