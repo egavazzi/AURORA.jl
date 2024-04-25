@@ -13,6 +13,7 @@ makedocs(
                     "Get started" => "manual_get-started.md",
                     "Folder structure" => "manual_folder-structure.md"
                     ],
+                "Troubleshooting" => "troubleshooting.md",
                 ],
         warnonly = true)
 

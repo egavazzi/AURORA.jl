@@ -214,9 +214,9 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     E_levels_neutrals = load_excitation_threshold()
 
     ## Collision cross-sections
-    print("Calling Matlab for the cross-sections...")
-    # Translating all of this to Julia is a big task. So for now we still use the
-    # Matlab code.
+    println("Calling Matlab for the cross-sections...")
+    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
+    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
     # TODO: translate that part
     # Creating a MATLAB session
     path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
@@ -241,7 +241,7 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
     # Closing the MATLAB session
     close(s1)
-    println(" done.")
+    println("Calling Matlab for the cross-sections... done.")
 
     return h_atm, ne, Te, E, dE,
     n_neutrals, E_levels_neutrals, σ_neutrals,
