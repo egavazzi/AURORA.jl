@@ -9,10 +9,8 @@ using CairoMakie
 CairoMakie.activate!()
 
 
-# directory to plot, absolute path
-# full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_correct_msis_and_scattering")
-
+## Directory to plot, absolute path
+full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
 
 
 ## Load the Q data (volume emission-rates)
@@ -24,13 +22,11 @@ Q7774 = data["Q7774"]
 Q8446 = data["Q8446"]
 QO1D = data["QO1D"]
 QO1S = data["QO1S"]
-h_atm = vec(data["h_atm"]) ./ 1e3    # convert to km
+h_atm = vec(data["h_atm"]) ./ 1e3 # convert to km
 t = vec(data["t"])
 
-
-
 ## Plot Q data
-f = with_theme(
+fig = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
@@ -40,53 +36,48 @@ f = with_theme(
             Colorbar = (flip_vertical_label = true, vertical = true),
         )
     ) do
-    f = Figure(size = (1000, 800))
-    ga = f[1, 1] = GridLayout()
+    fig = Figure(size = (1000, 800))
+    ga = fig[1, 1] = GridLayout()
     ax4278 = Axis(ga[1, 1]; title = "4278 Å", xticklabelsvisible = false, ylabel ="altitude (km)")
     hm4278 = heatmap!(t, h_atm, Q4278'; rasterize = true)
     cb4278 = Colorbar(ga[1, 2], hm4278; label = "photons/m³/s")
     colgap!(ga, 10)
 
-    gb = f[1, 2] = GridLayout()
+    gb = fig[1, 2] = GridLayout()
     ax6730 = Axis(gb[1, 1]; title = "6730 Å", xticklabelsvisible = false, yticklabelsvisible = false)
     hm6730 = heatmap!(t, h_atm, Q6730')
     cb6730 = Colorbar(gb[1, 2], hm6730; label = "photons/m³/s")
     colgap!(gb, 10)
 
-    gc = f[2, 1] = GridLayout()
+    gc = fig[2, 1] = GridLayout()
     ax7774 = Axis(gc[1, 1]; title = "7774 Å", xlabel = "time(s)", ylabel = "altitude (km)")
     hm7774 = heatmap!(t, h_atm, Q7774')
     cb7774 = Colorbar(gc[1, 2], hm7774; label = "photons/m³/s")
     colgap!(gc, 10)
 
-    gd = f[2, 2] = GridLayout()
+    gd = fig[2, 2] = GridLayout()
     ax8446 = Axis(gd[1, 1]; title = "8446 Å", yticklabelsvisible = false, xlabel = "time (s)")
     hm8446 = heatmap!(t, h_atm, Q8446')
     cb8446 = Colorbar(gd[1, 2], hm8446; label = "photons/m³/s")
     colgap!(gd, 10)
-    return f
+    return fig
 end
-display(f)
-# display(GLMakie.Screen(), f)
+display(fig)
 
-
-
-## save plot as image
+## Save Qtz plot
 savefile = joinpath(full_path_to_directory, "Qtz.png")
-save(savefile, f)
-
+save(savefile, fig)
+println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "Qtz.svg")
-save(savefile, f)
+save(savefile, fig; backend = CairoMakie)
+println("Saved $savefile")
+savefile = joinpath(full_path_to_directory, "Qtz.pdf")
+save(savefile, fig; backend = CairoMakie)
+println("Saved $savefile")
+savefile = joinpath(full_path_to_directory, "Qtz.eps")
+save(savefile, fig; backend = CairoMakie)
+println("Saved $savefile")
 ##
-
-
-
-
-
-
-
-
-
 
 
 
@@ -107,13 +98,11 @@ IO1D = vec(data["I_O1D"])
 IO1S = vec(data["I_O1S"])
 t = vec(data["t"])
 
-
-
 ## Plot the I data
 custom_theme = Theme(fontsize = 20, linewidth = 2)
 set_theme!(custom_theme)
-f = Figure(size = (1000, 800))
-ax = Axis(f[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "#exc/m²/s",
+fig = Figure(size = (1000, 800))
+ax = Axis(fig[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "#exc/m²/s",
           yscale = log10, limits = (t[1], t[end], 1e4, 1e11), xticks = t[1]:0.1:t[end],
           yminorticksvisible = true, yminorgridvisible = true,
           yminorticks = IntervalsBetween(9), yticksmirrored = true)
@@ -129,55 +118,21 @@ lines!(t, I8446; label = rich("I", subscript("8446")), color = :black)
 lines!(t, IO1D; label = rich("I", subscript("O(¹D)")), color = RGBf(1, 0.2, 0), linestyle = :dash)
 lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyle = :dash)
 # axislegend(ax, position = :lt)
-Legend(f[1, 2], ax; patchsize = [40, 20])
+Legend(fig[1, 2], ax; patchsize = [40, 20])
 set_theme!()
-display(f)
-# display(GLMakie.Screen(), f)
+display(fig)
 
-
-
-## save plot as image
+## Save It plot
 savefile = joinpath(full_path_to_directory, "It.png")
-save(savefile, f)
-
+save(savefile, fig)
+println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "It.svg")
-save(savefile, f)
+save(savefile, fig)
+println("Saved $savefile")
+savefile = joinpath(full_path_to_directory, "It.pdf")
+save(savefile, fig)
+println("Saved $savefile")
+savefile = joinpath(full_path_to_directory, "It.eps")
+save(savefile, fig)
+println("Saved $savefile")
 ##
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##
-
-f = Figure(size = (1000, 800))
-ga = f[1, 1] = GridLayout()
-ax4278 = Axis(ga[1, 1]; title = "4278 Å", xticklabelsvisible = false, ylabel ="altitude (km)")
-hm4278 = heatmap!(t, h_atm, Q4278'; rasterize = true)
-cb4278 = Colorbar(ga[1, 2], hm4278; label = "photons/m³/s")
-ylims!(nothing, 400)
-colgap!(ga, 10)
-f
