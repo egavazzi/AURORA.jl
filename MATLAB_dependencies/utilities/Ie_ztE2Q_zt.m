@@ -2,7 +2,7 @@ function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm)
 % IE_ZTE2Q_ZT - Calculate the volume emission/excitation rates
 %   Ie_ztE2Q_zt loads all electron-fluxes in a directory and
 %   calculates volume emission and excitation-rates for the auroral
-%   emissions at 4278 Å, 6730 Å, 7774 Å, 8446 Å, and the O1D, O1S
+%   emissions at 4278 AA, 6730 AA, 7774 AA, 8446 AA, and the O1D, O1S
 %   and the N2A3 excitation rates. The function automatically
 %   handles the calculations of excitation cross-sections etc.
 % 
@@ -16,7 +16,7 @@ function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm)
 % Output
 %  ThatWentOK - bolean output, returns 1 if processing worked out
 
-%   Copyright © 2018-2019 Bjorn Gustavsson, <bjorn.gustavsson@uit.no>
+%   Copyright  2018-2019 Bjorn Gustavsson, <bjorn.gustavsson@uit.no>
 %   This is free software, licensed under GNU GPL version 2 or later
 
 
@@ -46,6 +46,30 @@ try
   XsO2i = O2_levels(:,2)'*XsO2;
   XsN2i = N2_levels(:,2)'*XsN2;
   XsN2A3 = XsN2(13,:);
+
+  
+  QO = zeros(size(XsO, 1), size(h_atm, 1));
+  for ixso = 1:size(XsO, 1)
+      Xs = XsO(ixso, :);
+      Q = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO,Xs(1:szIzte(3)));
+      QO(ixso, :) = Q;
+  end
+
+  QO2 = zeros(size(XsO2, 1), size(h_atm, 1));
+  for ixso2 = 1:size(XsO2, 1)
+      Xs = XsO2(ixso2, :);
+      Q = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO2,Xs(1:szIzte(3)));
+      QO2(ixso2, :) = Q;
+  end
+
+  QN2 = zeros(size(XsN2, 1), size(h_atm, 1));
+  for ixsn2 = 1:size(XsN2, 1)
+      Xs = XsN2(ixsn2, :);
+      Q = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nN2,Xs(1:szIzte(3)));
+      QN2(ixsn2, :) = Q;
+  end
+
+  save Q_major.mat QO QO2 QN2
   
   Q4278 = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nN2,emXS4278(1:szIzte(3)));
   
