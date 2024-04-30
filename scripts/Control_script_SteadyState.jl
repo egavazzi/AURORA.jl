@@ -36,13 +36,12 @@ t0 = 0;                     # (s) time of start for smooth transition
 t1 = 0;                     # (s) time of end for smooth transition
 
 
-
 e_grid = 10 .^(range(1,stop=5,length=400))
 
-for i in 1:length(e_grid)-1
+for i in length(e_grid)-1:-1:1
     E_max = e_grid[i+1]
     E_min = e_grid[i]
-    name_savedir = string((E_min + E_max)/2) * "eV"
+    name_savedir = string(E_min)*'-'*string(E_max) * "eV"
     INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
     calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
         msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
