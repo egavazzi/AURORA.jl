@@ -1,7 +1,9 @@
 using AURORA
 using MAT
+using CairoMakie
+CairoMakie.activate!()
 using GLMakie
-GLMakie.activate!()
+# GLMakie.activate!()
 
 
 ## This is for simple cases of comparison where z-grid and t-grid are the same
@@ -39,7 +41,7 @@ QO1S_2 = data["QO1S"]
 fig = with_theme(
     Theme(
         Axis = (
-            xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
+            xticksmirrored = true, yticksmirrored = true, xminorticksvisible = true,
             yminorticksvisible = true, limits=(nothing, (nothing, 400))
             ),
             Heatmap = (rasterize = true,),
@@ -47,7 +49,7 @@ fig = with_theme(
         )
     ) do
 
-    fig = Figure(size = (1000, 1000))
+    fig = Figure(size = (1400, 1200))
     Label(fig[0, 1:2],
           "1st column: " * split(full_path_to_directory1, "/")[end] * "\n" *
           "2nd column: " * split(full_path_to_directory2, "/")[end],
@@ -76,6 +78,13 @@ fig = with_theme(
                       colormap = :RdBu, colorrange = colorlims_diff)
     cb4278 = Colorbar(ga_3[1, 2], hm4278; label = "photons/m³/s")
     colgap!(ga_3, 10)
+    ga_4 = fig[1, 4] = GridLayout()
+    ax4278 = Axis(ga_4[1, 1]; title = "Relative difference (1 - 2)",
+    xticklabelsvisible = false, yticklabelsvisible = false)
+    hm4278 = heatmap!(t, h_atm, (abs.(Q4278_1 - Q4278_2) ./ Q4278_1)';
+            colormap = :cividis, colorrange = (0, 1))
+    cb4278 = Colorbar(ga_4[1, 2], hm4278; label = "relative difference")
+    colgap!(ga_4, 10)
 
     # Second row : 6730 Å
     colorlims = (0, maximum([maximum(Q6730_1), maximum(Q6730_2)]))
@@ -99,6 +108,13 @@ fig = with_theme(
                       colormap = :RdBu, colorrange = colorlims_diff)
     cb6730 = Colorbar(gb_3[1, 2], hm6730; label = "photons/m³/s")
     colgap!(gb_3, 10)
+    gb_4 = fig[2, 4] = GridLayout()
+    ax6730 = Axis(gb_4[1, 1]; title = "Relative difference (1 - 2)",
+    xticklabelsvisible = false, yticklabelsvisible = false)
+    hm6730 = heatmap!(t, h_atm, (abs.(Q6730_1 - Q6730_2) ./ Q6730_1)';
+            colormap = :cividis, colorrange = (0, 1))
+    cb6730 = Colorbar(gb_4[1, 2], hm6730; label = "relative difference")
+    colgap!(gb_4, 10)
 
 
     # Third row : 7774 Å
@@ -123,7 +139,13 @@ fig = with_theme(
                       colormap = :RdBu, colorrange = colorlims_diff)
     cb7774 = Colorbar(gc_3[1, 2], hm7774; label = "photons/m³/s")
     colgap!(gc_3, 10)
-
+    gc_4 = fig[3, 4] = GridLayout()
+    ax7774 = Axis(gc_4[1, 1]; title = "Relative difference (1 - 2)",
+    xticklabelsvisible = false, yticklabelsvisible = false)
+    hm7774 = heatmap!(t, h_atm, (abs.(Q7774_1 - Q7774_2) ./ Q7774_1)';
+            colormap = :cividis, colorrange = (0, 1))
+    cb7774 = Colorbar(gc_4[1, 2], hm7774; label = "relative difference")
+    colgap!(gc_4, 10)
 
     # Fourth row : 8446 Å
     colorlims = (0, maximum([maximum(Q8446_1), maximum(Q8446_2)]))
@@ -147,7 +169,15 @@ fig = with_theme(
                       colormap = :RdBu, colorrange = colorlims_diff)
     cb8446 = Colorbar(gd_3[1, 2], hm8446; label = "photons/m³/s")
     colgap!(gd_3, 10)
+    gd_4 = fig[4, 4] = GridLayout()
+    ax8446 = Axis(gd_4[1, 1]; title = "Relative difference (1 - 2)",
+    xticklabelsvisible = false, yticklabelsvisible = false)
+    hm8446 = heatmap!(t, h_atm, (abs.(Q8446_1 - Q8446_2) ./ Q8446_1)';
+            colormap = :cividis, colorrange = (0, 1))
+    cb8446 = Colorbar(gd_4[1, 2], hm8446; label = "relative difference")
+    colgap!(gd_4, 10)
 
     return fig
 end
-display(GLMakie.Screen(), fig)
+display(fig)
+# display(GLMakie.Screen(), fig)
