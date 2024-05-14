@@ -2,17 +2,15 @@ using AURORA
 using CairoMakie
 CairoMakie.activate!()
 
-altitude_max = 700;
-θ_lims = 180:-10:0;
-E_max = 3000
+altitude_max = 600;         # (km) top altitude of the ionosphere
+θ_lims = 180:-10:0          # (°) angle-limits for the electron beams
+E_max = 3000;               # (eV) upper limit to the energy grid
 
-path_to_AURORA_matlab = "/home/etienne/Documents/MATLAB/AURORA/"    # path to Matlab executable
+msis_file = find_nrlmsis_file(year = 2005, month = 10, day = 8, hour = 22, minute = 0,
+                              lat = 70, lon = 19, height = 85:1:700);
+iri_file = find_iri_file(year = 2005, month = 10, day = 8, hour = 22, minute = 0, lat = 70,
+                         lon = 19, height = 85:1:700);
 
-# h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
-# μ_scatterings = setup(path_to_AURORA_matlab, altitude_max, θ_lims, E_max);
-
-msis_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_neutrals/msis20181207.txt"
-iri_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_electron/iri20181207.txt"
 h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
@@ -58,4 +56,4 @@ scatterlines!(E, dE, color = :red)
 display(f3)
 
 ## Plot cross-sections and back-scattering ratios.
-# This will have to be done, eventually... But it is not the most important atm
+# This will have to be done, eventually... But it is not the most important at the moment

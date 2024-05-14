@@ -1,31 +1,35 @@
 # ignore the documentation
 docs/build/*
-# .github/*
 
-
-# ignore the sysimage
-JuliaSysimage.so
+# ignore the new msis and iri files
+internal_data/data_neutrals/msis*
+internal_data/data_electron/iri*
 
 # ignore the cascading files
-internal_data/e_cascading/*/Cascading*.mat
+internal_data/e_cascading/*
 
 # ignore the scattering files
 internal_data/e_scattering/*
-!internal_data/e_scattering/.gitkeep
 
 # ignore the data folders (but not data/ itself)
 data/*
-!data/.gitkeep
 
 # ignore the profiles
 profiles/*
 
+# ignore the control scripts
+scripts/Control*.jl
+MATLAB_dependencies/Control*.m
+# except the following ones
+!scripts/Control_script.jl
+!scripts/Control_script_SteadyState.jl
+!MATLAB_dependencies/Control_make_all.m
 
+# ignore ANY .CondaPkg/ folder
+*.CondaPkg/ 
 
+# ignore matlab temporary files
+*.asv
 
-
-# ignore old e_cascading_data
-e_cascading_data/*
-
-# local files
+# ignore local files
 local_files_no_git/*

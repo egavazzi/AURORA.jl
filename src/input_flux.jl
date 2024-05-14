@@ -90,6 +90,9 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
         Ie_top = Ie_top_raw[:, :, 1:length(E)]
     end
 
+    # set the input up-flux to 0
+    Ie_top[μ_center .> 0, :, :] .= 0
+
     return Ie_top
 end
 

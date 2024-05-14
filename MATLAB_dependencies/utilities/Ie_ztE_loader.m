@@ -60,7 +60,10 @@ if numel(data_paths) == 1 % Simplest case with data from one directory
   else
     res_files = dir(fullfile(data_paths{1},'IeFl*.mat'));
   end
-  load(fullfile(data_paths{1},res_files(1).name))
+  filenames = {res_files.name};
+  [a, sorting_order] = natsort(filenames);
+  res_files = res_files(sorting_order);
+  load(fullfile(data_paths{1},res_files(1).name));
   [mu_scatterings, E, t_run, mu_lims] = convert_from_julia(mu_scatterings, E, t_run, mu_lims);
   IeZTE = Ie_ztE;
   t = t_run;
@@ -144,7 +147,14 @@ function [mu_scatterings, E, t_run, mu_lims] = convert_from_julia(mu_scatterings
   if isa(mu_scatterings, 'struct')
     mu_scatterings_temp{1} = mu_scatterings.Pmu2mup;
     mu_scatterings_temp{2} = mu_scatterings.BeamWeight_relative;
-    mu_scatterings_temp{3} = mu_scatterings.BeamWeight;
+    try
+      % Works with new versions of AURORA.jl (after Oct 2023)
+      mu_scatterings_temp{3} = mu_scatterings.BeamWeight;
+    catch
+      % If it fails, try with 'BeamWeight_discrete' which was the variable
+      % name used in old versions of AURORA.jl (before Oct 2023)
+      mu_scatterings_temp{3} = mu_scatterings.BeamWeight_discrete;
+    end
 
     mu_scatterings = mu_scatterings_temp;
   end
