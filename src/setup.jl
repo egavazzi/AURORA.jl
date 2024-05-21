@@ -518,7 +518,6 @@ Calculate the cross-section for a given species and their different energy state
 # Outputs
 - `σ_species`: A matrix of cross-section values for each energy state, for the defined species
 """
-using DelimitedFiles
 function get_cross_section(species_name, E, dE)
     filename =  pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
     state_name = readdlm(filename, String, comments=true, comment_char='%')
