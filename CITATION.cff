@@ -10,10 +10,10 @@ authors:
     family-names: Gustavsson
   - given-names: Etienne
     family-names: Gavazzi
-repository-code: 'https://github.com/egavazzi/AURORA.jl'
-license: GPL-3.0
-version: 0.4.0
 identifiers:
   - type: doi
     value: 10.5281/zenodo.11238621
+repository-code: 'https://github.com/egavazzi/AURORA.jl'
+license: GPL-3.0
+version: 0.4.0
 date-released: '2024-05-22'
