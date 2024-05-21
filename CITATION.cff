@@ -6,10 +6,10 @@ title: AURORA.jl
 message: 'If you use this software, please cite it as below.'
 type: software
 authors:
-  - given-names: Björn
-    family-names: Gustavsson
   - given-names: Etienne
     family-names: Gavazzi
+  - given-names: Björn
+    family-names: Gustavsson
 identifiers:
   - type: doi
     value: 10.5281/zenodo.11238621
