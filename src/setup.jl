@@ -212,36 +212,7 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     n_neutrals = load_neutral_densities(msis_file, h_atm)
     ne, Te = load_electron_properties(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
-
-    ## Collision cross-sections
-    println("Calling Matlab for the cross-sections...")
-    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
-    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
-    # TODO: translate that part
-    # Creating a MATLAB session
-    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(genpath(path_to_AURORA_matlab))
-    cd(path_to_AURORA_matlab)
-    "
-    @mput E
-    @mput dE
-    mat"
-    E = E';
-    dE = dE';
-    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
-    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
-    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
-    "
-    σ_N2 = @mget XsN2;
-    σ_O2 = @mget XsO2;
-    σ_O = @mget XsO;
-    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
-    # Closing the MATLAB session
-    close(s1)
-    println("Calling Matlab for the cross-sections... done.")
+    σ_neutrals = load_cross_sections(E, dE)
 
     return h_atm, ne, Te, E, dE,
     n_neutrals, E_levels_neutrals, σ_neutrals,
@@ -469,4 +440,94 @@ function load_excitation_threshold()
 
 	E_levels_neutrals = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels)
     return E_levels_neutrals
+end
+
+# This is the old function calling the Matlab code.
+function load_old_cross_sections(E, dE)
+    println("Calling Matlab for the cross-sections...")
+    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
+    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
+    # TODO: translate that part
+    # Creating a MATLAB session
+    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
+    s1 = MSession();
+    @mput path_to_AURORA_matlab
+    mat"
+    addpath(genpath(path_to_AURORA_matlab))
+    cd(path_to_AURORA_matlab)
+    "
+    @mput E
+    @mput dE
+    mat"
+    E = E';
+    dE = dE';
+    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
+    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
+    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
+    "
+    σ_N2 = @mget XsN2;
+    σ_O2 = @mget XsO2;
+    σ_O = @mget XsO;
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
+    # Closing the MATLAB session
+    close(s1)
+    println("Calling Matlab for the cross-sections... done.")
+
+    return σ_neutrals
+end
+
+"""
+    load_cross_sections(E, dE)
+
+Load the cross sections of the neutrals species for their different energy states.
+
+# Calling
+`σ_neutrals = load_cross_sections(E, dE)`
+
+# Inputs
+- `E`: energy grid (eV), vector [nE]
+- `dE`: energy grid step size (eV), vector [nE]
+
+# Returns
+- `σ_neutrals`: A named tuple containing the cross sections for N2, O2, and O.
+"""
+function load_cross_sections(E, dE)
+    σ_N2 = get_cross_section("N2", E, dE)
+    σ_O2 = get_cross_section("O2", E, dE)
+    σ_O = get_cross_section("O", E, dE)
+
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
+    return σ_neutrals
+end
+
+
+using DelimitedFiles
+"""
+    get_cross_section(species_name, E, dE)
+
+Calculate the cross-section for a given species and their different energy states.
+
+# Calling
+`σ_N2 = get_cross_section("N2", E, dE)`
+
+# Inputs
+- `species_name`: name of the species, string
+- `E`: energy grid (eV), vector [nE]
+- `dE`: energy grid step size (eV), vector [nE]
+
+# Outputs
+- `σ_species`: A matrix of cross-section values for each energy state, for the defined species
+"""
+function get_cross_section(species_name, E, dE)
+    filename =  pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
+    state_name = readdlm(filename, String, comments=true, comment_char='%')
+    function_name = "e_" * species_name .* state_name
+
+    σ_species = zeros(size(state_name, 1), length(E))
+    for i_state in axes(state_name, 1) # loop over the different energy states
+        func = getfield(Main, Symbol(function_name[i_state])) # get the corresponding function name
+        σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
+    end
+
+    return σ_species
 end

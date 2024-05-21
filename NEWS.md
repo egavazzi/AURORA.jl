@@ -1,5 +1,6 @@
 # News
 
+- rewrite of the cross-section functions in Julia, which means the whole setup is now in Julia [#34](https://github.com/egavazzi/AURORA.jl/pull/34)
 - add info to help debug segfault when calling Matlab [#33](https://github.com/egavazzi/AURORA.jl/pull/33)
 - use 'pymsis' and 'iri2016' python packages to get msis and iri data [#30](https://github.com/egavazzi/AURORA.jl/pull/30)
 - add a .JuliaFormatter.toml file for the inbuilt vscode Julia extension formatter
