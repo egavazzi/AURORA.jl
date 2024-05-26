@@ -261,7 +261,7 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 """
 function make_energy_grid(E_max)
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
-    E = cumsum(E_function.(0:2000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    E = cumsum(E_function.(0:4000, 0.15, 11.5, 0.05, 80)) .+ 1.9
     iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
     E = E[1:iE_max];                        # crop E accordingly
     dE = diff(E); dE = [dE; dE[end]]
