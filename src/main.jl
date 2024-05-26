@@ -39,6 +39,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                 μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
+    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
+        Ie_top = AURORA.Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -147,6 +149,11 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
                                 μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
+    elseif INPUT_OPTIONS.input_type == "LET"
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.E0, INPUT_OPTIONS.Q, E, μ_center,
+                             INPUT_OPTIONS.Beams, INPUT_OPTIONS.low_energy_tail)
+    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
+        Ie_top = Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
