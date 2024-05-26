@@ -9,7 +9,7 @@ function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
 
     # for constant input flux (e.g. first run), we need to resize the matrix from
     # [1, n_μ * [n_E, 1]] to [1, n_μ * [n_E, n_t]]
-    if size(Ie_top[1], 2) == 1
+    if size(Ie_top_raw[1], 2) == 1
         for i_μ in eachindex(μ_center)
             Ie_top_raw[i_μ] = Ie_top_raw[i_μ] * ones(1, length(t) + (n_loop - 1) * (length(t) - 1)) # (e-/m²/s)
         end
