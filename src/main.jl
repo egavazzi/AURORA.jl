@@ -174,21 +174,13 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
         # date and time as a name
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
+    # Make a string with full path of savedir from root_savedir and name_savedir
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    savedir = rename_if_exists(savedir)
+    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        # throw a warning if name_savedir exists and if it already contains results
-        print("\n", @bold @red "WARNING!")
-        print(@bold " '$savedir' ")
-        println(@bold @red "already exists, any results stored in it will be overwritten.")
-        # println(@bold @red "already exists, the experiment is aborted.")
-        # return
-    else
-        if ~isdir(pkgdir(AURORA, "data", root_savedir)) # check if the root_savedir exists
-            mkdir(pkgdir(AURORA, "data", root_savedir)) # if not, creates it
-        end
-        mkpath(savedir)
+        savedir = rename_if_exists(savedir)
     end
+    mkpath(savedir)
     print("\n", @bold "Results will be saved at $savedir \n")
 
     ## And save the simulation parameters in it
