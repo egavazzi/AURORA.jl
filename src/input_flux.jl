@@ -45,9 +45,9 @@ function Ie_top_from_ketchup(t, E, n_loop, μ_center, filename)
     for i_μ in 1:Int(length(μ_center) / 2) # down-flux
         Ie_top[i_μ, :,  :] = Ie_top_raw[i_μ][1:length(E), :]' # (e-/m²/s)
     end
-    for i_μ in Int(length(μ_center) / 2):length(μ_center) # up-flux set to 0
-        Ie_top[i_μ, :,  :] .= 0
-    end
+    # set the input up-flux to 0
+    Ie_top[μ_center .> 0, :, :] .= 0
+
 
 
     return Ie_top
