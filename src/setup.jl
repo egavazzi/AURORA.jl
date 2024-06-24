@@ -239,6 +239,8 @@ function make_altitude_grid(top_altitude)
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
     h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
+    # h_atm = vcat(90e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # test with zmin of 90km
+    # h_atm = vcat(95e3:25:h_atm[315], h_atm[316:end]) # test with zmin of 90km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
@@ -261,7 +263,7 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 """
 function make_energy_grid(E_max)
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
-    E = cumsum(E_function.(0:2000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    E = cumsum(E_function.(0:4000, 0.15, 11.5, 0.05, 80)) .+ 1.9
     iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
     E = E[1:iE_max];                        # crop E accordingly
     dE = diff(E); dE = [dE; dE[end]]
@@ -381,6 +383,7 @@ function load_neutral_densities(msis_file, h_atm)
         nN2 = msis_interpolated[:, 3] # already in m⁻³
         nO2 = msis_interpolated[:, 4] # already in m⁻³
         nO = msis_interpolated[:, 5]  # already in m⁻³
+        Tn = msis_interpolated[:, end]
     end
 
 	nO[end-2:end] .= 0
@@ -391,7 +394,7 @@ function load_neutral_densities(msis_file, h_atm)
 	nN2[end-5:end-3] .= erf_factor .* nN2[end-5:end-3]
 	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
 
-    n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
+    n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO, Tn = Tn)
     return n_neutrals
 end
 

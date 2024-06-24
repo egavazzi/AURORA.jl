@@ -27,7 +27,7 @@ for i2 = 1:numel(RunDirs)
     Qzt_file = dir('Qzt_all_L.mat');
     atm_file = dir('neutral_atm.mat');
     if ~isempty(atm_file)
-      load(atm_file.name,'nN2','nO2','nO','h_atm')
+      load(atm_file.name,'nN2','nO2','nO','h_atm', 'ne', 'Te')
     end
     its_done = 0;
     if ~isempty(Qzt_file)
@@ -39,7 +39,8 @@ for i2 = 1:numel(RunDirs)
       CD = pwd;
       fprintf('Directory: %s already processed?\n',CD)
     else
-      ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm);
+      % ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm);
+      ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm, ne, Te);
       if ThatWentOK
         CD = pwd;
         fprintf(':::Processed OK: %s\n',CD)
