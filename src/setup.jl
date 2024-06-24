@@ -239,6 +239,8 @@ function make_altitude_grid(top_altitude)
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
     h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
+    # h_atm = vcat(90e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # test with zmin of 90km
+    # h_atm = vcat(95e3:25:h_atm[315], h_atm[316:end]) # test with zmin of 90km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
