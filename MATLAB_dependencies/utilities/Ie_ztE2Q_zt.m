@@ -1,8 +1,8 @@
-function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm)
+function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm, ne, Te)
 % IE_ZTE2Q_ZT - Calculate the volume emission/excitation rates
 %   Ie_ztE2Q_zt loads all electron-fluxes in a directory and
 %   calculates volume emission and excitation-rates for the auroral
-%   emissions at 4278 Å, 6730 Å, 7774 Å, 8446 Å, and the O1D, O1S
+%   emissions at 4278 ï¿½, 6730 ï¿½, 7774 ï¿½, 8446 ï¿½, and the O1D, O1S
 %   and the N2A3 excitation rates. The function automatically
 %   handles the calculations of excitation cross-sections etc.
 % 
@@ -16,7 +16,7 @@ function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm)
 % Output
 %  ThatWentOK - bolean output, returns 1 if processing worked out
 
-%   Copyright © 2018-2019 Bjorn Gustavsson, <bjorn.gustavsson@uit.no>
+%   Copyright ï¿½ 2018-2019 Bjorn Gustavsson, <bjorn.gustavsson@uit.no>
 %   This is free software, licensed under GNU GPL version 2 or later
 
 
