@@ -1,5 +1,8 @@
 # News
 
+## v0.4.1
+- fix bug where ionization rates have too high values [#37](https://github.com/egavazzi/AURORA.jl/pull/37)
+
 ## v0.4.0
 - register the repository on [zenodo.org](https://zenodo.org/)
 - add a .JuliaFormatter.toml file for the inbuilt vscode Julia extension formatter
