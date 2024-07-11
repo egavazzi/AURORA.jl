@@ -15,7 +15,7 @@ iri_file = find_iri_file(
 
 
 ## Checking the input from the ketchup file (e-/m²/s)
-h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 input_type = "from_ketchup_file";
@@ -24,7 +24,7 @@ INPUT_OPTIONS = (;input_type, input_file);
 Ie_top = AURORA.Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file)
 
 ## Checking the input from Maxwellian with LET (e-/m²/s/eV)
-h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 input_type = "LET"

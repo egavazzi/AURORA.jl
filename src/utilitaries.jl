@@ -119,7 +119,7 @@ end
 
 
 using MAT
-function save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
+function save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
     savefile = joinpath(savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
         write(file, "h_atm", h_atm)
@@ -128,6 +128,7 @@ function save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
         write(file, "nO", n_neutrals.nO)
         write(file, "ne", ne)
         write(file, "Te", Te)
+        write(file, "Tn", Tn)
     close(file)
 end
 
