@@ -171,7 +171,7 @@ It is a partial rework of the `setup` function. Some parts are implemented in pu
 but there are still some calls to the original MATLAB code.
 
 # Calling
-`h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
+`h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
 μ_scatterings = setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file);`
 
 # Inputs
@@ -186,6 +186,7 @@ but there are still some calls to the original MATLAB code.
 - `h_atm`: altitude (m), vector [nZ]
 - `ne`: e- densities (m³), vector [nZ]
 - `Te`: e- temperatures (K), vector [nZ]
+- `Tn`: neutrals temperatures (K), vector [nZ]
 - `E`: energy grid (eV), vector [nE]
 - `dE`: energy bin sizes(eV), vector [nE]
 - `n_neutrals`: neutral densities (m³), Tuple of vectors ([nZ], ..., [nZ])
@@ -209,12 +210,12 @@ function setup_new(top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
     E, dE = make_energy_grid(E_max)
     μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
-    n_neutrals = load_neutral_densities(msis_file, h_atm)
+    n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
     ne, Te = load_electron_properties(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
     σ_neutrals = load_cross_sections(E, dE)
 
-    return h_atm, ne, Te, E, dE,
+    return h_atm, ne, Te, Tn, E, dE,
     n_neutrals, E_levels_neutrals, σ_neutrals,
     μ_lims, μ_center, μ_scatterings
 end
@@ -239,6 +240,7 @@ function make_altitude_grid(top_altitude)
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
     h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
+    # h_atm = vcat(95e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
@@ -261,7 +263,7 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 """
 function make_energy_grid(E_max)
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
-    E = cumsum(E_function.(0:2000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    E = cumsum(E_function.(0:4000, 0.15, 11.5, 0.05, 80)) .+ 1.9
     iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
     E = E[1:iE_max];                        # crop E accordingly
     dE = diff(E); dE = [dE; dE[end]]
@@ -358,7 +360,7 @@ function load_neutral_densities(msis_file, h_atm)
     else
         # new msis file calculated using pymsis
         z_msis = data_msis[:, 1]
-        data_msis = data_msis[:, 1:5] # keep only data of interest (and also avoid NaN values)
+        data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
     end
 
     # import interpolate function from python
@@ -376,11 +378,13 @@ function load_neutral_densities(msis_file, h_atm)
         nO = msis_interpolated[:, 9] * 1e6   # from cm⁻³ to m⁻³
         nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
         nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
+        Tn = msis_interpolated[:, 13]
     else
         # new msis file calculated using pymsis
         nN2 = msis_interpolated[:, 3] # already in m⁻³
         nO2 = msis_interpolated[:, 4] # already in m⁻³
         nO = msis_interpolated[:, 5]  # already in m⁻³
+        Tn = msis_interpolated[:, 6]
     end
 
 	nO[end-2:end] .= 0
@@ -392,7 +396,7 @@ function load_neutral_densities(msis_file, h_atm)
 	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
 
     n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
-    return n_neutrals
+    return n_neutrals, Tn
 end
 
 using PythonCall
