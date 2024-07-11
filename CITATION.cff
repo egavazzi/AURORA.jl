@@ -6,11 +6,14 @@ title: AURORA.jl
 message: 'If you use this software, please cite it as below.'
 type: software
 authors:
-  - given-names: Björn
-    family-names: Gustavsson
   - given-names: Etienne
     family-names: Gavazzi
+  - given-names: Björn
+    family-names: Gustavsson
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.11238621
 repository-code: 'https://github.com/egavazzi/AURORA.jl'
 license: GPL-3.0
-version: 0.3.1
-date-released: '2023-12-18'
+version: 0.4.0
+date-released: '2024-05-22'
