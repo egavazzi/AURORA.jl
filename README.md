@@ -38,5 +38,5 @@ The documentation is available [**here**](https://egavazzi.github.io/AURORA.jl/d
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://egavazzi.github.io/AURORA.jl/dev/
-[doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.11238621.svg
-[doi-url]: https://doi.org/10.5281/zenodo.11238621
+[doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.11238620.svg
+[doi-url]: https://doi.org/10.5281/zenodo.11238620
