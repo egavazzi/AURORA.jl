@@ -25,7 +25,7 @@ include("crank_nicolson.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
-export setup_new, make_altitude_grid, make_energy_grid, make_scattering_matrices
+export setup, make_altitude_grid, make_energy_grid, make_scattering_matrices
 export find_nrlmsis_file
 export find_iri_file
 export Ie_top_from_file, Ie_top_flickering, Ie_top_constant

@@ -12,7 +12,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -129,7 +129,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile

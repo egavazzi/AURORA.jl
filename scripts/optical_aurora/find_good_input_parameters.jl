@@ -16,7 +16,7 @@ iri_file = find_iri_file(
 
 ## Checking the input from the ketchup file (e-/m²/s)
 h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 input_type = "from_ketchup_file";
 input_file = "data/Optical_Aurora_course/input_from_ketchup_3keV-10/Ie_incoming.mat"
@@ -25,7 +25,7 @@ Ie_top = AURORA.Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_
 
 ## Checking the input from Maxwellian with LET (e-/m²/s/eV)
 h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 input_type = "LET"
 E0 = 2760;                  # characteristic energy of the maxwellian (eV)

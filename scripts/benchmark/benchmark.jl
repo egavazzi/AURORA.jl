@@ -29,7 +29,7 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Setup and initialization
 h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
