@@ -322,10 +322,14 @@ function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
     [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
     mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
     c_o_mu = mu_avg(mu_lims);
+
+    n_dirs = size(Pmu2mup, 2);
+    theta1 = linspace(0,pi,n_dirs);
     "
     θ_lims = vec(@mget theta_lims2do);
     μ_lims = vec(@mget mu_lims);
     μ_center = vec(@mget c_o_mu);
+    θ₁ = vec(@mget theta1)
 
     Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
     BeamWeight_relative = @mget theta2beamW;
@@ -336,7 +340,7 @@ function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
     # contribution from withing each beam. It means that when summing up along each beam, we should get 1
     BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
 
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight);
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
 
     ## Closing the MATLAB session
     close(s1)
