@@ -281,7 +281,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 end
 
 using LoopVectorization
-function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
+function prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
 
@@ -346,7 +346,8 @@ function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading
         end
     end
 end
-function add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
+
+function add_ionization_collisions_turbo!(Q, iE, Ionization_matrix, Ionizing_matrix,
     secondary_vector, primary_vector)
     # We need to add all the ionization collisions in three steps (15 different collisions
     # split over groups of 5)
@@ -401,7 +402,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
     end
 end
 
-function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
 
@@ -421,11 +422,11 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
         add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
-        prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
+        prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
     end
 
-    add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
+    add_ionization_collisions_turbo!(Q, iE, Ionization_matrix, Ionizing_matrix,
                                 secondary_vector, primary_vector)
 end

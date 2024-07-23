@@ -104,7 +104,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                         μ_scatterings.BeamWeight, μ_center,
                         Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
@@ -217,7 +217,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
                                     D[iE, :],  Q[:, 1, iE], Ie_top_local[:, iE])
 
         # Update the cascading of e-
-        update_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
+        update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
                     cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
 

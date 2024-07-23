@@ -93,11 +93,11 @@ iE = length(E)
                     cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center, 20)
 
     using AURORA
-    @benchmark update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+    @benchmark update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                     μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector) seconds=20
-    @time update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+    @time update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                     μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
@@ -125,7 +125,7 @@ Profile.init(n = 10^8, delay = 0.01)
 
     # p = Progress(length(E));
     @time for iE in length(E):-1:1
-        update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+        update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
         μ_scatterings.BeamWeight, μ_center,
         Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
