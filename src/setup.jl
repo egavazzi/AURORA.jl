@@ -426,13 +426,13 @@ function load_electron_properties(iri_file, h_atm)
     # extract electron density and temperature
     if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
         ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-	    Te = iri_interpolated[:, 6]
-	    Te[Te .== -1] .= 350
+        Te = iri_interpolated[:, 6]
     else # new iri file calculated using iri2016 package
         ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
-	    Te = iri_interpolated[:, 5]
-	    Te[Te .== -1] .= 350
+        Te = iri_interpolated[:, 5]
     end
+    ne[ne .< 0] .= 1
+    Te[Te .== -1] .= 350
 
     return ne, Te
 end
