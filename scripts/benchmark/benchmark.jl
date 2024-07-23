@@ -70,7 +70,7 @@ iE = length(E)
     # Compute the flux of e-
     Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
     Ie = rand(length(h_atm) * length(μ_center), length(t), length(E));
-    @btime Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+    @btime Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                 A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
         # 0.028401 seconds (3.76 k allocations: 46.271 MiB, 15.74% gc time)
         # 3000eV -> 337 energy grid points -> 337*50MiB ≈ 17GiB

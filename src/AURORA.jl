@@ -33,7 +33,7 @@ export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 export loss_to_thermal_electrons, beams2beams, make_A, make_B, make_D
 export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,
        f_smooth_transition, rename_if_exists
-export d2M, Crank_Nicolson, Crank_Nicolson_Optimized
+export d2M, Crank_Nicolson
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!, update_Q_turbo!
 export rotating, load_scattering_matrices
