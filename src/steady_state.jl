@@ -10,10 +10,10 @@ function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top)
     # height just to make it possible to use the diff function.
     h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
     h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
-    Ddz_Up   = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
-                        0 =>  1 ./ (2 .* diff(h4diffu[1:end])))
-    Ddz_Down = spdiagm( 0 => -1 ./ (2 .* diff(h4diffd[1:end])),
-                        1 =>  1 ./ (2 .* diff(h4diffd[1:end-1])))
+    Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
+                        0 =>  1 ./ diff(h4diffu[1:end]))
+    Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
+                        1 =>  1 ./ diff(h4diffd[1:end-1]))
 
     # Diffusion operator
     Ddiffusion = d2M(h_atm)
