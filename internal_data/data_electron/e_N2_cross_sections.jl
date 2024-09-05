@@ -940,7 +940,7 @@ end
 
 function e_N2ddion(Ep)
     # e_N2ddion - double dissociative ionization cross section (m^2)
-    # i.e. N2 + e** -> e* + N^+ + N^+
+    # i.e. N2 + e** -> e** + 2e* + N^+ + N^+
 
     cross_section = similar(Ep)
 
