@@ -1,5 +1,8 @@
 # News
 
+## v0.4.2
+- fix bug where ionization rates have too low values due to missing secondary e- [#40](https://github.com/egavazzi/AURORA.jl/pull/40)
+
 ## v0.4.1
 - fix bug where ionization rates have too high values [#37](https://github.com/egavazzi/AURORA.jl/pull/37)
 
