@@ -220,7 +220,7 @@ using Polyester
 function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center, Nthreads = 6)
     # Nthreads is set to 6 by default as it seems to be optimal on my machine
     # But on Revontuli, something like 20 is more optimal
-    Ionization = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
+    Ionization = zeros(size(Ie, 1), size(Ie, 2))
     Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
@@ -236,12 +236,15 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
                 # ISOTROPIC SECONDARY ELECTRONS
 
                 Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
-                @views for i_μ in eachindex(μ_center)
-                    Ionization[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :] .=
-                        max.(0, n_repeated_over_t .*
-                             (σ[i_level, iE] .*
-                             Ie[(i_μ - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                             BeamWeight[i_μ] ./ sum(BeamWeight))
+                fill!(Ionization, 0)
+                for i_μ1 in eachindex(μ_center)
+                    for i_μ2 in eachindex(μ_center)
+                        Ionization[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
+                            max.(0, n_repeated_over_t .*
+                                (σ[i_level, iE] .*
+                                Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
+                                BeamWeight[i_μ2] ./ sum(BeamWeight))
+                    end
                 end
 
                 # Calculate the spectra of the secondary e-
@@ -285,7 +288,7 @@ function prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cas
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
 
-    Ionization = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
+    Ionization = zeros(size(Ie, 1), size(Ie, 2))
     Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
@@ -300,17 +303,16 @@ function prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cas
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # ISOTROPIC SECONDARY ELECTRONS
 
-                # Ionizing_matrix[counter_ionization[1]] .= n_repeated_over_μt .*
-                #                                         (σ[i_level, iE] .* @view(Ie[:, :, iE]));
                 Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
-                @views for i_μ in eachindex(μ_center)
-                    idx_z = (i_μ - 1) * length(h_atm) .+ (1:length(h_atm))
-                    # Ionization_matrix[counter_ionization[1]][idx_z, :] .=
-                    Ionization[idx_z, :] .=
-                        max.(0, n_repeated_over_t .*
-                             (σ[i_level, iE] .*
-                             Ie[idx_z, :, iE]) .*
-                             BeamWeight[i_μ] ./ sum(BeamWeight))
+                fill!(Ionization, 0)
+                for i_μ1 in eachindex(μ_center)
+                    for i_μ2 in eachindex(μ_center)
+                        Ionization[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
+                            max.(0, n_repeated_over_t .*
+                                (σ[i_level, iE] .*
+                                Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
+                                BeamWeight[i_μ2] ./ sum(BeamWeight))
+                    end
                 end
 
                 # Calculate the spectra of the secondary e-
