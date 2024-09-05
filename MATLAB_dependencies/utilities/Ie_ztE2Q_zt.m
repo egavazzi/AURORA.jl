@@ -1,4 +1,4 @@
-function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm)
+function ThatWentOK = Ie_ztE2Q_zt(nN2,nO2,nO,h_atm, ne, Te)
 % IE_ZTE2Q_ZT - Calculate the volume emission/excitation rates
 %   Ie_ztE2Q_zt loads all electron-fluxes in a directory and
 %   calculates volume emission and excitation-rates for the auroral
@@ -86,6 +86,16 @@ try
   Q8446_O2 = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO2,emXS8446_O2(1:szIzte(3)));
   Q7774_O2 = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO2,emX7774_O2(1:szIzte(3)));
   
+  % This is to account for quenching for O1D emission %
+  % In case Tn was not saved, you must save the msis_file as a .dat and change the name string below
+  % msis_file = "/home/etienne/Documents/Julia/AURORA.jl/internal_data/data_neutrals/msis_20051008-2200_70N-19E.dat";
+  % load(msis_file);
+  % OPS.atmosphere = interp1(msis_20051008_2200_70N_19E(:,1),msis_20051008_2200_70N_19E,h_atm/1e3,'pchip');
+  % Tn = OPS.atmosphere(:,end);
+
+  % tauO1D = tau_O1D(nO / 1e6, nO2 / 1e6, nN2 / 1e6, ne / 1e6, Tn, Te, h_atm);
+  % QO1D = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO,excXS_O1D(1:szIzte(3))) .* tauO1D;
+  % === %
   QO1D = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO,excXS_O1D(1:szIzte(3)));
   QO1S = exc_tz_of_Ie_ztE(t,h_atm,E(1:szIzte(3)),Ie_ZTE,nO,excXS_O1S(1:szIzte(3)));
 

@@ -28,8 +28,8 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 
 ## Setup and initialization
-h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
@@ -70,7 +70,7 @@ iE = length(E)
     # Compute the flux of e-
     Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
     Ie = rand(length(h_atm) * length(μ_center), length(t), length(E));
-    @btime Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+    @btime Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                 A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
         # 0.028401 seconds (3.76 k allocations: 46.271 MiB, 15.74% gc time)
         # 3000eV -> 337 energy grid points -> 337*50MiB ≈ 17GiB
@@ -93,11 +93,11 @@ iE = length(E)
                     cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center, 20)
 
     using AURORA
-    @benchmark update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+    @benchmark update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                     μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector) seconds=20
-    @time update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+    @time update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                     μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
@@ -125,7 +125,7 @@ Profile.init(n = 10^8, delay = 0.01)
 
     # p = Progress(length(E));
     @time for iE in length(E):-1:1
-        update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+        update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
         μ_scatterings.BeamWeight, μ_center,
         Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)

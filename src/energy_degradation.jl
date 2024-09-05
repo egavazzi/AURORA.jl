@@ -78,6 +78,7 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
 end
 
 using LoopVectorization
+using Polyester
 function add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
     Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
 
@@ -120,8 +121,10 @@ function add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inel
                 partition_fraction = partition_fraction / sum(partition_fraction)
 
                 # and finally calculate the flux of degrading e-
-                @turbo inline=false thread=true for i_u in eachindex(findall(x -> x != 0, partition_fraction))
+                @tturbo for i_u in eachindex(findall(x -> x != 0, partition_fraction))
                     for j in axes(Q, 2)
+                # @batch per=thread for i_u in eachindex(findall(x -> x != 0, partition_fraction))
+                #     @turbo for j in axes(Q, 2)
                         for k in axes(Q, 1)
                             Q[k, j, i_degrade[i_u]] +=  max(0, Ie_degraded[k, j]) * partition_fraction[i_u]
                         end
@@ -278,7 +281,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 end
 
 using LoopVectorization
-function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
+function prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
 
@@ -343,14 +346,17 @@ function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading
         end
     end
 end
-function add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
+
+function add_ionization_collisions_turbo!(Q, iE, Ionization_matrix, Ionizing_matrix,
     secondary_vector, primary_vector)
     # We need to add all the ionization collisions in three steps (15 different collisions
     # split over groups of 5)
     for i_loop in 1:3
         idx = (i_loop - 1) * 5
-        @tturbo inline=false for iI in 1:(iE - 1)
+        @tturbo for iI in 1:(iE - 1)
             for j in axes(Q, 2)
+        # @batch per=thread for iI in 1:(iE - 1)
+        #     @turbo for j in axes(Q, 2)
                 for k in axes(Q, 1)
                     Q[k, j, iI] += Ionization_matrix[idx + 1][k, j] * secondary_vector[idx + 1][iI] +
                                     Ionizing_matrix[idx + 1][k, j] * primary_vector[idx + 1][iI] +
@@ -396,7 +402,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
     end
 end
 
-function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
 
@@ -416,11 +422,11 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
         add_inelastic_collisions_turbo!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
-        prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
+        prepare_ionization_collisions_turbo!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
     end
 
-    add_ionization_collisions!(Q, iE, Ionization_matrix, Ionizing_matrix,
+    add_ionization_collisions_turbo!(Q, iE, Ionization_matrix, Ionizing_matrix,
                                 secondary_vector, primary_vector)
 end

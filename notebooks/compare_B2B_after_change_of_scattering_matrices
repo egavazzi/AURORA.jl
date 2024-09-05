@@ -37,7 +37,7 @@ begin
 	θ_lims = 180:-10:0;         # (°) angle-limits for the electron beams
 	E_max = 7000;               # (eV) upper limit to the energy grid
 	
-	# h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+	# h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
 	# μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
 	E, dE = make_energy_grid(E_max)
 end

@@ -1,7 +1,14 @@
 # News
 
-- use 'pymsis' and 'iri2016' python packages to get msis and iri data [#30](https://github.com/egavazzi/AURORA.jl/pull/30)
+## v0.4.1
+- fix bug where ionization rates have too high values [#37](https://github.com/egavazzi/AURORA.jl/pull/37)
+
+## v0.4.0
+- register the repository on [zenodo.org](https://zenodo.org/)
 - add a .JuliaFormatter.toml file for the inbuilt vscode Julia extension formatter
+- rewrite of the cross-section functions in Julia, which means the whole setup is now in Julia [#34](https://github.com/egavazzi/AURORA.jl/pull/34)
+- add info to help debug segfault when calling Matlab [#33](https://github.com/egavazzi/AURORA.jl/pull/33)
+- use 'pymsis' and 'iri2016' python packages to get msis and iri data [#30](https://github.com/egavazzi/AURORA.jl/pull/30)
 - use half steps in height for A and B matrices in the CN [#28](https://github.com/egavazzi/AURORA.jl/pull/28)
 - make saving simulation data safer [#27](https://github.com/egavazzi/AURORA.jl/pull/27)
 - add scripts to plot I and Q in Julia [#26](https://github.com/egavazzi/AURORA.jl/pull/26)

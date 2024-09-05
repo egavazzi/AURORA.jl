@@ -9,7 +9,7 @@ function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
 
     # for constant input flux (e.g. first run), we need to resize the matrix from
     # [1, n_μ * [n_E, 1]] to [1, n_μ * [n_E, n_t]]
-    if size(Ie_top[1], 2) == 1
+    if size(Ie_top_raw[1], 2) == 1
         for i_μ in eachindex(μ_center)
             Ie_top_raw[i_μ] = Ie_top_raw[i_μ] * ones(1, length(t) + (n_loop - 1) * (length(t) - 1)) # (e-/m²/s)
         end
@@ -23,6 +23,36 @@ function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
 
     return Ie_top
 end
+
+
+function Ie_top_from_ketchup(t, E, n_loop, μ_center, filename)
+    Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
+
+    file = matopen(filename)
+    Ie_top_raw = read(file, "Ie_total")
+    close(file)
+
+    # for constant input flux (e.g. first run), we need to resize the matrix from
+    # [1, n_μ * [n_E, 1]] to [1, n_μ * [n_E, n_t]]
+    if size(Ie_top_raw[1], 2) == 1 && length(t) > 1
+        for i_μ in eachindex(μ_center)
+            Ie_top_raw[i_μ] = repeat(Ie_top_raw[i_μ], outer=(1, length(t) + (n_loop - 1) * (length(t) - 1)))
+        end
+    end
+
+    # then we resize the matrix from [1, n_μ * [n_E, n_t]] to [n_μ, n_t, n_E] to be consistent with
+    # the other flux matrices
+    for i_μ in 1:Int(length(μ_center) / 2) # down-flux
+        Ie_top[i_μ, :,  :] = Ie_top_raw[i_μ][1:length(E), :]' # (e-/m²/s)
+    end
+    # set the input up-flux to 0
+    Ie_top[μ_center .> 0, :, :] .= 0
+
+
+
+    return Ie_top
+end
+
 
 
 function Ie_top_from_file(t, E, μ_center, n_loop, filename)
@@ -177,6 +207,48 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot
                                                 (E[iE] > E[i_Emin]) .*
                                                 BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
 
+        end
+    end
+
+    return Ie_top
+end
+
+"""
+    Ie_with_LET(E0, Q, E, LEToff=false)
+
+Ie_with_LET - electron spectra with low energy tail (energetic e)
+
+Ie_with_LET gives the flux from a Maxwellian spectra with a low
+energy tail - implementation of Meier/Strickland/Hecht/Christensen
+JGR 1989 (pages 13541-13552)
+
+# Inputs
+`E0` - characteristic energy (eV)
+`Q` - energy flux (eV/cm^2/s)
+`E` - energy grid
+
+# Output:
+`Ie` - differential electron flux (#/eV/m^2/s/ster)
+
+NOTE - flux is per eV!!!
+NOTE - ONLY FOR STEADY STATE SIMULATIONS
+"""
+function Ie_with_LET(E0, Q, E, μ_center, Beams, low_energy_tail=true)
+    Ie_top = zeros(length(μ_center), 1, length(E))
+
+    # Parameter for LET amplitude
+    b = (0.8 * E0/1e3) .* (E0 < 500) + (0.1 * E0 / 1e3 + .35) .* (E0 >= 500)
+
+    for i_μ in eachindex(μ_center[Beams])
+
+        # Maxwellian spectra
+        Ie_top[i_μ, 1, :] = Q / (2 * pi * E0^3) .* E .* exp.(-E ./ E0)
+
+        if low_energy_tail
+            # Max of Maxwellian - to scale LET amplitude
+            Ie_max = maximum(Ie_top[i_μ, 1, :])
+
+            Ie_top[i_μ, 1, :] = Ie_top[i_μ, 1, :] .+ 0.4 * Ie_max * (E0 ./ E) .* exp.(-E ./ 1e3 ./ b)
         end
     end
 

@@ -11,8 +11,8 @@ msis_file = find_nrlmsis_file(year = 2005, month = 10, day = 8, hour = 22, minut
 iri_file = find_iri_file(year = 2005, month = 10, day = 8, hour = 22, minute = 0, lat = 70,
                          lon = 19, height = 85:1:700);
 
-h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
 ## Plot densities
 f1 = Figure()

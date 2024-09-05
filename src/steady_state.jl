@@ -10,10 +10,10 @@ function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top)
     # height just to make it possible to use the diff function.
     h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
     h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
-    Ddz_Up   = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
-                        0 =>  1 ./ (2 .* diff(h4diffu[1:end])))
-    Ddz_Down = spdiagm( 0 => -1 ./ (2 .* diff(h4diffd[1:end])),
-                        1 =>  1 ./ (2 .* diff(h4diffd[1:end-1])))
+    Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
+                        0 =>  1 ./ diff(h4diffu[1:end]))
+    Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
+                        1 =>  1 ./ diff(h4diffd[1:end-1]))
 
     # Diffusion operator
     Ddiffusion = d2M(h_atm)
@@ -26,16 +26,15 @@ function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top)
     val_l = Vector{Float64}()
     for i1 in axes(B, 2)
         for i2 in axes(B, 2)
-            # A_tmp = A
-            # B_tmp = B[:, i1, i2]
-            if μ[i1] < 0    # downward fluxes
-                A_tmp = (A .+ A[[2:end; end]]) ./ 2
-                B_tmp = (B[:, i1, i2] .+ B[[2:end; end], i1, i2]) ./ 2
-            else            # upward fluxes
-                A_tmp = (A .+ A[[1; 1:end-1]]) ./ 2
-                B_tmp = (B[:, i1, i2] .+ B[[1; 1:end-1], i1, i2]) ./ 2
-            end
-
+            A_tmp = A
+            B_tmp = B[:, i1, i2]
+            # if μ[i1] < 0    # downward fluxes
+            #     A_tmp = (A .+ A[[2:end; end]]) ./ 2
+            #     B_tmp = (B[:, i1, i2] .+ B[[2:end; end], i1, i2]) ./ 2
+            # else            # upward fluxes
+            #     A_tmp = (A .+ A[[1; 1:end-1]]) ./ 2
+            #     B_tmp = (B[:, i1, i2] .+ B[[1; 1:end-1], i1, i2]) ./ 2
+            # end
             if i1 != i2
                 tmp_lhs = -B_tmp
                 tmp_lhs[1] = tmp_lhs[end] = 0

@@ -11,8 +11,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
 
     ## Get atmosphere
-    h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -39,6 +39,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                 μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
+    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
+        Ie_top = AURORA.Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -71,7 +73,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
         CFL_number, INPUT_OPTIONS, savedir)
-    save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
+    save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     # Initialize arrays for the ionization collisions part of the energy degradation
     Ionization_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
@@ -98,11 +100,11 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                                 μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
 
             # Compute the flux of e-
-            Ie[:, :, iE] = Crank_Nicolson_Optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+            Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
                         μ_scatterings.BeamWeight, μ_center,
                         Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
@@ -126,9 +128,8 @@ end
 function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
     ## Get atmosphere
-    println("Calling Matlab for the setup...")
-    h_atm, ne, Te, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup_new(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -148,6 +149,11 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
                                 μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
+    elseif INPUT_OPTIONS.input_type == "LET"
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.E0, INPUT_OPTIONS.Q, E, μ_center,
+                             INPUT_OPTIONS.Beams, INPUT_OPTIONS.low_energy_tail)
+    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
+        Ie_top = Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -168,27 +174,19 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
         # date and time as a name
         name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
     end
+    # Make a string with full path of savedir from root_savedir and name_savedir
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    savedir = rename_if_exists(savedir)
+    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        # throw a warning if name_savedir exists and if it already contains results
-        print("\n", @bold @red "WARNING!")
-        print(@bold " '$savedir' ")
-        println(@bold @red "already exists, any results stored in it will be overwritten.")
-        # println(@bold @red "already exists, the experiment is aborted.")
-        # return
-    else
-        if ~isdir(pkgdir(AURORA, "data", root_savedir)) # check if the root_savedir exists
-            mkdir(pkgdir(AURORA, "data", root_savedir)) # if not, creates it
-        end
-        mkpath(savedir)
+        savedir = rename_if_exists(savedir)
     end
+    mkpath(savedir)
     print("\n", @bold "Results will be saved at $savedir \n")
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
-    save_neutrals(h_atm, n_neutrals, ne, Te, savedir)
+    save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     # Initialize arrays for the ionization collisions part of the energy degradation
     Ionization_matrix = [zeros(length(h_atm) * length(μ_center), 1) for _ in 1:15]
@@ -219,7 +217,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
                                     D[iE, :],  Q[:, 1, iE], Ie_top_local[:, iE])
 
         # Update the cascading of e-
-        update_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
+        update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
                     cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
                     Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
 
