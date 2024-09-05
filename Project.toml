@@ -1,7 +1,7 @@
 name = "AURORA"
 uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
 authors = ["Etienne <etienne.gavazzi@uit.no>"]
-version = "0.4.1"
+version = "0.4.2"
 
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
