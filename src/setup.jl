@@ -1,5 +1,4 @@
 using MATLAB
-
 """
     setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
 
@@ -56,6 +55,7 @@ function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
 end
 
 
+
 """
     make_altitude_grid(top_altitude)
 
@@ -81,6 +81,8 @@ function make_altitude_grid(top_altitude)
     return h_atm
 end
 
+
+
 """
     make_energy_grid(E_max)
 
@@ -104,6 +106,8 @@ function make_energy_grid(E_max)
     dE = diff(E); dE = [dE; dE[end]]
     return E, dE
 end
+
+
 
 """
     make_scattering_matrices(θ_lims)
@@ -137,6 +141,7 @@ function make_scattering_matrices(θ_lims)
 
     return μ_lims, μ_center, μ_scatterings
 end
+
 
 
 # This function is here just for testing. It is not supposed to be used in production.
@@ -182,6 +187,7 @@ function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
 
     return μ_lims, μ_center, μ_scatterings
 end
+
 
 
 using DelimitedFiles
@@ -238,6 +244,8 @@ function load_neutral_densities(msis_file, h_atm)
     return n_neutrals, Tn
 end
 
+
+
 using PythonCall
 function load_electron_properties(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
@@ -272,6 +280,24 @@ function load_electron_properties(iri_file, h_atm)
     return ne, Te
 end
 
+
+"""
+    load_excitation_threshold()
+
+Load the excitation thresholds or energy levels of the different states
+(vibrational, rotational, ionization, ...) of the neutrals species as specified in the
+XX_levels.dat files. The corresponding names of the states can be found in the
+XX_levels.name files. XX refers to N2, O2 or O.
+
+# Calling
+`E_levels_neutrals = load_excitation_threshold()`
+
+# Returns
+- `E_levels_neutrals`: A named tuple. The elements of the tuple are matrices for N2, O2,
+    and O. The matrices have two columns. The first column contains the energy levels
+    and the second column contains the associated number of secondaries (which will be non-
+    zero only for ionized states).
+"""
 function load_excitation_threshold()
     file_N2_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "N2_levels.dat")
 	file_O2_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "O2_levels.dat")
@@ -284,6 +310,8 @@ function load_excitation_threshold()
 	E_levels_neutrals = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels)
     return E_levels_neutrals
 end
+
+
 
 # This is the old function calling the Matlab code.
 function load_old_cross_sections(E, dE)
@@ -319,6 +347,8 @@ function load_old_cross_sections(E, dE)
     return σ_neutrals
 end
 
+
+
 """
     load_cross_sections(E, dE)
 
@@ -342,6 +372,7 @@ function load_cross_sections(E, dE)
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
     return σ_neutrals
 end
+
 
 
 using DelimitedFiles
