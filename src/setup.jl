@@ -4,11 +4,11 @@ using MATLAB
 
 Load the atmosphere, the energy grid, the collision cross-sections, ...
 
-# Calling
-`h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims, μ_center,
-μ_scatterings = setup(top_altitude, θ_lims, E_max, msis_file, iri_file);`
+## Calling
+`h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims,
+μ_center, μ_scatterings = setup(top_altitude, θ_lims, E_max, msis_file, iri_file)`
 
-# Inputs
+## Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
@@ -16,27 +16,25 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 - `msis_file`: path to the msis file to use
 - `iri_file`: path to the iri file to use
 
-# Outputs
-- `h_atm`: altitude (m), vector [nZ]
-- `ne`: e- densities (m³), vector [nZ]
-- `Te`: e- temperatures (K), vector [nZ]
-- `Tn`: neutrals temperatures (K), vector [nZ]
-- `E`: energy grid (eV), vector [nE]
-- `dE`: energy bin sizes(eV), vector [nE]
-- `n_neutrals`: neutral densities (m³), Tuple of vectors ([nZ], ..., [nZ])
-- `E_levels_neutrals`: collisions energy levels and number of secondary e- produced,
-    Tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
-- `σ_neutrals`: collision cross-sections (m³), Tuple of matrices ([n`_`levels x nE], ...,
-    [n`_`levels x nE])
-- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
-- `μ_scatterings`: Tuple with several of the scattering informations, namely
+## Outputs
+- `h_atm`: altitude (m). Vector [nZ]
+- `ne`: e- density (m⁻³). Vector [nZ]
+- `Te`: e- temperature (K). Vector [nZ]
+- `Tn`: neutral temperature (K). Vector [nZ]
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy bin sizes(eV). Vector [nE]
+- `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
+- `E_levels_neutrals`: collisions energy levels and number of secondary e- produced. Named
+    tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
+- `σ_neutrals`: collision cross-sections (m⁻³). Named tuple of matrices ([n`_`levels x nE],
+    ..., [n`_`levels x nE])
+- `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
+- `μ_scatterings`: Named tuple with several of the scattering informations, namely
     μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
-    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
-    n`_`direction]
-    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x
-    n`_`direction]
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
+    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
@@ -68,7 +66,7 @@ Create an altitude grid based on the `top_altitude` given as input.
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
 
 # Outputs
-- `h_atm`: altitude (m), vector [nZ]
+- `h_atm`: altitude (m). Vector [nZ]
 """
 function make_altitude_grid(top_altitude)
     Δz(n) = 150 .+
@@ -95,8 +93,8 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
-- `E`: energy grid (eV), vector [nE]
-- `dE`: energy bin sizes(eV), vector [nE]
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy bin sizes(eV). Vector [nE]
 """
 function make_energy_grid(E_max)
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
@@ -118,17 +116,15 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 `μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)`
 
 # Inputs
-- `θ_lims`: pitch angle limits of the e- beams (deg), vector [n_beam + 1]
+- `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
 
 # Outputs
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams, vector [n_beam]
-- `μ_scatterings`: Tuple with several of the scattering informations, namely
-    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
-    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
-    n`_`direction]
-    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x
-    n`_`direction]
+- `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
+- `μ_scatterings`: Tuple with several of the scattering informations, namely μ`_`scatterings
+    = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
+    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
+    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
@@ -137,53 +133,8 @@ function make_scattering_matrices(θ_lims)
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
     Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
-
-    return μ_lims, μ_center, μ_scatterings
-end
-
-
-
-# This function is here just for testing. It is not supposed to be used in production.
-function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
-    ## Creating a MATLAB session
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(path_to_AURORA_matlab,'-end')
-    add_AURORA
-    cd(path_to_AURORA_matlab)
-    "
-
-    theta_lims2do = reshape(Vector(θ_lims), 1, :);
-    @mput theta_lims2do
-    mat"
-    theta_lims2do = double(theta_lims2do)
-    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
-    c_o_mu = mu_avg(mu_lims);
-
-    n_dirs = size(Pmu2mup, 2);
-    theta1 = linspace(0,pi,n_dirs);
-    "
-    θ_lims = vec(@mget theta_lims2do);
-    μ_lims = vec(@mget mu_lims);
-    μ_center = vec(@mget c_o_mu);
-    θ₁ = vec(@mget theta1)
-
-    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
-    BeamWeight_relative = @mget theta2beamW;
-
-    # This beam weight is calculated in a continuous way
-    BeamWeight = 2π .* vec(@mget BeamW);
-    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting matrix with the relative
-    # contribution from withing each beam. It means that when summing up along each beam, we should get 1
-    BeamWeight_relative = BeamWeight_relative ./ repeat(sum(BeamWeight_relative, dims=2), 1, size(BeamWeight_relative, 2));
-
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative, BeamWeight = BeamWeight, theta1 = θ₁);
-
-    ## Closing the MATLAB session
-    close(s1)
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
+                     BeamWeight = BeamWeight, theta1 = θ₁)
 
     return μ_lims, μ_center, μ_scatterings
 end
@@ -194,6 +145,22 @@ using DelimitedFiles
 using PythonCall
 using SpecialFunctions
 using Term
+"""
+    load_neutral_densities(msis_file, h_atm)
+
+Load the neutral densities and temperature.
+
+# Calling
+`n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)`
+
+# Inputs
+- `msis_file`: absolute path to the msis file to read n_neutrals and Tn from. String
+- `h_atm`: altitude (m). Vector [nZ]
+
+# Returns
+- `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
+- `Tn`: neutral temperature (K). Vector [nZ]
+"""
 function load_neutral_densities(msis_file, h_atm)
     # read the file without the headers
     data_msis = readdlm(msis_file, skipstart=14)
@@ -247,6 +214,22 @@ end
 
 
 using PythonCall
+"""
+    load_electron_properties(iri_file, h_atm)
+
+Load the electron density and temperature.
+
+# Calling
+`ne, Te = load_electron_properties(iri_file, h_atm)`
+
+# Inputs
+- `iri_file`: absolute path to the iri file to read ne and Te from. String
+- `h_atm`: altitude (m). Vector [nZ]
+
+# Returns
+- `ne`: e- density (m⁻³). Vector [nZ]
+- `Te`: e- temperature (K). Vector [nZ]
+"""
 function load_electron_properties(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
     if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
@@ -281,22 +264,23 @@ function load_electron_properties(iri_file, h_atm)
 end
 
 
+
 """
     load_excitation_threshold()
 
-Load the excitation thresholds or energy levels of the different states
-(vibrational, rotational, ionization, ...) of the neutrals species as specified in the
-XX_levels.dat files. The corresponding names of the states can be found in the
-XX_levels.name files. XX refers to N2, O2 or O.
+Load the excitation thresholds or energy levels of the different states (vibrational,
+rotational, ionization, ...) of the neutrals species as specified in the XX_levels.dat
+files. The corresponding names of the states can be found in the XX_levels.name files. XX
+refers to N2, O2 or O.
 
 # Calling
 `E_levels_neutrals = load_excitation_threshold()`
 
 # Returns
-- `E_levels_neutrals`: A named tuple. The elements of the tuple are matrices for N2, O2,
-    and O. The matrices have two columns. The first column contains the energy levels
-    and the second column contains the associated number of secondaries (which will be non-
-    zero only for ionized states).
+- `E_levels_neutrals`: A named tuple of matrices, namely `(N2_levels, O2_levels, O_levels)`.
+    The matrices have shape [n`_`levels x 2]. The first column contains the energy levels
+    and the second column contains the number of secondaries associated to that level (is
+    non-zero only for ionized states).
 """
 function load_excitation_threshold()
     file_N2_levels = pkgdir(AURORA, "internal_data", "data_neutrals", "N2_levels.dat")
@@ -312,6 +296,69 @@ function load_excitation_threshold()
 end
 
 
+
+"""
+    load_cross_sections(E, dE)
+
+Load the cross sections of the neutrals species for their different energy states.
+
+# Calling
+`σ_neutrals = load_cross_sections(E, dE)`
+
+# Inputs
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy grid step size (eV). Vector [nE]
+
+# Returns
+- `σ_neutrals`: A named tuple containing the cross sections for N2, O2, and O.
+"""
+function load_cross_sections(E, dE)
+    σ_N2 = get_cross_section("N2", E, dE)
+    σ_O2 = get_cross_section("O2", E, dE)
+    σ_O = get_cross_section("O", E, dE)
+
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
+    return σ_neutrals
+end
+
+
+
+using DelimitedFiles
+"""
+    get_cross_section(species_name, E, dE)
+
+Calculate the cross-section for a given species and their different energy states.
+
+# Calling
+`σ_N2 = get_cross_section("N2", E, dE)`
+
+# Inputs
+- `species_name`: name of the species. String
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy grid step size (eV). Vector [nE]
+
+# Outputs
+- `σ_species`: A matrix of cross-section values for each energy state, for the defined
+  species
+"""
+function get_cross_section(species_name, E, dE)
+    filename =  pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
+    state_name = readdlm(filename, String, comments=true, comment_char='%')
+    function_name = "e_" * species_name .* state_name
+
+    σ_species = zeros(size(state_name, 1), length(E))
+    for i_state in axes(state_name, 1) # loop over the different energy states
+        func = getfield(Main, Symbol(function_name[i_state])) # get the corresponding function name
+        σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
+    end
+
+    return σ_species
+end
+
+
+
+# ======================================================================================== #
+# ======================================================================================== #
 
 # This is the old function calling the Matlab code.
 function load_old_cross_sections(E, dE)
@@ -349,59 +396,51 @@ end
 
 
 
-"""
-    load_cross_sections(E, dE)
+# This function is here just for testing. It is not supposed to be used in production. It
+# loads the scattering matrices using the old matlab code.
+function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
+    ## Creating a MATLAB session
+    s1 = MSession();
+    @mput path_to_AURORA_matlab
+    mat"
+    addpath(path_to_AURORA_matlab,'-end')
+    add_AURORA
+    cd(path_to_AURORA_matlab)
+    "
 
-Load the cross sections of the neutrals species for their different energy states.
+    theta_lims2do = reshape(Vector(θ_lims), 1, :);
+    @mput theta_lims2do
+    mat"
+    theta_lims2do = double(theta_lims2do)
+    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
+    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
+    c_o_mu = mu_avg(mu_lims);
 
-# Calling
-`σ_neutrals = load_cross_sections(E, dE)`
+    n_dirs = size(Pmu2mup, 2);
+    theta1 = linspace(0,pi,n_dirs);
+    "
+    θ_lims = vec(@mget theta_lims2do);
+    μ_lims = vec(@mget mu_lims);
+    μ_center = vec(@mget c_o_mu);
+    θ₁ = vec(@mget theta1)
 
-# Inputs
-- `E`: energy grid (eV), vector [nE]
-- `dE`: energy grid step size (eV), vector [nE]
+    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
+    BeamWeight_relative = @mget theta2beamW;
 
-# Returns
-- `σ_neutrals`: A named tuple containing the cross sections for N2, O2, and O.
-"""
-function load_cross_sections(E, dE)
-    σ_N2 = get_cross_section("N2", E, dE)
-    σ_O2 = get_cross_section("O2", E, dE)
-    σ_O = get_cross_section("O", E, dE)
+    # This beam weight is calculated in a continuous way
+    BeamWeight = 2π .* vec(@mget BeamW);
+    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting
+    # matrix with the relative contribution from withing each beam. It means that when
+    # summing up along each beam, we should get 1
+    BeamWeight_relative = BeamWeight_relative ./
+                          repeat(sum(BeamWeight_relative, dims = 2), 1,
+                                 size(BeamWeight_relative, 2))
 
-    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
-    return σ_neutrals
-end
+    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
+                     BeamWeight = BeamWeight, theta1 = θ₁)
 
+    ## Closing the MATLAB session
+    close(s1)
 
-
-using DelimitedFiles
-"""
-    get_cross_section(species_name, E, dE)
-
-Calculate the cross-section for a given species and their different energy states.
-
-# Calling
-`σ_N2 = get_cross_section("N2", E, dE)`
-
-# Inputs
-- `species_name`: name of the species, string
-- `E`: energy grid (eV), vector [nE]
-- `dE`: energy grid step size (eV), vector [nE]
-
-# Outputs
-- `σ_species`: A matrix of cross-section values for each energy state, for the defined species
-"""
-function get_cross_section(species_name, E, dE)
-    filename =  pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
-    state_name = readdlm(filename, String, comments=true, comment_char='%')
-    function_name = "e_" * species_name .* state_name
-
-    σ_species = zeros(size(state_name, 1), length(E))
-    for i_state in axes(state_name, 1) # loop over the different energy states
-        func = getfield(Main, Symbol(function_name[i_state])) # get the corresponding function name
-        σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
-    end
-
-    return σ_species
+    return μ_lims, μ_center, μ_scatterings
 end
