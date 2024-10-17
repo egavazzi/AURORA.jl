@@ -1,4 +1,3 @@
-using MATLAB
 """
     setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
 
@@ -357,8 +356,16 @@ end
 
 
 
+
+
+
+
+
+
 # ======================================================================================== #
+#                                      LEGACY CODE                                         #
 # ======================================================================================== #
+using MATLAB
 
 # This is the old function calling the Matlab code.
 function load_old_cross_sections(E, dE)
