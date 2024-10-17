@@ -32,7 +32,7 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
     Ie_scatter = AB2B * @view(Ie[:, :, iE])
 
     # Loop over the energy levels of the collisions with the i-th neutral species
-    for i_level in 2:size(E_levels, 1)
+    for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
             # The flux of e- degraded from energy bin [E[iE], E[iE] + dE[iE]] to any lower
             # energy bin by excitation of the E_levels[i_level] state of the current
@@ -91,7 +91,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
 
-    for i_level = 2:size(E_levels, 1)
+    for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
@@ -161,7 +161,7 @@ function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
 
-    for i_level = 2:size(E_levels, 1)
+    for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
