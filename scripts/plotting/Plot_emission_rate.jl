@@ -3,25 +3,25 @@
 
 using AURORA
 using MAT
-using GLMakie
-# GLMakie.activate!()
 using CairoMakie
-CairoMakie.activate!()
-
+using GLMakie
+GLMakie.activate!()
 
 ## Directory to plot, absolute path
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_lr_Bz-9_newZ_550km_finer-theta_halfstepsAB_scaled")
+full_path_to_directory = joinpath(REVONTULI_MOUNT,
+                                  "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
+                                  "InvertedV_480s_fixed-secondaries")
 
 
 ## Load the Q data (volume emission-rates)
 Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
 data = matread(Q_file)
-Q4278 = data["Q4278"]
-Q6730 = data["Q6730"]
-Q7774 = data["Q7774"]
-Q8446 = data["Q8446"]
-QO1D = data["QO1D"]
-QO1S = data["QO1S"]
+Q4278 = data["Q4278"] * 1e4
+Q6730 = data["Q6730"] * 1e4
+Q7774 = data["Q7774"] * 1e4
+Q8446 = data["Q8446"] * 1e4
+QO1D = data["QO1D"] * 1e4
+QO1S = data["QO1S"] * 1e4
 h_atm = vec(data["h_atm"]) ./ 1e3 # convert to km
 t = vec(data["t"])
 
@@ -30,11 +30,12 @@ fig = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
-            yminorticksvisible = true, limits=(nothing, (nothing, 400))
+            yminorticksvisible = true, limits=((0, 1), (100, 400))
             ),
-            Heatmap = (rasterize = true,),
-            Colorbar = (flip_vertical_label = true, vertical = true),
-        )
+        Heatmap = (rasterize = true,),
+        Colorbar = (flip_vertical_label = true, vertical = true),
+        ),
+        fontsize = 20
     ) do
     fig = Figure(size = (1000, 800))
     ga = fig[1, 1] = GridLayout()
@@ -66,7 +67,7 @@ display(fig)
 
 ## Save Qtz plot
 savefile = joinpath(full_path_to_directory, "Qtz.png")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "Qtz.svg")
 save(savefile, fig; backend = CairoMakie)
@@ -86,27 +87,27 @@ println("Saved $savefile")
 ## Load the I data (column-integrated emission-rates)
 I_file = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
 data = matread(I_file)
-I4278 = vec(data["I_4278"])
-I6730 = vec(data["I_6730"])
-I7774 = vec(data["I_7774"])
-I7774_O = vec(data["I_7774_O"])
-I7774_O2 = vec(data["I_7774_O2"])
-I8446 = vec(data["I_8446"])
-I8446_O = vec(data["I_8446_O"])
-I8446_O2 = vec(data["I_8446_O2"])
-IO1D = vec(data["I_O1D"])
-IO1S = vec(data["I_O1S"])
+I4278 = vec(data["I_4278"]) * 1e4 / 1e10
+I6730 = vec(data["I_6730"]) * 1e4 / 1e10
+I7774 = vec(data["I_7774"]) * 1e4 / 1e10
+I7774_O = vec(data["I_7774_O"]) * 1e4 / 1e10
+I7774_O2 = vec(data["I_7774_O2"]) * 1e4 / 1e10
+I8446 = vec(data["I_8446"]) * 1e4 / 1e10
+I8446_O = vec(data["I_8446_O"]) * 1e4 / 1e10
+I8446_O2 = vec(data["I_8446_O2"]) * 1e4 / 1e10
+IO1D = vec(data["I_O1D"]) * 1e4 / 1e10
+IO1S = vec(data["I_O1S"]) * 1e4 / 1e10
 t = vec(data["t"])
 
 ## Plot the I data
 custom_theme = Theme(fontsize = 20, linewidth = 2)
 set_theme!(custom_theme)
 fig = Figure(size = (1000, 800))
-ax = Axis(fig[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "#exc/m²/s",
-          yscale = log10, limits = (t[1], t[end], 1e4, 1e11), xticks = t[1]:0.1:t[end],
+ax = Axis(fig[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "R",
+          yscale = log10, limits = (t[1], t[end], 1e1, 1e4), xticks = t[1]:0.1:t[end],
           yminorticksvisible = true, yminorgridvisible = true,
           yminorticks = IntervalsBetween(9), yticksmirrored = true)
-ylims!(1e4, 1e11)
+ylims!(1e1, 1e6)
 lines!(t[2:end], I4278[2:end]; label = rich("I", subscript("4278")), color = :blue)
 lines!(t[2:end], I6730[2:end]; label = rich("I", subscript("6730")), color = :red)
 lines!(t, I7774; label = rich("I", subscript("7774")), color = RGBf(0.5, 0, 0))
@@ -124,15 +125,15 @@ display(fig)
 
 ## Save It plot
 savefile = joinpath(full_path_to_directory, "It.png")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "It.svg")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "It.pdf")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "It.eps")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 ##
