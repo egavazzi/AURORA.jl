@@ -143,7 +143,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     end
 
     # Plot (TODO: redo with loop and proper subplots down and up)
-    fig = Figure()
+    fig = Figure(size = (1500, 1000))
     n_row = size(angles_to_plot, 1)
     n_col = size(angles_to_plot, 2)
     for i in axes(angles_to_plot, 1)
@@ -168,7 +168,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
         end
     end
 
-    cb = Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10)
+    Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)")
     Label(fig[0, :], time; tellwidth = false, fontsize=18)
 
     return fig
@@ -176,9 +176,9 @@ end
 
 
 
-##
+
 # Main function
-function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
+function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits)
     ## Find the files to process
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
@@ -206,7 +206,6 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
     # Convert from #e-/m²/s to #e-/m²/s/eV/ster
     println("Convert from #e-/m²/s to #e-/m²/s/eV/ster.")
     # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
-    # example: [DOWN1 DOWN2 DOWN3; UP1 UP2 UP3] becomes [DOWN1 DOWN2 DOWN3 UP1 UP2 UP3]
     angles_to_plot_vert = vcat(eachrow(angles_to_plot)...)
     for i_μ in eachindex(angles_to_plot_vert)
         Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
@@ -214,51 +213,55 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
 
     # Create the figure
     println("Create the plot.")
-    global_min, global_max = extrema(Ie_plot)
-    global_min = global_max / 1e4
     Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
-    f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (global_min, global_max))
-    display(f)
+    fig = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, color_limits)
+    display(fig)
 
     # Animate
     println("Animate.")
     n_t = length(t_run) # number of timesteps per file
-    for i_file in 1:n_files
-        # First file (already loaded)
-        if i_file == 1
-            i_t = 1
-            while i_t <= n_t
-                Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
-                time[] = @sprintf("%.3f", t_run[i_t])
-                notify(Ie_timeslice)
-                sleep(0.01)
-                i_t += 1
-            end
-        # Next files
-        else
-            # Load the data
-            println("Load data...")
-            data = matread(files_to_process[i_file]);
-            Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
-            t_run = data["t_run"]
-            # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
-            Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
-            # Merge the streams to angles_to_plot
-            Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
-            # Convert from #e-/m²/s to #e-/m²/s/eV/ster
-            for i_μ in eachindex(angles_to_plot_vert)
-                Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
-            end
-            # Animate
-            println("Animate.")
-            i_t = 2 # we skip the first timestamp as it is the same as the last element from the previous file.
-            while i_t <= n_t
-                Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
-                time[] = @sprintf("%.3f", t_run[i_t])
-                notify(Ie_timeslice)
-                sleep(0.01)
-                i_t += 1
+    record(fig, full_path_to_directory * "animation.mp4"; compression = 10) do io
+        for i_file in 1:n_files
+            # First file (already loaded)
+            if i_file == 1
+                i_t = 1
+                while i_t <= n_t
+                    isopen(fig.scene) || error("Figure is closed") # exit if figure is closed
+                    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+                    time[] = @sprintf("%.3f s", t_run[i_t])
+                    notify(Ie_timeslice)
+                    sleep(0.01)
+                    i_t += 1
+                    recordframe!(io)
+                end
+            # Next files
+            else
+                # Load the data
+                println("Load data...")
+                data = matread(files_to_process[i_file]);
+                Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
+                t_run = data["t_run"]
+                # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
+                Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
+                # Merge the streams to angles_to_plot
+                Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
+                # Convert from #e-/m²/s to #e-/m²/s/eV/ster
+                for i_μ in eachindex(angles_to_plot_vert)
+                    Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
+                end
+                # Animate
+                println("Animate.")
+                i_t = 2 # we skip the first timestamp as it is the same as the last element from the previous file.
+                while i_t <= n_t
+                    isopen(fig.scene) || error("Figure is closed") # exit if figure is closed
+                    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+                    time[] = @sprintf("%.3f s", t_run[i_t])
+                    notify(Ie_timeslice)
+                    sleep(0.01)
+                    i_t += 1
+                    recordframe!(io)
+                end
             end
         end
     end
@@ -269,15 +272,11 @@ end
 
 ## Calling the animate function
 
-angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
-                 (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
-
-# filename = "data/Visions2/IeFlickering-02.mat"
-# animate_IeztE_3Dzoft(filename, angles_to_plot)
-
-
 directory_to_process = "Visions2/"
-animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
+angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
+                  (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
+color_limits = (1e5, 1e9)
+animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits)
 
 
 
