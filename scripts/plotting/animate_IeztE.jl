@@ -10,6 +10,7 @@ using GLMakie
 using CairoMakie
 using MAT
 using AURORA
+using Printf
 GLMakie.activate!()
 
 
@@ -177,14 +178,18 @@ end
 
 ##
 # Main function
-function animate_IeztE_3Dzoft(filename, angles_to_plot)
-    # Read the data
-    println("Load the data.")
+function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
+    ## Find the files to process
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    files = readdir(full_path_to_directory, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    n_files = length(files_to_process)
 
-    data = matread(filename);
+    ## Load data from the first file
+    println("Load the data.")
+    data = matread(files_to_process[1]);
     Ie_raw = data["Ie_ztE"]; # size of [n_mu x nz, nt, nE]
-    # μ_scatterings = data["mu_scatterings"]
-    μ_lims = data["mu_lims"]
+    μ_lims = vec(data["mu_lims"])
     t_run = data["t_run"]
     E = data["E"]
     h_atm = data["h_atm"]
@@ -192,38 +197,70 @@ function animate_IeztE_3Dzoft(filename, angles_to_plot)
     dE = diff(E); dE = [dE; dE[end]]
     θ_lims = acosd.(μ_lims)
 
-    println("Restructure from 3D to 4D array.")
     # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
+    println("Restructure from 3D to 4D array.")
     Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_mu, nz, nt, nE]
-
-    println("Merge the streams to match the angles to plot.")
     # Merge the streams to angles_to_plot and
+    println("Merge the streams to match the angles to plot.")
     Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
-
-    println("Convert from #e-/m²/s to #e-/m²/s/eV/ster.")
     # Convert from #e-/m²/s to #e-/m²/s/eV/ster
+    println("Convert from #e-/m²/s to #e-/m²/s/eV/ster.")
     # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
     # example: [DOWN1 DOWN2 DOWN3; UP1 UP2 UP3] becomes [DOWN1 DOWN2 DOWN3 UP1 UP2 UP3]
     angles_to_plot_vert = vcat(eachrow(angles_to_plot)...)
-    for i in eachindex(angles_to_plot_vert)
-        Ie_plot[i, :, :, :] = Ie_plot[i, :, :, :] ./ beam_weight(angles_to_plot_vert[i]) ./ reshape(dE, (1, 1, :))
+    for i_μ in eachindex(angles_to_plot_vert)
+        Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
     end
 
+    # Create the figure
+    println("Create the plot.")
     global_min, global_max = extrema(Ie_plot)
     global_min = global_max / 1e4
-
-    println("Create the plot.")
     Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
     f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (global_min, global_max))
     display(f)
 
+    # Animate
     println("Animate.")
-    @time for i_t in 1:length(t_run)
-        Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
-        time[] = "$(t_run[i_t]) s"
-        notify(Ie_timeslice)
-        sleep(0.01)
+    n_t = length(t_run) # number of timesteps per file
+    for i_file in 1:n_files
+        # First file (already loaded)
+        if i_file == 1
+            i_t = 1
+            while i_t <= n_t
+                Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+                time[] = @sprintf("%.3f", t_run[i_t])
+                notify(Ie_timeslice)
+                sleep(0.01)
+                i_t += 1
+            end
+        # Next files
+        else
+            # Load the data
+            println("Load data...")
+            data = matread(files_to_process[i_file]);
+            Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
+            t_run = data["t_run"]
+            # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
+            Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
+            # Merge the streams to angles_to_plot
+            Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
+            # Convert from #e-/m²/s to #e-/m²/s/eV/ster
+            for i_μ in eachindex(angles_to_plot_vert)
+                Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
+            end
+            # Animate
+            println("Animate.")
+            i_t = 2 # we skip the first timestamp as it is the same as the last element from the previous file.
+            while i_t <= n_t
+                Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+                time[] = @sprintf("%.3f", t_run[i_t])
+                notify(Ie_timeslice)
+                sleep(0.01)
+                i_t += 1
+            end
+        end
     end
 
     return nothing
@@ -231,12 +268,16 @@ end
 
 
 ## Calling the animate function
-filename = "data/Visions2/IeFlickering-01.mat"
 
 angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
                  (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
 
-animate_IeztE_3Dzoft(filename, angles_to_plot)
+# filename = "data/Visions2/IeFlickering-02.mat"
+# animate_IeztE_3Dzoft(filename, angles_to_plot)
+
+
+directory_to_process = "Visions2/"
+animate_IeztE_3Dzoft(directory_to_process, angles_to_plot)
 
 
 
