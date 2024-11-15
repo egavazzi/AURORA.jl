@@ -3,11 +3,14 @@ using MAT
 using CairoMakie
 CairoMakie.activate!()
 using GLMakie
-# GLMakie.activate!()
+GLMakie.activate!()
 
+set_theme!(fontsize = 20)
 
 ## Directory to plot, absolute path
-full_path_to_directory = joinpath(REVONTULI_MOUNT, "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_475s_lr_zmin90km")
+full_path_to_directory = joinpath(REVONTULI_MOUNT,
+                                  "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
+                                  "InvertedV_480s_fixed-secondaries")
 
 # Read the ionization data
 ionization_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
@@ -79,7 +82,6 @@ end
 onany(i_t) do i_t
     step!(QO2i_slice, QOi_slice, QN2i_slice, Qtot_slice, time, i_t[])
 end
-#endregion
 display(GLMakie.Screen(), fig)
 
 ## Save animation as a video
@@ -88,14 +90,23 @@ record(fig, video_file, 1:length(t); framerate = 60, px_per_unit = 2) do i_t
     Makie.set_close_to!(sl_time, i_t)
 end
 println("Saved $video_file")
-## Save a snapshot
-# savefile = joinpath(full_path_to_directory, "Ionization_rate.png")
-# save(savefile, fig)
+#endregion
+
+
+
 
 
 ## Plot ionization rate as heatmap + top incoming flux
+#region
 # File with Ie_top flux datafilename
-Ietop_file = joinpath(full_path_to_directory, "Ie_incoming_475s_lr.mat")
+# Ietop_file = joinpath(full_path_to_directory, "Ie_incoming_475s.mat")
+incoming_files = filter(file -> startswith(file, "Ie_incoming_"), readdir(full_path_to_directory))
+if length(incoming_files) > 1
+    error("More than one file contains incoming flux. This is not normal")
+else
+    global Ietop_file = joinpath(full_path_to_directory, incoming_files[1])
+end
+
 # Read the Ie_top flux
 data = matread(Ietop_file)
 Ietop = data["Ie_total"]
@@ -123,20 +134,24 @@ custom_formatter(values) = map(v -> rich("10", superscript("$(round(Int64, v))")
 Colorbar(fig[1, 2], hm; tickformat = custom_formatter, label = "IeE (eV/m²/s/eV/ster)")
 # Plot ionization rate as heatmap
 custom_formatter(values) = map(v -> rich("10", superscript("$(round(Int64, v))")), values)
-ax = Axis(fig[2, 1], xlabel = "t (s)", ylabel = "altitude (km)", aspect= AxisAspect(1),
-xminorticksvisible = true, yminorticksvisible = true, xticksmirrored = true, yticksmirrored = true)
+ax_Q = Axis(fig[2, 1], xlabel = "t (s)", ylabel = "altitude (km)", aspect = AxisAspect(1),
+          xminorticksvisible = true, yminorticksvisible = true, xticksmirrored = true,
+          yticksmirrored = true)
 hm = heatmap!(t, h_atm / 1e3, log10.(Qtot)'; colorrange = (6, 10), rasterize = true)
 cb = Colorbar(fig[2, 2], hm; tickformat = custom_formatter, label = "Ionization rate (/m³/s)")
 Qtot_contour = log10.(Qtot) |> (x -> replace(x, -Inf => 0))
 ct = contour!(t, h_atm / 1e3, Qtot_contour'; levels = 6:10, color = :black, labels = true)
 colsize!(fig.layout, 1, Aspect(2, 1.0))
 rowsize!(fig.layout, 1, Relative(1/4))
+linkxaxes!(ax_Ietop, ax_Q)
+xlims!(ax_Q, 0, 1)
+ylims!(ax_Q, 100, nothing)
 # display(fig, backend = GLMakie)
 display(fig)
 
 ## Save the figure
 savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.png")
-save(savefile, fig)
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.svg")
 save(savefile, fig; backend = CairoMakie)
@@ -147,3 +162,4 @@ println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.eps")
 save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
+#endregion
