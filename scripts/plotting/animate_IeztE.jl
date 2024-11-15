@@ -143,7 +143,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     end
 
     # Plot (TODO: redo with loop and proper subplots down and up)
-    fig = Figure(size = (1500, 1000))
+    fig = Figure(size = (1500, 1000), fontsize=20)
     n_row = size(angles_to_plot, 1)
     n_col = size(angles_to_plot, 2)
     for i in axes(angles_to_plot, 1)
@@ -151,7 +151,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
             idx = (i - 1) * n_col  + j # goes along first row, then second row
 
             ax = Axis(fig[i, j], xscale = log10)
-            heatmap!(E, h_atm / 1e3, Ie_streams[idx], colorrange = color_limits, colorscale = log10)
+            heatmap!(E, h_atm / 1e3, Ie_streams[idx], colorrange = color_limits, colorscale = log10, colormap = :inferno)
 
             if i == 1
                 ax.title = string(angles_to_plot[i, j][1], " - ", angles_to_plot[i, j][2], "° DOWN")
@@ -168,8 +168,8 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
         end
     end
 
-    Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)")
-    Label(fig[0, :], time; tellwidth = false, fontsize=18)
+    Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
+    Label(fig[0, :], time; tellwidth = false, fontsize=20)
 
     return fig
 end
@@ -221,13 +221,13 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
     # Animate
     println("Animate.")
     n_t = length(t_run) # number of timesteps per file
-    record(fig, full_path_to_directory * "animation.mp4"; compression = 10) do io
+    record(fig, joinpath(full_path_to_directory, "animation.mp4"); compression = 10) do io
         for i_file in 1:n_files
             # First file (already loaded)
             if i_file == 1
                 i_t = 1
                 while i_t <= n_t
-                    isopen(fig.scene) || error("Figure is closed") # exit if figure is closed
+                    Makie.current_backend() == GLMakie || isopen(fig.scene) || error("Figure is closed") # exit if GLMakie window is closed
                     Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
                     time[] = @sprintf("%.3f s", t_run[i_t])
                     notify(Ie_timeslice)
@@ -238,7 +238,7 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
             # Next files
             else
                 # Load the data
-                println("Load data...")
+                println("Load data... $i_file/$n_files")
                 data = matread(files_to_process[i_file]);
                 Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
                 t_run = data["t_run"]
@@ -254,7 +254,7 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
                 println("Animate.")
                 i_t = 2 # we skip the first timestamp as it is the same as the last element from the previous file.
                 while i_t <= n_t
-                    isopen(fig.scene) || error("Figure is closed") # exit if figure is closed
+                    Makie.current_backend() == GLMakie || isopen(fig.scene) || error("Figure is closed") # exit if GLMakie window is closed
                     Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
                     time[] = @sprintf("%.3f s", t_run[i_t])
                     notify(Ie_timeslice)
@@ -288,32 +288,25 @@ animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits)
 # First load Ie
 # filename = "/run/user/1000/gvfs/sftp:host=revontuli.uit.no/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_longer_fixed-secondaries/IeFlickering-01.mat"
 filename = "data/Visions2/IeFlickering-01.mat"
-@time data = matread(filename);
-@time Ie_raw = data["Ie_ztE"]; # size of [n_mu x nz, nt, nE]
 
+data = matread(filename);
+Ie_raw = data["Ie_ztE"]; # size of [n_mu x nz, nt, nE]
 μ_scatterings = data["mu_scatterings"]
 μ_lims = data["mu_lims"]
 t_run = data["t_run"]
 E = data["E"]
-dE = diff(E); dE = [dE; dE[end]];
 h_atm = data["h_atm"]
-
-@time Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E); # size [n_mu, nz, nt, nE]
-
+dE = diff(E); dE = [dE; dE[end]];
 θ_lims = acosd.(μ_lims)
+
 angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
                  (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
-
-@time Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot);
+Ie = restructure_Ie(Ie_raw, μ_lims, h_atm, t_run, E); # size [n_mu, nz, nt, nE]
+Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot);
 
 Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
 time = Observable("$(t_run[1]) s")
-
-global_min, global_max = extrema(Ie_plot)
-# global_min, global_max = extrema(Ie)
-global_min = global_max / 1e4
-
-f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (global_min, global_max))
+f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (1e5, 1e9))
 display(f)
 
 
@@ -327,14 +320,14 @@ end
 
 ## Testing recording the animation to a mp4
 # with glmakie(~12s for n_t=51)
-@time record(f, "time_animation1_v2.mp4", 1:n_t; framerate=10, backend=GLMakie) do i_t
-    Ie_timeslice[] .= Ie[:, :, i_t, :]
+@time record(f, "time_animation1.mp4", 1:10; framerate=10, backend=GLMakie) do i_t
+    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
     time[] = "$(t_run[i_t]) s"
     notify(Ie_timeslice)
 end
 # with cairomakie (~110s for n_t=51)
-@time record(f, "time_animation2_v2.mp4", 1:n_t; framerate=10, backend=CairoMakie) do i_t
-    Ie_timeslice[] .= Ie[:, :, i_t, :]
+@time record(f, "time_animation2.mp4", 1:10; framerate=10, backend=CairoMakie) do i_t
+    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
     time[] = "$(t_run[i_t]) s"
     notify(Ie_timeslice)
 end
