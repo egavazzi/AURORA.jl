@@ -116,36 +116,34 @@ Ie_file = joinpath(full_path_to_directory, "IeFlickering-01.mat")
 Egrid = matopen(Ie_file) do file; read(file, "E"); end # extract Egrid from the simulation
 dEgrid = diff(Egrid); dEgrid = [dEgrid; dEgrid[end] + diff(dEgrid)[end]] # calculate dE
 # Plot e- precipitation
-fig = Figure(size = (1000, 1000))
-angle_cone = [170 180] # angle for the cone of precipitation to plot
+fig = Figure(size = (850, 950))
+angle_cone = [90 180] # angle for the cone of precipitation to plot, 180° is field-aligned down
 ax_Ietop = Axis(fig[1, 1], yscale = log10, ylabel = " Energy (eV)",
-           title = string(180 - angle_cone[2], " - ", 180 - angle_cone[1], "° DOWN"),
+                title = string(180 - angle_cone[2], " - ", 180 - angle_cone[1], "° DOWN"),
                 yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                 xticklabelsvisible = false, xminorticksvisible = true,
                 xticksmirrored = true, yticksmirrored = true,
                 limits = ((0, 1), nothing))
 idx_θ = vec(angle_cone[1] .<= abs.(acosd.(mu_avg(θ_Visions_lims))) .<= angle_cone[2])
 BeamW = beam_weight([angle_cone[1], angle_cone[2]])
-# data_heatmap = log10.(dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dEgrid')
-data_heatmap = log10.(dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dEgrid' .* Egrid')
-hm = Makie.heatmap!(t_top, Egrid, data_heatmap; colormap = :inferno)
+data_heatmap = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dEgrid' .* Egrid'
+hm = Makie.heatmap!(t_top, Egrid, data_heatmap; colorrange = (1e6, maximum(data_heatmap)),
+                    colorscale = log10, colormap = :inferno)
 custom_formatter(values) = map(v -> rich("10", superscript("$(round(Int64, v))")), values)
-# Colorbar(fig[1, 2], hm; tickformat = custom_formatter, label = "Ie (#e-/m²/s/eV/ster)")
-Colorbar(fig[1, 2], hm; tickformat = custom_formatter, label = "IeE (eV/m²/s/eV/ster)")
+Colorbar(fig[1, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
 # Plot ionization rate as heatmap
-custom_formatter(values) = map(v -> rich("10", superscript("$(round(Int64, v))")), values)
 ax_Q = Axis(fig[2, 1], xlabel = "t (s)", ylabel = "altitude (km)", aspect = AxisAspect(1),
           xminorticksvisible = true, yminorticksvisible = true, xticksmirrored = true,
           yticksmirrored = true)
-hm = heatmap!(t, h_atm / 1e3, log10.(Qtot)'; colorrange = (6, 10), rasterize = true)
-cb = Colorbar(fig[2, 2], hm; tickformat = custom_formatter, label = "Ionization rate (/m³/s)")
+hm = heatmap!(t, h_atm / 1e3, Qtot'; colorrange = (1e6, maximum(Qtot)), colorscale=log10, rasterize = true)
+cb = Colorbar(fig[2, 2], hm; label = "Ionization rate (/m³/s)")
 Qtot_contour = log10.(Qtot) |> (x -> replace(x, -Inf => 0))
 ct = contour!(t, h_atm / 1e3, Qtot_contour'; levels = 6:10, color = :black, labels = true)
 colsize!(fig.layout, 1, Aspect(2, 1.0))
-rowsize!(fig.layout, 1, Relative(1/4))
+rowsize!(fig.layout, 1, Relative(1/5))
 linkxaxes!(ax_Ietop, ax_Q)
 xlims!(ax_Q, 0, 1)
-ylims!(ax_Q, 100, nothing)
+ylims!(ax_Q, 100, 500)
 # display(fig, backend = GLMakie)
 display(fig)
 
