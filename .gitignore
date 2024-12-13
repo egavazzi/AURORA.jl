@@ -33,3 +33,6 @@ MATLAB_dependencies/Control*.m
 
 # ignore local files
 local_files_no_git/*
+
+# ignore the Figures
+Figures/*
