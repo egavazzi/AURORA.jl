@@ -11,7 +11,8 @@ This is a Julia implementation of the original AURORA code written in MATLAB and
 
 Below is an example of electron flux in the ionosphere produced by AURORA in response to an Alfvénic precipitation.
 
-https://github.com/user-attachments/assets/f396baa2-fe78-426f-9642-252e08987ec0
+https://github.com/user-attachments/assets/e67fc4d3-1fe1-4c0b-a8f6-42275f6e4659
+
 
 
 ## Installation
