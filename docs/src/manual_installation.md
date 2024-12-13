@@ -16,8 +16,6 @@ julia> Pkg.instantiate() # this might take a while...
 
 4. AURORA is now ready to use!
 
-<br></br>
-<br></br>
 
 **Notes:**
 - "Instantiating" the environment will download and install dependencies in their correct version. This needs to be done only the first time you use AURORA.
