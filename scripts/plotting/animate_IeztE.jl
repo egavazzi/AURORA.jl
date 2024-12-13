@@ -134,7 +134,8 @@ It should take Ie as a function of pitch-angle, height and energy as input. But 
 function of time. This because we want to update the time OUTSIDE of the function.
 =#
 function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
-                                time::Observable{String}, h_atm, E, angles_to_plot, color_limits)
+                                time::Observable{String}, h_atm, E, angles_to_plot, color_limits,
+                                t_top, data_Ietop)
 
     # Slice the input Ie into its different pitch-angle components
     Ie_streams = Array{Observable}(nothing, length(angles_to_plot))
@@ -146,11 +147,12 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     fig = Figure(size = (1500, 1000), fontsize=20)
     n_row = size(angles_to_plot, 1)
     n_col = size(angles_to_plot, 2)
+    ga = fig[1:4, 1:n_col] = GridLayout()
     for i in axes(angles_to_plot, 1)
         for j in axes(angles_to_plot, 2)
             idx = (i - 1) * n_col  + j # goes along first row, then second row
 
-            ax = Axis(fig[i, j], xscale = log10)
+            ax = Axis(ga[i, j], xscale = log10)
             heatmap!(E, h_atm / 1e3, Ie_streams[idx], colorrange = color_limits, colorscale = log10, colormap = :inferno)
 
             if i == 1
@@ -167,9 +169,22 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
             end
         end
     end
-
     Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
-    Label(fig[0, :], time; tellwidth = false, fontsize=20)
+    Label(fig[0, 4], time; tellwidth = false, tellheight = false, fontsize=20)
+
+    # Plot Ie precipitating at the top (#TODO: redo this properly)
+    gb = fig[0, 1:2] = GridLayout()
+    ax_Ietop = Axis(gb[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
+                    title = "Incoming flux at the top",
+                    # title = string(180 - angle_cone[2], " - ", 180 - angle_cone[1], "° DOWN"),
+                    yminorticksvisible = true, yminorticks = IntervalsBetween(9),
+                    xticklabelsvisible = true, xminorticksvisible = true,
+                    xticksmirrored = true, yticksmirrored = true,
+                    limits = ((0, 1), nothing))
+    hm = heatmap!(t_top, E, data_Ietop; colormap = :inferno, colorscale=log10, colorrange=(1e6, maximum(data_Ietop)))
+    time_float64 = @lift(parse(Float64, $time[1:end-1]))
+    vlines!(time_float64, linewidth = 3)
+    Colorbar(gb[1, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
 
     return fig
 end
@@ -215,13 +230,13 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
     println("Create the plot.")
     Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
-    fig = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, color_limits)
+    fig = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, color_limits, t_top, data_Ietop)
     display(fig)
 
     # Animate
     println("Animate.")
     n_t = length(t_run) # number of timesteps per file
-    record(fig, joinpath(full_path_to_directory, "animation.mp4"); compression = 10) do io
+    record(fig, joinpath(full_path_to_directory, "animation3.mp4")) do io
         for i_file in 1:n_files
             # First file (already loaded)
             if i_file == 1
@@ -272,7 +287,7 @@ end
 
 ## Calling the animate function
 
-directory_to_process = "Visions2/"
+directory_to_process = "Visions2/Alfven_475s_longer_fixed-secondaries"
 angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
                   (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
 color_limits = (1e5, 1e9)
@@ -287,7 +302,7 @@ animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits)
 
 # First load Ie
 # filename = "/run/user/1000/gvfs/sftp:host=revontuli.uit.no/mnt/data/etienne/Julia/AURORA.jl/data/Visions2/Alfven_536s_longer_fixed-secondaries/IeFlickering-01.mat"
-filename = "data/Visions2/IeFlickering-01.mat"
+filename = "data/Visions2/Alfven_475s_longer_fixed-secondaries/IeFlickering-01.mat"
 
 data = matread(filename);
 Ie_raw = data["Ie_ztE"]; # size of [n_mu x nz, nt, nE]
@@ -306,7 +321,7 @@ Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot);
 
 Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
 time = Observable("$(t_run[1]) s")
-f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (1e5, 1e9))
+f = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, (1e5, 1e9), t_top, data_Ietop)
 display(f)
 
 
@@ -331,3 +346,27 @@ end
     time[] = "$(t_run[i_t]) s"
     notify(Ie_timeslice)
 end
+
+
+
+
+
+
+## TODO: redo this properly by integrating this in the animate function (and maybe with a bool to choose to plot it or not?)
+full_path_to_directory = "data/Visions2/Alfven_475s_longer_fixed-secondaries"
+incoming_files = filter(file -> startswith(file, "Ie_incoming_"), readdir(full_path_to_directory))
+if length(incoming_files) > 1
+    error("More than one file contains incoming flux. This is not normal")
+else
+    global Ietop_file = joinpath(full_path_to_directory, incoming_files[1])
+end
+
+# Read the Ie_top flux
+data = matread(Ietop_file)
+Ietop = data["Ie_total"]
+t_top = data["t_top"]; t_top = [t_top; t_top[end] + diff(t_top)[end]] .- t_top[1]
+
+angle_cone = [90 180] # angle for the cone of precipitation to plot
+idx_θ = vec(angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= angle_cone[2])
+BeamW = beam_weight([angle_cone[1], angle_cone[2]])
+data_Ietop = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dE' .* E'
