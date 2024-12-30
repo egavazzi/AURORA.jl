@@ -195,7 +195,8 @@ prompt emissions, volume-excitation-rates correspond also to volume-emission-rat
 `make_volume_excitation_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: relative path to the simulation folder to process. Example: "Visions2/Alfven_536s"
+- `directory_to_process`: Name of the simulation folder to process.
+    Must be situated under "data/". Example: "Visions2/Alfven_536s"
 """
 function make_volume_excitation_file(directory_to_process)
     ## Find the files to process
@@ -203,20 +204,20 @@ function make_volume_excitation_file(directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
 
-    # Load simulation grid
+    ## Load simulation grid
     f = matopen(files_to_process[1])
         h_atm = read(f, "h_atm")
         E = read(f, "E")
     close(f)
     dE = diff(E); dE = [dE; dE[end]]
 
-    # Load simulation neutral densities
+    ## Load simulation neutral densities
     data = matread(joinpath(full_path_to_directory, "neutral_atm.mat"))
     nO = data["nO"]
     nO2 = data["nO2"]
     nN2 = data["nN2"]
 
-    # Load the emission cross-sections
+    ## Load the emission cross-sections
     σ_4278 = excitation_4278(E)# .+ dE/2)
     σ_6730 = excitation_6730_N2(E)# .+ dE/2)
     σ_7774_O = excitation_7774_O(E)# .+ dE/2)
@@ -225,14 +226,14 @@ function make_volume_excitation_file(directory_to_process)
     σ_8446_O2 = excitation_8446_O2(E)# .+ dE/2)
     σ_O1D = excitation_O1D(E)# .+ dE/2)
     σ_O1S = excitation_O1S(E)# .+ dE/2)
-    # Load/calculate the ionization cross-sections
+    ## Load/calculate the ionization cross-sections
     σ_N2, σ_O2, σ_O = load_cross_sections(E, dE) # load the cross-sections
     N2_levels, O2_levels, O_levels = load_excitation_threshold() # load the energy levels
     σ_Oi = σ_O' * O_levels[:, 2] # basically do sum(cross_section_for_each_reaction * number_of_ionizations_per_reaction)
     σ_O2i = σ_O2' * O2_levels[:, 2]
     σ_N2i = σ_N2' * N2_levels[:, 2]
 
-    # Initialize arrays to store the results for each time-slice
+    ## Initialize arrays to store the results for each time-slice
     Q4278 = Vector{Matrix{Float64}}()
     Q6730 = Vector{Matrix{Float64}}()
     Q7774_O = Vector{Matrix{Float64}}()
@@ -250,8 +251,9 @@ function make_volume_excitation_file(directory_to_process)
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
+    ## Loop over the files
     for (i_file, file) in enumerate(files_to_process)
-        # Load simulation results for current file.
+        ## Load simulation results for current file.
         if i_file == 1
             f = matopen(file)
                 Ie_ztE = read(f, "Ie_ztE")
@@ -295,7 +297,7 @@ function make_volume_excitation_file(directory_to_process)
         #     end
         # end
 
-        # Calculate Q (volume-excitation-rate) for various optical emissions
+        ## Calculate Q (volume-excitation-rate) for various optical emissions
         Q4278_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_4278, nN2)
         Q6730_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_6730, nN2)
         Q7774_O_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_7774_O, nO)
@@ -311,8 +313,8 @@ function make_volume_excitation_file(directory_to_process)
         QO2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O2i, nO2)
         QN2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_N2i, nN2)
 
-        # Push the newly calculated Q_local for the current time-slice into a vector
-        # We get Q4278 = [[n_z, n_t1], [n_z, n_t2], ...]
+        ## Push the newly calculated Q_local for the current time-slice into a vector
+        # We get something like Q4278 = [[n_z, n_t1], [n_z, n_t2], ...]
         push!(Q4278, Q4278_local)
         push!(Q6730, Q6730_local)
         push!(Q7774_O, Q7774_O_local)
@@ -331,7 +333,7 @@ function make_volume_excitation_file(directory_to_process)
         next!(p)
     end
 
-    # Concatenate along time
+    ## Concatenate along time
     # We get Q4278 = [n_z, n_t]
     Q4278 = reduce(hcat, Q4278)
     Q6730 = reduce(hcat, Q6730)
@@ -348,7 +350,7 @@ function make_volume_excitation_file(directory_to_process)
     QN2i = reduce(hcat, QN2i)
     t = reduce(vcat, t)
 
-    # 5. Save results
+    ## Save results
     savefile = joinpath(full_path_to_directory, "Qzt_all.mat")
     f = matopen(savefile, "w")
         write(f, "h_atm", h_atm)
@@ -402,4 +404,89 @@ function calculate_volume_excitation(h_atm, t, Ie_ztE_omni, σ, n)
     end
 
     return Q
+end
+
+"""
+    make_Ie_top_file(directory_to_process)
+
+Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation
+and extracts the particle flux `Ie` (#e⁻/m²/s) at the top of the ionosphere (i.e. at the
+max altitude used in the simulation).
+
+# Calling
+`make_Ie_top_file(directory_to_process)`
+
+# Inputs
+- `directory_to_process`: Name of the simulation folder to process.
+    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+"""
+function make_Ie_top_file(directory_to_process)
+    ## Find the files to process
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    files = readdir(full_path_to_directory, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+
+    ## Load simulation grid
+    f = matopen(files_to_process[1])
+        h_atm = read(f, "h_atm")
+        E = read(f, "E")
+        μ_scatterings = read(f, "mu_scatterings")
+    close(f)
+    n_z = length(h_atm)
+    dE = diff(E); dE = [dE; dE[end]]
+    BeamWeight = μ_scatterings["BeamWeight"]
+
+    ## Initialize arrays to store the results for each time-slice
+    Ie_top = Vector{Array{Float64, 3}}()
+    t = Vector{Vector{Float64}}()
+
+    n_files = length(files_to_process)
+    p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
+    ## Loop over the files
+    for (i_file, file) in enumerate(files_to_process)
+        ## Load simulation results for current file.
+        if i_file == 1
+            f = matopen(file)
+                Ie_ztE = read(f, "Ie_ztE")
+                t_local = read(f, "t_run")
+            close(f)
+        else
+            f = matopen(file)
+            Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
+            t_local = read(f, "t_run")[2:end]
+            close(f)
+        end
+
+        ## Extract Ie at the top for each beam
+        Ie_top_local = Ie_ztE[n_z:n_z:end, :, :]
+
+        ## Push the Ie_top of the current time-slice into a vector
+        # We get Ie_top = [[n_μ, n_t1, n_E], [n_μ, n_t2, n_E], ...]
+        push!(Ie_top, Ie_top_local)
+        push!(t, t_local)
+
+        next!(p)
+    end
+
+    ## Concatenate along time
+    # We get Ie_top = [n_μ, n_t, n_E]
+    Ie_top = reduce(hcat, Ie_top)
+    t = reduce(vcat, t)
+
+    ## Play with the units
+    Ie_top_raw = copy(Ie_top) # in #e-/m²/s
+    Ie_top = Ie_top ./ reshape(dE, (1, 1, :)) ./ BeamWeight # in #e-/m²/s/eV/ster
+
+    ## Save results
+    savefile = joinpath(full_path_to_directory, "Ie_top.mat")
+    f = matopen(savefile, "w")
+        write(f, "E", E)
+        write(f, "dE", dE)
+        write(f, "BeamW", BeamWeight)
+        write(f, "t", t)
+        write(f, "Ie_top_raw", Ie_top_raw)
+        write(f, "Ie_top", Ie_top)
+    close(f)
+
+    return nothing
 end
