@@ -13,6 +13,7 @@ export e_O2elastic, e_O2_OO3S, e_O2_9p97, e_O2_8p4, e_O2_6, e_O2_4p5, e_O2b1Sgp,
 include("../internal_data/data_electron/e_O_cross_sections.jl")
 export e_Oelastic, e_O1D, e_O1S, e_O3s5S0, e_O3s3S0, e_O3p5P, e_O3sp3D0, e_O3p3P, e_Oion4S0,
     e_Oion2D0, e_Oion2P0, e_Oionion
+include("../internal_data/data_electron/emission_cross_sections.jl")
 
 include("setup.jl")
 include("nrlmsis.jl")
@@ -45,7 +46,7 @@ include("steady_state.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
-export make_density_file, downsampling_fluxes
+export make_density_file, downsampling_fluxes, make_volume_excitation_file
 
 
 
