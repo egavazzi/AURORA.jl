@@ -26,7 +26,7 @@ version = "0.0.1"
 
 [[deps.AURORA]]
 deps = ["CairoMakie", "CondaPkg", "Dates", "DelimitedFiles", "Distributed", "Downloads", "HCubature", "HTTP", "Interpolations", "JSON", "KLU", "LibGit2", "LinearAlgebra", "LinearSolve", "LoopVectorization", "MAT", "MATLAB", "Pkg", "Polyester", "Printf", "ProfileCanvas", "ProgressMeter", "PythonCall", "QuadGK", "Rotations", "SharedArrays", "SparseArrays", "SpecialFunctions", "Term"]
-git-tree-sha1 = "8cbeb67b6d719c2798475f022e0b223ebe6fbaae"
+git-tree-sha1 = "c951860a634ccb0f96c3c88fa0827cb3ebf4495b"
 repo-rev = "main"
 repo-url = "https://github.com/egavazzi/AURORA.jl.git"
 uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
