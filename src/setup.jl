@@ -25,7 +25,7 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 - `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
 - `E_levels_neutrals`: collisions energy levels and number of secondary e- produced. Named
     tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
-- `σ_neutrals`: collision cross-sections (m⁻³). Named tuple of matrices ([n`_`levels x nE],
+- `σ_neutrals`: collision cross-sections (m⁻²). Named tuple of matrices ([n`_`levels x nE],
     ..., [n`_`levels x nE])
 - `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
 - `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
@@ -299,7 +299,7 @@ end
 """
     load_cross_sections(E, dE)
 
-Load the cross sections of the neutrals species for their different energy states.
+Load the cross-sections of the neutrals species for their different energy states.
 
 # Calling
 `σ_neutrals = load_cross_sections(E, dE)`
@@ -309,7 +309,7 @@ Load the cross sections of the neutrals species for their different energy state
 - `dE`: energy grid step size (eV). Vector [nE]
 
 # Returns
-- `σ_neutrals`: A named tuple containing the cross sections for N2, O2, and O.
+- `σ_neutrals`: A named tuple containing the cross-sections (m⁻²) for N2, O2, and O.
 """
 function load_cross_sections(E, dE)
     σ_N2 = get_cross_section("N2", E, dE)
@@ -349,6 +349,8 @@ function get_cross_section(species_name, E, dE)
     for i_state in axes(state_name, 1) # loop over the different energy states
         func = getfield(Main, Symbol(function_name[i_state])) # get the corresponding function name
         σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
+        # Note that we use `E .+ dE/2` as input to the cross-section functions, as this
+        # corresponds to the middle energy of the energy bins (E is the energy *grid*).
     end
 
     return σ_species

@@ -90,7 +90,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
 
-        p = Progress(length(E), desc=string("Calculating flux for loop ", i, "/", n_loop))
+        p = Progress(length(E); desc=string("Calculating flux for loop ", i, "/", n_loop), dt=1.0)
         # Looping over energy
         for iE in length(E):-1:1
             A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
