@@ -78,8 +78,6 @@ function make_density_file(directory_to_process)
     close(f)
 end
 
-
-
 """
     calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
 
@@ -115,6 +113,8 @@ function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, 
     end
 end
 
+
+## ====================================================================================== ##
 
 
 """
@@ -181,6 +181,8 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
     return nothing
 end
 
+
+## ====================================================================================== ##
 
 
 #TODO: add option to batch process a directory with sub-directories
@@ -406,6 +408,10 @@ function calculate_volume_excitation(h_atm, t, Ie_ztE_omni, σ, n)
     return Q
 end
 
+
+## ====================================================================================== ##
+
+
 """
     make_Ie_top_file(directory_to_process)
 
@@ -486,6 +492,122 @@ function make_Ie_top_file(directory_to_process)
         write(f, "t", t)
         write(f, "Ie_top_raw", Ie_top_raw)
         write(f, "Ie_top", Ie_top)
+    close(f)
+
+    return nothing
+end
+
+
+## ====================================================================================== ##
+
+"""
+    make_current_file(directory_to_process)
+
+Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
+loads the particle flux `Ie` (#e⁻/m²/s) and calculates the field-aligned current-density
+and field-aligned energy-flux for each height and through time.
+s
+The following variables are saved to a file named *J.mat*:
+- `J_up`: Field-aligned current-density in the upward direction. 2D array [n\\_z, n\\_t]
+- `J_down`: Field-aligned current-density in the downward direction. 2D array [n\\_z, n\\_t]
+- `E_up`: Field-aligned energy-flux (eV/m²/s) in the upward direction. 2D array [n\\_z, n\\_t]
+- `E_down`: Field-aligned energy-flux (eV/m²/s) in the downward direction. 2D array [n\\_z, n\\_t]
+
+# Calling
+`make_current_file(directory_to_process)`
+
+# Inputs
+- `directory_to_process`: Name of the simulation folder to process.
+    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+"""
+function make_current_file(directory_to_process)
+    ## Find the files to process
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    files = readdir(full_path_to_directory, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+
+    ## Load simulation grid
+    f = matopen(files_to_process[1])
+        h_atm = read(f, "h_atm")
+        E = read(f, "E")
+        μ_lims = read(f, "mu_lims")
+    close(f)
+    dE = diff(E); dE = [dE; dE[end]]
+    μ_center = mu_avg(acosd.(μ_lims))
+
+    ## Initialize arrays to store the results for each time-slice
+    J_up = Vector{Array{Float64, 2}}()
+    J_down = Vector{Array{Float64, 2}}()
+    IeE_up = Vector{Array{Float64, 2}}()
+    IeE_down = Vector{Array{Float64, 2}}()
+    t = Vector{Vector{Float64}}()
+
+    ## Define constant
+    q_e = 1.602176620898e-19 # elementary charge (C)
+
+    n_files = length(files_to_process)
+    p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
+    ## Loop over the files
+    for (i_file, file) in enumerate(files_to_process)
+        ## Load simulation results for current file.
+        if i_file == 1
+            f = matopen(file)
+                Ie_ztE = read(f, "Ie_ztE")
+                t_local = read(f, "t_run")
+            close(f)
+        else
+            f = matopen(file)
+            Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
+            t_local = read(f, "t_run")[2:end]
+            close(f)
+        end
+
+        ## Calculate the field aligned currents and energy flux
+        n_z = length(h_atm)
+        n_μ = length(μ_center)
+        n_t = size(Ie_ztE, 2)
+        J_up_local = zeros(n_z, n_t)
+        J_down_local = zeros(n_z, n_t)
+        IeE_up_local = zeros(n_z, n_t)
+        IeE_down_local = zeros(n_z, n_t)
+        @views for i_μ in 1:n_μ
+            if μ_center[i_μ] > 0
+                J_up_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3) #TODO check with BG why no velocity dependence?
+                IeE_up_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E, (1, 1, :)), dims=3)
+            else
+                J_down_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
+                IeE_down_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E, (1, 1, :)), dims=3)
+            end
+        end
+
+        ## Push the J of the current time-slice into a vector
+        # We get J_up = [[n_z, n_t1], [n_z, n_t2], ...]
+        push!(J_up, J_up_local)
+        push!(J_down, J_down_local)
+        push!(IeE_up, IeE_up_local)
+        push!(IeE_down, IeE_down_local)
+        push!(t, t_local)
+
+        next!(p)
+    end
+
+    ## Concatenate along time
+    # We get J_up = [n_z, n_t]
+    J_up = reduce(hcat, J_up)
+    J_down = reduce(hcat, J_down)
+    IeE_up = reduce(hcat, IeE_up)
+    IeE_down = reduce(hcat, IeE_down)
+    t = reduce(vcat, t)
+
+    ## Save results
+    savefile = joinpath(full_path_to_directory, "J.mat")
+    f = matopen(savefile, "w")
+        write(f, "h_atm", h_atm)
+        write(f, "t", t)
+        write(f, "J_up", J_up)
+        write(f, "J_down", J_down)
+        write(f, "IeE_up", IeE_up)
+        write(f, "IeE_down", IeE_down)
     close(f)
 
     return nothing

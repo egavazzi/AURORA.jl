@@ -46,7 +46,8 @@ include("steady_state.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
-export make_density_file, downsampling_fluxes, make_volume_excitation_file, make_Ie_top_file
+export make_density_file, downsampling_fluxes, make_volume_excitation_file, make_Ie_top_file,
+    make_current_file
 
 
 
