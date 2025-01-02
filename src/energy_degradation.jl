@@ -103,7 +103,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
 
                 Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
                 fill!(Ionization, 0)
-                for i_μ1 in eachindex(μ_center)
+                @views for i_μ1 in eachindex(μ_center)
                     for i_μ2 in eachindex(μ_center)
                         Ionization[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
                             max.(0, n_repeated_over_t .*
@@ -173,7 +173,7 @@ function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading
 
                 Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
                 fill!(Ionization, 0)
-                for i_μ1 in eachindex(μ_center)
+                @views for i_μ1 in eachindex(μ_center)
                     for i_μ2 in eachindex(μ_center)
                         Ionization[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
                             max.(0, n_repeated_over_t .*
