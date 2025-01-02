@@ -1,4 +1,5 @@
 # News
+- performance improvement [#44](https://github.com/egavazzi/AURORA.jl/pull/44)
 
 ## v0.4.3
 - fix bug where secondary e- are not properly redistributed isotropically [#43](https://github.com/egavazzi/AURORA.jl/pull/43)
