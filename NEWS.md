@@ -1,5 +1,8 @@
 # News
 
+## v0.4.3
+- fix bug where secondary e- are not properly redistributed isotropically [#43](https://github.com/egavazzi/AURORA.jl/pull/43)
+
 ## v0.4.2
 - fix bug where ionization rates have too low values due to missing secondary e- [#40](https://github.com/egavazzi/AURORA.jl/pull/40)
 
