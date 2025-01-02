@@ -109,7 +109,7 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
                             max.(0, n_repeated_over_t .*
                                 (σ[i_level, iE] .*
                                 Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                                BeamWeight[i_μ2] ./ sum(BeamWeight))
+                                BeamWeight[i_μ1] ./ sum(BeamWeight))
                     end
                 end
 
@@ -179,7 +179,7 @@ function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading
                             max.(0, n_repeated_over_t .*
                                 (σ[i_level, iE] .*
                                 Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                                BeamWeight[i_μ2] ./ sum(BeamWeight))
+                                BeamWeight[i_μ1] ./ sum(BeamWeight))
                     end
                 end
 
