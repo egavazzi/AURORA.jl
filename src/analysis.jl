@@ -220,14 +220,14 @@ function make_volume_excitation_file(directory_to_process)
     nN2 = data["nN2"]
 
     ## Load the emission cross-sections
-    σ_4278 = excitation_4278(E)# .+ dE/2)
-    σ_6730 = excitation_6730_N2(E)# .+ dE/2)
-    σ_7774_O = excitation_7774_O(E)# .+ dE/2)
-    σ_7774_O2 = excitation_7774_O2(E)# .+ dE/2)
-    σ_8446_O = excitation_8446_O(E)# .+ dE/2)
-    σ_8446_O2 = excitation_8446_O2(E)# .+ dE/2)
-    σ_O1D = excitation_O1D(E)# .+ dE/2)
-    σ_O1S = excitation_O1S(E)# .+ dE/2)
+    σ_4278 = excitation_4278(E .+ dE/2)
+    σ_6730 = excitation_6730_N2(E .+ dE/2)
+    σ_7774_O = excitation_7774_O(E .+ dE/2)
+    σ_7774_O2 = excitation_7774_O2(E .+ dE/2)
+    σ_8446_O = excitation_8446_O(E .+ dE/2)
+    σ_8446_O2 = excitation_8446_O2(E .+ dE/2)
+    σ_O1D = excitation_O1D(E .+ dE/2)
+    σ_O1S = excitation_O1S(E .+ dE/2)
     ## Load/calculate the ionization cross-sections
     σ_N2, σ_O2, σ_O = load_cross_sections(E, dE) # load the cross-sections
     N2_levels, O2_levels, O_levels = load_excitation_threshold() # load the energy levels
