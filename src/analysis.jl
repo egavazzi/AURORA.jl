@@ -500,6 +500,7 @@ end
 
 ## ====================================================================================== ##
 
+
 """
     make_current_file(directory_to_process)
 
@@ -611,4 +612,22 @@ function make_current_file(directory_to_process)
     close(f)
 
     return nothing
+end
+
+
+## ====================================================================================== ##
+
+function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+
+    ## Define constant
+    c = 2.99792458e8 # speed of light (m/s)
+
+    ## Apply the effective lifetime and the Einstein coefficient
+    Q = Q .* τ .* A
+
+    t2, h_atm2 = []
+    itp = linear_interpolation(t, h_atm, Q, extrapolation_bc = 0.0)
+    I = itp(t2, h2) #???? TODO Innvestigate how interp2 is working and the stupid meshgrid
+
+    # TODO: use trapezoid integration from Integrals.jl
 end
