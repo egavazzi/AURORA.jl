@@ -7,7 +7,6 @@ So far we have
 
 =#
 using AURORA
-using Printf
 using GLMakie
 GLMakie.activate!()
 
