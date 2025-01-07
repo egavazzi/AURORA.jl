@@ -20,7 +20,7 @@ include("nrlmsis.jl")
 include("iri.jl")
 include("input_flux.jl")
 include("phase_functions.jl")
-include("utilitaries.jl")
+include("utilities.jl")
 include("matrix_building.jl")
 include("crank_nicolson.jl")
 include("cascading.jl")
@@ -52,7 +52,7 @@ export make_density_file, downsampling_fluxes, make_volume_excitation_file, make
 
 
 # MI_coupling functions
-include("../MI_coupling/src/utilitaries.jl")
+include("../MI_coupling/src/utilities.jl")
 include("../MI_coupling/src/ketchup_conversion.jl")
 include("../MI_coupling/src/conversions.jl")
 include("../MI_coupling/src/make_Ie_from_ketchup.jl")
