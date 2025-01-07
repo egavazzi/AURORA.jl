@@ -197,6 +197,32 @@ function rename_if_exists(savefile)
 end
 
 
+"""
+    find_Ietop_file(path_to_directory)
+
+Look for Ie\\_incoming file present in the directory given by `path_to_directory`. If several
+files are starting with the name "Ie\\_incoming", return an error. If only one file is found,
+return a string with the path to that file.
+
+# Calling
+`Ietop_file = find_Ietop_file(path_to_directory)`
+
+# Inputs
+- `path_to_directory`: path to a directory
+
+# Returns
+- `Ietop_file`: path to the Ie\\_incoming file, in the form "path_to_directory/Ie_incoming_*.mat"
+"""
+function find_Ietop_file(path_to_directory)
+    incoming_files = filter(file -> startswith(file, "Ie_incoming_"), readdir(path_to_directory))
+    if length(incoming_files) > 1
+        error("More than one file contains incoming flux. This is not normal")
+    else
+        return Ietop_file = joinpath(path_to_directory, incoming_files[1])
+    end
+end
+
+
 ## ====================================================================================== ##
 
 
