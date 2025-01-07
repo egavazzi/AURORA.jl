@@ -31,7 +31,7 @@ f3pu        ✅
 g3pu        ✅
 M1M2        ✅
 o1pu        ✅
-dissociation      ✅
+dissociation✅
 ionx2sgp    ✅
 iona2pu     ✅
 ionb2sup    ✅
