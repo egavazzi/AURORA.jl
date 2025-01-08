@@ -353,7 +353,7 @@ function make_volume_excitation_file(directory_to_process)
     t = reduce(vcat, t)
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "Qzt_all.mat")
+    savefile = joinpath(full_path_to_directory, "Qzt_all_L.mat")
     f = matopen(savefile, "w")
         write(f, "h_atm", h_atm)
         write(f, "t", t)
