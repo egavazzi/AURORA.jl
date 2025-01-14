@@ -371,6 +371,8 @@ function make_volume_excitation_file(directory_to_process)
         write(f, "QN2i", QN2i)
     close(f)
 
+    println("Volume excitation rates saved in $savefile")
+
     return nothing
 end
 
@@ -494,6 +496,8 @@ function make_Ie_top_file(directory_to_process)
         write(f, "Ie_top", Ie_top)
     close(f)
 
+    println("Top flux saved in $savefile")
+
     return nothing
 end
 
@@ -611,6 +615,8 @@ function make_current_file(directory_to_process)
         write(f, "IeE_down", IeE_down)
     close(f)
 
+    println("Currents saved in $savefile")
+
     return nothing
 end
 
@@ -687,6 +693,8 @@ function make_column_excitation_file(directory_to_process)
         write(f, "I_O1D", I_O1D)
         write(f, "I_O1S", I_O1S)
     close(f)
+
+    println("Column excitation rates saved in $savefile")
 
     return nothing
 end
