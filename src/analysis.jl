@@ -673,7 +673,7 @@ function make_column_excitation_file(directory_to_process)
     I_O1S = q2colem(t, h_atm, QO1S)
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "I_lambda_of_t2.mat")
+    savefile = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
     f = matopen(savefile, "w")
         write(f, "t", t)
         write(f, "I_4278", I_4278)
