@@ -248,7 +248,7 @@ function make_volume_excitation_file(directory_to_process)
     QOi = Vector{Matrix{Float64}}()
     QO2i = Vector{Matrix{Float64}}()
     QN2i = Vector{Matrix{Float64}}()
-    t = Vector{Vector{Float64}}()
+    t = Vector{}()
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -444,7 +444,7 @@ function make_Ie_top_file(directory_to_process)
 
     ## Initialize arrays to store the results for each time-slice
     Ie_top = Vector{Array{Float64, 3}}()
-    t = Vector{Vector{Float64}}()
+    t = Vector{}()
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -541,7 +541,7 @@ function make_current_file(directory_to_process)
     J_down = Vector{Array{Float64, 2}}()
     IeE_up = Vector{Array{Float64, 2}}()
     IeE_down = Vector{Array{Float64, 2}}()
-    t = Vector{Vector{Float64}}()
+    t = Vector{}()
 
     ## Define constant
     q_e = 1.602176620898e-19 # elementary charge (C)
