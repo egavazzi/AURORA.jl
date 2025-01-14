@@ -2,7 +2,7 @@
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "6b3bf052d82a79ae037d737571246a9dadd453f5"
+project_hash = "1ba417a9bd38d517d0489f6174ac1273f50c3bdb"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
@@ -812,6 +812,36 @@ git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
 
+[[deps.IntegerMathUtils]]
+git-tree-sha1 = "b8ffb903da9f7b8cf695a8bead8e01814aa24b30"
+uuid = "18e54dd8-cb9d-406c-a71d-865a43cbb235"
+version = "0.1.2"
+
+[[deps.Integrals]]
+deps = ["CommonSolve", "HCubature", "LinearAlgebra", "MonteCarloIntegration", "QuadGK", "Random", "Reexport", "SciMLBase"]
+git-tree-sha1 = "cfdc4fb8d21c8f596572a59912ae863774123622"
+uuid = "de52edbc-65ea-441a-8357-d3a637375a31"
+version = "4.5.0"
+
+    [deps.Integrals.extensions]
+    IntegralsArblibExt = "Arblib"
+    IntegralsCubaExt = "Cuba"
+    IntegralsCubatureExt = "Cubature"
+    IntegralsFastGaussQuadratureExt = "FastGaussQuadrature"
+    IntegralsForwardDiffExt = "ForwardDiff"
+    IntegralsMCIntegrationExt = "MCIntegration"
+    IntegralsZygoteExt = ["Zygote", "ChainRulesCore"]
+
+    [deps.Integrals.weakdeps]
+    Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Cuba = "8a292aeb-7a57-582c-b821-06e4c11590b1"
+    Cubature = "667455a9-e2ce-5579-9412-b964f529a492"
+    FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    MCIntegration = "ea1e2de9-7db7-4b42-91ee-0cd1bf6df167"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "10bd689145d2c3b2a9844005d01087cc1194e79e"
@@ -965,6 +995,12 @@ version = "2.10.2+1"
 git-tree-sha1 = "50901ebc375ed41dbf8058da26f9de442febbbec"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.3.1"
+
+[[deps.LatticeRules]]
+deps = ["Random"]
+git-tree-sha1 = "7f5b02258a3ca0221a6a9710b0a0a2e8fb4957fe"
+uuid = "73f95e8e-ec14-4e6a-8b18-0d2e271c4e55"
+version = "0.0.1"
 
 [[deps.LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
@@ -1256,6 +1292,12 @@ version = "1.2.0"
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 version = "1.11.0"
 
+[[deps.MonteCarloIntegration]]
+deps = ["Distributions", "QuasiMonteCarlo", "Random"]
+git-tree-sha1 = "722ad522068d31954b4a976b66a26aeccbf509ed"
+uuid = "4886b29c-78c9-11e9-0a6e-41e1f4161f7b"
+version = "0.2.0"
+
 [[deps.MosaicViews]]
 deps = ["MappedArrays", "OffsetArrays", "PaddedViews", "StackViews"]
 git-tree-sha1 = "7b86a5d4d70a9f5cdf2dacb3cbe6d251d1a61dbe"
@@ -1479,6 +1521,12 @@ git-tree-sha1 = "1101cd475833706e4d0e7b122218257178f48f34"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 version = "2.4.0"
 
+[[deps.Primes]]
+deps = ["IntegerMathUtils"]
+git-tree-sha1 = "cb420f77dc474d23ee47ca8d14c90810cafe69e7"
+uuid = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
+version = "0.5.6"
+
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -1534,6 +1582,16 @@ version = "2.11.1"
 
     [deps.QuadGK.weakdeps]
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.QuasiMonteCarlo]]
+deps = ["Accessors", "ConcreteStructs", "LatticeRules", "LinearAlgebra", "Primes", "Random", "Requires", "Sobol", "StatsBase"]
+git-tree-sha1 = "cc086f8485bce77b6187141e1413c3b55f9a4341"
+uuid = "8a4e6c94-4038-4cdc-81c3-7e6ffdb2a71b"
+version = "0.3.3"
+weakdeps = ["Distributions"]
+
+    [deps.QuasiMonteCarlo.extensions]
+    QuasiMonteCarloDistributionsExt = "Distributions"
 
 [[deps.Quaternions]]
 deps = ["LinearAlgebra", "Random", "RealDot"]
@@ -1778,6 +1836,12 @@ deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL"
 git-tree-sha1 = "2da10356e31327c7096832eb9cd86307a50b1eb6"
 uuid = "45858cf5-a6b0-47a3-bbea-62219f50df47"
 version = "0.1.3"
+
+[[deps.Sobol]]
+deps = ["DelimitedFiles", "Random"]
+git-tree-sha1 = "5a74ac22a9daef23705f010f72c81d6925b19df8"
+uuid = "ed01d8cd-4d21-5b2a-85b4-cc3bdc58bad4"
+version = "1.5.0"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"

@@ -185,7 +185,6 @@ end
 ## ====================================================================================== ##
 
 
-#TODO: add option to batch process a directory with sub-directories
 """
     make_volume_excitation_file(directory_to_process)
 
@@ -375,6 +374,7 @@ function make_volume_excitation_file(directory_to_process)
     return nothing
 end
 
+
 """
     calculate_volume_excitation(h_atm, t, Ie_ztE_omni, σ, n)
 
@@ -507,7 +507,7 @@ end
 Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
 loads the particle flux `Ie` (#e⁻/m²/s) and calculates the field-aligned current-density
 and field-aligned energy-flux for each height and through time.
-s
+
 The following variables are saved to a file named *J.mat*:
 - `J_up`: Field-aligned current-density in the upward direction. 2D array [n\\_z, n\\_t]
 - `J_down`: Field-aligned current-density in the downward direction. 2D array [n\\_z, n\\_t]
@@ -617,6 +617,107 @@ end
 
 ## ====================================================================================== ##
 
+
+
+"""
+    make_column_excitation_file(directory_to_process)
+
+Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
+loads the volume excitation rates `Q_XXXX` (#excitation/m³/s) contained in the file `Qzt_all_L.mat`
+and integrate them in height, taking into account the finite speed of light.
+
+The calculated colum-integrated excitation rates are saved to a file named *I_lambda_of_t.mat*.
+The column-integrated excitation rates are named "I_4278, I_6730, ...". They are all vectors
+in time (length n\\_t), and have units of (#excitation/m²/s).
+
+Note that the function `make_volume_excitation_file()` needs to be run before this one, as
+we need the file `Qzt_all_L.mat` with the volume excitation rates.
+
+# Calling
+`make_current_file(directory_to_process)`
+
+# Inputs
+- `directory_to_process`: Name of the simulation folder to process.
+    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+"""
+function make_column_excitation_file(directory_to_process)
+    ## Find the files to process
+    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
+    Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
+
+    ## Load volume-excitation-rates
+    data = matread(Q_file)
+    h_atm = data["h_atm"]
+    t = data["t"]
+    Q4278 = data["Q4278"]
+    Q6730 = data["Q6730"]
+    Q7774 = data["Q7774"]
+    Q7774_O = data["Q7774_O"]
+    Q7774_O2 = data["Q7774_O2"]
+    Q8446 = data["Q8446"]
+    Q8446_O = data["Q8446_O"]
+    Q8446_O2 = data["Q8446_O2"]
+    QO1D = data["QO1D"]
+    QO1S = data["QO1S"]
+
+    ## Integrate in altitude, taking into account finite photon velocity and path length.
+    I_4278 = q2colem(t, h_atm, Q4278)
+    I_6730 = q2colem(t, h_atm, Q6730)
+    I_7774 = q2colem(t, h_atm, Q7774)
+    I_7774_O = q2colem(t, h_atm, Q7774_O)
+    I_7774_O2 = q2colem(t, h_atm, Q7774_O2)
+    I_8446 = q2colem(t, h_atm, Q8446)
+    I_8446_O = q2colem(t, h_atm, Q8446_O)
+    I_8446_O2 = q2colem(t, h_atm, Q8446_O2)
+    I_O1D = q2colem(t, h_atm, QO1D)
+    I_O1S = q2colem(t, h_atm, QO1S)
+
+    ## Save results
+    savefile = joinpath(full_path_to_directory, "I_lambda_of_t2.mat")
+    f = matopen(savefile, "w")
+        write(f, "t", t)
+        write(f, "I_4278", I_4278)
+        write(f, "I_6730", I_6730)
+        write(f, "I_7774", I_7774)
+        write(f, "I_7774_O", I_7774_O)
+        write(f, "I_7774_O2", I_7774_O2)
+        write(f, "I_8446", I_8446)
+        write(f, "I_8446_O", I_8446_O)
+        write(f, "I_8446_O2", I_8446_O2)
+        write(f, "I_O1D", I_O1D)
+        write(f, "I_O1S", I_O1S)
+    close(f)
+
+    return nothing
+end
+
+import Interpolations # use import here to avoid conflicts with DataInterpolations.jl
+using Integrals
+"""
+    q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+
+Integrate the volume-excitation-rate (#exc/m³/s) to column-excitation-rate (#exc/m²/s).
+Takes into account the time-delay between light emitted at different altitudes. Photons
+emitted at at altitude of 200km will arrive at the detector 100e3/3e8 = 0.333 ms later than
+electrons emitted at an altitude of 100km. This is a small time-shift, but it is close to
+the time-differences corresponding to the phase-shifts between auroral emissions varying at
+~10Hz.
+
+The einstein coefficient `A` and effective lifetime `τ` are optional (equal to one by default).
+
+# Calling
+`I = q2colem(t, h_atm, Q, A, τ)`
+
+# Inputs
+- `h_atm`: altitude (m). Vector [n\\_z]
+- `t`: time (s). Vector [n\\_t]
+- `Q`: volume-excitation-rate (#exc/m³/s) of the wavelength of interest. 2D array [n\\_z, n\\_t]
+- `A`: einstein coefficient (s⁻¹). Scalar (Float or Int)
+- `τ`: effective lifetime (s). Vector [n\\_z].
+
+# Output
+- `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
+"""
 function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
 
     ## Define constant
@@ -625,9 +726,27 @@ function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     ## Apply the effective lifetime and the Einstein coefficient
     Q = Q .* τ .* A
 
-    t2, h_atm2 = []
-    itp = linear_interpolation(t, h_atm, Q, extrapolation_bc = 0.0)
-    I = itp(t2, h2) #???? TODO Innvestigate how interp2 is working and the stupid meshgrid
+    ## Create the 2D interpolator
+    # TODO Explain what we are doing. But before that we test if it works.
+    nodes = (h_atm, t)
+    itp = Interpolations.interpolate(nodes, Q, Gridded(Linear()))
+    itp = Interpolations.extrapolate(itp, 0.0) # allows for extrapolation but set those values to 0.0
 
-    # TODO: use trapezoid integration from Integrals.jl
+    ## Shift data in time
+    # TODO Explain what we are doing
+    #=
+    We use a 2D interpolation. As the height are the same, we could have also done a 1D
+    interpolation for each height. We use the 2D interpolation for convenience as it allows
+    us to have only one interpolatior object (instead of one per height). This is also
+    closest to the method used in the legacy Matlab code from which this function is
+    inspired.
+    =#
+    I = [itp(h_atm[i], (t[j] - (h_atm[i] - h_atm[1]) / c)) for i in eachindex(h_atm), j in eachindex(t)]
+
+    ## Integrate in height
+    problem = SampledIntegralProblem(I, h_atm; dim=1)
+    method = TrapezoidalRule()
+    I_lambda = solve(problem, method)
+
+    return I_lambda.u
 end
