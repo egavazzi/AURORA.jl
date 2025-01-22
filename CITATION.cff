@@ -17,5 +17,5 @@ identifiers:
 license: GPL-3.0
 version: 0.4.3
 date-released: "2025-01-02"
-doi: 10.5281/zenodo.11238620
+doi: 10.5281/zenodo.14588863
 repository-code: "https://github.com/egavazzi/AURORA.jl"
