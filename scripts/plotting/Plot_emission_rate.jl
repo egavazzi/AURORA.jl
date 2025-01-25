@@ -10,12 +10,16 @@ GLMakie.activate!()
 ## Directory to plot, absolute path
 full_path_to_directory = joinpath(REVONTULI_MOUNT,
                                   "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
-                                  "InvertedV_480s_fixed-secondaries")
+                                  "InvertedV_480s")
 
 
 ## Load the Q data (volume emission-rates)
 Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
 data = matread(Q_file)
+#=
+Multiply by 1e4 because flux from Visions2 and thus results from AURORA are in /cm²
+instead of /m², so need to correct here
+=#
 Q4278 = data["Q4278"] * 1e4
 Q6730 = data["Q6730"] * 1e4
 Q7774 = data["Q7774"] * 1e4
@@ -25,12 +29,23 @@ QO1S = data["QO1S"] * 1e4
 h_atm = vec(data["h_atm"]) ./ 1e3 # convert to km
 t = vec(data["t"])
 
+
+# Find height of maximum emission
+height_Q4278max = [h_atm[i_max[1]] for i_max in vec(findmax(Q4278, dims=1)[2])]
+height_Q4278max[vec(maximum(Q4278, dims=1)) .< maximum(Q4278) / 10] .= NaN # remove when values of Q are less than 10% of the max
+height_Q6730max = [h_atm[i_max[1]] for i_max in vec(findmax(Q6730, dims=1)[2])]
+height_Q6730max[vec(maximum(Q6730, dims=1)) .< maximum(Q6730) / 10] .= NaN # remove when values of Q are less than 10% of the max
+height_Q7774max = [h_atm[i_max[1]] for i_max in vec(findmax(Q7774, dims=1)[2])]
+height_Q7774max[vec(maximum(Q7774, dims=1)) .< maximum(Q7774) / 10] .= NaN # remove when values of Q are less than 10% of the max
+height_Q8446max = [h_atm[i_max[1]] for i_max in vec(findmax(Q8446, dims=1)[2])]
+height_Q8446max[vec(maximum(Q8446, dims=1)) .< maximum(Q8446) / 10] .= NaN # remove when values of Q are less than 10% of the max
+
 ## Plot Q data
 fig = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
-            yminorticksvisible = true, limits=((0, 1), (100, 400))
+            yminorticksvisible = true, limits=((0, 3), (100, 400))
             ),
         Heatmap = (rasterize = true,),
         Colorbar = (flip_vertical_label = true, vertical = true),
@@ -42,28 +57,32 @@ fig = with_theme(
     ax4278 = Axis(ga[1, 1]; title = "4278 Å", xticklabelsvisible = false, ylabel ="altitude (km)")
     hm4278 = heatmap!(t, h_atm, Q4278'; rasterize = true)
     cb4278 = Colorbar(ga[1, 2], hm4278; label = "photons/m³/s")
+    lines!(ax4278, t, height_Q4278max; color = :red, linestyle = :dash, linewidth = 2)
     colgap!(ga, 10)
 
     gb = fig[1, 2] = GridLayout()
     ax6730 = Axis(gb[1, 1]; title = "6730 Å", xticklabelsvisible = false, yticklabelsvisible = false)
     hm6730 = heatmap!(t, h_atm, Q6730')
     cb6730 = Colorbar(gb[1, 2], hm6730; label = "photons/m³/s")
+    lines!(ax6730, t, height_Q6730max; color = :red, linestyle = :dash, linewidth = 2)
     colgap!(gb, 10)
 
     gc = fig[2, 1] = GridLayout()
     ax7774 = Axis(gc[1, 1]; title = "7774 Å", xlabel = "time(s)", ylabel = "altitude (km)")
     hm7774 = heatmap!(t, h_atm, Q7774')
     cb7774 = Colorbar(gc[1, 2], hm7774; label = "photons/m³/s")
+    lines!(ax7774, t, height_Q7774max; color = :red, linestyle = :dash, linewidth = 2)
     colgap!(gc, 10)
 
     gd = fig[2, 2] = GridLayout()
     ax8446 = Axis(gd[1, 1]; title = "8446 Å", yticklabelsvisible = false, xlabel = "time (s)")
     hm8446 = heatmap!(t, h_atm, Q8446')
     cb8446 = Colorbar(gd[1, 2], hm8446; label = "photons/m³/s")
+    lines!(ax8446, t, height_Q8446max; color = :red, linestyle = :dash, linewidth = 2)
     colgap!(gd, 10)
     return fig
 end
-display(fig)
+display(GLMakie.Screen(), fig)
 
 ## Save Qtz plot
 savefile = joinpath(full_path_to_directory, "Qtz.png")
@@ -87,6 +106,11 @@ println("Saved $savefile")
 ## Load the I data (column-integrated emission-rates)
 I_file = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
 data = matread(I_file)
+#=
+Multiply by 1e4 because flux from Visions2 and thus results from AURORA are in /cm²
+instead of /m², so need to correct here
+Divide by 1e10 to convert to Rayleigh
+=#
 I4278 = vec(data["I_4278"]) * 1e4 / 1e10
 I6730 = vec(data["I_6730"]) * 1e4 / 1e10
 I7774 = vec(data["I_7774"]) * 1e4 / 1e10
@@ -104,7 +128,10 @@ custom_theme = Theme(fontsize = 20, linewidth = 2)
 set_theme!(custom_theme)
 fig = Figure(size = (1000, 800))
 ax = Axis(fig[1, 1]; title = "Intensity", xlabel = "time (s)", ylabel = "R",
-          yscale = log10, limits = (t[1], t[end], 1e1, 1e4), xticks = t[1]:0.1:t[end],
+          yscale = log10, limits = (t[1], t[end], 1e1, 1e4),
+        #   xticks = t[1]:0.1:t[end],
+          xminorticksvisible = true, xminorgridvisible = true,
+          xminorticks = IntervalsBetween(10),
           yminorticksvisible = true, yminorgridvisible = true,
           yminorticks = IntervalsBetween(9), yticksmirrored = true)
 ylims!(1e1, 1e6)
@@ -121,7 +148,7 @@ lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyl
 # axislegend(ax, position = :lt)
 Legend(fig[1, 2], ax; patchsize = [40, 20])
 set_theme!()
-display(fig)
+display(GLMakie.Screen(), fig)
 
 ## Save It plot
 savefile = joinpath(full_path_to_directory, "It.png")
@@ -136,4 +163,3 @@ println("Saved $savefile")
 savefile = joinpath(full_path_to_directory, "It.eps")
 save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
-##
