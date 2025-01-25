@@ -18,5 +18,5 @@ makedocs(
         warnonly = true)
 
 deploydocs(;
-    repo="github.com/egavazzi/AURORA.jl",
+    repo="github.com/egavazzi/AURORA.jl.git",
     )
