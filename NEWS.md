@@ -1,4 +1,9 @@
 # News
+- rewrite the analysis functions into Julia [#42](https://github.com/egavazzi/AURORA.jl/pull/42)
+  - speedup of the analysis of simulation results
+  - now loads and analyzes the results "slice by slice", which makes it possible to handle longer simulations
+  - emission cross-section functions translated to Julia
+- remove the last Matlab dependencies [#49](https://github.com/egavazzi/AURORA.jl/pull/49)
 - performance improvement [#44](https://github.com/egavazzi/AURORA.jl/pull/44)
 
 ## v0.4.3
