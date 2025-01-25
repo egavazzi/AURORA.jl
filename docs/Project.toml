@@ -1,2 +1,3 @@
 [deps]
+AURORA = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
