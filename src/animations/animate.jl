@@ -36,7 +36,7 @@ function takes care of merging the beams together while keeping the correct unit
 You can also use only one row which will plot only the down-flux.
 
 *Important*: The limits of the `angles_to_plot` needs to match existing limits of the beams
-used in the simulation. E.g. if `θ_lims=180:-10:0` was used in the simulation, `(30, 60)`
+used in the simulation. E.g. if `θ_lims = 180:-10:0` was used in the simulation, `(30, 60)`
 will be fine as 30° and 60° exist as limits, but `(35, 60)` will not as 35° does not exist
 as a limit.
 
