@@ -1,4 +1,5 @@
 # News
+- add julia script and functions to make an animation of simulation results [#50](https://github.com/egavazzi/AURORA.jl/pull/50)
 - rewrite the analysis functions into Julia [#42](https://github.com/egavazzi/AURORA.jl/pull/42)
   - speedup of the analysis of simulation results
   - now loads and analyzes the results "slice by slice", which makes it possible to handle longer simulations

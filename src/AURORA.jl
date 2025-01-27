@@ -49,7 +49,10 @@ include("analysis.jl")
 export make_density_file, downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file
 
-
+include("animations/utilities.jl")
+include("animations/plot.jl")
+include("animations/animate.jl")
+export animate_IeztE_3Dzoft
 
 # MI_coupling functions
 include("../MI_coupling/src/utilities.jl")
