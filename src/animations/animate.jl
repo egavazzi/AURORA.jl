@@ -12,6 +12,43 @@ using Printf
 
 
 # Main function
+"""
+    animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = false)
+
+Plot a heatmap of Ie over height and energy, and animate it in time. It will load the
+result files one by one. The animation will be saved as a .mp4 file under the
+`directory_to_process`.
+
+# Example
+```julia-repl
+julia> directory_to_process = "Visions2/Alfven_475s";
+julia> angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);   # DOWN
+                         (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)];  # UP
+julia> color_limits = (1e5, 1e9);
+julia> animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = true)
+```
+
+Note that the first row of `angles_to_plot` gives the angles for the down-flux, and the
+second row gives the angles for the up-flux. The angles are given from 0° to 90°, and the
+function takes care of merging the beams together while keeping the correct units.
+
+*Important*: Right now, the function only supports an `angles_to_plot` with **maximum two rows**.
+You can also use only one row which will plot only the down-flux.
+
+*Important*: The limits of the `angles_to_plot` needs to match existing limits of the beams
+used in the simulation. E.g. if `θ_lims=180:-10:0` was used in the simulation, `(30, 60)`
+will be fine as 30° and 60° exist as limits, but `(35, 60)` will not as 35° does not exist
+as a limit.
+
+# Arguments
+- `directory_to_process`: directory to process
+- `angles_to_plot`: limits of the angles to plot
+- `color_limits`: limits for the colormap/colorbar
+
+# Keyword Arguments
+- `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
+                        ionosphere by loading it from the file `Ie_top.mat`
+"""
 function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = false)
     ## Find the files to process
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
@@ -34,13 +71,13 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
     # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
     println("Restructure from 3D to 4D array.")
     Ie = restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_mu, nz, nt, nE]
-    # Merge the streams to angles_to_plot and
+    # Merge the streams to angles_to_plot
     println("Merge the streams to match the angles to plot.")
     Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
+    # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
+    angles_to_plot_vert = vcat(eachrow(angles_to_plot)...) #
     # Convert from #e-/m²/s to #e-/m²/s/eV/ster
     println("Convert from #e-/m²/s to #e-/m²/s/eV/ster.")
-    # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
-    angles_to_plot_vert = vcat(eachrow(angles_to_plot)...)
     for i_μ in eachindex(angles_to_plot_vert)
         Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
     end

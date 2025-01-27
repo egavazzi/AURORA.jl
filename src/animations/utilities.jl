@@ -24,15 +24,15 @@ end
 Function that merges the streams of `Ie` that are given over `θ_lims` to fit the
 `new_θ_lims` of interest. It can be useful when wanting to merge some streams for plotting.
 
-For example, if we have
-```
-    θ_lims = [180 160 140 120 100 90 80 60 40 20 0] # simulation
-```
-and we want to plot with (this should be an array of tuples, but to simplify the comparison we write it as a vector here)
-```
-    new_θ_lims = [180 160 120 100 90 80 60 40 20 0] # to plot
-```
-the function will merge the streams (160°-140°) and (140°-120°) together into a new stream with limits (160°-120°).
+For example, if we have `θ_lims = [180 160 140 120 100 90 80 60 40 20 0]`, and
+we want to plot with `new_θ_lims = [180 160 120 100 90 80 60 40 20 0]` (note that
+this should be an array of tuples, but to simplify the comparison we write it as a vector
+here), the function will merge the streams (160°-140°) and (140°-120°) together into a new
+stream with limits (160°-120°).
+
+*Important*: The limits in `new_θ_lims` need to match some existing limits in `θ_lims`. In
+the example above, `new_θ_lims = [180 160 120 100 90 80 65 40 20 0]` would not have worked
+because 65° is not a limit that exists in `θ_lims`.
 
 # Calling
 `Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)`
@@ -42,8 +42,8 @@ the function will merge the streams (160°-140°) and (140°-120°) together int
 - `θ_lims`: pitch-angle limits. Usually a vector or range.
 - `new_θ_lims`: new pitch-angle limits. Given as an array of tuples with two rows, for example:
 ```
-            julia> new_θ_lims = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
-                                 (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
+julia> new_θ_lims = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
+                     (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
 ```
 
 # Returns
@@ -88,6 +88,16 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     #   (60, 80)
     #   (80, 90)
     new_θ_lims_temp = vcat(eachrow(new_θ_lims_temp)...)
+
+    # Check if all the limits in new_θ_lims match some limits in θ_lims
+    for i in eachindex(new_θ_lims_temp)
+        if new_θ_lims_temp[i][1] ∉ θ_lims
+            error("The limit $(new_θ_lims_temp[i][1]) in `new_θ_lims` does not match any limit in `θ_lims`.")
+        elseif new_θ_lims_temp[i][2] ∉ θ_lims
+            error("The limit $(new_θ_lims_temp[i][2]) in `new_θ_lims` does not match any limit in `θ_lims`.")
+        end
+    end
+
 
     # Restructure to [n_μ_new, n_z, n_t, n_E]
     # Loop over the new_θ_lims streams

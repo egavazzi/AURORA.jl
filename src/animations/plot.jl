@@ -6,6 +6,16 @@ data, the plot is automatically updated.
 
 It should take Ie as a function of pitch-angle, height and energy as input. But NOT as a
 function of time. This because we want to update the time OUTSIDE of the function.
+
+It is also possible to plot the precipitating Ie at the top of the ionosphere by giving an
+optional NamedTuple `Ietop_struct` as input. By default it is set to
+```
+Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing)
+```
+which won't plot anything.
+To plot something, you need to give a `Ietop_struct` with
+`Ie_top_struct.bool = true` as well as some values for `Ie_top_struct.t_top` and
+`Ie_top_struct.data_Ietop`.
 =#
 function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
                                 time::Observable{String}, h_atm, E, angles_to_plot, color_limits,
@@ -17,7 +27,6 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
         Ie_streams[i] = @lift($Ie_timeslice[i, :, :]')
     end
 
-    # Plot (TODO: redo with loop and proper subplots down and up)
     fig = Figure(size = (1500, 1000), fontsize=20)
     n_row = size(angles_to_plot, 1)
     n_col = size(angles_to_plot, 2)
@@ -46,7 +55,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     end
     Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
 
-    # Plot Ie precipitating at the top (#TODO: redo this properly)
+    # Plot Ie precipitating at the top (#TODO: this can probably be done in a better way than with a struct, or?)
     if Ietop_struct.bool
         plot_hposition = 1:floor(Int, n_col / 2)
         gb = fig[0, plot_hposition] = GridLayout()
