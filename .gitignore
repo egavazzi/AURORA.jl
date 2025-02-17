@@ -36,3 +36,6 @@ local_files_no_git/*
 
 # ignore the Figures
 Figures/*
+
+# ignore vscode config files
+.vscode/*
