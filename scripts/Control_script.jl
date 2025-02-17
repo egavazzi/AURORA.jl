@@ -65,3 +65,10 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 ## Run the simulation
 calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
     msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, CFL_number)
+
+## Run the analysis
+directory_to_process = joinpath("data", root_savedir, name_savedir)
+make_Ie_top_file(directory_to_process)
+make_volume_excitation_file(directory_to_process)
+make_current_file(directory_to_process)
+make_column_excitation_file(directory_to_process)
