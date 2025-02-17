@@ -25,6 +25,10 @@ function make_density_file(directory_to_process)
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
+    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
+    # the number in the filename.
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
     ## Extract simulation grid
     f = matopen(files_to_process[1])
@@ -139,6 +143,10 @@ The downsampled electron fluxes `Ie` will be saved in a subfolder inside the `di
 function downsampling_fluxes(directory_to_process, downsampling_factor)
     files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
+    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
+    # the number in the filename.
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
     for j in files_to_process
         f = matopen(j)
@@ -204,6 +212,10 @@ function make_volume_excitation_file(directory_to_process)
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
+    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
+    # the number in the filename.
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
@@ -433,6 +445,10 @@ function make_Ie_top_file(directory_to_process)
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
+    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
+    # the number in the filename.
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
@@ -530,6 +546,10 @@ function make_current_file(directory_to_process)
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
+    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
+    # the number in the filename.
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
