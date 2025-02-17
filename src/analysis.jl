@@ -274,7 +274,7 @@ function make_volume_excitation_file(directory_to_process)
             close(f)
         else
             f = matopen(file)
-            Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
+            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
             t_local = read(f, "t_run")[2:end]
             close(f)
         end
@@ -476,7 +476,7 @@ function make_Ie_top_file(directory_to_process)
             close(f)
         else
             f = matopen(file)
-            Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
+            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
             t_local = read(f, "t_run")[2:end]
             close(f)
         end
@@ -582,7 +582,7 @@ function make_current_file(directory_to_process)
             close(f)
         else
             f = matopen(file)
-            Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
+            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
             t_local = read(f, "t_run")[2:end]
             close(f)
         end
