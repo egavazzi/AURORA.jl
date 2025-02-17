@@ -577,7 +577,7 @@ function make_current_file(directory_to_process)
         IeE_down_local = zeros(n_z, n_t)
         @views for i_μ in 1:n_μ
             if μ_center[i_μ] > 0
-                J_up_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3) #TODO check with BG why no velocity dependence?
+                J_up_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
                 IeE_up_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E, (1, 1, :)), dims=3)
             else
                 J_down_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
@@ -735,23 +735,64 @@ function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     Q = Q .* τ .* A
 
     ## Create the 2D interpolator
-    # TODO Explain what we are doing. But before that we test if it works.
+    # To explain how this function is working, let's follow an example.
+    # Suppose we have the following Q matrix:
+    #     julia> Q
+    #     5×5 Matrix{Float64}:
+    #     0.65745   0.0652896  0.313073   0.4075     0.811552
+    #     0.780153  0.530831   0.546205   0.575431   0.707561
+    #     0.573467  0.555628   0.567592   0.88814    0.728269
+    #     0.865137  0.141949   0.0853166  0.0506817  0.65735
+    #     0.707699  0.646255   0.959993   0.932128   0.956778
+    # given over the following time and height vectors:
+    #     julia> t
+    #     5-element Vector{Int64}:
+    #         1
+    #         2
+    #         3
+    #         4
+    #         5
+    #     julia> h_atm
+    #     5-element Vector{Int64}:
+    #         1
+    #         2
+    #         3
+    #         4
+    #         5
     nodes = (h_atm, t)
     itp = Interpolations.interpolate(nodes, Q, Gridded(Linear()))
     itp = Interpolations.extrapolate(itp, 0.0) # allows for extrapolation but set those values to 0.0
 
     ## Shift data in time
-    # TODO Explain what we are doing
-    #=
-    We use a 2D interpolation. As the height are the same, we could have also done a 1D
-    interpolation for each height. We use the 2D interpolation for convenience as it allows
-    us to have only one interpolatior object (instead of one per height). This is also
-    closest to the method used in the legacy Matlab code from which this function is
-    inspired.
-    =#
+    # We shift the values in time.
+    # For each height (index i) and time (index j) position in the Q matrix, we calculate at
+    # what time the corresponding photons will reach the bottom of the height column. That new
+    # time is given by the formula `t[j] - (h_atm[i] - h_atm[1]) / c`. We use that new time as
+    # input to the interpolator `itp`,  which has for effect to "shift" that value in time.
+    # Continuing our example from above, and taking c = 1 for simplicity, we get
+    #     julia> I = [itp(h_atm[i], (t[j] - (h_atm[i] - h_atm[1]) / 1)) for i in eachindex(h_atm), j in eachindex(t)]
+    #     5×5 Matrix{Float64}:
+    #     0.65745  0.0652896  0.313073  0.4075    0.811552
+    #     0.0      0.780153   0.530831  0.546205  0.575431
+    #     0.0      0.0        0.573467  0.555628  0.567592
+    #     0.0      0.0        0.0       0.865137  0.141949
+    #     0.0      0.0        0.0       0.0       0.707699
+    # We can see that the values have been shifted/delayed in time.
+    # For the first time t = 1, only photons from the height h_atm = 1 are arriving. For the
+    # time t = 2, photons from the height h_atm = 2 that were emitted at time t = 1 are now
+    # arriving. Etc. etc.
+
+    # We used a 2D interpolation. As the height are unchanged, we could have also done a 1D
+    # interpolation for each height. We use the 2D interpolation for convenience as it allows
+    # us to have only one interpolatior object (instead of one per height). This is also
+    # closest to the method used in the legacy Matlab code from which this function is
+    # inspired.
     I = [itp(h_atm[i], (t[j] - (h_atm[i] - h_atm[1]) / c)) for i in eachindex(h_atm), j in eachindex(t)]
 
     ## Integrate in height
+    # Now that we have the matrix I which contains the information about the number of
+    # photons arriving at the bottom of the column for each height and time steps, we can
+    # integrate it along the height.
     problem = SampledIntegralProblem(I, h_atm; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)
