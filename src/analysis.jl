@@ -17,13 +17,12 @@ altitude and time.
 `make_density_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: relative path to the simulation folder to process. Example: "Visions2/Alfven_536s"
+- `directory_to_process`: absolute or relative path to the simulation directory to process
 """
 function make_density_file(directory_to_process)
     println("Calculating the densities from integrating Ie.")
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    files = readdir(full_path_to_directory, join=true)
+    files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
     # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
@@ -134,7 +133,7 @@ save the results in a new subfolder called`downsampled_10x`, inside the `directo
 `downsampling_fluxes(directory_to_process, downsampling_factor)`
 
 # Inputs
-- `directory_to_process`: absolute path to the directory to process.
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
 - `downsampling_factor`: downsampling factor for the time
 
 # Outputs
@@ -204,13 +203,11 @@ prompt emissions, volume-excitation-rates correspond also to volume-emission-rat
 `make_volume_excitation_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: Name of the simulation folder to process.
-    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
 """
 function make_volume_excitation_file(directory_to_process)
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    files = readdir(full_path_to_directory, join=true)
+    files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
     # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
@@ -437,13 +434,11 @@ max altitude used in the simulation).
 `make_Ie_top_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: Name of the simulation folder to process.
-    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
 """
 function make_Ie_top_file(directory_to_process)
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    files = readdir(full_path_to_directory, join=true)
+    files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
     # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
@@ -538,13 +533,11 @@ The following variables are saved to a file named *J.mat*:
 `make_current_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: Name of the simulation folder to process.
-    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
 """
 function make_current_file(directory_to_process)
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    files = readdir(full_path_to_directory, join=true)
+    files = readdir(directory_to_process, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
     # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
@@ -663,13 +656,11 @@ we need the file `Qzt_all_L.mat` with the volume excitation rates.
 `make_current_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: Name of the simulation folder to process.
-    Must be situated under "data/". Example: "Visions2/Alfven_536s"
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
 """
 function make_column_excitation_file(directory_to_process)
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
-    Q_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
+    Q_file = joinpath(directory_to_process, "Qzt_all_L.mat")
 
     ## Load volume-excitation-rates
     data = matread(Q_file)
