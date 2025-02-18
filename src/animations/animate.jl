@@ -66,7 +66,7 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
     h_atm = data["h_atm"]
 
     dE = diff(E); dE = [dE; dE[end]]
-    θ_lims = acosd.(μ_lims)
+    θ_lims = round.(acosd.(μ_lims))
 
     # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
     println("Restructure from 3D to 4D array.")
