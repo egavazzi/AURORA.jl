@@ -10,7 +10,7 @@ GLMakie.activate!()
 ## Directory to plot, absolute path
 full_path_to_directory = joinpath(REVONTULI_MOUNT,
                                   "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
-                                  "InvertedV_480s")
+                                  "Alfven_326s")
 
 
 ## Load the Q data (volume emission-rates)
@@ -45,7 +45,8 @@ fig = with_theme(
     Theme(
         Axis = (
             xticksmirrored = true, yticksmirrored = false, xminorticksvisible = true,
-            yminorticksvisible = true, limits=((0, 3), (100, 400))
+            yminorticksvisible = true,
+            limits=((0, t[end]), (100, 400))
             ),
         Heatmap = (rasterize = true,),
         Colorbar = (flip_vertical_label = true, vertical = true),
@@ -82,21 +83,21 @@ fig = with_theme(
     colgap!(gd, 10)
     return fig
 end
-display(GLMakie.Screen(), fig)
+display(fig)
 
 ## Save Qtz plot
 savefile = joinpath(full_path_to_directory, "Qtz.png")
 save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Qtz.svg")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Qtz.pdf")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Qtz.eps")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Qtz.svg")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Qtz.pdf")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Qtz.eps")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
 ##
 
 
@@ -108,8 +109,9 @@ I_file = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
 data = matread(I_file)
 #=
 Multiply by 1e4 because flux from Visions2 and thus results from AURORA are in /cm²
-instead of /m², so need to correct here
-Divide by 1e10 to convert to Rayleigh
+instead of /m², so need to correct here.
+
+Then divide by 1e10 to convert to Rayleigh.
 =#
 I4278 = vec(data["I_4278"]) * 1e4 / 1e10
 I6730 = vec(data["I_6730"]) * 1e4 / 1e10
@@ -148,18 +150,18 @@ lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyl
 # axislegend(ax, position = :lt)
 Legend(fig[1, 2], ax; patchsize = [40, 20])
 set_theme!()
-display(GLMakie.Screen(), fig)
+display(fig)
 
 ## Save It plot
 savefile = joinpath(full_path_to_directory, "It.png")
 save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "It.svg")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "It.pdf")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "It.eps")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "It.svg")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "It.pdf")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "It.eps")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
