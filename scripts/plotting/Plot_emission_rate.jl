@@ -56,7 +56,7 @@ fig = with_theme(
     fig = Figure(size = (1000, 800))
     ga = fig[1, 1] = GridLayout()
     ax4278 = Axis(ga[1, 1]; title = "4278 Å", xticklabelsvisible = false, ylabel ="altitude (km)")
-    hm4278 = heatmap!(t, h_atm, Q4278'; rasterize = true)
+    hm4278 = heatmap!(t, h_atm, Q4278')
     cb4278 = Colorbar(ga[1, 2], hm4278; label = "photons/m³/s")
     lines!(ax4278, t, height_Q4278max; color = :red, linestyle = :dash, linewidth = 2)
     colgap!(ga, 10)
