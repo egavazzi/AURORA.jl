@@ -10,7 +10,7 @@ set_theme!(fontsize = 20)
 ## Directory to plot, absolute path
 full_path_to_directory = joinpath(REVONTULI_MOUNT,
                                   "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
-                                  "Alfven_train_474s")
+                                  "Alfven_524s")
 
 # Read the ionization data
 ionization_file = joinpath(full_path_to_directory, "Qzt_all_L.mat")
@@ -42,8 +42,7 @@ ax_Ietop = Axis(fig[1, 1], yscale = log10, ylabel = " Energy (eV)",
                 title = string(180 - angle_cone[2], " - ", 180 - angle_cone[1], "° DOWN"),
                 yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                 xticklabelsvisible = false, xminorticksvisible = true,
-                xticksmirrored = true, yticksmirrored = true,
-                limits = ((0, 1), nothing))
+                xticksmirrored = true, yticksmirrored = true)
 idx_θ = vec(angle_cone[1] .<= abs.(acosd.(mu_avg(θ_Visions_lims))) .<= angle_cone[2])
 BeamW = beam_weight([angle_cone[1], angle_cone[2]])
 data_heatmap = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dEgrid' .* Egrid'
@@ -52,39 +51,41 @@ hm = Makie.heatmap!(t_top, Egrid, data_heatmap; colorrange = (1e6, maximum(data_
 custom_formatter(values) = map(v -> rich("10", superscript("$(round(Int64, v))")), values)
 Colorbar(fig[1, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
 # Plot ionization rate as heatmap
-ax_Q = Axis(fig[2, 1], xlabel = "t (s)", ylabel = "altitude (km)", aspect = AxisAspect(1),
-          xminorticksvisible = true, yminorticksvisible = true, xticksmirrored = true,
-          yticksmirrored = true)
-hm = heatmap!(t, h_atm, Qtot'; colorrange = (1e6, maximum(Qtot)), colorscale=log10, rasterize = true)
+ax_Q = Axis(fig[2, 1], xlabel = "t (s)", ylabel = "altitude (km)",
+            xminorticksvisible = true, yminorticksvisible = true,
+            xticksmirrored = true, yticksmirrored = true)
+hm = heatmap!(t, h_atm, Qtot'; colorrange = (1e6, maximum(Qtot)), colorscale = log10,
+              rasterize = true)
 cb = Colorbar(fig[2, 2], hm; label = "Ionization rate (/m³/s)")
 Qtot_contour = log10.(Qtot) |> (x -> replace(x, -Inf => 0))
 ct = contour!(t, h_atm, Qtot_contour'; levels = 6:10, color = :black, labels = true)
-colsize!(fig.layout, 1, Aspect(2, 1.0))
+# colsize!(fig.layout, 1, Aspect(2, 1.0))
+colsize!(fig.layout, 1, Auto())
 rowsize!(fig.layout, 1, Relative(1/5))
 linkxaxes!(ax_Ietop, ax_Q)
-xlims!(ax_Q, 0, 3)
+xlims!(ax_Q, 0, min(t_top[end], t[end]))
 ylims!(ax_Q, 100, 500)
 # Add line to indicate height of max ionization
 height_Qmax = [h_atm[i_max[1]] for i_max in vec(findmax(Qtot, dims=1)[2])]
-# height_Qmax[vec(maximum(Qtot, dims=1)) .< 1e6] .= NaN # remove when values of Q are very low
+# height_Qmax[vec(maximum(Qtot, dims=1)) .< 1e6] .= NaN # remove when values of Q are under a certain threshold
 height_Qmax[vec(maximum(Qtot, dims=1)) .< maximum(Qtot) / 10] .= NaN # remove when values of Q are less than 10% of the max
 lines!(ax_Q, t, height_Qmax; color = :red, linestyle = :dash, linewidth = 2)
-# display(fig, backend = GLMakie)
+# Display
 display(fig)
 
 ## Save the figure
 savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.png")
 save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.svg")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.pdf")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
-savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.eps")
-save(savefile, fig; backend = CairoMakie)
-println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.svg")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.pdf")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
+# savefile = joinpath(full_path_to_directory, "Ionization_rate_zt.eps")
+# save(savefile, fig; backend = CairoMakie)
+# println("Saved $savefile")
 #endregion
 
 
