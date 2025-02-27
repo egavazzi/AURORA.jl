@@ -72,7 +72,7 @@ function make_density_file(directory_to_process)
     end
 
     ## And save the densities into a file
-    savefile = joinpath(full_path_to_directory, "superthermal_e_density.mat")
+    savefile = joinpath(directory_to_process, "superthermal_e_density.mat")
     f = matopen(savefile, "w")
         write(f, "n_e", n_e)
         write(f, "E", E)
@@ -222,7 +222,7 @@ function make_volume_excitation_file(directory_to_process)
     dE = diff(E); dE = [dE; dE[end]]
 
     ## Load simulation neutral densities
-    data = matread(joinpath(full_path_to_directory, "neutral_atm.mat"))
+    data = matread(joinpath(directory_to_process, "neutral_atm.mat"))
     nO = data["nO"]
     nO2 = data["nO2"]
     nN2 = data["nN2"]
@@ -361,7 +361,7 @@ function make_volume_excitation_file(directory_to_process)
     t = reduce(vcat, t)
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "Qzt_all_L.mat")
+    savefile = joinpath(directory_to_process, "Qzt_all_L.mat")
     f = matopen(savefile, "w")
         write(f, "h_atm", h_atm)
         write(f, "t", t)
@@ -497,7 +497,7 @@ function make_Ie_top_file(directory_to_process)
     Ie_top = Ie_top ./ reshape(dE, (1, 1, :)) ./ BeamWeight # in #e-/m²/s/eV/ster
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "Ie_top.mat")
+    savefile = joinpath(directory_to_process, "Ie_top.mat")
     f = matopen(savefile, "w")
         write(f, "E", E)
         write(f, "dE", dE)
@@ -618,7 +618,7 @@ function make_current_file(directory_to_process)
     t = reduce(vcat, t)
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "J.mat")
+    savefile = joinpath(directory_to_process, "J.mat")
     f = matopen(savefile, "w")
         write(f, "h_atm", h_atm)
         write(f, "t", t)
@@ -690,7 +690,7 @@ function make_column_excitation_file(directory_to_process)
     I_O1S = q2colem(t, h_atm, QO1S)
 
     ## Save results
-    savefile = joinpath(full_path_to_directory, "I_lambda_of_t.mat")
+    savefile = joinpath(directory_to_process, "I_lambda_of_t.mat")
     f = matopen(savefile, "w")
         write(f, "t", t)
         write(f, "I_4278", I_4278)
