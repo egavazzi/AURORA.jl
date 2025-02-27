@@ -22,4 +22,4 @@
     - "Activating" the local environment will however have to be done everytime you start a new Julia session and want to use AURORA.
 
 !!! warning "Supported OS"
-    AURORA is developed on Linux and thus **only fully supported on Linux**. It should also work fine on macOS. There might be some issues on Windows due to the use of the pymsis and iri2016 python packages which both call some fortran code under the hood (and thus bring all kind of issues related to making fortran compilers work on Windows).
+    AURORA is developed on Linux and is thus **only fully supported on Linux**. It should also work fine on macOS. There might be some issues on Windows due to the use of the pymsis and iri2016 python packages which both call some fortran code under the hood (and thus bring all kind of issues related to making fortran compilers work on Windows).
