@@ -4,24 +4,21 @@
 |:---------------------------------:|:-----------------------:|
 | [![][docs-dev-img]][docs-dev-url] | [![][doi-img]][doi-url] |
 
-AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron-fluxes during periods of rapidly varying electron-precipitation.
+AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron-fluxes during periods of rapidly varying electron-precipitation (sub-second).
 
 
-This is a Julia implementation of the original AURORA code written in MATLAB and available at https://github.com/egavazzi/AURORA. The version present here is the one we recommend to use. It is in active development, is faster (~1000x), and produces more accurate results (i.e. bugs have been fixed).
+This is a Julia implementation of the original AURORA code written in MATLAB and available at https://github.com/egavazzi/AURORA. This version is the one we recommend to use. It is in active development, is much faster (~ 1000x), and produces more accurate results (i.e. bugs have been fixed).
 
-Below is an example of electron flux in the ionosphere produced by AURORA in response to an Alfvénic precipitation.
+Below is an example of electron flux in the ionosphere produced by AURORA in response to Alfvénic precipitation.
 
 https://github.com/user-attachments/assets/e67fc4d3-1fe1-4c0b-a8f6-42275f6e4659
 
 
 
-## Installation
+## Installation / Documentation
 Instructions are available in the [**documentation**](https://egavazzi.github.io/AURORA.jl/dev/).
 
-## Documentation
-The documentation is available [**here**](https://egavazzi.github.io/AURORA.jl/dev/).
-
-Descriptions of how the code works are available in Gustavsson (2022), in Gavazzi (2022), and in [this document](https://github.com/egavazzi/AURORA.jl/blob/main/docs/other/AURORA_Documentation.pdf).
+Descriptions of how the code works are available in Gustavsson (2022), in section 3 of Gavazzi (2022), and in [this document](https://github.com/egavazzi/AURORA.jl/blob/main/docs/other/AURORA_Documentation.pdf).
 
 ## References
 Gavazzi, E. (2022). The effects of time-variation of electron fluxes from the auroral ionosphere on M-I coupling [Master thesis, UiT Norges arktiske universitet]. https://munin.uit.no/handle/10037/25897
