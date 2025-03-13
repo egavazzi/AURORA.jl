@@ -59,4 +59,7 @@ export convert_fzvzmu_to_Ie, convert_M_to_I, convert_Ie_to_fzvzmu, convert_I_to_
 export make_Ie_from_ketchup
 export make_f_from_AURORA
 
+# Precompile selected functions
+include("precompiles.jl")
+
 end
