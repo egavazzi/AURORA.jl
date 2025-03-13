@@ -347,7 +347,7 @@ function get_cross_section(species_name, E, dE)
 
     σ_species = zeros(size(state_name, 1), length(E))
     for i_state in axes(state_name, 1) # loop over the different energy states
-        func = getfield(Main, Symbol(function_name[i_state])) # get the corresponding function name
+        func = getfield(AURORA, Symbol(function_name[i_state])) # get the corresponding function name
         σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
         # Note that we use `E .+ dE/2` as input to the cross-section functions, as this
         # corresponds to the middle energy of the energy bins (E is the energy *grid*).

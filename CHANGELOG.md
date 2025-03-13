@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- precompile the cross-section functions, leading to faster simulation start [#51](https://github.com/egavazzi/AURORA.jl/pull/51)
 - add julia script and functions to make an animation of simulation results [#50](https://github.com/egavazzi/AURORA.jl/pull/50)
 - rewrite the analysis functions into Julia [#42](https://github.com/egavazzi/AURORA.jl/pull/42)
   - speedup of the analysis of simulation results
