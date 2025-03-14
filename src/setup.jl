@@ -1,3 +1,8 @@
+using DelimitedFiles
+using PythonCall
+using SpecialFunctions
+using Term
+
 """
     setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
 
@@ -40,7 +45,7 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
     E, dE = make_energy_grid(E_max)
-    μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
+    μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
     ne, Te = load_electron_properties(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
@@ -107,12 +112,12 @@ end
 
 
 """
-    make_scattering_matrices(θ_lims)
+    load_scattering_matrices(θ_lims)
 
 Create an energy grid based on the maximum energy `E_max` given as input.
 
 # Calling
-`μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)`
+`μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)`
 
 # Inputs
 - `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
@@ -127,11 +132,11 @@ Create an energy grid based on the maximum energy `E_max` given as input.
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function make_scattering_matrices(θ_lims)
+function load_scattering_matrices(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
+    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
                      BeamWeight = BeamWeight, theta1 = θ₁)
 
@@ -140,10 +145,6 @@ end
 
 
 
-using DelimitedFiles
-using PythonCall
-using SpecialFunctions
-using Term
 """
     load_neutral_densities(msis_file, h_atm)
 
@@ -212,7 +213,6 @@ end
 
 
 
-using PythonCall
 """
     load_electron_properties(iri_file, h_atm)
 
@@ -322,7 +322,6 @@ end
 
 
 
-using DelimitedFiles
 """
     get_cross_section(species_name, E, dE)
 
