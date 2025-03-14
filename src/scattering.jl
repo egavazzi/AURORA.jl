@@ -59,7 +59,7 @@ function find_scattering_matrices(θ_lims, n_direction=720)
         println("Could not find file with matching pitch-angle grid.")
         println("Starting to calculate the requested scattering-matrices.")
 
-        Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = rotating(θ_lims, n_direction)
+        Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)
 
         # Save the results for future use
         filename = pkgdir(AURORA, "internal_data", "e_scattering",
