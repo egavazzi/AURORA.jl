@@ -47,7 +47,7 @@ function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
     E, dE = make_energy_grid(E_max)
     μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
-    ne, Te = load_electron_properties(iri_file, h_atm)
+    ne, Te = load_electron_densities(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
     σ_neutrals = load_cross_sections(E, dE)
 
@@ -194,12 +194,12 @@ end
 
 
 """
-    load_electron_properties(iri_file, h_atm)
+    load_electron_densities(iri_file, h_atm)
 
 Load the electron density and temperature.
 
 # Calling
-`ne, Te = load_electron_properties(iri_file, h_atm)`
+`ne, Te = load_electron_densities(iri_file, h_atm)`
 
 # Inputs
 - `iri_file`: absolute path to the iri file to read ne and Te from. String
@@ -209,7 +209,7 @@ Load the electron density and temperature.
 - `ne`: e- density (m⁻³). Vector [nZ]
 - `Te`: e- temperature (K). Vector [nZ]
 """
-function load_electron_properties(iri_file, h_atm)
+function load_electron_densities(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
     data_iri = readdlm(iri_file, skipstart=14)
     z_iri = data_iri[:, 1]
