@@ -1,5 +1,5 @@
+using DataInterpolations
 using DelimitedFiles
-using PythonCall
 using SpecialFunctions
 using Term
 
@@ -175,30 +175,27 @@ function load_neutral_densities(msis_file, h_atm)
         data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
     end
 
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
-    msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
+    msis_interpolator = [PCHIPInterpolation(data_msis[:, i], z_msis;
+                                            extrapolation = ExtrapolationType.Extension)
+                         for i in axes(data_msis, 2)]
     # interpolate the msis data over our h_atm grid
-    msis_interpolated = msis_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    msis_interpolated = pyconvert(Array, msis_interpolated)
+    msis_interpolated = [msis_interpolator[i](h_atm / 1e3) for i in axes(data_msis, 2)]
 
     # extract the neutral densities
     if msis_file[end-11:end-4] == "DOWNLOAD"
         # old msis file downloaded using HTTP request
-        nO = msis_interpolated[:, 9] * 1e6   # from cm⁻³ to m⁻³
-        nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
-        nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
-        Tn = msis_interpolated[:, 13]
+        nO = msis_interpolated[9] * 1e6   # from cm⁻³ to m⁻³
+        nN2 = msis_interpolated[10] * 1e6 # from cm⁻³ to m⁻³
+        nO2 = msis_interpolated[11] * 1e6 # from cm⁻³ to m⁻³
+        Tn = msis_interpolated[13]
     else
         # new msis file calculated using pymsis
-        nN2 = msis_interpolated[:, 3] # already in m⁻³
-        nO2 = msis_interpolated[:, 4] # already in m⁻³
-        nO = msis_interpolated[:, 5]  # already in m⁻³
-        Tn = msis_interpolated[:, 6]
+        nN2 = msis_interpolated[3] # already in m⁻³
+        nO2 = msis_interpolated[4] # already in m⁻³
+        nO = msis_interpolated[5]  # already in m⁻³
+        Tn = msis_interpolated[6]
     end
-
 	nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
 	nO2[end-2:end] .= 0
@@ -239,22 +236,20 @@ function load_electron_properties(iri_file, h_atm)
         z_iri = data_iri[:, 1]
     end
 
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
-    iri_interpolator = pyinterpolate.PchipInterpolator(z_iri, data_iri);
+    iri_interpolator = [PCHIPInterpolation(data_iri[:, i], z_iri;
+                                           extrapolation = ExtrapolationType.Extension)
+                        for i in axes(data_iri, 2)]
     # interpolate the iri data over our h_atm grid
-    iri_interpolated = iri_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    iri_interpolated = pyconvert(Array, iri_interpolated)
+    iri_interpolated = [iri_interpolator[i](h_atm / 1e3) for i in axes(data_iri, 2)]
 
     # extract electron density and temperature
     if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 6]
+        ne = iri_interpolated[2] * 1e6 # from cm⁻³ to m⁻³
+        Te = iri_interpolated[6]
     else # new iri file calculated using iri2016 package
-        ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 5]
+        ne = iri_interpolated[2] # from cm⁻³ to m⁻³
+        Te = iri_interpolated[5]
     end
     ne[ne .< 0] .= 1
     Te[Te .== -1] .= 350
