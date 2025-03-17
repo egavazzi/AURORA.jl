@@ -1,15 +1,15 @@
 # Changelog
 
 ## Unreleased
-- precompile the cross-section functions, leading to faster simulation start [#51](https://github.com/egavazzi/AURORA.jl/pull/51)
-- add julia script and functions to make an animation of simulation results [#50](https://github.com/egavazzi/AURORA.jl/pull/50)
-- rewrite the analysis functions into Julia [#42](https://github.com/egavazzi/AURORA.jl/pull/42)
-  - speedup of the analysis of simulation results
-  - now load and analyze the results "slice by slice", which makes it possible to handle longer simulations
-  - emission cross-section functions translated to Julia
-- add analysis functions to the control script template 
-- remove the last Matlab dependencies [#49](https://github.com/egavazzi/AURORA.jl/pull/49)
-- performance improvement [#44](https://github.com/egavazzi/AURORA.jl/pull/44)
+- Precompile some functions, leading to 10x faster simulation startup in new Julia sessions [#51](https://github.com/egavazzi/AURORA.jl/pull/51), [#52](https://github.com/egavazzi/AURORA.jl/pull/52)
+- Add julia script and functions to make an animation of simulation results [#50](https://github.com/egavazzi/AURORA.jl/pull/50)
+- Rewrite the analysis functions into Julia [#42](https://github.com/egavazzi/AURORA.jl/pull/42)
+  - Speedup of the analysis of simulation results
+  - Now load and analyze the results "slice by slice", which makes it possible to handle longer simulations
+  - Emission cross-section functions translated to Julia
+- Add analysis functions to the control script template 
+- Remove the last Matlab dependencies [#49](https://github.com/egavazzi/AURORA.jl/pull/49)
+- Performance improvement [#44](https://github.com/egavazzi/AURORA.jl/pull/44)
 
 ## v0.4.3 - 2025-01-02
 - fix bug where secondary e- are not properly redistributed isotropically [#43](https://github.com/egavazzi/AURORA.jl/pull/43)

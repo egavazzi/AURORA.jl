@@ -28,7 +28,7 @@ directly loaded. Otherwise, they are calculated and saved to a file.
     Matrix [n`_`beam x n`_`direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
-function find_scattering_matrices(θ_lims, n_direction=720)
+function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
     scattering_files = readdir(pkgdir(AURORA, "internal_data", "e_scattering"))
     found_them = 0
     for i1 in eachindex(scattering_files)
@@ -40,7 +40,7 @@ function find_scattering_matrices(θ_lims, n_direction=720)
                 n_direction_file = read(file, "n_direction")
                 close(file)
                 if θ_lims == θ_lims_file && n_direction == n_direction_file
-                    print("Loading scattering-matrices from file: ", scattering_files[i1])
+                    verbose && print("Loading scattering-matrices from file: ", scattering_files[i1])
                     file = matopen(filename)
                     Pmu2mup = read(file, "Pmu2mup")
                     theta2beamW = read(file, "theta2beamW")
@@ -48,7 +48,7 @@ function find_scattering_matrices(θ_lims, n_direction=720)
                     θ₁ = read(file, "theta1")
                     close(file)
                     found_them = 1
-                    println(" ✅")
+                    verbose && println(" ✅")
                     break
                 end
             catch
@@ -56,8 +56,8 @@ function find_scattering_matrices(θ_lims, n_direction=720)
         end
     end
     if found_them == 0
-        println("Could not find file with matching pitch-angle grid.")
-        println("Starting to calculate the requested scattering-matrices.")
+        verbose && println("Could not find file with matching pitch-angle grid.")
+        verbose && println("Starting to calculate the requested scattering-matrices.")
 
         Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)
 
