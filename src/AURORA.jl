@@ -17,7 +17,7 @@ include("crank_nicolson.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
-export setup, make_altitude_grid, make_energy_grid, make_scattering_matrices
+export setup, make_altitude_grid, make_energy_grid
 export find_nrlmsis_file
 export find_iri_file
 export Ie_top_from_file, Ie_top_flickering, Ie_top_constant
@@ -28,7 +28,6 @@ export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,
 export d2M, Crank_Nicolson
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!, update_Q_turbo!
-export rotating, load_scattering_matrices
 
 include("main.jl")
 export calculate_e_transport

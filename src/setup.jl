@@ -1,3 +1,8 @@
+using DataInterpolations
+using DelimitedFiles
+using SpecialFunctions
+using Term
+
 """
     setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
 
@@ -40,9 +45,9 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(top_altitude)
     E, dE = make_energy_grid(E_max)
-    μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
+    μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
-    ne, Te = load_electron_properties(iri_file, h_atm)
+    ne, Te = load_electron_densities(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
     σ_neutrals = load_cross_sections(E, dE)
 
@@ -107,12 +112,12 @@ end
 
 
 """
-    make_scattering_matrices(θ_lims)
+    load_scattering_matrices(θ_lims)
 
 Create an energy grid based on the maximum energy `E_max` given as input.
 
 # Calling
-`μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)`
+`μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)`
 
 # Inputs
 - `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
@@ -127,11 +132,11 @@ Create an energy grid based on the maximum energy `E_max` given as input.
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function make_scattering_matrices(θ_lims)
+function load_scattering_matrices(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
+    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
                      BeamWeight = BeamWeight, theta1 = θ₁)
 
@@ -140,10 +145,6 @@ end
 
 
 
-using DelimitedFiles
-using PythonCall
-using SpecialFunctions
-using Term
 """
     load_neutral_densities(msis_file, h_atm)
 
@@ -161,44 +162,24 @@ Load the neutral densities and temperature.
 - `Tn`: neutral temperature (K). Vector [nZ]
 """
 function load_neutral_densities(msis_file, h_atm)
-    # read the file without the headers
-    data_msis = readdlm(msis_file, skipstart=14)
+    data_msis = readdlm(msis_file, skipstart=14) # read the file without the headers
+    z_msis = data_msis[:, 1] # extract the z-grid of the msis data
+    data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
 
-    # extract the z-grid of the msis data
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        z_msis = data_msis[:, 6]
-    else
-        # new msis file calculated using pymsis
-        z_msis = data_msis[:, 1]
-        data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
-    end
-
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
-    msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
+    msis_interpolator = [PCHIPInterpolation(data_msis[:, i], z_msis;
+                                            extrapolation = ExtrapolationType.Extension)
+                         for i in axes(data_msis, 2)]
     # interpolate the msis data over our h_atm grid
-    msis_interpolated = msis_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    msis_interpolated = pyconvert(Array, msis_interpolated)
+    msis_interpolated = [msis_interpolator[i](h_atm / 1e3) for i in axes(data_msis, 2)]
 
     # extract the neutral densities
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        nO = msis_interpolated[:, 9] * 1e6   # from cm⁻³ to m⁻³
-        nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
-        nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
-        Tn = msis_interpolated[:, 13]
-    else
-        # new msis file calculated using pymsis
-        nN2 = msis_interpolated[:, 3] # already in m⁻³
-        nO2 = msis_interpolated[:, 4] # already in m⁻³
-        nO = msis_interpolated[:, 5]  # already in m⁻³
-        Tn = msis_interpolated[:, 6]
-    end
+    nN2 = msis_interpolated[3] # already in m⁻³
+    nO2 = msis_interpolated[4] # already in m⁻³
+    nO = msis_interpolated[5]  # already in m⁻³
+    Tn = msis_interpolated[6]
 
-	nO[end-2:end] .= 0
+    nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
 	nO2[end-2:end] .= 0
     erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
@@ -212,14 +193,13 @@ end
 
 
 
-using PythonCall
 """
-    load_electron_properties(iri_file, h_atm)
+    load_electron_densities(iri_file, h_atm)
 
 Load the electron density and temperature.
 
 # Calling
-`ne, Te = load_electron_properties(iri_file, h_atm)`
+`ne, Te = load_electron_densities(iri_file, h_atm)`
 
 # Inputs
 - `iri_file`: absolute path to the iri file to read ne and Te from. String
@@ -229,33 +209,22 @@ Load the electron density and temperature.
 - `ne`: e- density (m⁻³). Vector [nZ]
 - `Te`: e- temperature (K). Vector [nZ]
 """
-function load_electron_properties(iri_file, h_atm)
+function load_electron_densities(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        data_iri = readdlm(iri_file, skipstart=41)
-        z_iri = data_iri[:, 1]
-    else # new iri file calculated using iri2016 package
-        data_iri = readdlm(iri_file, skipstart=14)
-        z_iri = data_iri[:, 1]
-    end
+    data_iri = readdlm(iri_file, skipstart=14)
+    z_iri = data_iri[:, 1]
 
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
-    iri_interpolator = pyinterpolate.PchipInterpolator(z_iri, data_iri);
+    iri_interpolator = [PCHIPInterpolation(data_iri[:, i], z_iri;
+                                           extrapolation = ExtrapolationType.Extension)
+                        for i in axes(data_iri, 2)]
     # interpolate the iri data over our h_atm grid
-    iri_interpolated = iri_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    iri_interpolated = pyconvert(Array, iri_interpolated)
+    iri_interpolated = [iri_interpolator[i](h_atm / 1e3) for i in axes(data_iri, 2)]
 
     # extract electron density and temperature
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 6]
-    else # new iri file calculated using iri2016 package
-        ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 5]
-    end
+    ne = iri_interpolated[2] # from cm⁻³ to m⁻³
+    Te = iri_interpolated[5]
+
     ne[ne .< 0] .= 1
     Te[Te .== -1] .= 350
 
@@ -322,7 +291,6 @@ end
 
 
 
-using DelimitedFiles
 """
     get_cross_section(species_name, E, dE)
 
@@ -354,102 +322,4 @@ function get_cross_section(species_name, E, dE)
     end
 
     return σ_species
-end
-
-
-
-
-
-
-
-
-
-# ======================================================================================== #
-#                                      LEGACY CODE                                         #
-# ======================================================================================== #
-using MATLAB
-
-# This is the old function calling the Matlab code.
-function load_old_cross_sections(E, dE)
-    println("Calling Matlab for the cross-sections...")
-    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
-    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
-    # TODO: translate that part
-    # Creating a MATLAB session
-    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(genpath(path_to_AURORA_matlab))
-    cd(path_to_AURORA_matlab)
-    "
-    @mput E
-    @mput dE
-    mat"
-    E = E';
-    dE = dE';
-    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
-    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
-    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
-    "
-    σ_N2 = @mget XsN2;
-    σ_O2 = @mget XsO2;
-    σ_O = @mget XsO;
-    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
-    # Closing the MATLAB session
-    close(s1)
-    println("Calling Matlab for the cross-sections... done.")
-
-    return σ_neutrals
-end
-
-
-
-# This function is here just for testing. It is not supposed to be used in production. It
-# loads the scattering matrices using the old matlab code.
-function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
-    ## Creating a MATLAB session
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(path_to_AURORA_matlab,'-end')
-    add_AURORA
-    cd(path_to_AURORA_matlab)
-    "
-
-    theta_lims2do = reshape(Vector(θ_lims), 1, :);
-    @mput theta_lims2do
-    mat"
-    theta_lims2do = double(theta_lims2do)
-    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
-    c_o_mu = mu_avg(mu_lims);
-
-    n_dirs = size(Pmu2mup, 2);
-    theta1 = linspace(0,pi,n_dirs);
-    "
-    θ_lims = vec(@mget theta_lims2do);
-    μ_lims = vec(@mget mu_lims);
-    μ_center = vec(@mget c_o_mu);
-    θ₁ = vec(@mget theta1)
-
-    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
-    BeamWeight_relative = @mget theta2beamW;
-
-    # This beam weight is calculated in a continuous way
-    BeamWeight = 2π .* vec(@mget BeamW);
-    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting
-    # matrix with the relative contribution from withing each beam. It means that when
-    # summing up along each beam, we should get 1
-    BeamWeight_relative = BeamWeight_relative ./
-                          repeat(sum(BeamWeight_relative, dims = 2), 1,
-                                 size(BeamWeight_relative, 2))
-
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
-                     BeamWeight = BeamWeight, theta1 = θ₁)
-
-    ## Closing the MATLAB session
-    close(s1)
-
-    return μ_lims, μ_center, μ_scatterings
 end
