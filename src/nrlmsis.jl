@@ -205,8 +205,6 @@ function calculate_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
-
-
     # import nrlmsis 2.1 model from the Python package 'pymsis'
     msis = pyimport("pymsis.msis")
 

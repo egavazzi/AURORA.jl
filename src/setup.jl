@@ -162,18 +162,9 @@ Load the neutral densities and temperature.
 - `Tn`: neutral temperature (K). Vector [nZ]
 """
 function load_neutral_densities(msis_file, h_atm)
-    # read the file without the headers
-    data_msis = readdlm(msis_file, skipstart=14)
-
-    # extract the z-grid of the msis data
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        z_msis = data_msis[:, 6]
-    else
-        # new msis file calculated using pymsis
-        z_msis = data_msis[:, 1]
-        data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
-    end
+    data_msis = readdlm(msis_file, skipstart=14) # read the file without the headers
+    z_msis = data_msis[:, 1] # extract the z-grid of the msis data
+    data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
 
     # create the interpolator
     msis_interpolator = [PCHIPInterpolation(data_msis[:, i], z_msis;
@@ -183,20 +174,12 @@ function load_neutral_densities(msis_file, h_atm)
     msis_interpolated = [msis_interpolator[i](h_atm / 1e3) for i in axes(data_msis, 2)]
 
     # extract the neutral densities
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        nO = msis_interpolated[9] * 1e6   # from cm⁻³ to m⁻³
-        nN2 = msis_interpolated[10] * 1e6 # from cm⁻³ to m⁻³
-        nO2 = msis_interpolated[11] * 1e6 # from cm⁻³ to m⁻³
-        Tn = msis_interpolated[13]
-    else
-        # new msis file calculated using pymsis
-        nN2 = msis_interpolated[3] # already in m⁻³
-        nO2 = msis_interpolated[4] # already in m⁻³
-        nO = msis_interpolated[5]  # already in m⁻³
-        Tn = msis_interpolated[6]
-    end
-	nO[end-2:end] .= 0
+    nN2 = msis_interpolated[3] # already in m⁻³
+    nO2 = msis_interpolated[4] # already in m⁻³
+    nO = msis_interpolated[5]  # already in m⁻³
+    Tn = msis_interpolated[6]
+
+    nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
 	nO2[end-2:end] .= 0
     erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
@@ -228,13 +211,8 @@ Load the electron density and temperature.
 """
 function load_electron_properties(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        data_iri = readdlm(iri_file, skipstart=41)
-        z_iri = data_iri[:, 1]
-    else # new iri file calculated using iri2016 package
-        data_iri = readdlm(iri_file, skipstart=14)
-        z_iri = data_iri[:, 1]
-    end
+    data_iri = readdlm(iri_file, skipstart=14)
+    z_iri = data_iri[:, 1]
 
     # create the interpolator
     iri_interpolator = [PCHIPInterpolation(data_iri[:, i], z_iri;
@@ -244,13 +222,9 @@ function load_electron_properties(iri_file, h_atm)
     iri_interpolated = [iri_interpolator[i](h_atm / 1e3) for i in axes(data_iri, 2)]
 
     # extract electron density and temperature
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        ne = iri_interpolated[2] * 1e6 # from cm⁻³ to m⁻³
-        Te = iri_interpolated[6]
-    else # new iri file calculated using iri2016 package
-        ne = iri_interpolated[2] # from cm⁻³ to m⁻³
-        Te = iri_interpolated[5]
-    end
+    ne = iri_interpolated[2] # from cm⁻³ to m⁻³
+    Te = iri_interpolated[5]
+
     ne[ne .< 0] .= 1
     Te[Te .== -1] .= 350
 
