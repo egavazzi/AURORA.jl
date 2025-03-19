@@ -1,5 +1,5 @@
-results_dir = "/Users/ost051/Documents/PhD/AURORA-20220613(1)/EtiennesVersion/AURORA.jl/data/ionprod/10.0-10.23352047097258eV"
-addpath("/Users/ost051/Documents/PhD/AURORA-20220613(1)/AURORA/Plotting")
+results_dir = "/mnt/data/oliver/AURORA.jl/data/ionprod/9942.457296427418-10174.634027476064eV"
+addpath("/home/bgu001/matlab/AURORA/Plotting")
 cd(results_dir)
 dDir = dir;
 if dDir(1).isdir
