@@ -21,13 +21,13 @@ beams.
     of the scattering matrices. Defaults to 720 when left empty.
 
 # Outputs
-- `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
-    n`_`direction]
-- `theta2beamW`: weight of each sub-beam within each beam. Matrix [n`_`beam x
-    n`_`direction]
+- `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n\\_direction x
+    2 * n\\_direction x n\\_beam]
+- `theta2beamW`: weight of each sub-beam within each beam. Matrix [n\\_beam x
+    n\\_direction]
 - `BeamWeight_relative`: relative weight of each sub-beam within each beam. It is the same
     as theta2beamW but normalized so that summing along the sub-beams gives 1 for each beam.
-    Matrix [n`_`beam x n`_`direction]
+    Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
 function rotating(θ_lims, n_direction=720)
@@ -104,13 +104,13 @@ directly loaded. Otherwise, they are calculated and saved to a file.
     of the scattering matrices. Defaults to 720 when left empty.
 
 # Outputs
-- `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
-    n`_`direction]
-- `theta2beamW`: weight of each sub-beam within each beam. Matrix [n`_`beam x
-    n`_`direction]
+- `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n\\_direction x
+    2 * n\\_direction x n\\_beam]
+- `theta2beamW`: weight of each sub-beam within each beam. Matrix [n\\_beam x
+    n\\_direction]
 - `BeamWeight_relative`: relative weight of each sub-beam within each beam. It is the same
     as theta2beamW but normalized so that summing along the sub-beams gives 1 for each beam.
-    Matrix [n`_`beam x n`_`direction]
+    Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
 function load_scattering_matrices(θ_lims, n_direction=720; verbose = true)
