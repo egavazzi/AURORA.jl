@@ -257,6 +257,11 @@ function make_volume_excitation_file(directory_to_process)
     QOi = Vector{Matrix{Float64}}()
     QO2i = Vector{Matrix{Float64}}()
     QN2i = Vector{Matrix{Float64}}()
+
+    #Q_from_O  = Vector{Matrix{Float64}}()
+    #Q_from_O2 = Vector{Matrix{Float64}}()
+    #Q_from_N2 = Vector{Matrix{Float64}}()
+
     t = Vector{}()
 
     n_files = length(files_to_process)
@@ -323,6 +328,10 @@ function make_volume_excitation_file(directory_to_process)
         QO2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O2i, nO2)
         QN2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_N2i, nN2)
 
+        Q_from_O_local  = [calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O[i, :] , nO ) for i in axes(σ_O , 1)]
+        Q_from_O2_local = [calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O2[i, :], nO2) for i in axes(σ_O2, 1)]
+        Q_from_N2_local = [calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_N2[i, :], nN2) for i in axes(σ_N2, 1)]
+
         ## Push the newly calculated Q_local for the current time-slice into a vector
         # We get something like Q4278 = [[n_z, n_t1], [n_z, n_t2], ...]
         push!(Q4278, Q4278_local)
@@ -338,6 +347,15 @@ function make_volume_excitation_file(directory_to_process)
         push!(QOi, QOi_local)
         push!(QO2i, QO2i_local)
         push!(QN2i, QN2i_local)
+
+       #push!(Q_from_O , Q_from_O_local )
+       #push!(Q_from_O2, Q_from_O2_local)
+       #push!(Q_from_N2, Q_from_N2_local)
+
+        Q_from_O  = Q_from_O_local 
+        Q_from_O2 = Q_from_O2_local
+        Q_from_N2 = Q_from_N2_local
+
         push!(t, t_local)
 
         next!(p)
@@ -358,6 +376,11 @@ function make_volume_excitation_file(directory_to_process)
     QOi = reduce(hcat, QOi)
     QO2i = reduce(hcat, QO2i)
     QN2i = reduce(hcat, QN2i)
+
+    Q_from_O  = reduce(hcat, Q_from_O )
+    Q_from_O2 = reduce(hcat, Q_from_O2)
+    Q_from_N2 = reduce(hcat, Q_from_N2)
+
     t = reduce(vcat, t)
 
     ## Save results
@@ -378,6 +401,9 @@ function make_volume_excitation_file(directory_to_process)
         write(f, "QOi", QOi)
         write(f, "QO2i", QO2i)
         write(f, "QN2i", QN2i)
+        write(f, "Q_from_O" , Q_from_O )
+        write(f, "Q_from_O2", Q_from_O2)
+        write(f, "Q_from_N2", Q_from_N2)
     close(f)
 
     println("Volume excitation rates saved in $savefile")
