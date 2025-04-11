@@ -1,14 +1,14 @@
 """
-    setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
+    setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)
 
 Load the atmosphere, the energy grid, the collision cross-sections, ...
 
 ## Calling
 `h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims,
-μ_center, μ_scatterings = setup(top_altitude, θ_lims, E_max, msis_file, iri_file)`
+μ_center, μ_scatterings = setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)`
 
 ## Inputs
-- `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+- `altitude_lim`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
@@ -37,8 +37,8 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
-    h_atm = make_altitude_grid(top_altitude)
+function setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)
+    h_atm = make_altitude_grid(altitude_lim[1], altitude_lim[2])
     E, dE = make_energy_grid(E_max)
     μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
@@ -54,25 +54,26 @@ end
 
 
 """
-    make_altitude_grid(top_altitude)
+    make_altitude_grid(altitude_lim)
 
-Create an altitude grid based on the `top_altitude` given as input.
+Create an altitude grid based on the 'bottom_altitude', 'top_altitude' given as input.
 
 # Calling
-`h_atm = make_altitude_grid(top_altitude)`
+`h_atm = make_altitude_grid(bottom_altitude, top_altitude)
 
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+- `bottom_altitude`: the altitude, in km, for the bottom of the ionosphere in our simulation
 
 # Outputs
 - `h_atm`: altitude (m). Vector [nZ]
 """
-function make_altitude_grid(top_altitude)
+function make_altitude_grid(bottom_altitude, top_altitude)
     Δz(n) = 150 .+
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
-    h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
-    # h_atm = vcat(95e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
+    h_atm = 100e3 .+ cumsum(real.(Δz(500))) .- real.(Δz(1))
+    h_atm = vcat(bottom_altitude:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
