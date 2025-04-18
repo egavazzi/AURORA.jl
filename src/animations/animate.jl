@@ -7,8 +7,8 @@ So far we have
 
 =#
 using CairoMakie
-using MAT
-using Printf
+using MAT: matread
+using Printf: @sprintf
 
 
 # Main function

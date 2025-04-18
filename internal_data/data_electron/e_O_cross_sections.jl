@@ -1,4 +1,4 @@
-using PythonCall
+using PythonCall: pyimport, pyconvert
 
 function e_Oelastic(Ep)
     # e_Oelastic - elastic electron collision cross section (m^2)

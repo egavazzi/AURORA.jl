@@ -1,5 +1,5 @@
-using LinearAlgebra
-using SparseArrays
+using LinearAlgebra: Diagonal, ldiv!, mul!
+using SparseArrays: spdiagm, sparse, dropzeros!, findnz
 
 function d2M(z)
     dzd = z[2:end-1] - z[1:end-2]
@@ -16,7 +16,7 @@ function d2M(z)
 end
 
 
-using KLU
+using KLU: klu
 function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
 

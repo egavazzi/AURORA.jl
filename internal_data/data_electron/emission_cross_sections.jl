@@ -1,5 +1,5 @@
-using DataInterpolations
-using Statistics
+using DataInterpolations: LinearInterpolation, PCHIPInterpolation
+using Statistics: mean
 
 """
     excitation_4278(E)
@@ -102,7 +102,7 @@ function excitation_6730_N2(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = DataInterpolations.LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -541,7 +541,7 @@ function excitation_O1D(E)
     log_cross_section = log.(xs_o1d)
 
     # Create the interpolation function
-    interp = DataInterpolations.LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -584,7 +584,7 @@ function excitation_O1S(E)
     log_cross_section = log.(xs_o1s)
 
     # Create the interpolation function
-    interp = DataInterpolations.LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))

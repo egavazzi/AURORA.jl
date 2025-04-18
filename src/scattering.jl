@@ -1,7 +1,7 @@
-using Rotations
-using AURORA
-using ProgressMeter
-using MAT
+using Dates: Dates, now
+using MAT: matopen
+using ProgressMeter: Progress, next!
+using Rotations: AngleAxis
 
 # 144x faster than the Matlab code (24s instead of 1h for θ_lims = 180:-10:0 and
 # n_direction = 720)

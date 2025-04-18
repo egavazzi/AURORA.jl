@@ -1,5 +1,5 @@
-using MAT
-using Interpolations
+using Interpolations: interpolate, extrapolate, Gridded, Linear
+using MAT: matopen
 
 # conservation of fzvzmu and Ie ✅
 function convert_M_to_I(path_to_vlasov_initial_file, path_to_vlasov_simulation,
@@ -109,8 +109,8 @@ end
 
 
 
-using ProgressMeter
-using QuadGK
+using QuadGK: quadgk
+using ProgressMeter: Progress, next!
 
 # speedup ~240x
 # conservation of Ie and fzvzmu ✅

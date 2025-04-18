@@ -140,10 +140,9 @@ end
 
 
 
-using DelimitedFiles
-using PythonCall
-using SpecialFunctions
-using Term
+using DelimitedFiles: readdlm
+using PythonCall: pyimport, pyconvert
+using SpecialFunctions: erf
 """
     load_neutral_densities(msis_file, h_atm)
 
@@ -212,7 +211,7 @@ end
 
 
 
-using PythonCall
+using PythonCall: pyimport, pyconvert
 """
     load_electron_properties(iri_file, h_atm)
 
@@ -322,7 +321,7 @@ end
 
 
 
-using DelimitedFiles
+using DelimitedFiles: readdlm
 """
     get_cross_section(species_name, E, dE)
 
@@ -354,102 +353,4 @@ function get_cross_section(species_name, E, dE)
     end
 
     return σ_species
-end
-
-
-
-
-
-
-
-
-
-# ======================================================================================== #
-#                                      LEGACY CODE                                         #
-# ======================================================================================== #
-using MATLAB
-
-# This is the old function calling the Matlab code.
-function load_old_cross_sections(E, dE)
-    println("Calling Matlab for the cross-sections...")
-    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
-    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
-    # TODO: translate that part
-    # Creating a MATLAB session
-    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(genpath(path_to_AURORA_matlab))
-    cd(path_to_AURORA_matlab)
-    "
-    @mput E
-    @mput dE
-    mat"
-    E = E';
-    dE = dE';
-    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
-    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
-    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
-    "
-    σ_N2 = @mget XsN2;
-    σ_O2 = @mget XsO2;
-    σ_O = @mget XsO;
-    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
-    # Closing the MATLAB session
-    close(s1)
-    println("Calling Matlab for the cross-sections... done.")
-
-    return σ_neutrals
-end
-
-
-
-# This function is here just for testing. It is not supposed to be used in production. It
-# loads the scattering matrices using the old matlab code.
-function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
-    ## Creating a MATLAB session
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(path_to_AURORA_matlab,'-end')
-    add_AURORA
-    cd(path_to_AURORA_matlab)
-    "
-
-    theta_lims2do = reshape(Vector(θ_lims), 1, :);
-    @mput theta_lims2do
-    mat"
-    theta_lims2do = double(theta_lims2do)
-    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
-    c_o_mu = mu_avg(mu_lims);
-
-    n_dirs = size(Pmu2mup, 2);
-    theta1 = linspace(0,pi,n_dirs);
-    "
-    θ_lims = vec(@mget theta_lims2do);
-    μ_lims = vec(@mget mu_lims);
-    μ_center = vec(@mget c_o_mu);
-    θ₁ = vec(@mget theta1)
-
-    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
-    BeamWeight_relative = @mget theta2beamW;
-
-    # This beam weight is calculated in a continuous way
-    BeamWeight = 2π .* vec(@mget BeamW);
-    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting
-    # matrix with the relative contribution from withing each beam. It means that when
-    # summing up along each beam, we should get 1
-    BeamWeight_relative = BeamWeight_relative ./
-                          repeat(sum(BeamWeight_relative, dims = 2), 1,
-                                 size(BeamWeight_relative, 2))
-
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
-                     BeamWeight = BeamWeight, theta1 = θ₁)
-
-    ## Closing the MATLAB session
-    close(s1)
-
-    return μ_lims, μ_center, μ_scatterings
 end

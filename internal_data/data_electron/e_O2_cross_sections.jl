@@ -1,4 +1,4 @@
-using PythonCall
+using PythonCall: pyimport, pyconvert
 
 function e_O2elastic(Ep)
     s = [4.0725, 4.2883, 5.272, 5.8454, 7.1862, 8.8346, 9.7956, 10.861, 8.8346, 6.4813, 4.5155, 2.2608, 0.91126, 0.10422] .* 1e-20

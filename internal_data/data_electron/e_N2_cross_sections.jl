@@ -1,43 +1,4 @@
-using PythonCall
-
-"TO DO
-elastic     ✅
-rot0_2      ✅
-rot0_4      ✅
-rot0_6      ✅
-rot0_8      ✅
-vib0_1      ✅
-vib0_2      ✅
-vib0_3      ✅
-vib0_4      ✅
-vib0_5      ✅
-vib0_6      ✅
-vib0_7      ✅
-a3sup       ✅
-b3pg        ✅
-w3du        ✅
-bp3sum      ✅
-ap1sum      ✅
-w1du        ✅
-e3sgp       ✅
-ab1sgp      ✅
-a1pg        ✅
-c3pu        ✅
-bp1sup      ✅
-cp1sup      ✅
-cp3pu       ✅
-d3sup       ✅
-f3pu        ✅
-g3pu        ✅
-M1M2        ✅
-o1pu        ✅
-dissociation✅
-ionx2sgp    ✅
-iona2pu     ✅
-ionb2sup    ✅
-dionv       ✅
-ddion       ✅
-"
+using PythonCall: pyimport, pyconvert
 
 function e_N2elastic(Ep)
     cross_section = Vector{Float64}(undef, length(Ep))

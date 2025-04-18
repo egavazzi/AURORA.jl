@@ -39,7 +39,7 @@ function CFL_criteria(t, h_atm, v, CFL_number=64)
 end
 
 
-using HCubature
+using HCubature: hcubature
 """
     mu_avg(θ_lims)
 
@@ -65,7 +65,7 @@ function mu_avg(θ_lims)
 end
 
 
-using QuadGK
+using QuadGK: quadgk
 """
     beam_weight(θ_lims)
 
@@ -91,8 +91,8 @@ end
 
 ## ====================================================================================== ##
 
-using LibGit2
-using Pkg
+import LibGit2
+import Pkg
 function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
     n_loop, CFL_number, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
@@ -118,7 +118,7 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
 end
 
 
-using MAT
+using MAT: matopen
 function save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
     savefile = joinpath(savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
@@ -133,8 +133,8 @@ function save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 end
 
 
-using MAT
-using Printf
+using MAT: matopen
+using Printf: @sprintf
 function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     # Extract the time array for the current loop
 	t_run = collect(t .+ t[end] * (i - 1))

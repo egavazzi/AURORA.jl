@@ -1,7 +1,9 @@
+using LoopVectorization: @tturbo
+using SparseArrays: sparse
+
 #################################################################################
 #                                   B2B matrix                                  #
 #################################################################################
-using SparseArrays
 function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
     idx1 = Vector{Float64}(undef, 0)
     idx2 = Vector{Float64}(undef, 0)
@@ -22,7 +24,6 @@ end
 #################################################################################
 #                               Inelastic collisions                            #
 #################################################################################
-using LoopVectorization
 function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
     Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
 
@@ -149,7 +150,6 @@ end
 
 
 
-using LoopVectorization
 function prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E,
                                               dE, iE, BeamWeight, μ_center,
                                               Ionization_matrix, Ionizing_matrix,

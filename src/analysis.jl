@@ -1,6 +1,4 @@
-using MAT
-using LoopVectorization
-
+using MAT: matopen, matread
 """
     make_density_file(directory_to_process)
 
@@ -710,8 +708,8 @@ function make_column_excitation_file(directory_to_process)
     return nothing
 end
 
-import Interpolations # use import here to avoid conflicts with DataInterpolations.jl
-using Integrals
+using Integrals: SampledIntegralProblem, TrapezoidalRule, solve
+using Interpolations: interpolate, extrapolate, Gridded, Linear
 """
     q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
 
@@ -771,8 +769,8 @@ function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     #         4
     #         5
     nodes = (h_atm, t)
-    itp = Interpolations.interpolate(nodes, Q, Gridded(Linear()))
-    itp = Interpolations.extrapolate(itp, 0.0) # allows for extrapolation but set those values to 0.0
+    itp = interpolate(nodes, Q, Gridded(Linear()))
+    itp = extrapolate(itp, 0.0) # allows for extrapolation but set those values to 0.0
 
     ## Shift data in time
     # We shift the values in time.
