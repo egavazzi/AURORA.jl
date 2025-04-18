@@ -1,7 +1,7 @@
-using MAT
-using Interpolations
-using QuadGK
-using ProgressMeter
+using MAT: matopen
+using Interpolations: interpolate, extrapolate, Gridded, Linear
+using QuadGK: quadgk
+using ProgressMeter: Progress, next!
 
 
 # conservation of Ie and fzvzvperp ✅

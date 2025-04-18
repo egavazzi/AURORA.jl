@@ -1,6 +1,6 @@
-using MAT
-using Interpolations
-using ProgressMeter
+using MAT: matopen
+using Interpolations: interpolate, Gridded, Linear
+using ProgressMeter: Progress, next!
 
 """
     make_Ie_from_ketchup(path_to_vlasov_initial_file, path_to_vlasov_simulation,
@@ -10,8 +10,8 @@ using ProgressMeter
 This function extracts and converts the function distributions from ketchup into fluxes of
 electrons Ie.
 
-It looks through a directory with all the fzvzmu***.mat files from a simulation. Each file 
-should correspond to one time step and contain the function distribution over all the space 
+It looks through a directory with all the fzvzmu***.mat files from a simulation. Each file
+should correspond to one time step and contain the function distribution over all the space
 points of the simulation.
 
 Speedup compared to the Matlab version : ~100x
@@ -60,7 +60,7 @@ function make_Ie_from_ketchup(path_to_vlasov_initial_file, path_to_vlasov_simula
     ## Refine μ_mag_grid (using gridded interpolation)
     G = interpolate((eachindex(μ_mag_grid), ), μ_mag_grid, Gridded(Linear()))
     μ_mag_grid_finer = G(1:1/HMR_MU:length(μ_mag_grid))
-    Δμ_mag_finer = 1/HMR_MU .* Δμ_mag; 
+    Δμ_mag_finer = 1/HMR_MU .* Δμ_mag;
     Δμ_mag_finer = repeat(Δμ_mag_finer, inner=HMR_MU)
     μ_mag_finer = μ_mag_grid_finer[2:end] - 0.5 * Δμ_mag_finer
 
@@ -82,7 +82,7 @@ function make_Ie_from_ketchup(path_to_vlasov_initial_file, path_to_vlasov_simula
         i_zz = Nz - i_z + 1 # because ketchup matrices are flipped
         Bz = B[i_zz]
         for i_t in 1:Nt # loop over time
-            Ie_temp = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer, 
+            Ie_temp = convert_fzvzmu_to_Ie(vz, μ_mag, vz_finer, μ_mag_finer, Δvz_finer, Δμ_mag_finer,
                                             E, μ_pitch, Bz, m, HMR_VZ, HMR_MU, fzvzmu[i_t, :, :, i_zz])
             for i_μ in 1:length(μ_pitch)
                 Ie[i_zmax * (i_μ - 1) + i_z, i_t, :] = Ie_temp[:, i_μ]
