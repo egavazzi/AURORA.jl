@@ -1,4 +1,4 @@
-using MAT
+using MAT: matopen
 
 function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
     Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))

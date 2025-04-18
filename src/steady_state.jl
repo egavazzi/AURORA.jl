@@ -1,6 +1,6 @@
-using KLU
-using LinearAlgebra
-using SparseArrays
+using KLU: klu
+using LinearAlgebra: Diagonal
+using SparseArrays: spdiagm, sparse, dropzeros!, findnz
 
 function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ))
