@@ -6,9 +6,6 @@ using Term
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
     CFL_number = 64; savedir_behavior = "default")
-    # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
-    # Nthreads is set to 6 by default as it seems to be optimal on my machine
-
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
@@ -116,7 +113,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+    I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
