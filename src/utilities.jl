@@ -227,13 +227,13 @@ end
     make_savedir(root_savedir, name_savedir; behavior = "default")
 
 Return the path to the directory where the results will be saved. If the directory does not
-already exist, it will be created.
+already exist, create it.
 
 If the constructed `savedir` already exists and contains files starting with `"IeFlickering-"`,
 a new directory is created to avoid accidental overwriting of results (e.g., `savedir(1)`, `savedir(2)`, etc.).
 
 # Calling
-`savedir = make_savedir(root_savedir, name_savedir)`
+`savedir = make_savedir(root_savedir, name_savedir)` \\
 `savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")`
 
 # Arguments
@@ -242,7 +242,7 @@ a new directory is created to avoid accidental overwriting of results (e.g., `sa
 - `name_savedir::String`: The name of the subdirectory to be created within `root_savedir`.
     If empty or contains only spaces, it defaults to the current date and time in the
     format `"yyyymmdd-HHMM"`.
-- `behavior::String` (optional): Determines how the full path of the save directory is constructed.
+- `behavior::String` (optional): Determines how the full path is constructed.
     - `"default"`: The path will be built starting under the `data/` folder of the AURORA installation
         (i.e., `AURORA_folder/data/root_savedir/name_savedir/`, where `AURORA_folder` is
         the folder containing the AURORA code). This is the default behavior.
@@ -269,7 +269,7 @@ function make_savedir(root_savedir, name_savedir; behavior = "default")
     if behavior == "default"
         savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
     elseif behavior == "custom"
-        savedir = pkgdir(root_savedir, name_savedir)
+        savedir = joinpath(root_savedir, name_savedir)
     end
 
     # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
