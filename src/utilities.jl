@@ -223,6 +223,68 @@ function find_Ietop_file(path_to_directory)
 end
 
 
+"""
+    make_savedir(root_savedir, name_savedir; behavior = "default")
+
+Return the path to the directory where the results will be saved. If the directory does not
+already exist, it will be created.
+
+If the constructed `savedir` already exists and contains files starting with `"IeFlickering-"`,
+a new directory is created to avoid accidental overwriting of results (e.g., `savedir(1)`, `savedir(2)`, etc.).
+
+# Calling
+`savedir = make_savedir(root_savedir, name_savedir)`
+`savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")`
+
+# Arguments
+- `root_savedir::String`: The root directory where the data will be saved. If empty or
+    contains only spaces, it defaults to `"backup"`.
+- `name_savedir::String`: The name of the subdirectory to be created within `root_savedir`.
+    If empty or contains only spaces, it defaults to the current date and time in the
+    format `"yyyymmdd-HHMM"`.
+- `behavior::String` (optional): Determines how the full path of the save directory is constructed.
+    - `"default"`: The path will be built starting under the `data/` folder of the AURORA installation
+        (i.e., `AURORA_folder/data/root_savedir/name_savedir/`, where `AURORA_folder` is
+        the folder containing the AURORA code). This is the default behavior.
+    - `"custom"`: The path will be built as `root_savedir/name_savedir/`, with the argument
+        `root_savedir` treated as an absolute or relative path. This allows for saving results
+        in any location on the system. Useful if AURORA is installed as a dependency to some
+        other project.
+
+# Returns
+- `savedir::String`: The full path to the directory where the results will be saved.
+"""
+function make_savedir(root_savedir, name_savedir; behavior = "default")
+    ## Create the folder to save the data to
+    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
+    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
+        root_savedir = "backup"
+    end
+    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
+    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
+        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
+    end
+
+    # Make a string with full path of savedir from root_savedir and name_savedir
+    if behavior == "default"
+        savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
+    elseif behavior == "custom"
+        savedir = pkgdir(root_savedir, name_savedir)
+    end
+
+    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
+    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
+    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
+        savedir = rename_if_exists(savedir)
+    end
+
+    # And finally create the directory
+    mkpath(savedir)
+    print("\n", @bold "Results will be saved at $savedir \n")
+
+    return savedir
+end
+
 ## ====================================================================================== ##
 
 

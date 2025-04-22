@@ -5,7 +5,7 @@ using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
-    CFL_number = 64)
+    CFL_number = 64; savedir_behavior = "default")
     # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
     # Nthreads is set to 6 by default as it seems to be optimal on my machine
 
@@ -52,24 +52,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
 
     ## Create the folder to save the data to
-    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        root_savedir = "backup"
-    end
-    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
-    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
-
+    savedir = make_savedir(root_savedir, name_savedir; behavior = savedir_behavior)
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
@@ -168,24 +151,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
 
 
     ## Create the folder to save the data to
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
-        root_savedir = "backup"
-    end
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        # if name_savedir is empty or contains only "space" characters, we use the current
-        # date and time as a name
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
-    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
+    savedir = make_savedir(root_savedir, name_savedir; behavior = savedir_behavior)
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
