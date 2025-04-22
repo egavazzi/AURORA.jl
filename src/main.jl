@@ -110,7 +110,7 @@ end
 
 
 function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
+    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS; savedir_behavior = "default")
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
