@@ -62,7 +62,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     end
     # Make a string with full path of savedir from root_savedir and name_savedir
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
+    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
+    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
         savedir = rename_if_exists(savedir)
     end
@@ -178,7 +179,8 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     end
     # Make a string with full path of savedir from root_savedir and name_savedir
     savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
+    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
+    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
     if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
         savedir = rename_if_exists(savedir)
     end
