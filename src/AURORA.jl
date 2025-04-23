@@ -40,11 +40,6 @@ include("analysis.jl")
 export make_density_file, downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file
 
-include("animations/utilities.jl")
-include("animations/plot.jl")
-include("animations/animate.jl")
-export animate_IeztE_3Dzoft
-
 # MI_coupling functions
 include("../MI_coupling/src/utilities.jl")
 include("../MI_coupling/src/ketchup_conversion.jl")
@@ -58,6 +53,10 @@ export read_input
 export convert_fzvzmu_to_Ie, convert_M_to_I, convert_Ie_to_fzvzmu, convert_I_to_M
 export make_Ie_from_ketchup
 export make_f_from_AURORA
+
+# Define and export functions to be extented by the AURORA_viz module
+function animate_IeztE_3Dzoft end
+export animate_IeztE_3Dzoft
 
 # Precompile selected functions
 include("precompiles.jl")

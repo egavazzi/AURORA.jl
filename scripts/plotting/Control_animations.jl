@@ -26,7 +26,7 @@ GLMakie.activate!()
 
 directory_to_process = "Visions2/Alfven_475s"
 angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
-                  (0, 10)   (10, 30)   (30, 60)   (60, 85)   (80, 90)]  # UP
+                  (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
 
 color_limits = (1e5, 1e9)
 animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = true)
