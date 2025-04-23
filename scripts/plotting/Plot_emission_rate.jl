@@ -10,7 +10,7 @@ GLMakie.activate!()
 ## Directory to plot, absolute path
 full_path_to_directory = joinpath(REVONTULI_MOUNT,
                                   "mnt/data/etienne/Julia/AURORA.jl/data/Visions2/" *
-                                  "Alfven_326s")
+                                  "Alfven_475s")
 
 
 ## Load the Q data (volume emission-rates)
@@ -145,8 +145,8 @@ lines!(t, I7774; label = rich("I", subscript("7774")), color = RGBf(0.5, 0, 0))
 lines!(t, I8446; label = rich("I", subscript("8446")), color = :black)
 # lines!(t, I8446_O; label = rich("I", subscript("8446(O)")))
 # lines!(t, I8446_O2; label = rich("I", subscript("8446(O2)")))
-lines!(t, IO1D; label = rich("I", subscript("O(¹D)")), color = RGBf(1, 0.2, 0), linestyle = :dash)
-lines!(t, IO1S; label = rich("I", subscript("O(¹S)")), color = :green, linestyle = :dash)
+lines!(t, IO1D; label = rich("q", subscript("O(¹D)")), color = RGBf(1, 0.2, 0), linestyle = :dash)
+lines!(t, IO1S; label = rich("q", subscript("O(¹S)")), color = :green, linestyle = :dash)
 # axislegend(ax, position = :lt)
 Legend(fig[1, 2], ax; patchsize = [40, 20])
 set_theme!()
