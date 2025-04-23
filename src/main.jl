@@ -4,8 +4,7 @@ using Dates
 using Term
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
-    CFL_number = 64; savedir_behavior = "default")
+    n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
@@ -46,10 +45,6 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
-
-
-    ## Create the folder to save the data to
-    savedir = make_savedir(root_savedir, name_savedir; behavior = savedir_behavior)
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
@@ -107,7 +102,7 @@ end
 
 
 function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS; savedir_behavior = "default")
+    msis_file, iri_file, savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
@@ -145,10 +140,6 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
-
-
-    ## Create the folder to save the data to
-    savedir = make_savedir(root_savedir, name_savedir; behavior = savedir_behavior)
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
