@@ -7,8 +7,8 @@ altitude_max = 600;         # (km) top altitude of the ionosphere
 E_max = 3000;               # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.001:0.1;   # (s) time-array over which data will be saved
-n_loop = 10;                # number of loops to run
+t_sampling = 0:0.001:0.01;   # (s) time-array over which data will be saved
+n_loop = 1;                # number of loops to run
 
 CFL_number = 128;
 
@@ -61,12 +61,60 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 # INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 
+@time h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+
+# # check neutrals
+# using MAT
+# data_old = matread("old_neutrals.mat")
+# n_neutrals.nN2 == data_old["nN2"]
+# n_neutrals.nO2 == data_old["nO2"]
+# n_neutrals.nO == data_old["nO"]
+
+# # check electrons
+# data_old = matread("old_electrons.mat")
+# ne == data_old["ne"]
+# Te == data_old["Te"]
+
+# check cross-sections
+data_old = matread("old_sigma.mat")
+# x = [data_old["xs_N2"][i, :] ≈ σ_neutrals.σ_N2[i, :] for i in axes(σ_neutrals.σ_N2, 1)]
+# [data_old["xs_O2"][i, :] ≈ σ_neutrals.σ_O2[i, :] for i in axes(σ_neutrals.σ_O2, 1)]
+# [data_old["xs_O"][i, :] ≈ σ_neutrals.σ_O[i, :] for i in axes(σ_neutrals.σ_O, 1)]
+
+data_old["xs_N2"] ≈ σ_neutrals.σ_N2 # returns false on v8.0.0
+data_old["xs_O2"] ≈ σ_neutrals.σ_O2 # returns false on v8.0.0
+data_old["xs_O"] ≈ σ_neutrals.σ_O   # returns false on v8.0.0
+
+findall(iszero, x)
+#=
+6-element Vector{Int64}:
+  8
+ 10
+ 11
+ 12
+ 17
+ 18
+=#
+y = data_old["xs_N2"][8, :] .≈ σ_neutrals.σ_N2[8, :]
+findall(iszero, y)
+
+[(data_old["xs_N2"][8, i] .- σ_neutrals.σ_N2[8, i]) for i in findall(iszero, y)]
+
+
+# in case we want to visually check
+using GLMakie
+GLMakie.activate!()
+scatterlines(data_old["xs_N2"][2, :])
+scatterlines!(σ_neutrals.σ_N2[2, :]; linestyle = :dash)
+xlims!(6, 9)
+
 
 ## Run the simulation
 calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
     msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS, CFL_number)
 
-## Run the analysis
+## Analyze the results
 directory_to_process = joinpath("data", root_savedir, name_savedir)
 make_Ie_top_file(directory_to_process)
 make_volume_excitation_file(directory_to_process)
