@@ -2,12 +2,12 @@ using Dates: Dates, now
 using ProgressMeter: Progress, next!
 using Term: @bold
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
+function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -46,7 +46,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
@@ -100,11 +100,11 @@ end
 
 
 
-function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
+function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
@@ -141,7 +141,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
