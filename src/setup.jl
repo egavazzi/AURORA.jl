@@ -54,9 +54,10 @@ end
 
 
 """
-    make_altitude_grid(altitude_lims)
+    make_altitude_grid(bottom_altitude, top_altitude)
 
-Create an altitude grid based on the 'bottom_altitude', 'top_altitude' given as input.
+Create an altitude grid based on the altitude limits given as input. It uses
+constant steps of 150m for altitudes below 100km, and a non-linear grid above 100km.
 
 # Calling
 `h_atm = make_altitude_grid(bottom_altitude, top_altitude)
