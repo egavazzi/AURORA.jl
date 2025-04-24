@@ -1,14 +1,14 @@
 """
-    setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)
+    setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
 
 Load the atmosphere, the energy grid, the collision cross-sections, ...
 
 ## Calling
 `h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims,
-μ_center, μ_scatterings = setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)`
+μ_center, μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)`
 
 ## Inputs
-- `altitude_lim`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
+- `altitude_lims`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
@@ -37,8 +37,8 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function setup(altitude_lim, θ_lims, E_max, msis_file, iri_file)
-    h_atm = make_altitude_grid(altitude_lim[1], altitude_lim[2])
+function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    h_atm = make_altitude_grid(altitude_lims[1], altitude_lims[2])
     E, dE = make_energy_grid(E_max)
     μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
@@ -54,7 +54,7 @@ end
 
 
 """
-    make_altitude_grid(altitude_lim)
+    make_altitude_grid(altitude_lims)
 
 Create an altitude grid based on the 'bottom_altitude', 'top_altitude' given as input.
 
