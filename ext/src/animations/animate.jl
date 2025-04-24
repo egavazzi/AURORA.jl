@@ -6,9 +6,10 @@ So far we have
 
 
 =#
-using CairoMakie
-using MAT
-using Printf
+using Makie
+using MAT: matread
+using Printf: @sprintf
+using Term: @bold
 
 
 # Main function
@@ -49,7 +50,7 @@ as a limit.
 - `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
                         ionosphere by loading it from the file `Ie_top.mat`
 """
-function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = false)
+function AURORA.animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = false)
     ## Find the files to process
     full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
@@ -70,10 +71,10 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
 
     # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
     println("Restructure from 3D to 4D array.")
-    Ie = restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_mu, nz, nt, nE]
+    Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_mu, nz, nt, nE]
     # Merge the streams to angles_to_plot
     println("Merge the streams to match the angles to plot.")
-    Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
+    Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
     # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
     angles_to_plot_vert = vcat(eachrow(angles_to_plot)...) #
     # Convert from #e-/m²/s to #e-/m²/s/eV/ster
@@ -108,7 +109,7 @@ function animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits
     display(fig)
 
     # Animate
-    println("Animation will be saved at $video_filename.")
+    println(@bold "The animation will be saved at $video_filename.")
     println("Animate.")
     n_t = length(t_run) # number of timesteps per file
     record(fig, video_filename) do io
