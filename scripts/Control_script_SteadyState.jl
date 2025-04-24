@@ -1,10 +1,10 @@
 using AURORA
 
 ## Setting parameters
-altitude_lims = [100, 500];         # (km) altitude limits of the ionosphere
-θ_lims = 180:-10:10;         # (°) angle-limits for the electron beams
-E_max = 3000;               # (eV) upper limit to the energy grid
-B_angle_to_zenith = 13;     # (°) angle between the B-field line and the zenith
+altitude_lims = [100, 500];     # (km) altitude limits of the ionosphere
+θ_lims = 180:-10:10;            # (°) angle-limits for the electron beams
+E_max = 3000;                   # (eV) upper limit to the energy grid
+B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
 msis_file = find_nrlmsis_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
@@ -18,8 +18,7 @@ root_savedir = ""   # name of the root folder
 name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
-
-
+## Define input parameters
 input_type = "constant_onset"
 IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
 z₀ = altitude_lims[2];      # (km) altitude of the source
