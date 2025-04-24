@@ -3,7 +3,7 @@ using ProgressMeter
 using Dates
 using Term
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
+function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
     CFL_number = 64)
     # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
@@ -12,7 +12,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -71,7 +71,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
 
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
@@ -125,11 +125,11 @@ end
 
 
 
-function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
+function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -186,7 +186,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     print("\n", @bold "Results will be saved at $savedir \n")
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
@@ -204,6 +204,10 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     D = make_D(E, dE, θ_lims);
     # Extract the top flux for the current loop
     Ie_top_local = Ie_top[:, 1, :];
+    
+    if all(Ie_top[:, 1, :] .== 0)
+        throw(ErrorException("Ie_top is all zeros"))
+    end
 
     p = Progress(length(E), desc=string("Calculating flux"))
     # Looping over energy
@@ -226,6 +230,7 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
         next!(p)
     end
 
-    save_results(Ie, E, 1:1:1, μ_lims, h_atm, I0, μ_scatterings, 1, 1, savedir)
+    #save_results(Ie, E, 1:1:1, μ_lims, h_atm, I0, μ_scatterings, 1, 1, savedir)
+    save_results(Ie, E, 1:1:1, μ_lims, h_atm, Ie_top_local, μ_scatterings, 1, 1, savedir)
 
 end
