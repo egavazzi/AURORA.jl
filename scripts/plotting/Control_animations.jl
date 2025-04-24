@@ -23,7 +23,6 @@ GLMakie.activate!()
 
 
 ## Calling the animate function
-
 directory_to_process = "Visions2/Alfven_475s"
 angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
                   (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP

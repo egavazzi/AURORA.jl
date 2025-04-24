@@ -3,11 +3,7 @@ using ProgressMeter: Progress, next!
 using Term: @bold
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
-    CFL_number = 64)
-    # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
-    # Nthreads is set to 6 by default as it seems to be optimal on my machine
-
+    n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
@@ -48,26 +44,6 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
-
-
-    ## Create the folder to save the data to
-    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        root_savedir = "backup"
-    end
-    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
-
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
@@ -125,13 +101,13 @@ end
 
 
 function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
+    msis_file, iri_file, savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+    I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -163,26 +139,6 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
-
-
-    ## Create the folder to save the data to
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
-        root_savedir = "backup"
-    end
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        # if name_savedir is empty or contains only "space" characters, we use the current
-        # date and time as a name
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
 
     ## And save the simulation parameters in it
     save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
