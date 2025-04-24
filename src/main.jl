@@ -1,7 +1,6 @@
-using MAT
-using ProgressMeter
-using Dates
-using Term
+using Dates: Dates, now
+using ProgressMeter: Progress, next!
+using Term: @bold
 
 function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
@@ -36,7 +35,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
     elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
-        Ie_top = AURORA.Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
+        Ie_top = Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple

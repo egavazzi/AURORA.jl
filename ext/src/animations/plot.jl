@@ -1,4 +1,4 @@
-using CairoMakie
+using Makie
 
 #=
 This is the function that creates the plot from the data observable. Then when we update the

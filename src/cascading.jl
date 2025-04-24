@@ -1,8 +1,8 @@
-using Dates
-using HCubature
-using Interpolations
-using ProgressMeter
-using MAT
+using Dates: Dates, now
+using HCubature: hcubature
+using Interpolations: linear_interpolation
+using MAT: matopen
+using ProgressMeter: Progress, next!
 
 
 # function is_cascading_loaded(Q, E4Q, E_secondary)
@@ -55,16 +55,15 @@ let Q = [], E4Q , E_ionizations
                 end
             end
             if found_them == 0
-                println("Could not find file with matching energy grid")
-                println("Starting to calculate the requested cascading-matrices")
+                println("Could not find a file with matching energy grid.")
+                println("Starting to calculate the requested cascading-matrices.")
 
                 # Precalculating the degrading spectra
                 E_ionizations = [15.581, 16.73, 18.75, 24, 42]
                 Q = zeros(length(E_secondary), length(E_secondary), length(E_ionizations))
                 E4Q = E_secondary
                 dE = diff(E_secondary); dE = dE[[1:end; end]]
-                println("Pre-calculating all energy-degradations for e - N2-ionizing collisions")
-                println("This will take a bit of time")
+                println("Pre-calculating all energy-degradations for e - N2-ionizing collisions.")
                 println("Starting at ", Dates.format(now(), "HH:MM:SS"))
                 for i1 in length(E_ionizations):-1:1
                     iLim = findfirst(x -> x > E_ionizations[i1], E_secondary)
@@ -176,16 +175,15 @@ let Q = [], E4Q , E_ionizations
                 end
             end
             if found_them == 0
-                println("Could not find file with matching energy grid")
-                println("Starting to calculate the requested cascading-matrices")
+                println("Could not find a file with matching energy grid.")
+                println("Starting to calculate the requested cascading-matrices.")
 
                 # Precalculating the degrading spectra
                 E_ionizations = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
                 Q = zeros(length(E_secondary), length(E_secondary), length(E_ionizations))
                 E4Q = E_secondary
                 dE = diff(E_secondary); dE = dE[[1:end; end]]
-                println("Pre-calculating all energy-degradations for e - O2-ionizing collisions")
-                println("This will take a bit of time")
+                println("Pre-calculating all energy-degradations for e - O2-ionizing collisions.")
                 println("Starting at ", Dates.format(now(), "HH:MM:SS"))
                 for i1 in length(E_ionizations):-1:1
                     iLim = findfirst(x -> x > E_ionizations[i1], E_secondary)
@@ -314,16 +312,15 @@ let Q = [], E4Q , E_ionizations
                 end
             end
             if found_them == 0
-                println("Could not find file with matching energy grid")
-                println("Starting to calculate the requested cascading-matrices")
+                println("Could not find file with matching energy grid.")
+                println("Starting to calculate the requested cascading-matrices.")
 
                 # Precalculating the degrading spectra
                 E_ionizations = [13.618, 16.9, 18.6, 28.5]
                 Q = zeros(length(E_secondary), length(E_secondary), length(E_ionizations))
                 E4Q = E_secondary
                 dE = diff(E_secondary); dE = dE[[1:end; end]]
-                println("Pre-calculating all energy-degradations for e - O-ionizing collisions")
-                println("This will take a bit of time")
+                println("Pre-calculating all energy-degradations for e - O-ionizing collisions.")
                 println("Starting at ", Dates.format(now(), "HH:MM:SS"))
                 for i1 in length(E_ionizations):-1:1
                     iLim = findfirst(x -> x > E_ionizations[i1], E_secondary)
