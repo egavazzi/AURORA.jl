@@ -160,10 +160,6 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     # Extract the top flux for the current loop
     Ie_top_local = Ie_top[:, 1, :];
 
-    if all(Ie_top[:, 1, :] .== 0)
-        throw(ErrorException("Ie_top is all zeros"))
-    end
-
     p = Progress(length(E), desc=string("Calculating flux"))
     # Looping over energy
     for iE in length(E):-1:1
@@ -185,7 +181,6 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         next!(p)
     end
 
-    #save_results(Ie, E, 1:1:1, μ_lims, h_atm, I0, μ_scatterings, 1, 1, savedir)
-    save_results(Ie, E, 1:1:1, μ_lims, h_atm, Ie_top_local, μ_scatterings, 1, 1, savedir)
+    save_results(Ie, E, 1:1:1, μ_lims, h_atm, I0, μ_scatterings, 1, 1, savedir)
 
 end
