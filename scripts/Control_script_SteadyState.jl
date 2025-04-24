@@ -22,15 +22,15 @@ savedir = make_savedir(root_savedir, name_savedir)
 
 input_type = "constant_onset"
 IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = altitude_lim[2];          # (km) altitude of the source
-#E_min = E_max - 100;         # (eV) bottom energy of the FAB
-Beams = 1:length(θ_lims)-1;   # beam numbers for the precipitation, starting with field aligned down
+z₀ = altitude_lims[2];      # (km) altitude of the source
+E_min = E_max - 100;        # (eV) bottom energy of the FAB
+Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
 t0 = 0;                     # (s) time of start for smooth transition
 t1 = 0;                     # (s) time of end for smooth transition
 INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Run the simulation
-calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
+calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS);
 
 ## Analyze the results
