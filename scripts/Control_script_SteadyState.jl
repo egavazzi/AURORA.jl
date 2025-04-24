@@ -1,8 +1,3 @@
-##
-#ENV["JULIA_CONDAPKG_BACKEND"] = "Null"
-#ENV["JULIA_PYTHONCALL_EXE"] = "/usr/local/bin/python3"  # optional
-#ENV["JULIA_PYTHONCALL_EXE"] = "@PyCall"  # optional
-
 using AURORA
 # using BenchmarkTools
 using MAT
@@ -15,10 +10,10 @@ iri_file = find_iri_file(
     );
 
 
-    
-root_savedir = "ionprod"  
+
+root_savedir = "ionprod"
 # name for the root folder where data will be saved (data/root_savedir/)
-#name_savedir = "1e5keV"   
+#name_savedir = "1e5keV"
 # name for the actual data folder of the current experiment (data/root_savedir/name_savedir/...)
 
 
@@ -47,4 +42,3 @@ for i in length(e_grid)-1:-1:1
     calculate_e_transport_steady_state(altitude_lim, θ_lims, E_max, B_angle_to_zenith,
         msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
 end
-
