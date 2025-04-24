@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Make it possible to choose a bottom altitude for the ionosphere [#58](https://github.com/egavazzi/AURORA.jl/pull/58)
 - Clean the dependencies and use extensions, which reduces the precompilation times [#56](https://github.com/egavazzi/AURORA.jl/pull/56)
 - Allow for saving simulation results anywhere on the system [#57](https://github.com/egavazzi/AURORA.jl/pull/57)
 - Precompile some functions, leading to 10x faster simulation startup in new Julia sessions [#51](https://github.com/egavazzi/AURORA.jl/pull/51), [#52](https://github.com/egavazzi/AURORA.jl/pull/52)
