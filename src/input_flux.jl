@@ -66,11 +66,11 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
 
     ## check that Ie_top is matching our simulation grid
     if size(Ie_top_raw, 1) != length(μ_center)
-        error("""The incoming flux Ie_top is wrongly dimensioned. Check the θ dimension.\
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the θ dimension. \
         Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
     end
     if size(Ie_top_raw, 3) < length(E)
-        error("""The incoming flux Ie_top is wrongly dimensioned. Check the E dimension.\
+        error("""The incoming flux Ie_top is wrongly dimensioned. Check the E dimension. \
         Remember that Ie_top should have the shape [n_μ, n_t, n_E].""")
         error_grid = 1
     end
