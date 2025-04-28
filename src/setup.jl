@@ -40,6 +40,14 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(altitude_lims[1], altitude_lims[2])
     E, dE = make_energy_grid(E_max)
+
+    e_grid = 10 .^(range(1,stop=5,length=400))
+    E = sort([E; e_grid])
+
+    iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
+    E = E[1:iE_max];                        # crop E accordingly
+    dE = diff(E); dE = [dE; dE[end]]
+
     μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
     ne, Te = load_electron_properties(iri_file, h_atm)
@@ -74,7 +82,7 @@ function make_altitude_grid(bottom_altitude, top_altitude)
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
     h_atm = 100e3 .+ cumsum(real.(Δz(500))) .- real.(Δz(1))
-    h_atm = vcat(bottom_altitude:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
+    h_atm = vcat(bottom_altitude*1e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
