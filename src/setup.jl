@@ -172,6 +172,8 @@ Load the neutral densities and temperature.
 function load_neutral_densities(msis_file, h_atm)
     # read the file without the headers
     data_msis = readdlm(msis_file, skipstart=14)
+    #sanitize data: replace NaN by 0
+    data_msis[isnan.(data_msis)] .= 0
 
     # extract the z-grid of the msis data
     if msis_file[end-11:end-4] == "DOWNLOAD"
