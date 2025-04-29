@@ -1,14 +1,14 @@
 """
-    setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
+    setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
 
 Load the atmosphere, the energy grid, the collision cross-sections, ...
 
 ## Calling
 `h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims,
-μ_center, μ_scatterings = setup(top_altitude, θ_lims, E_max, msis_file, iri_file)`
+μ_center, μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)`
 
 ## Inputs
-- `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+- `altitude_lims`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
     corresponds to field aligned down, and 0° field aligned up. Vector [n_beam]
 - `E_max`: upper limit for the energy grid (in eV)
@@ -37,8 +37,8 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function setup(top_altitude, θ_lims, E_max, msis_file, iri_file)
-    h_atm = make_altitude_grid(top_altitude)
+function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    h_atm = make_altitude_grid(altitude_lims[1], altitude_lims[2])
     E, dE = make_energy_grid(E_max)
     μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
@@ -54,25 +54,27 @@ end
 
 
 """
-    make_altitude_grid(top_altitude)
+    make_altitude_grid(bottom_altitude, top_altitude)
 
-Create an altitude grid based on the `top_altitude` given as input.
+Create an altitude grid based on the altitude limits given as input. It uses
+constant steps of 150m for altitudes below 100km, and a non-linear grid above 100km.
 
 # Calling
-`h_atm = make_altitude_grid(top_altitude)`
+`h_atm = make_altitude_grid(bottom_altitude, top_altitude)
 
 # Inputs
 - `top_altitude`: the altitude, in km, for the top of the ionosphere in our simulation
+- `bottom_altitude`: the altitude, in km, for the bottom of the ionosphere in our simulation
 
 # Outputs
 - `h_atm`: altitude (m). Vector [nZ]
 """
-function make_altitude_grid(top_altitude)
+function make_altitude_grid(bottom_altitude, top_altitude)
     Δz(n) = 150 .+
             150 / 200 * (0:(n - 1)) .+
             1.2 * exp.(Complex.(((0:(n - 1)) .- 150) / 22) .^ .9)
-    h_atm = 100e3 .+ cumsum(real.(Δz(450))) .- real.(Δz(1))
-    # h_atm = vcat(95e3:(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
+    h_atm = 100e3 .+ cumsum(real.(Δz(500))) .- real.(Δz(1))
+    h_atm = vcat((bottom_altitude * 1e3):(h_atm[2] - h_atm[1]):h_atm[1], h_atm[2:end]) # add altitude steps under 100km
     i_zmax = findmin(abs.(h_atm .- top_altitude * 1e3))[2]
     h_atm = h_atm[1:i_zmax]
     return h_atm
@@ -140,10 +142,9 @@ end
 
 
 
-using DelimitedFiles
-using PythonCall
-using SpecialFunctions
-using Term
+using DelimitedFiles: readdlm
+using PythonCall: pyimport, pyconvert
+using SpecialFunctions: erf
 """
     load_neutral_densities(msis_file, h_atm)
 
@@ -163,6 +164,8 @@ Load the neutral densities and temperature.
 function load_neutral_densities(msis_file, h_atm)
     # read the file without the headers
     data_msis = readdlm(msis_file, skipstart=14)
+    # sanitize data: replace NaN by 0, this tends to happen with low altitude boundaries
+    data_msis[isnan.(data_msis)] .= 0
 
     # extract the z-grid of the msis data
     if msis_file[end-11:end-4] == "DOWNLOAD"
@@ -212,7 +215,7 @@ end
 
 
 
-using PythonCall
+using PythonCall: pyimport, pyconvert
 """
     load_electron_properties(iri_file, h_atm)
 
@@ -322,7 +325,7 @@ end
 
 
 
-using DelimitedFiles
+using DelimitedFiles: readdlm
 """
     get_cross_section(species_name, E, dE)
 
@@ -354,102 +357,4 @@ function get_cross_section(species_name, E, dE)
     end
 
     return σ_species
-end
-
-
-
-
-
-
-
-
-
-# ======================================================================================== #
-#                                      LEGACY CODE                                         #
-# ======================================================================================== #
-using MATLAB
-
-# This is the old function calling the Matlab code.
-function load_old_cross_sections(E, dE)
-    println("Calling Matlab for the cross-sections...")
-    println("If you get a segmentation fault here, please check https://egavazzi.github.io/AURORA.jl/dev/troubleshooting/.")
-    # Translating all of this to Julia is a big task. So for now we still use Matlab code.
-    # TODO: translate that part
-    # Creating a MATLAB session
-    path_to_AURORA_matlab = pkgdir(AURORA, "MATLAB_dependencies")
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(genpath(path_to_AURORA_matlab))
-    cd(path_to_AURORA_matlab)
-    "
-    @mput E
-    @mput dE
-    mat"
-    E = E';
-    dE = dE';
-    [XsO,xs_fcnO] = get_all_xs('O',E+dE/2);
-    [XsO2,xs_fcnO2] = get_all_xs('O2',E+dE/2);
-    [XsN2,xs_fcnN2] = get_all_xs('N2',E+dE/2);
-    "
-    σ_N2 = @mget XsN2;
-    σ_O2 = @mget XsO2;
-    σ_O = @mget XsO;
-    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O);
-    # Closing the MATLAB session
-    close(s1)
-    println("Calling Matlab for the cross-sections... done.")
-
-    return σ_neutrals
-end
-
-
-
-# This function is here just for testing. It is not supposed to be used in production. It
-# loads the scattering matrices using the old matlab code.
-function load_old_scattering_matrices(path_to_AURORA_matlab, θ_lims)
-    ## Creating a MATLAB session
-    s1 = MSession();
-    @mput path_to_AURORA_matlab
-    mat"
-    addpath(path_to_AURORA_matlab,'-end')
-    add_AURORA
-    cd(path_to_AURORA_matlab)
-    "
-
-    theta_lims2do = reshape(Vector(θ_lims), 1, :);
-    @mput theta_lims2do
-    mat"
-    theta_lims2do = double(theta_lims2do)
-    [Pmu2mup,theta2beamW,BeamW,mu_lims] = e_scattering_result_finder(theta_lims2do,AURORA_root_directory);
-    mu_scatterings = {Pmu2mup,theta2beamW,BeamW};
-    c_o_mu = mu_avg(mu_lims);
-
-    n_dirs = size(Pmu2mup, 2);
-    theta1 = linspace(0,pi,n_dirs);
-    "
-    θ_lims = vec(@mget theta_lims2do);
-    μ_lims = vec(@mget mu_lims);
-    μ_center = vec(@mget c_o_mu);
-    θ₁ = vec(@mget theta1)
-
-    Pmu2mup = @mget Pmu2mup; # Probability mu to mu prime
-    BeamWeight_relative = @mget theta2beamW;
-
-    # This beam weight is calculated in a continuous way
-    BeamWeight = 2π .* vec(@mget BeamW);
-    # Here we normalize BeamWeight_relative, as it is supposed to be a relative weighting
-    # matrix with the relative contribution from withing each beam. It means that when
-    # summing up along each beam, we should get 1
-    BeamWeight_relative = BeamWeight_relative ./
-                          repeat(sum(BeamWeight_relative, dims = 2), 1,
-                                 size(BeamWeight_relative, 2))
-
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
-                     BeamWeight = BeamWeight, theta1 = θ₁)
-
-    ## Closing the MATLAB session
-    close(s1)
-
-    return μ_lims, μ_center, μ_scatterings
 end

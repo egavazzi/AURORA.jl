@@ -1,18 +1,13 @@
-using MAT
-using ProgressMeter
-using Dates
-using Term
+using Dates: Dates, now
+using ProgressMeter: Progress, next!
+using Term: @bold
 
-function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS,
-    CFL_number = 64)
-    # Nthreads is a parameter used in add_ionization_collisions! in update_Q!
-    # Nthreads is set to 6 by default as it seems to be optimal on my machine
-
+function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
+    n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -40,7 +35,7 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
     elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
-        Ie_top = AURORA.Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
+        Ie_top = Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -50,28 +45,8 @@ function calculate_e_transport(altitude_max, θ_lims, E_max, B_angle_to_zenith, 
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
-
-    ## Create the folder to save the data to
-    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        root_savedir = "backup"
-    end
-    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
-
-
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
@@ -125,14 +100,14 @@ end
 
 
 
-function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, root_savedir, name_savedir, INPUT_OPTIONS)
+function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
+    msis_file, iri_file, savedir, INPUT_OPTIONS)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_max, θ_lims, E_max, msis_file, iri_file);
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
     ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+    I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -165,28 +140,8 @@ function calculate_e_transport_steady_state(altitude_max, θ_lims, E_max, B_angl
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
 
-
-    ## Create the folder to save the data to
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        # if root_savedir is empty or contains only "space" characters, we use "backup/" as a name
-        root_savedir = "backup"
-    end
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        # if name_savedir is empty or contains only "space" characters, we use the current
-        # date and time as a name
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    # Rename `savedir` to `savedir(N)` if it exists and already contain results. N is a number
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-    mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
-
     ## And save the simulation parameters in it
-    save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
