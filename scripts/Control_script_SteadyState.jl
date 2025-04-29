@@ -15,10 +15,10 @@ B_angle_to_zenith = 13;         # (°) angle between the B-field line and the ze
 
 h_atmosphere_models = altitude_lims[1]-9:1:altitude_lims[2]+200
 msis_file = find_nrlmsis_file(
-    year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=h_atmosphere_models
+    year=2006, month=12, day=12, hour=19, minute=30, lat=70, lon=19, height=h_atmosphere_models
     );
 iri_file = find_iri_file(
-    year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=h_atmosphere_models
+    year=2006, month=12, day=12, hour=19, minute=30, lat=70, lon=19, height=h_atmosphere_models
     );
 
 
