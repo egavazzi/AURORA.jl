@@ -134,9 +134,9 @@ function AURORA.animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color
                 Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
                 t_run = data["t_run"]
                 # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
-                Ie = restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
+                Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
                 # Merge the streams to angles_to_plot
-                Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
+                Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
                 # Convert from #e-/m²/s to #e-/m²/s/eV/ster
                 for i_μ in eachindex(angles_to_plot_vert)
                     Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
