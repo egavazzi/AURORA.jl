@@ -134,11 +134,13 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     end
 
     ## Calculate the phase functions and put them in a Tuple
+    print("Calculating the phase functions...")
     phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
     phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
+    println(" done ✅")
 
     ## And save the simulation parameters in it
     save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
