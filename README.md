@@ -25,6 +25,8 @@ Gavazzi, E. (2022). The effects of time-variation of electron fluxes from the au
 
 Gustavsson, B. (2022). Time-Dependent Electron Transport I: Modelling of Supra-Thermal Electron Bursts Modulated at 5–10 Hz With Implications for Flickering Aurora. Journal of Geophysical Research: Space Physics, 127(6), e2019JA027608. https://doi.org/10.1029/2019JA027608
 
+## Citation
+To cite this software, please use the <img src="https://github.com/user-attachments/assets/0e3949b2-396d-4bac-b559-94d71221f198" width="150"></img> button. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all its versions. To cite a specific version, you can find version specific DOIs on Zenodo.  
 
 
 
