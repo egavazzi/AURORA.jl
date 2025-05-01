@@ -72,11 +72,6 @@ function e_O3s3S0(Ep)
     s = [4, 9.83, 10.67, 11.17, 8.67, 7.9, 6.33, 5.67, 4.27] .* 1e-22
     E = [9.6, 13.33, 16.667, 20, 30, 50, 100, 150, 200]
 
-    # pyinterpolate = pyimport("scipy.interpolate")
-    # cross_section = [pyinterpolate.PchipInterpolator(log.(E), log.(s))(log.(Ep[Ep .< E[end]])),
-    #                  pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    # cross_section = pyconvert.(Array, cross_section)
-    # cross_section = vcat(cross_section[1], cross_section[2])
     cross_section = [
         PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
         LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
@@ -113,11 +108,6 @@ function e_O3sp3D0(Ep)
     s = [3, 5.5, 5, 5.8, 4.5, 4, 2.5] .* 1e-22
     E = [12.6, 20, 30, 50, 100, 150, 200]
 
-    # pyinterpolate = pyimport("scipy.interpolate")
-    # cross_section = [pyinterpolate.PchipInterpolator(log.(E), log.(s))(log.(Ep[Ep .< E[end]])),
-    #                  pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    # cross_section = pyconvert.(Array, cross_section)
-    # cross_section = vcat(cross_section[1], cross_section[2])
     cross_section = [
         PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
         LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
@@ -136,9 +126,6 @@ function e_O3p3P(Ep)
     s = [5.1, 7.8, 4, 2.9, 1.1] .* 1e-22
     E = [13.5, 20, 30, 50, 100]
 
-    # pyinterpolate = pyimport("scipy.interpolate")
-    # cross_section = pyinterpolate.PchipInterpolator(log.(E), log.(s))(log.(Ep[Ep .<= 60]))
-    # cross_section = pyconvert(Array, cross_section)
     cross_section = PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .<= 60]))
     cross_section = exp.(cross_section)
 
