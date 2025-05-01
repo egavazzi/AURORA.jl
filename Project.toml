@@ -1,7 +1,7 @@
 name = "AURORA"
 uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
 authors = ["Etienne <etienne.gavazzi@uit.no>"]
-version = "0.4.3"
+version = "0.5.0"
 
 [deps]
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
