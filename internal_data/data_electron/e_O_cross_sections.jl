@@ -1,5 +1,4 @@
-using PythonCall: pyimport, pyconvert
-import DataInterpolations
+using DataInterpolations: LinearInterpolation, PCHIPInterpolation, ExtrapolationType
 
 function e_Oelastic(Ep)
     # e_Oelastic - elastic electron collision cross section (m^2)
@@ -79,8 +78,8 @@ function e_O3s3S0(Ep)
     # cross_section = pyconvert.(Array, cross_section)
     # cross_section = vcat(cross_section[1], cross_section[2])
     cross_section = [
-        DataInterpolations.PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
-        DataInterpolations.LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
         ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
@@ -120,8 +119,8 @@ function e_O3sp3D0(Ep)
     # cross_section = pyconvert.(Array, cross_section)
     # cross_section = vcat(cross_section[1], cross_section[2])
     cross_section = [
-        DataInterpolations.PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
-        DataInterpolations.LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .< E[end]]));
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
         ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
@@ -140,7 +139,7 @@ function e_O3p3P(Ep)
     # pyinterpolate = pyimport("scipy.interpolate")
     # cross_section = pyinterpolate.PchipInterpolator(log.(E), log.(s))(log.(Ep[Ep .<= 60]))
     # cross_section = pyconvert(Array, cross_section)
-    cross_section = DataInterpolations.PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .<= 60]))
+    cross_section = PCHIPInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Extension)(log.(Ep[Ep .<= 60]))
     cross_section = exp.(cross_section)
 
     if any(Ep .> 60)
