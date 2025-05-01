@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "d8648beaea469fee72b12a405a5b23b6a18e0164"
+project_hash = "7e9748dd3fd497c7c67cf4b910c22a64ffc50ace"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -382,9 +382,9 @@ version = "1.16.0"
 
 [[deps.DataInterpolations]]
 deps = ["EnumX", "FindFirstFunctions", "ForwardDiff", "LinearAlgebra", "PrettyTables", "RecipesBase", "Reexport"]
-path = "/home/etienne/.julia/dev/DataInterpolations"
+git-tree-sha1 = "b6fc25b5dbff016d8aae1e0ae2740347bccb6f65"
 uuid = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
-version = "8.0.0"
+version = "8.0.1"
 
     [deps.DataInterpolations.extensions]
     DataInterpolationsChainRulesCoreExt = "ChainRulesCore"
@@ -1409,7 +1409,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
