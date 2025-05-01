@@ -1,6 +1,5 @@
-using PythonCall
+using PythonCall: pyimport, pyconvert
 import DataInterpolations
-# import PCHIPInterpolation
 
 function e_N2elastic(Ep)
     cross_section = Vector{Float64}(undef, length(Ep))
