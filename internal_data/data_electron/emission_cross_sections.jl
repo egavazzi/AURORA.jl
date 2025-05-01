@@ -102,7 +102,7 @@ function excitation_6730_N2(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -182,7 +182,7 @@ function excitation_8446_O(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -278,7 +278,7 @@ function excitation_8446_O2(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -393,7 +393,7 @@ function excitation_7774_O(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -499,7 +499,7 @@ function excitation_7774_O2(E)
     log_cross_section = log.(EnX[:, 2])
 
     # Create the interpolation function
-    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = PCHIPInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -541,7 +541,7 @@ function excitation_O1D(E)
     log_cross_section = log.(xs_o1d)
 
     # Create the interpolation function
-    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
@@ -584,7 +584,7 @@ function excitation_O1S(E)
     log_cross_section = log.(xs_o1s)
 
     # Create the interpolation function
-    interp = LinearInterpolation(log_cross_section, log_energy; extrapolate = true)
+    interp = LinearInterpolation(log_cross_section, log_energy; extrapolation = ExtrapolationType.Linear)
 
     # Compute interpolated values
     σ = exp.(interp(log.(E)))
