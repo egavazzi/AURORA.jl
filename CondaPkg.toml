@@ -1,6 +1,3 @@
-[deps]
-scipy = ""
-
 [pip.deps]
 iri2016 = ""
 pymsis = ""
