@@ -1,3 +1,7 @@
+using DataInterpolations: PCHIPInterpolation, ExtrapolationType
+using DelimitedFiles: readdlm
+using SpecialFunctions: erf
+
 """
     setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
 
@@ -40,9 +44,9 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
     h_atm = make_altitude_grid(altitude_lims[1], altitude_lims[2])
     E, dE = make_energy_grid(E_max)
-    μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)
+    μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)
     n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
-    ne, Te = load_electron_properties(iri_file, h_atm)
+    ne, Te = load_electron_densities(iri_file, h_atm)
     E_levels_neutrals = load_excitation_threshold()
     σ_neutrals = load_cross_sections(E, dE)
 
@@ -109,12 +113,12 @@ end
 
 
 """
-    make_scattering_matrices(θ_lims)
+    load_scattering_matrices(θ_lims)
 
 Create an energy grid based on the maximum energy `E_max` given as input.
 
 # Calling
-`μ_lims, μ_center, μ_scatterings = make_scattering_matrices(θ_lims)`
+`μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)`
 
 # Inputs
 - `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
@@ -129,11 +133,11 @@ Create an energy grid based on the maximum energy `E_max` given as input.
     + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
-function make_scattering_matrices(θ_lims)
+function load_scattering_matrices(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = load_scattering_matrices(θ_lims, 720)
+    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
                      BeamWeight = BeamWeight, theta1 = θ₁)
 
@@ -142,9 +146,6 @@ end
 
 
 
-using DelimitedFiles: readdlm
-using PythonCall: pyimport, pyconvert
-using SpecialFunctions: erf
 """
     load_neutral_densities(msis_file, h_atm)
 
@@ -162,46 +163,26 @@ Load the neutral densities and temperature.
 - `Tn`: neutral temperature (K). Vector [nZ]
 """
 function load_neutral_densities(msis_file, h_atm)
-    # read the file without the headers
-    data_msis = readdlm(msis_file, skipstart=14)
-    # sanitize data: replace NaN by 0, this tends to happen with low altitude boundaries
+    data_msis = readdlm(msis_file, skipstart=14) # read the file without the headers
     data_msis[isnan.(data_msis)] .= 0
 
-    # extract the z-grid of the msis data
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        z_msis = data_msis[:, 6]
-    else
-        # new msis file calculated using pymsis
-        z_msis = data_msis[:, 1]
-        data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
-    end
+    z_msis = data_msis[:, 1] # extract the z-grid of the msis data
+    data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
 
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
     # create the interpolator
-    msis_interpolator = pyinterpolate.PchipInterpolator(z_msis, data_msis);
+    msis_interpolator = [PCHIPInterpolation(data_msis[:, i], z_msis;
+                                            extrapolation = ExtrapolationType.Extension)
+                         for i in axes(data_msis, 2)]
     # interpolate the msis data over our h_atm grid
-    msis_interpolated = msis_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    msis_interpolated = pyconvert(Array, msis_interpolated)
+    msis_interpolated = [msis_interpolator[i](h_atm / 1e3) for i in axes(data_msis, 2)]
 
     # extract the neutral densities
-    if msis_file[end-11:end-4] == "DOWNLOAD"
-        # old msis file downloaded using HTTP request
-        nO = msis_interpolated[:, 9] * 1e6   # from cm⁻³ to m⁻³
-        nN2 = msis_interpolated[:, 10] * 1e6 # from cm⁻³ to m⁻³
-        nO2 = msis_interpolated[:, 11] * 1e6 # from cm⁻³ to m⁻³
-        Tn = msis_interpolated[:, 13]
-    else
-        # new msis file calculated using pymsis
-        nN2 = msis_interpolated[:, 3] # already in m⁻³
-        nO2 = msis_interpolated[:, 4] # already in m⁻³
-        nO = msis_interpolated[:, 5]  # already in m⁻³
-        Tn = msis_interpolated[:, 6]
-    end
+    nN2 = msis_interpolated[3] # already in m⁻³
+    nO2 = msis_interpolated[4] # already in m⁻³
+    nO = msis_interpolated[5]  # already in m⁻³
+    Tn = msis_interpolated[6]
 
-	nO[end-2:end] .= 0
+    nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
 	nO2[end-2:end] .= 0
     erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
@@ -215,14 +196,13 @@ end
 
 
 
-using PythonCall: pyimport, pyconvert
 """
-    load_electron_properties(iri_file, h_atm)
+    load_electron_densities(iri_file, h_atm)
 
 Load the electron density and temperature.
 
 # Calling
-`ne, Te = load_electron_properties(iri_file, h_atm)`
+`ne, Te = load_electron_densities(iri_file, h_atm)`
 
 # Inputs
 - `iri_file`: absolute path to the iri file to read ne and Te from. String
@@ -232,33 +212,24 @@ Load the electron density and temperature.
 - `ne`: e- density (m⁻³). Vector [nZ]
 - `Te`: e- temperature (K). Vector [nZ]
 """
-function load_electron_properties(iri_file, h_atm)
+function load_electron_densities(iri_file, h_atm)
     # read the file and extract z-grid of the iri data
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        data_iri = readdlm(iri_file, skipstart=41)
-        z_iri = data_iri[:, 1]
-    else # new iri file calculated using iri2016 package
-        data_iri = readdlm(iri_file, skipstart=14)
-        z_iri = data_iri[:, 1]
-    end
+    data_iri = readdlm(iri_file, skipstart=14)
+    data_iri[isnan.(data_iri)] .= 0
 
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
+    z_iri = data_iri[:, 1]
+
     # create the interpolator
-    iri_interpolator = pyinterpolate.PchipInterpolator(z_iri, data_iri);
+    iri_interpolator = [PCHIPInterpolation(data_iri[:, i], z_iri;
+                                           extrapolation = ExtrapolationType.Extension)
+                        for i in axes(data_iri, 2)]
     # interpolate the iri data over our h_atm grid
-    iri_interpolated = iri_interpolator(h_atm / 1e3)
-    # the data needs to be converted from a Python array back to a Julia array
-    iri_interpolated = pyconvert(Array, iri_interpolated)
+    iri_interpolated = [iri_interpolator[i](h_atm / 1e3) for i in axes(data_iri, 2)]
 
     # extract electron density and temperature
-    if iri_file[end-11:end-4] == "DOWNLOAD" # old iri file downloaded using HTTP request
-        ne = iri_interpolated[:, 2] * 1e6 # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 6]
-    else # new iri file calculated using iri2016 package
-        ne = iri_interpolated[:, 2] # from cm⁻³ to m⁻³
-        Te = iri_interpolated[:, 5]
-    end
+    ne = iri_interpolated[2] # from cm⁻³ to m⁻³
+    Te = iri_interpolated[5]
+
     ne[ne .< 0] .= 1
     Te[Te .== -1] .= 350
 
@@ -325,7 +296,6 @@ end
 
 
 
-using DelimitedFiles: readdlm
 """
     get_cross_section(species_name, E, dE)
 
