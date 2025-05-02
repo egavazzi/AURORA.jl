@@ -1,8 +1,8 @@
 # AURORA.jl
 
-| **Documentation**                 | **DOI**                 |
-|:---------------------------------:|:-----------------------:|
-| [![][docs-dev-img]][docs-dev-url] | [![][doi-img]][doi-url] |
+| **Documentation** | **DOI** |
+|:-----------------:|:-------:|
+| [![docs-stable-img]][docs-stable-url] [![][docs-dev-img]][docs-dev-url] | [![][doi-img]][doi-url] |
 
 AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron-fluxes during periods of rapidly varying electron-precipitation (sub-second).
 
@@ -36,5 +36,7 @@ Gustavsson, B. (2022). Time-Dependent Electron Transport I: Modelling of Supra-T
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://egavazzi.github.io/AURORA.jl/dev/
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://egavazzi.github.io/AURORA.jl/stable/
 [doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.11238620.svg
 [doi-url]: https://doi.org/10.5281/zenodo.11238620
