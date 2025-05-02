@@ -1,4 +1,4 @@
-using PythonCall: pyimport, pyconvert
+using DataInterpolations: LinearInterpolation, PCHIPInterpolation, ExtrapolationType
 
 function e_N2elastic(Ep)
     cross_section = Vector{Float64}(undef, length(Ep))
@@ -59,22 +59,18 @@ function e_N2rot0_2(Ep)
         -15.639548788652569, -15.655341886713167, -15.511449283499555,
         -15.414539270491499, -15.468521082957746, -15.552841968657781,
         -15.787812395596042]
-    # import interpolate function from python
-    pyinterpolate = pyimport("scipy.interpolate")
-    # cross_section = 10 .^ pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(Ep));
-    cross_section = 10 .^ [pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(Ep[Ep .<= 10^log10E[end-1]])),
-                pyinterpolate.interp1d(log10E[end-1:end], log10Xs[end-1:end], kind="linear", fill_value="extrapolate")(log10.(Ep[Ep .>= 10^log10E[end-1]]))]
-    # convert from a Python array back to a Julia array
-    cross_section = pyconvert.(Array, cross_section)
-    # merge the two parts
-    cross_section = vcat(cross_section[1], cross_section[2])
+
+    cross_section = 10 .^ [
+        PCHIPInterpolation(log10Xs, log10E)(log10.(Ep[Ep .<= 10^log10E[end - 1]]));
+        LinearInterpolation(log10Xs[(end - 1):end], log10E[(end - 1):end]; extrapolation = ExtrapolationType.Linear)(log10.(Ep[Ep .>= 10^log10E[end - 1]]))
+        ]
 
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924
+    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924 # still wonder why (and slightly ashamed of working on a 1st of May) /EG20250101
     cross_section[Ep .< 0.001480105560000] .= 0
 
     return cross_section
@@ -119,9 +115,8 @@ function e_N2rot0_4(Ep)
                -15.804100347590765, -15.931814138253838, -16.080921907623924,
                -15.903089986991944, -15.860120913598763]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = 10 .^ pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(Ep));
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = 10 .^ PCHIPInterpolation(log10Xs, log10E; extrapolation = ExtrapolationType.Extension)(log10.(Ep))
+
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
@@ -146,9 +141,7 @@ function e_N2rot0_6(Ep)
                -17.141544862344141, -17.151656694256861, -18.154901959985743,
                -17.096910013008056, -16.443697499232712, -16.585026652029178]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = 10 .^ pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(Ep));
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = 10 .^ PCHIPInterpolation(log10Xs, log10E; extrapolation = ExtrapolationType.Extension)(log10.(Ep))
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
@@ -173,9 +166,7 @@ function e_N2rot0_8(Ep)
                -16.972370479146925, -17.063587133755963, -17.133072146723649,
                -17.275381828471725]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = 10 .^ pyinterpolate.PchipInterpolator(log10E, log10Xs)(log10.(Ep));
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = 10 .^ PCHIPInterpolation(log10Xs, log10E; extrapolation = ExtrapolationType.Extension)(log10.(Ep))
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
@@ -197,11 +188,10 @@ function e_N2vib0_1(Ep)
     E = vcat(E, [5, 7.5, 10, 15, 18, 20, 23, 25, 30, 50, 75])
     s = vcat(s, [6.5e-22, 3.1e-22, 1.4e-22, 4.1e-22, 7.5e-22, 19.4e-22, 12.1e-22, 7.2e-22, 2.4e-22, 1.4e-22, 0.67e-22])
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-               pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
 
     I = findall(.!isfinite.(cross_section))
@@ -221,11 +211,10 @@ function e_N2vib0_2(Ep)
     E = vcat(E, [5, 7.5, 10, 15, 18, 20, 23, 25, 30, 50, 75])
     s = vcat(s, [6.5, 3.1, 1.4, 4.1, 7.5, 19.4, 12.1, 7.2, 2.4, 1.4, 0.67] .* 1e-22)
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
 
     I = findall(.!isfinite.(cross_section))
@@ -241,9 +230,7 @@ function e_N2vib0_3(Ep)
     E = [1.0271, 1.8119, 1.9281, 2.3916, 2.4163, 2.5739, 2.7995, 3.0116, 3.1689, 3.3487, 3.5064, 3.7333, 3.8524, 4.0669, 4.067, 4.2041, 4.3523, 4.5029, 4.6469]
     s = [7.0427e-25, 5.5034e-24, 2.5652e-22, 1.673e-20, 1.6872e-20, 3.4988e-21, 1.5817e-20, 2.1678e-21, 1.1187e-20, 1.5309e-21, 4.3424e-21, 1.2751e-21, 1.7867e-21, 7.6565e-22, 7.6526e-22, 1.0711e-21, 5.0849e-22, 1.0811e-21, 5.5485e-22]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = pyinterpolate.PchipInterpolator(E, s)(Ep)
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
     # Handling energies beyond the last data point using e_N2vib0_1
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
@@ -265,9 +252,7 @@ function e_N2vib0_4(Ep)
     E = vcat([1.1342], E)
     s = vcat([1e-27], s)
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = pyinterpolate.PchipInterpolator(E, s)(Ep)
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
     # Handling energies beyond the last data point using e_N2vib0_1
@@ -287,9 +272,7 @@ function e_N2vib0_5(Ep)
     s = vcat([s[1]/3], s)
     E = vcat([1.4088], E)
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = pyinterpolate.PchipInterpolator(E, s)(Ep)
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
@@ -305,9 +288,7 @@ function e_N2vib0_6(Ep)
     E = [1.5176, 2.143, 2.2964, 2.5275, 2.8863, 3.0358, 3.1708, 3.4811]
     s = [1.0846e-25, 9.2113e-24, 4.9432e-23, 4.459e-21, 3.4105e-22, 1.1193e-21, 2.9207e-22, 2.1537e-22]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = pyinterpolate.PchipInterpolator(E, s)(Ep)
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
@@ -323,9 +304,7 @@ function e_N2vib0_7(Ep)
     E = [2.0073, 2.2342, 2.3663, 2.5946, 2.8222, 3.0483, 3.2516, 3.3851, 3.5291, 4.1979]
     s = [6.317e-23, 1.3348e-22, 6.3896e-22, 2.4423e-21, 4.2059e-22, 1.6918e-21, 3.8452e-22, 7.5752e-22, 3.9773e-22, 2.5062e-22]
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = pyinterpolate.PchipInterpolator(E, s)(Ep)
-    cross_section = pyconvert.(Array, cross_section)
+    cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end]) / 5
@@ -357,11 +336,10 @@ function e_N2a3sup(Ep)
         end
     end
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    XsItikawa = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                 pyinterpolate.interp1d(log.(E), log.(s), fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    XsItikawa = pyconvert.(Array, XsItikawa)
-    XsItikawa = vcat(XsItikawa[1], XsItikawa[2])
+    XsItikawa = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     XsItikawa = exp.(XsItikawa)
 
     XsItikawa[.!isfinite.(XsItikawa)] .= 0
@@ -376,11 +354,10 @@ function e_N2b3pg(Ep)
     E = [7, 8, 9, 10, 12.5, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 25, 32, 22.5, 18.5, 13, 8, 3] .* 1e-22
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -421,11 +398,10 @@ function e_N2w3du(Ep)
     E = [7, 8, 9, 10, 12.5, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 7.5, 24.5, 33, 34, 31, 7, 2.2] .* 1e-22
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -453,11 +429,10 @@ function e_N2bp3sum(Ep)
     E = [8.1647, 12, 15, 18, 20, 30, 50]
     s = [.0001, 8, 13, 8, 4, 3, 2] .* 1e-22
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -485,11 +460,10 @@ function e_N2ap1sum(Ep)
     E = [8.3987, 15, 18, 20, 30, 50]
     s = [.0001, 11, 5, 3.5, 2, .8] .* 1e-22
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -517,11 +491,10 @@ function e_N2w1du(Ep)
     E = [8.8895, 12, 15, 17, 20, 30, 50]
     s = [.0001, 12, 9.5, 7, 3, 1.75, 0.7] .* 1e-22
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -569,7 +542,6 @@ function e_N2ab1sgp(Ep)
     end
 
     cross_section = cross_section / 1e4
-
     cross_section[.!isfinite.(cross_section)] .= 0
 
     return cross_section
@@ -591,11 +563,10 @@ function e_N2a1pg(Ep)
     E = [10, 12.5, 15, 16.25, 17.5, 20, 22.0, 30.0, 35.0, 40.0, 50, 60, 75, 90, 100]
     s = [0.42, 2.29, 3.67, 4, 3.67, 3.08, 2.67, 2.12, 1.67, 1.5, 1.17, 0.83, 0.75, 0.57, 0.5] .* 1e-21
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -623,11 +594,10 @@ function e_N2c3pu(Ep)
     E = [12.1, 12.67, 13.33, 13.5, 15, 17, 20, 30, 50]
     s = [0.5, 1, 2, 3, 3.75, 2.05, 1.44, 0.54, 0.21] .* 1e-21
 
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -793,12 +763,10 @@ function e_N2dissociation(Ep)
     E = [20, 23.6, 27.8, 35, 45, 55, 65, 80, 96, 110, 125, 148, 170, 195, 245, 295, 2985.1, 49183, 55306]
     s = [0.87, 1.13, 1.39, 1.54, 1.7, 1.87, 1.87, 2.04, 2.07, 1.96, 1.9, 1.87, 1.78, 1.74, 1.57, 1.48, 5.0198e-1/3, 4.5953e-2/3, 4.47e-2/3] * 1e-20
 
-
-    pyinterpolate = pyimport("scipy.interpolate")
-    cross_section = [pyinterpolate.PchipInterpolator(E, log.(s))(Ep[Ep .< E[end]]),
-                     pyinterpolate.interp1d(log.(E), log.(s), kind="linear", fill_value="extrapolate")(log.(Ep[Ep .>= E[end]]))]
-    cross_section = pyconvert.(Array, cross_section)
-    cross_section = vcat(cross_section[1], cross_section[2])
+    cross_section = [
+        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
+        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
+        ]
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -921,28 +889,3 @@ function e_N2ddion(Ep)
 
     return cross_section
 end
-
-
-
-
-
-
-
-
-
-
-# function e_N2d3sup(E)
-#     cross_section = similar(E)
-
-#     for ie in eachindex(E)
-#         if E[ie] > 12.85 && E[ie] < 50
-#             cross_section[ie] = (1 - 12.85 / E[ie]) * exp(0.938347 - 31.08899 * log(E[ie]) + 8.257418 * log(E[ie])^2 - 0.793736 * log(E[ie])^3)
-#         elseif E[ie] >= 50
-#             cross_section[ie] = 6.3166e-14 / E[ie]^3
-#         else
-#             cross_section[ie] = 0
-#         end
-#     end
-
-#     return cross_section * 1e-4
-# end
