@@ -1,11 +1,11 @@
-using HTTP
-using JSON
-using Downloads
-using DelimitedFiles
-using ProgressMeter
-using Dates
-using Term
-using Printf
+using Dates: Dates
+using DelimitedFiles: readdlm, writedlm
+using Downloads: Downloads
+using HTTP: HTTP
+using JSON: JSON
+using Printf: @sprintf
+using ProgressMeter: Progress, next!
+using Term: @bold, @underline
 
 ## TODO : add docstrings
 
@@ -195,8 +195,7 @@ function download_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute 
 end
 
 
-using HTTP
-using PythonCall
+using PythonCall: pyimport, pyconvert, Py
 function calculate_msis_data(year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     lat = 76, lon = 5, height = 85:1:700)
 

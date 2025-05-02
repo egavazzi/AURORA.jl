@@ -39,7 +39,7 @@ function CFL_criteria(t, h_atm, v, CFL_number=64)
 end
 
 
-using HCubature
+using HCubature: hcubature
 """
     mu_avg(θ_lims)
 
@@ -65,7 +65,7 @@ function mu_avg(θ_lims)
 end
 
 
-using QuadGK
+using QuadGK: quadgk
 """
     beam_weight(θ_lims)
 
@@ -91,15 +91,19 @@ end
 
 ## ====================================================================================== ##
 
-using LibGit2
-using Pkg
-function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
+import LibGit2
+import Pkg
+function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
     n_loop, CFL_number, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
-    commit_hash = LibGit2.head(pkgdir(AURORA))
-    version_AURORA = Pkg.TOML.parsefile(joinpath(pkgdir(@__MODULE__), "Project.toml"))["version"]
+    commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
+        LibGit2.head(pkgdir(AURORA))
+    else
+        "Not available"
+    end
+    version_AURORA = pkgversion(AURORA)
     open(savefile, "w") do f
-        write(f, "altitude_max = $altitude_max \n")
+        write(f, "altitude_lims = $altitude_lims \n")
         write(f, "θ_lims = $θ_lims \n")
         write(f, "E_max = $E_max \n")
         write(f, "B_angle_to_zenith = $B_angle_to_zenith \n")
@@ -118,7 +122,7 @@ function save_parameters(altitude_max, θ_lims, E_max, B_angle_to_zenith, t_samp
 end
 
 
-using MAT
+using MAT: matopen
 function save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
     savefile = joinpath(savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
@@ -133,8 +137,8 @@ function save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 end
 
 
-using MAT
-using Printf
+using MAT: matopen
+using Printf: @sprintf
 function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     # Extract the time array for the current loop
 	t_run = collect(t .+ t[end] * (i - 1))
@@ -223,6 +227,68 @@ function find_Ietop_file(path_to_directory)
 end
 
 
+"""
+    make_savedir(root_savedir, name_savedir; behavior = "default")
+
+Return the path to the directory where the results will be saved. If the directory does not
+already exist, create it.
+
+If the constructed `savedir` already exists and contains files starting with `"IeFlickering-"`,
+a new directory is created to avoid accidental overwriting of results (e.g., `savedir(1)`, `savedir(2)`, etc.).
+
+# Calling
+`savedir = make_savedir(root_savedir, name_savedir)` \\
+`savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")`
+
+# Arguments
+- `root_savedir::String`: The root directory where the data will be saved. If empty or
+    contains only spaces, it defaults to `"backup"`.
+- `name_savedir::String`: The name of the subdirectory to be created within `root_savedir`.
+    If empty or contains only spaces, it defaults to the current date and time in the
+    format `"yyyymmdd-HHMM"`.
+- `behavior::String` (optional): Determines how the full path is constructed.
+    - `"default"`: The path will be built starting under the `data/` folder of the AURORA installation
+        (i.e., `AURORA_folder/data/root_savedir/name_savedir/`, where `AURORA_folder` is
+        the folder containing the AURORA code). This is the default behavior.
+    - `"custom"`: The path will be built as `root_savedir/name_savedir/`, with the argument
+        `root_savedir` treated as an absolute or relative path. This allows for saving results
+        in any location on the system. Useful if AURORA is installed as a dependency to some
+        other project.
+
+# Returns
+- `savedir::String`: The full path to the directory where the results will be saved.
+"""
+function make_savedir(root_savedir, name_savedir; behavior = "default")
+    ## Create the folder to save the data to
+    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
+    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
+        root_savedir = "backup"
+    end
+    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
+    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
+        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
+    end
+
+    # Make a string with full path of savedir from root_savedir and name_savedir
+    if behavior == "default"
+        savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
+    elseif behavior == "custom"
+        savedir = joinpath(root_savedir, name_savedir)
+    end
+
+    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
+    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
+    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
+        savedir = rename_if_exists(savedir)
+    end
+
+    # And finally create the directory
+    mkpath(savedir)
+    print("\n", @bold "Results will be saved at $savedir \n")
+
+    return savedir
+end
+
 ## ====================================================================================== ##
 
 
@@ -257,3 +323,125 @@ function psi(x)
     return PSI
 end
 f_smooth_transition(0, 1, 0)
+
+## ====================================================================================== ##
+
+# Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [n_mu, nz, nt, nE]
+function restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
+    n_μ = length(μ_lims) - 1
+    n_z = length(h_atm)
+    n_t = length(t_run)
+    n_E = length(E)
+    Ie_restructured = zeros(n_μ, n_z, n_t, n_E);
+    for i_E in 1:n_E
+        for i_t in 1:n_t
+            for i_z in 1:n_z
+                for i_μ in 1:n_μ
+                    Ie_restructured[i_μ, i_z, i_t, i_E] = Ie_raw[i_z + (i_μ - 1) * n_z, i_t, i_E]
+                end
+            end
+        end
+    end
+    return Ie_restructured # size [n_mu, nz, nt, nE]
+end
+
+
+"""
+    restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
+
+Function that merges the streams of `Ie` that are given over `θ_lims` to fit the
+`new_θ_lims` of interest. It can be useful when wanting to merge some streams for plotting.
+
+For example, if we have `θ_lims = [180 160 140 120 100 90 80 60 40 20 0]`, and
+we want to plot with `new_θ_lims = [180 160 120 100 90 80 60 40 20 0]` (note that
+this should be an array of tuples, but to simplify the comparison we write it as a vector
+here), the function will merge the streams (160°-140°) and (140°-120°) together into a new
+stream with limits (160°-120°).
+
+*Important*: The limits in `new_θ_lims` need to match some existing limits in `θ_lims`. In
+the example above, `new_θ_lims = [180 160 120 100 90 80 65 40 20 0]` would not have worked
+because 65° is not a limit that exists in `θ_lims`.
+
+# Calling
+`Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)`
+
+# Arguments
+- `Ie`: array of electron flux with pitch-angle limits `θ_lims`. Of shape [n\\_μ, n\\_z, n\\_t, n\\_E].
+- `θ_lims`: pitch-angle limits. Usually a vector or range.
+- `new_θ_lims`: new pitch-angle limits. Given as an array of tuples with two rows, for example:
+```
+julia> new_θ_lims = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
+                     (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
+```
+
+# Returns
+- `Ie_plot`: array of electron flux with the new pitch-angle limits `new_θ_lims`. Of shape
+             [n\\_μ\\_new, n\\_z, n\\_t, n\\_E], where n\\_μ\\_new is the number of streams
+             in `new_θ_lims`. The first dimension of `Ie_plot` is sorted such that the
+             indices go along the first row of `new_θ_lims`, and then the second row.
+             In our example with `new_θ_lims` from above, that would be ``[1 2 3 4 5; 6 7 8 9 10]``.
+
+"""
+function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
+    # Initialize the new Ie_plot that will contain the restructured streams
+    n_μ_new = length(new_θ_lims)
+    n_z = size(Ie, 2)
+    n_t = size(Ie, 3)
+    n_E = size(Ie, 4)
+    Ie_plot = zeros(n_μ_new, n_z, n_t, n_E)
+
+    # Modify the values of the down-angles so that field aligned is 180°.
+    # For example new_θ_lims would go from something like
+    #   2×5 Matrix{Tuple{Int64, Int64}}:
+    #   (0, 10)  (10, 30)  (30, 60)  (60, 80)  (80, 90) # DOWN
+    #   (0, 10)  (10, 30)  (30, 60)  (60, 80)  (80, 90) # UP
+    # to
+    #   2×5 Matrix{Tuple{Int64, Int64}}:
+    #   (180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90) # DOWN
+    #   (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)  # UP
+    new_θ_lims_temp = copy(new_θ_lims)
+    new_θ_lims_temp[1, :] = map(x -> 180 .- x, new_θ_lims_temp[1, :] )
+
+    # Restructure `new_θ_lims_temp` from a 2D array to a 1D vector, by concatenating the rows.
+    # Following the example from above, new_θ_lims would now be
+    #   10-element Vector{Tuple{Int64, Int64}}:
+    #   (180, 170)
+    #   (170, 150)
+    #   (150, 120)
+    #   (120, 100)
+    #   (100, 90)
+    #   (0, 10)
+    #   (10, 30)
+    #   (30, 60)
+    #   (60, 80)
+    #   (80, 90)
+    new_θ_lims_temp = vcat(eachrow(new_θ_lims_temp)...)
+
+    # Check if all the limits in new_θ_lims match some limits in θ_lims
+    for i in eachindex(new_θ_lims_temp)
+        if new_θ_lims_temp[i][1] ∉ θ_lims
+            error("The limit $(new_θ_lims_temp[i][1]) in `new_θ_lims` does not match any limit in `θ_lims`.")
+        elseif new_θ_lims_temp[i][2] ∉ θ_lims
+            error("The limit $(new_θ_lims_temp[i][2]) in `new_θ_lims` does not match any limit in `θ_lims`.")
+        end
+    end
+
+
+    # Restructure to [n_μ_new, n_z, n_t, n_E]
+    # Loop over the new_θ_lims streams
+    @views for i in eachindex(new_θ_lims_temp)
+        # Find the indices of the streams from the simulation that should be merged in the stream new_θ_lims[i].
+        idx_θ = axes(Ie, 1)[minimum(new_θ_lims_temp[i]) .<= acosd.(mu_avg(θ_lims)) .<= maximum(new_θ_lims_temp[i])]
+        # Loop over these streams and add them into the right stream of Ie_plot.
+        for j in idx_θ
+            Ie_plot[i, :, :, :] .+= Ie[j, :, :, :]
+        end
+    end
+
+    # # Extracts the values, remove the doublets and sort.
+    # # Continuing the example from above, this gives us
+    # #       [180 170 150 120 100 90 80 60 30 10 0]
+    # new_θ_lims_temp = sort(unique(collect(Iterators.flatten(new_θ_lims_temp))); rev=true)
+
+    return Ie_plot
+end

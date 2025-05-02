@@ -11,11 +11,8 @@ identifiers:
   - description: This is the collection of archived snapshots of all versions of AURORA.jl
     type: doi
     value: 10.5281/zenodo.11238620
-  - description: This is the archived snapshot of version 0.4.3 of AURORA.jl
-    type: doi
-    value: 10.5281/zenodo.14588863
 license: GPL-3.0
-version: 0.4.3
-date-released: "2025-01-02"
-doi: 10.5281/zenodo.14588863
+version: 0.5.0
+date-released: "2025-05-01"
+doi: 10.5281/zenodo.11238620
 repository-code: "https://github.com/egavazzi/AURORA.jl"
