@@ -39,6 +39,7 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 AURORA_viz = "Makie"
 
 [compat]
+DataInterpolations = "8.0.1"
 Integrals = "4.5.0"
 Interpolations = "0.15.1"
 PrecompileTools = "1.2.1"
