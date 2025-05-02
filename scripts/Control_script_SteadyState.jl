@@ -2,7 +2,7 @@ using AURORA
 
 ## Setting parameters
 altitude_lims = [100, 500];     # (km) altitude limits of the ionosphere
-θ_lims = 180:-10:10;            # (°) angle-limits for the electron beams
+θ_lims = 180:-10:0;            # (°) angle-limits for the electron beams
 E_max = 3000;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
