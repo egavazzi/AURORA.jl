@@ -275,8 +275,9 @@ function convert_phase_fcn_to_3D!(phase_fcn, θ)
     # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the
     # probability of scattering will be underestimated the more we approach angles around 90°. This
     # function is here to correct that.
-    phase_fcn = phase_fcn .* abs.(sin.(θ));       # we don't need the factors 2π and dθ as they are the same for all theta bins.
+    phase_fcn = phase_fcn .* abs.(sin.(θ));     # we don't need the factors 2π and dθ as they are the same for all theta bins.
     phase_fcn = phase_fcn ./ sum(phase_fcn);    # so that sum of probabilities = 1
+    return nothing
 end
 
 function convert_phase_fcn_to_3D(phase_fcn, θ)
@@ -286,7 +287,7 @@ function convert_phase_fcn_to_3D(phase_fcn, θ)
     # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the
     # probability of scattering will be underestimated the more we approach angles around 90°. This
     # function is here to correct that.
-    phase_fcn = phase_fcn .* abs.(sin.(θ));       # we don't need the factors 2π and dθ as they are the same for all theta bins.
+    phase_fcn = phase_fcn .* abs.(sin.(θ));     # we don't need the factors 2π and dθ as they are the same for all theta bins.
     phase_fcn = phase_fcn ./ sum(phase_fcn);    # so that sum of probabilities = 1
     return phase_fcn
 end

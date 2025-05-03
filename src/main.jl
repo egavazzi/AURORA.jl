@@ -17,7 +17,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
     t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max), CFL_number)
-    # TODO: fix properly the time sampling of incoming data from file
+    # TODO: fix properly the time sampling of incoming data from file   # What did I mean here?? /EG20250504
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -50,7 +50,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    # Initialize arrays for the ionization collisions part of the energy degradation
+    ## Initialize arrays for the ionization collisions part of the energy degradation
     Ionization_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
     Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
     secondary_vector = [zeros(length(E)) for _ in 1:15]
@@ -147,7 +147,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    # Initialize arrays for the ionization collisions part of the energy degradation
+    ## Initialize arrays for the ionization collisions part of the energy degradation
     Ionization_matrix = [zeros(length(h_atm) * length(μ_center), 1) for _ in 1:15]
     Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), 1) for _ in 1:15]
     secondary_vector = [zeros(length(E)) for _ in 1:15]
