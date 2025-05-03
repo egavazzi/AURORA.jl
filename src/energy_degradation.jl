@@ -362,7 +362,7 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
         # fill!(Ionization_fragment_2[i], 0)
         # fill!(Ionizing_fragment_2[i], 0)
         prepare_first_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                n, t, h_atm, μ_center, BeamWeight)
+                                n, Ie, t, h_atm, μ_center, BeamWeight, iE)
         prepare_second_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
                                  σ, E_levels, cascading, E, dE, iE)
     end
@@ -372,9 +372,11 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
 end
 
 function prepare_first_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                      n, t, h_atm, μ_center, BeamWeight)
+                                      n, Ie, t, h_atm, μ_center, BeamWeight, iE)
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
+
+    # TODO IDEA: check if E[iE] is enough to ionize, otherwise do nothing
 
     # PRIMARY ELECTRONS
     Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
