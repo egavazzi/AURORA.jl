@@ -21,9 +21,16 @@ end
 
 
 
+
+
 #################################################################################
 #                               Inelastic collisions                            #
 #################################################################################
+
+
+
+
+
 function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
     Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
 
@@ -81,9 +88,16 @@ end
 
 
 
+
+
 #################################################################################
 #                               Ionization collisions                           #
 #################################################################################
+
+
+
+
+
 function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center)
 
@@ -246,9 +260,16 @@ end
 
 
 
+
+
 #################################################################################
 #                                   Update Q                                    #
 #################################################################################
+
+
+
+
+
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                    B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
                    μ_center)
@@ -299,4 +320,128 @@ function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_lev
 
     add_ionization_collisions_batch!(Q, iE, Ionization_matrix, Ionizing_matrix,
                                 secondary_vector, primary_vector)
+end
+
+
+
+
+
+#################################################################################
+#                                   Prototypes                                  #
+#################################################################################
+
+
+function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+                      B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
+                      μ_center)
+
+    # e-e collisions
+    @views if iE > 1
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+                                   outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
+    end
+
+    # TODO for later: move this outside of the energy loop and then just fill with zeros
+    Ionization_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
+    Ionizing_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
+    Ionization_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
+    Ionizing_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
+
+    # Loop over the neutral species
+    for i in 1:length(n_neutrals)
+        n = n_neutrals[i]                          # Neutral density
+        σ = σ_neutrals[i]                          # Array with collision cross sections
+        E_levels = E_levels_neutrals[i]            # Array with collision enery levels and number of secondary e-
+        B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
+        cascading = cascading_neutrals[i]          # Cascading function for the current i-th species
+
+        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+
+        # fill!(Ionization_fragment_1[i], 0)
+        # fill!(Ionizing_fragment_1[i], 0)
+        # fill!(Ionization_fragment_2[i], 0)
+        # fill!(Ionizing_fragment_2[i], 0)
+        prepare_first_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
+                                n, t, h_atm, μ_center, BeamWeight)
+        prepare_second_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
+                                 σ, E_levels, cascading, E, dE, iE)
+    end
+    add_ionization_fragments!(Q, iE,
+                              Ionization_fragment_1, Ionizing_fragment_1,
+                              Ionization_fragment_2, Ionizing_fragment_2)
+end
+
+function prepare_first_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
+                                      n, t, h_atm, μ_center, BeamWeight)
+    n_repeated_over_μt = repeat(n, length(μ_center), length(t))
+    n_repeated_over_t = repeat(n, 1, length(t))
+
+    # PRIMARY ELECTRONS
+    Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
+
+    # SECONDARY ELECTRONS (ISOTROPIC)
+    @views for i_μ1 in eachindex(μ_center)
+        for i_μ2 in eachindex(μ_center)
+            Ionization_fragment_1[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
+                max.(0, n_repeated_over_t .*
+                    (Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
+                    BeamWeight[i_μ1] ./ sum(BeamWeight))
+        end
+    end
+end
+
+function prepare_second_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
+                                            σ, E_levels, cascading, E, dE, iE)
+    # Loop through the different collisions for the current neutral species
+    for i_level in axes(E_levels, 1)[2:end]
+        # Continue with the ionizing collisions (will produce secondary e-)
+        if E_levels[i_level, 2] > 0
+            # Find the energy bins where the e- in the current energy bin will degrade when
+            # losing E_levels[i_level, 1] eV
+            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
+                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+
+            if !isempty(i_degrade) && i_degrade[1] < iE
+                # Calculate the spectra of the secondary e-
+                secondary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "s");
+                # We use the average energy of the e- in the current energy bin
+                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* dE / 2
+
+                # Calculate the distribution of the ionizing (= primary) e-, that have lost the
+                # corresponding amount of energy
+                primary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "c");
+
+                if sum(secondary_e_spectra) > 0
+                    # normalise
+                    secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra)
+                    # and multiply with the number of e- created
+                    secondary_e_spectra = E_levels[i_level, 2] .* secondary_e_spectra
+                end
+                if sum(primary_e_spectra) > 0
+                    # normalise
+                    primary_e_spectra = primary_e_spectra ./ sum(primary_e_spectra)
+                end
+
+                Ionization_fragment_2 .+= secondary_e_spectra .* σ[i_level, iE]
+                Ionizing_fragment_2 .+= primary_e_spectra .* σ[i_level, iE]
+            end
+        end
+    end
+end
+
+function add_ionization_fragments!(Q, iE,
+                                   Ionization_fragment_1, Ionizing_fragment_1,
+                                   Ionization_fragment_2, Ionizing_fragment_2)
+    @tturbo for iI in 1:(iE - 1)
+        for j in axes(Q, 2)
+            for k in axes(Q, 1)
+                Q[k, j, iI] += Ionization_fragment_1[1][k, j] * Ionization_fragment_2[1][iI] +  # secondaries
+                               Ionization_fragment_1[2][k, j] * Ionization_fragment_2[2][iI] +  # secondaries
+                               Ionization_fragment_1[3][k, j] * Ionization_fragment_2[3][iI] +  # secondaries
+                               Ionizing_fragment_1[1][k, j] * Ionizing_fragment_2[1][iI] +  # primaries
+                               Ionizing_fragment_1[2][k, j] * Ionizing_fragment_2[2][iI] +  # primaries
+                               Ionizing_fragment_1[3][k, j] * Ionizing_fragment_2[3][iI]    # primaries
+            end
+        end
+    end
 end
