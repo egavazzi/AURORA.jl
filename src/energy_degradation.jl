@@ -21,10 +21,12 @@ end
 
 function build_big_B2B(B2B_inelastic, n, h_atm)
     n_elements = size(B2B_inelastic, 1) * size(B2B_inelastic, 2) * length(h_atm)
+    # idx1 = zeros(Int64, n_elements)
+    # idx2 = zeros(Int64, n_elements)
+    # aB2B = zeros(n_elements)
     idx1 = Vector{Int}(undef, n_elements)
     idx2 = Vector{Int}(undef, n_elements)
     aB2B = Vector{Float64}(undef, n_elements)
-
     counter = 1
     for i1 in axes(B2B_inelastic, 1)
         for i2 in axes(B2B_inelastic, 2)
