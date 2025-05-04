@@ -17,7 +17,7 @@ end
 
 
 using KLU: klu, klu!
-function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, KLU_cache; first_iteration = false)
+function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
 
     # Spatial differentiation matrices, for up and down streams
@@ -114,9 +114,9 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, KLU_cache; firs
     b = similar(Ie_finer)
 
     if first_iteration
-        global KLU_cache = klu(Mlhs)
+        cache.KLU = klu(Mlhs)
     else
-        klu!(KLU_cache, Mlhs)
+        klu!(cache.KLU, Mlhs)
     end
 
     for i_t in 1:length(t) - 1
@@ -127,7 +127,7 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, KLU_cache; firs
         mul!(b, Mrhs, Ie_finer)
         Ie_finer .= b
         Ie_finer .+= Q_local
-        ldiv!(KLU_cache, Ie_finer)
+        ldiv!(cache.KLU, Ie_finer)
 
         Ie[:, i_t + 1] = Ie_finer
     end

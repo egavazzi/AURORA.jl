@@ -2,7 +2,7 @@ using KLU: klu, klu!
 using LinearAlgebra: Diagonal
 using SparseArrays: spdiagm, sparse, dropzeros!, findnz
 
-function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top, KLU_cache; first_iteration = false)
+function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ))
 
     # Spatial differentiation matrices, for up and down streams
@@ -71,15 +71,15 @@ function steady_state_scheme(h_atm, μ, A, B, D, Q, Ie_top, KLU_cache; first_ite
                             length(h_atm):length(h_atm):(length(μ)*length(h_atm))))
 
     if first_iteration
-        global KLU_cache = klu(Mlhs)
+        cache.KLU = klu(Mlhs)
     else
-        klu!(KLU_cache, Mlhs)
+        klu!(cache.KLU, Mlhs)
     end
 
     I_top_bottom = (Ie_top * [0, 1]')'
     Q_local = copy(Q)
     Q_local[index_top_bottom] = I_top_bottom[:]
-    Ie = KLU_cache \ Q_local
+    Ie = cache.KLU \ Q_local
 
     Ie[Ie .< 0] .= 0; # the fluxes should never be negative
 

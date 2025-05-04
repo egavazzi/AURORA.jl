@@ -1,11 +1,22 @@
 using Dates: Dates, now
 using ProgressMeter: Progress, next!
-using SparseArrays: spzeros, SparseMatrixCSC
 using Term: @bold
+
+using SparseArrays: SparseArrays, spzeros, spdiagm
+using KLU: KLU, klu
 
 # Practical cache storage
 mutable struct Cache
-    AB2B::SparseMatrixCSC{Float64,Int64}
+    # AB2B
+    # KLU_cache
+    AB2B::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    KLU::KLU.KLUFactorization{Float64, Int64}
+end
+
+function Cache()
+    AB2B = spzeros(1, 1)
+    KLU = klu(spdiagm(0 => ones(1)))
+    return Cache(AB2B, KLU)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -59,8 +70,8 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache
-    KLU_cache = []
-    cache = Cache(spzeros(1, 1))
+    # cache = Cache(nothing, nothing)
+    cache = Cache()
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -87,12 +98,12 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                 Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
-                                                         KLU_cache, first_iteration = true)
+                                                         cache, first_iteration = true)
             else
                 Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
-                                                         KLU_cache)
+                                                         cache)
             end
             # Update the cascading of e-
             update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
@@ -163,8 +174,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache
-    KLU_cache = []
-    cache = Cache(spzeros(1, 1))
+    # cache = Cache(nothing, nothing)
+    cache = Cache()
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -191,11 +202,11 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
             Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith),
                                                           μ_center, A, B, D[iE, :],
                                                           Q[:, 1, iE], Ie_top_local[:, iE],
-                                                          KLU_cache, first_iteration = true)
+                                                          cache, first_iteration = true)
         else
             Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center,
                                                A, B, D[iE, :], Q[:, 1, iE],
-                                               Ie_top_local[:, iE], KLU_cache)
+                                               Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-
