@@ -365,9 +365,9 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
         # If the energy is too low, skip the ionization calculation (use zeros)
         idx_ionization = (E_levels[:, 2] .> 0)
         if minimum(E_levels[idx_ionization, 1]) < E[iE]
-            prepare_first_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
+            prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
                                     n, Ie, t, h_atm, μ_center, BeamWeight, iE)
-            prepare_second_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
+            prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
                                     σ, E_levels, cascading, E, dE, iE)
         end
     end
@@ -376,12 +376,10 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
                               Ionization_fragment_2, Ionizing_fragment_2)
 end
 
-function prepare_first_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
+function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
                                       n, Ie, t, h_atm, μ_center, BeamWeight, iE)
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
-
-    # TODO IDEA: check if E[iE] is enough to ionize, otherwise do nothing
 
     # PRIMARY ELECTRONS
     Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
@@ -390,14 +388,14 @@ function prepare_first_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
     @views for i_μ1 in eachindex(μ_center)
         for i_μ2 in eachindex(μ_center)
             Ionization_fragment_1[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
-                max.(0, n_repeated_over_t .*
+                n_repeated_over_t .*
                     (Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                    BeamWeight[i_μ1] ./ sum(BeamWeight))
+                    BeamWeight[i_μ1] ./ sum(BeamWeight)
         end
     end
 end
 
-function prepare_second_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
+function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
                                             σ, E_levels, cascading, E, dE, iE)
     # Loop through the different collisions for the current neutral species
     for i_level in axes(E_levels, 1)[2:end]
