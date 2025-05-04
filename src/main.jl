@@ -79,10 +79,13 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                             A, B, D[iE, :], Q[:, :, iE], Ie_top_local[:, :, iE], I0[:, iE]);
 
             # Update the cascading of e-
-            update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                        B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
-                        μ_scatterings.BeamWeight, μ_center,
-                        Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+            # update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            #             B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
+            #             μ_scatterings.BeamWeight, μ_center,
+            #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+            new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+                        B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
+                        μ_center)
 
             next!(p)
         end
@@ -153,6 +156,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     secondary_vector = [zeros(length(E)) for _ in 1:15]
     primary_vector = [zeros(length(E)) for _ in 1:15]
 
+    ## Precalculate the B2B fragment
+    B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
     ## No n_loop here
     Q  = zeros(length(h_atm) * length(μ_center), 1, length(E));
@@ -168,17 +173,20 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
 
         B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
-                                μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
+                                               phase_fcn_neutrals, dE, iE, B2B_fragment,
+                                               μ_scatterings.theta1)
 
         # Compute the flux of e-
         Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center, A, B,
                                     D[iE, :],  Q[:, 1, iE], Ie_top_local[:, iE])
 
         # Update the cascading of e-
-        update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-                    cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
-                    Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+        # update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
+        #             cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
+        #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+        new_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+                  B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
+                  μ_center)
 
         next!(p)
     end
