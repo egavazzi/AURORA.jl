@@ -19,8 +19,25 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
     return AB2B
 end
 
+function make_big_B2B_matrix_new(B2B_inelastic, n, h_atm)
+    n_elements = size(B2B_inelastic, 1) * size(B2B_inelastic, 2) * length(h_atm)
+    idx1 = Vector{Int}(undef, n_elements)
+    idx2 = Vector{Int}(undef, n_elements)
+    aB2B = Vector{Float64}(undef, n_elements)
 
+    counter = 1
+    for i1 in axes(B2B_inelastic, 1)
+        for i2 in axes(B2B_inelastic, 2)
+            idx_range = counter:(counter + length(h_atm) - 1)
+            idx1[idx_range] .= (i1 - 1) * length(h_atm) .+ (1:length(h_atm))
+            idx2[idx_range] .= (i2 - 1) * length(h_atm) .+ (1:length(h_atm))
+            aB2B[idx_range] .= n * B2B_inelastic[i1, i2]
+            counter += length(h_atm)
+        end
+    end
 
+    return sparse!(idx1, idx2, aB2B)
+end
 
 
 #################################################################################
@@ -36,7 +53,7 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
 
     # Multiply each element of B2B with n (density vector) and resize to get a matrix that
     # can be multiplied with Ie
-    AB2B =  make_big_B2B_matrix(B2B_inelastic, n, h_atm)
+    AB2B =  make_big_B2B_matrix_new(B2B_inelastic, n, h_atm)
     Ie_scatter = AB2B * @view(Ie[:, :, iE])
 
     # Loop over the energy levels of the collisions with the i-th neutral species
