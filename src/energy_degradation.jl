@@ -1,12 +1,12 @@
 using LoopVectorization: @tturbo
-using SparseArrays: sparse
+using SparseArrays: sparse!
 
 #################################################################################
 #                                   B2B matrix                                  #
 #################################################################################
 function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
-    idx1 = Vector{Float64}(undef, 0)
-    idx2 = Vector{Float64}(undef, 0)
+    idx1 = Vector{Int}(undef, 0)
+    idx2 = Vector{Int}(undef, 0)
     aB2B = Vector{Float64}(undef, 0)
     for i1 in axes(B2B_inelastic, 1)
         for i2 in axes(B2B_inelastic, 2)
@@ -15,7 +15,7 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
             append!(aB2B, n * B2B_inelastic[i1, i2])
         end
     end
-    AB2B = sparse(idx1, idx2, aB2B)
+    AB2B = sparse!(idx1, idx2, aB2B)
     return AB2B
 end
 
@@ -361,10 +361,15 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
         # fill!(Ionizing_fragment_1[i], 0)
         # fill!(Ionization_fragment_2[i], 0)
         # fill!(Ionizing_fragment_2[i], 0)
-        prepare_first_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                n, Ie, t, h_atm, μ_center, BeamWeight, iE)
-        prepare_second_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
-                                 σ, E_levels, cascading, E, dE, iE)
+
+        # If the energy is too low, skip the ionization calculation (use zeros)
+        idx_ionization = (E_levels[:, 2] .> 0)
+        if minimum(E_levels[idx_ionization, 1]) < E[iE]
+            prepare_first_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
+                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE)
+            prepare_second_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
+                                    σ, E_levels, cascading, E, dE, iE)
+        end
     end
     add_ionization_fragments!(Q, iE,
                               Ionization_fragment_1, Ionizing_fragment_1,
