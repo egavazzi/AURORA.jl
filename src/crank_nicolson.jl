@@ -113,7 +113,11 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, KLU_cache; firs
     Ie_finer = I0
     b = similar(Ie_finer)
 
-    first_iteration ? KLU_cache = klu(Mlhs) : klu!(KLU_cache, Mlhs)
+    if first_iteration
+        global KLU_cache = klu(Mlhs)
+    else
+        klu!(KLU_cache, Mlhs)
+    end
 
     for i_t in 1:length(t) - 1
         I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
@@ -129,11 +133,7 @@ function Crank_Nicolson(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, KLU_cache; firs
     end
     Ie[Ie .< 0] .= 0; # the fluxes should never be negative
 
-    if first_iteration
-        return Ie, KLU_cache
-    else
-        return Ie
-    end
+    return Ie
 end
 
 function Crank_Nicolson_old(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0)

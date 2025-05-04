@@ -39,11 +39,13 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     end
 
     ## Calculate the phase functions and put them in a Tuple
+    print("Calculating the phase functions...")
     phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
     phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
     phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
+    println(" done ✅")
 
     ## And save the simulation parameters in it
     save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
@@ -55,6 +57,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
     # secondary_vector = [zeros(length(E)) for _ in 1:15]
     # primary_vector = [zeros(length(E)) for _ in 1:15]
+    KLU_cache = []
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -74,12 +77,11 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
             A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
 
             B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                                phase_fcn_neutrals, dE, iE, μ_scatterings.Pmu2mup,
-                                                μ_scatterings.BeamWeight_relative, μ_scatterings.theta1);
+                                                phase_fcn_neutrals, dE, iE, B2B_fragment, μ_scatterings.theta1);
 
             # Compute the flux of e-
             if iE == length(E)
-                Ie[:, :, iE], KLU_cache = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
                                                          [], first_iteration = true)
