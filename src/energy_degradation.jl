@@ -19,7 +19,7 @@ function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
     return AB2B
 end
 
-function make_big_B2B_matrix_new(B2B_inelastic, n, h_atm)
+function build_big_B2B(B2B_inelastic, n, h_atm)
     n_elements = size(B2B_inelastic, 1) * size(B2B_inelastic, 2) * length(h_atm)
     idx1 = Vector{Int}(undef, n_elements)
     idx2 = Vector{Int}(undef, n_elements)
@@ -39,22 +39,45 @@ function make_big_B2B_matrix_new(B2B_inelastic, n, h_atm)
     return sparse!(idx1, idx2, aB2B)
 end
 
+# After some trial and error, I managed to find in what order the elements of the B2B sparse
+# matrix are stored in memory. Here we update these values in place. What would'nt we do
+# for better performance eh?
+function update_big_B2B!(AB2B, B2B_inelastic, n)
+    counter = 1
+    n_μ = size(B2B_inelastic, 2)
+    @views for i1 in axes(B2B_inelastic, 2)
+        for i2 in eachindex(n)
+            idx_range = counter:(counter + n_μ - 1)
+            AB2B.nzval[idx_range] .= n[i2] .* B2B_inelastic[:, i1]
+            counter += n_μ
+        end
+    end
+    return nothing
+end
+
+
 
 #################################################################################
 #                               Inelastic collisions                            #
 #################################################################################
 
 
-
-
-
-function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
+    # Initialize
     Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
 
     # Multiply each element of B2B with n (density vector) and resize to get a matrix that
     # can be multiplied with Ie
-    AB2B =  make_big_B2B_matrix_new(B2B_inelastic, n, h_atm)
-    Ie_scatter = AB2B * @view(Ie[:, :, iE])
+    if iE == length(E)
+        # build the matrix the first time
+        cache.AB2B = build_big_B2B(B2B_inelastic, n, h_atm)
+    else
+        # then reuse the sparse structure and just update the values
+        update_big_B2B!(cache.AB2B, B2B_inelastic, n)
+    end
+
+    # Then calculate the flux of electrons that scatter
+    Ie_scatter = cache.AB2B * @view(Ie[:, :, iE])
 
     # Loop over the energy levels of the collisions with the i-th neutral species
     for i_level in axes(E_levels, 1)[2:end]
@@ -70,8 +93,8 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
 
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
-            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
-                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),      # find lowest bin
+                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level, 1], E))  # find highest bin
 
             partition_fraction = zeros(size(i_degrade)) # initialise
             if !isempty(i_degrade) && i_degrade[1] < iE
@@ -102,7 +125,6 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
         end
     end
 end
-
 
 
 
@@ -289,7 +311,7 @@ end
 
 function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                    B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
-                   μ_center)
+                   μ_center, cache)
 
     # e-e collisions
     @views if iE > 1
@@ -305,14 +327,14 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
         add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
     end
 end
 
 function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                     B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight, μ_center,
-                    Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+                    Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
 
     # e-e collisions
     @views if iE > 1
@@ -329,7 +351,7 @@ function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_lev
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
         prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
                                     BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
                                     secondary_vector, primary_vector, counter_ionization)
@@ -350,7 +372,7 @@ end
 
 function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                       B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
-                      μ_center)
+                      μ_center, cache)
 
     # e-e collisions
     @views if iE > 1
@@ -372,7 +394,7 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i]          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE)
+        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
 
         # fill!(Ionization_fragment_1[i], 0)
         # fill!(Ionizing_fragment_1[i], 0)

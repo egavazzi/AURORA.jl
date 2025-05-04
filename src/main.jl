@@ -1,6 +1,12 @@
 using Dates: Dates, now
 using ProgressMeter: Progress, next!
+using SparseArrays: spzeros, SparseMatrixCSC
 using Term: @bold
+
+# Practical cache storage
+mutable struct Cache
+    AB2B::SparseMatrixCSC{Float64,Int64}
+end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
     n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
@@ -58,6 +64,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # secondary_vector = [zeros(length(E)) for _ in 1:15]
     # primary_vector = [zeros(length(E)) for _ in 1:15]
     KLU_cache = []
+    cache = Cache(spzeros(1, 1))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -95,10 +102,10 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
             # update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
             #             B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
             #             μ_scatterings.BeamWeight, μ_center,
-            #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+            #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
             new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
-                        μ_center)
+                        μ_center, cache)
 
             next!(p)
         end
@@ -169,6 +176,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     # secondary_vector = [zeros(length(E)) for _ in 1:15]
     # primary_vector = [zeros(length(E)) for _ in 1:15]
     KLU_cache = []
+    cache = Cache(spzeros(1, 1))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -208,10 +216,10 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         # Update the cascading of e-
         # update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
         #             cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
-        #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector)
+        #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
         new_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                   B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
-                  μ_center)
+                  μ_center, cache)
 
         next!(p)
     end
