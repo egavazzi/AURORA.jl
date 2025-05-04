@@ -58,11 +58,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize arrays for the ionization collisions part of the energy degradation
-    # Ionization_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
-    # Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), length(t)) for _ in 1:15]
-    # secondary_vector = [zeros(length(E)) for _ in 1:15]
-    # primary_vector = [zeros(length(E)) for _ in 1:15]
+    ## Initialize cache
     KLU_cache = []
     cache = Cache(spzeros(1, 1))
 
@@ -91,7 +87,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                 Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
-                                                         [], first_iteration = true)
+                                                         KLU_cache, first_iteration = true)
             else
                 Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
@@ -99,11 +95,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                                          KLU_cache)
             end
             # Update the cascading of e-
-            # update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-            #             B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE,
-            #             μ_scatterings.BeamWeight, μ_center,
-            #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
-            new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
 
@@ -170,11 +162,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize arrays for the ionization collisions part of the energy degradation
-    # Ionization_matrix = [zeros(length(h_atm) * length(μ_center), 1) for _ in 1:15]
-    # Ionizing_matrix = [zeros(length(h_atm) * length(μ_center), 1) for _ in 1:15]
-    # secondary_vector = [zeros(length(E)) for _ in 1:15]
-    # primary_vector = [zeros(length(E)) for _ in 1:15]
+    ## Initialize cache
     KLU_cache = []
     cache = Cache(spzeros(1, 1))
 
@@ -209,15 +197,9 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
                                                A, B, D[iE, :], Q[:, 1, iE],
                                                Ie_top_local[:, iE], KLU_cache)
         end
-        # Ie[:, 1, iE] = steady_state_scheme_old(h_atm ./ cosd(B_angle_to_zenith),
-        #                                                   μ_center, A, B, D[iE, :],
-        #                                                   Q[:, 1, iE], Ie_top_local[:, iE])
 
         # Update the cascading of e-
-        # update_Q_turbo!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals, B2B_inelastic_neutrals,
-        #             cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight, μ_center,
-        #             Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
-        new_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+        update_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                   B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                   μ_center, cache)
 

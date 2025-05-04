@@ -309,7 +309,7 @@ end
 
 
 
-function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                    B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
                    μ_center, cache)
 
@@ -332,45 +332,9 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
     end
 end
 
-function update_Q_turbo!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                    B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight, μ_center,
-                    Ionization_matrix, Ionizing_matrix, secondary_vector, primary_vector, cache)
-
-    # e-e collisions
-    @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
-                                outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
-    end
-
-    counter_ionization = [1]
-    # Loop over the species
-    for i in 1:length(n_neutrals)
-        n = n_neutrals[i];                          # Neutral density
-        σ = σ_neutrals[i];                          # Array with collision cross sections
-        E_levels = E_levels_neutrals[i];            # Array with collision enery levels and number of secondary e-
-        B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
-        cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
-
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
-        prepare_ionization_collisions!(Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
-                                    BeamWeight, μ_center, Ionization_matrix, Ionizing_matrix,
-                                    secondary_vector, primary_vector, counter_ionization)
-    end
-
-    add_ionization_collisions_batch!(Q, iE, Ionization_matrix, Ionizing_matrix,
-                                secondary_vector, primary_vector)
-end
 
 
-
-
-
-#################################################################################
-#                                   Prototypes                                  #
-#################################################################################
-
-
-function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                       B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
                       μ_center, cache)
 
@@ -415,8 +379,15 @@ function new_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutr
                               Ionization_fragment_2, Ionizing_fragment_2)
 end
 
+
+#################################################################################
+#                                   Prototypes                                  #
+#################################################################################
+
+
+
 function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                      n, Ie, t, h_atm, μ_center, BeamWeight, iE)
+                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE)
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
     n_repeated_over_t = repeat(n, 1, length(t))
 
@@ -435,7 +406,7 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
 end
 
 function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
-                                            σ, E_levels, cascading, E, dE, iE)
+                                             σ, E_levels, cascading, E, dE, iE)
     # Loop through the different collisions for the current neutral species
     for i_level in axes(E_levels, 1)[2:end]
         # Continue with the ionizing collisions (will produce secondary e-)
