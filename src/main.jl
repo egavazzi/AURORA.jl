@@ -94,19 +94,26 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                                 phase_fcn_neutrals, dE, iE, B2B_fragment, μ_scatterings.theta1);
 
             # Compute the flux of e-
-            if iE == length(E)
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+            # if iE == length(E)
+            #     Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+            #                                              A, B, D[iE, :], Q[:, :, iE],
+            #                                              Ie_top_local[:, :, iE], I0[:, iE],
+            #                                              cache, first_iteration = true)
+            # else
+            #     Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+            #                                              A, B, D[iE, :], Q[:, :, iE],
+            #                                              Ie_top_local[:, :, iE], I0[:, iE],
+            #                                              cache)
+            # end
+            Ie[:, :, iE] = Crank_Nicolson_old(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache, first_iteration = true)
-            else
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                                         A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache)
-            end
+                                                         Ie_top_local[:, :, iE], I0[:, iE])
+
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            # update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            #             B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
+            #             μ_center, cache)
+            demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
 
