@@ -362,6 +362,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
 
+        # TODO: that's if I will move things outside of the energy loop
         # fill!(Ionization_fragment_1[i], 0)
         # fill!(Ionizing_fragment_1[i], 0)
         # fill!(Ionization_fragment_2[i], 0)
@@ -376,9 +377,14 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
                                     σ, E_levels, cascading, E, dE, iE)
         end
     end
-    add_ionization_fragments!(Q, iE,
-                              Ionization_fragment_1, Ionizing_fragment_1,
-                              Ionization_fragment_2, Ionizing_fragment_2)
+    # If there is no ionization to add (everything is zero), skip the update of Q
+    # Mmh the compiler seems to be smart enough to skip the update of Q anyway when
+    # everything is zero. But let's keep this if statement just in case.
+    if !(iszero(Ionization_fragment_2) && iszero(Ionizing_fragment_2))
+        add_ionization_fragments!(Q, iE,
+                                  Ionization_fragment_1, Ionizing_fragment_1,
+                                  Ionization_fragment_2, Ionizing_fragment_2)
+    end
 end
 
 
