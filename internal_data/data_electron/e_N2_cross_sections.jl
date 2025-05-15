@@ -70,7 +70,7 @@ function e_N2rot0_2(Ep)
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924 # still wonder why (and slightly ashamed of working on a 1st of May) /EG20250101
+    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924 # still wonder why /EG20250504
     cross_section[Ep .< 0.001480105560000] .= 0
 
     return cross_section
