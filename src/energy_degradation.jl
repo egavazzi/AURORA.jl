@@ -219,9 +219,6 @@ end
 #                               Ionization collisions                           #
 #################################################################################
 
-
-
-
 #=
 This is kind of the demo function for the ionization (legacy).
 For a given energy E and a neutral species n, this function does the following:
@@ -337,6 +334,8 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
         end
     end
 end
+
+
 
 #=
 The three following functions do the same thing as the function above, but in a much more
