@@ -113,8 +113,7 @@ function make_B(n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, 
             end
         end
 
-        # Save the inelastic B2B matrices for the future energy degradations (update of Q)
-        # calculations
+        # Save the inelastic B2B matrices for the future energy degradations (updates of Q)
         B2B_inelastic_neutrals[i] = copy(B2B_inelastic);
     end
     return B, B2B_inelastic_neutrals

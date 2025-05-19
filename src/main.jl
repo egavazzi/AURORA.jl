@@ -7,8 +7,6 @@ using KLU: KLU, klu
 
 # Practical cache storage
 mutable struct Cache
-    # AB2B
-    # KLU_cache
     AB2B::SparseArrays.SparseMatrixCSC{Float64, Int64}
     KLU::KLU.KLUFactorization{Float64, Int64}
 end
@@ -70,7 +68,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache
-    # cache = Cache(nothing, nothing)
     cache = Cache()
 
     ## Precalculate the B2B fragment
@@ -105,17 +102,11 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                                          Ie_top_local[:, :, iE], I0[:, iE],
                                                          cache)
             end
-            # Ie[:, :, iE] = Crank_Nicolson_old(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-            #                                              A, B, D[iE, :], Q[:, :, iE],
-            #                                              Ie_top_local[:, :, iE], I0[:, iE])
 
             # Update the cascading of e-
             update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
-            # demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-            #             B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
-            #             μ_center, cache)
 
             next!(p)
         end
@@ -181,7 +172,6 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache
-    # cache = Cache(nothing, nothing)
     cache = Cache()
 
     ## Precalculate the B2B fragment
