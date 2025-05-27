@@ -22,7 +22,7 @@ Descriptions of how the code works are available in Gustavsson (2022), in sectio
 
 
 ## Citation
-To cite this software, please use the <img src="https://github.com/user-attachments/assets/0e3949b2-396d-4bac-b559-94d71221f198" width="150"></img> button. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all of its versions. To cite a specific version, you can find version specific DOIs on Zenodo.  
+To cite this software, you can use the *Cite this repository* button in the **About** section. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all of its versions. To cite a specific version, you can find version specific DOIs on Zenodo.  
 
 
 ## References
