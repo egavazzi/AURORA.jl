@@ -31,6 +31,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Term = "22787eb5-b846-44ae-b979-8e399b8463ab"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
@@ -44,3 +45,4 @@ Integrals = "4.5.0"
 Interpolations = "0.15.1"
 PrecompileTools = "1.2.1"
 Statistics = "1.11.1"
+Test = "1.11.0"
