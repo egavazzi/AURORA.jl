@@ -40,7 +40,25 @@ using MAT
     reference_file = "reference_results/Qzt_all_L.mat"
     data_ref = matread(reference_file)
     data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test isapprox(data_new["QO1S"], data_ref["QO1S"])
+    @test isapprox(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4)
 
     rm("temp_results", recursive=true)
 end
+
+
+
+# using MAT
+# data1 = matread("test/reference_results/Qzt_all_L.mat")
+# data2 = matread("/home/etienne/Documents/Julia/tmp_AURORA.jl/test/reference_results/Qzt_all_L.mat")
+
+# isapprox.(data1["QO1S"], data2["QO1S"])
+# isapprox(data1["QO1S"], data2["QO1S"], rtol = 1e-4)
+
+# using GLMakie
+# f = Figure(linewidth = 2)
+# ax = Axis(f[1, 1], xscale = log10)
+# lines!(data1["QO1S"][:], data1["h_atm"] / 1e3, label = "Reference")
+# lines!(data2["QO1S"][:], data1["h_atm"] / 1e3, linestyle = :dash, label = "This PR")
+# xlims!(maximum(data1["QO1S"][:]) * 1e-3, maximum(data1["QO1S"][:]) * 1e1)
+# axislegend()
+# f

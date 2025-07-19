@@ -10,5 +10,5 @@ n_loop = 1
 CFL_number = 0
 input_options = (input_type = "constant_onset", IeE_tot = 0.01, z₀ = 500, E_min = 900, Beams = 1:2, t0 = 0, t1 = 0) 
 
-commit_hash = 6a5ad45b1d629af45543bab5f7745278044d932f 
+commit_hash = f8d4ed06145f9aa1342e910f390149f977042b74 
 version_AURORA = 0.5.0
