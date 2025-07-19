@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+    tags: '*'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+    branches: 
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+
+      - name: Install dependencies
+        run: julia --project -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run tests
+        run: julia --project -e 'using Pkg; Pkg.test()'
