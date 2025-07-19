@@ -453,7 +453,7 @@ function add_ionization_fragments!(Q, iE,
                                Ionization_fragment_1[3][k, j] * Ionization_fragment_2[3][iI] +  # secondaries
                                Ionizing_fragment_1[1][k, j] * Ionizing_fragment_2[1][iI] +  # primaries
                                Ionizing_fragment_1[2][k, j] * Ionizing_fragment_2[2][iI] +  # primaries
-                               Ionizing_fragment_1[3][k, j] * Ionizing_fragment_2[3][iI]    # primaries
+                               Ionizing_fragment_1[3][k, j] * Ionizing_fragment_2[3][iI] + 1    # primaries
             end
         end
     end
