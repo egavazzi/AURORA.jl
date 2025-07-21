@@ -124,12 +124,15 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
     p = Progress(length(θ₀); desc=string("Calculating scattering matrices "), color=:blue);
 
     rotation_axis1 = [0, 1, 0]
-    # e0 = zeros(3)
+    #=
+    What this basically do is:
+        - start with an initial angle θ₀ (from 0 to 180°), give us a vector e0
+        - rotate one time by a scattering angle θ₁ (from 0 to 360°), give us a vector e1
+        - rotate the vector e1 around e0 by an angle ϕ from 0 to 360°, each time giving us a vector es
+        - save the "z"-position of the es vector, which gives us the final "beam"-position
+    =#
     for i0 in length(θ₀):-1:1
         e0 = [sin(θ₀[i0]), 0, cos(θ₀[i0])]
-        # e0[1] = sin(θ₀[i0])
-        # e0[2] = 0
-        # e0[3] = cos(θ₀[i0])
 
         for i1 in length(θ₁):-1:1
             rotation_angle = θ₁[i1]
@@ -153,8 +156,6 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
     end
 
     Pmu2mup = B ./ repeat(sum(B, dims=3), outer = (1, 1, size(B, 3)))
-    # Pmu2mup[1, 1, :] .= Pmu2mup[2, 1, :] ./ 2 .+ Pmu2mup[1, 2, :] ./ 2
-    # Pmu2mup[end, end, :] .= Pmu2mup[end - 1, end, :] ./ 2 .+ Pmu2mup[end, end - 1, :] ./ 2
 
     theta2beamW = Array{Float64}(undef, length(θ_lims) - 1, length(θ₀))
     for iμ in (length(μ_lims) - 1):-1:1
