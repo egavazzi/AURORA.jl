@@ -119,8 +119,6 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
     μ = Vector{Float64}(undef, length(ϕ))
     B = Array{Float64}(undef, length(θ₀), length(θ₁), length(θ_lims) - 1)
 
-    st = sin.(ϕ)
-    ct = cos.(ϕ)
     cache = Vector{Float64}(undef, length(ϕ))
 
     p = Progress(length(θ₀); desc=string("Calculating scattering matrices "), color=:blue);
@@ -143,7 +141,10 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
 
             for iϕ in length(ϕ):-1:1
                 rotation_axis = e0
-                μ[iϕ] = my_very_special_rotation(e1, ct[iϕ], st[iϕ], rotation_axis)
+                rotation_angle = ϕ[iϕ]
+                rotation_matrix = AngleAxis(rotation_angle, rotation_axis[1], rotation_axis[2], rotation_axis[3])
+                es = rotation_matrix * e1
+                μ[iϕ] = es[3]
             end
 
             for iμ in (length(μ_lims) - 1):-1:1
@@ -163,13 +164,4 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
     BeamWeight_relative = theta2beamW ./ repeat(sum(theta2beamW, dims=2), 1, size(theta2beamW, 2))
 
     return Pmu2mup, theta2beamW, BeamWeight_relative, θ₁
-end
-
-function my_very_special_rotation(v, st, ct, k)
-    # Rotate the vector`v` around the rotation_axis `k` by a rotation_angle ϕ defined by
-    # cos(ϕ) = `ct` and sin(ϕ) = `st`. It is special in the way that it only computes and
-    # returns the z-component of the final vector.
-    # See Rodrigues' rotation formula at
-    # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
-    return v[3] * ct + (k[1]v[2] - k[2]v[1]) * st + k[3] * (k[1]v[1] + k[2]v[2] + k[3]v[3]) * (1 - ct)
 end
