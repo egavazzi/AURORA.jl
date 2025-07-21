@@ -137,7 +137,7 @@ function load_scattering_matrices(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 360)
+    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
     μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
                      BeamWeight = BeamWeight, theta1 = θ₁)
 
