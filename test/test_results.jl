@@ -36,11 +36,15 @@ using MAT
     ## Analyze the results
     make_volume_excitation_file(savedir)
 
-    ## Compare the results
+    ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
     reference_file = "reference_results/Qzt_all_L.mat"
     data_ref = matread(reference_file)
     data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
     @test isapprox(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4)
+
+    ## Print the actual maximum relative difference
+    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./ max.(abs.(data_ref["QO1S"]), eps())
+    println("Maximum relative difference: ", maximum(rel_diff))
 
     rm("temp_results", recursive=true)
 end
