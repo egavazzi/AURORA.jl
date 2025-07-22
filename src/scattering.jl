@@ -82,16 +82,109 @@ end
 
 
 
+
+
+
+# Another 100x factor (0.2s vs 20s for the legacy version, still with θ_lims = 180:-10:0 and
+# n_direction = 720
+"""
+    calculate_scattering_matrices(θ_lims, n_direction = 720)
+
+Calculate the scattering matrices for given pitch-angle limits `θ_lims` of the electron
+beams. Uses 720 directions by default for the start angle and the scattering angles,
+equivalent to (1/4)° steps.
+
+# Calling
+`Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ =  calculate_scattering_matrices(θ_lims, n_direction)`
+
+# Inputs
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
+    corresponds to field aligned down, and 0° field aligned up.
+- `n_direction`: number of directions or sub-beams to use for the discretized calculations
+    of the scattering matrices. Defaults to 720 when left empty.
+
+# Outputs
+- `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n\\_direction x * n\\_direction x n\\_beam]
+- `theta2beamW`: weight of each sub-beam within each beam. Matrix [n\\_beam x n\\_direction]
+- `BeamWeight_relative`: relative weight of each sub-beam within each beam. It is the same
+    as theta2beamW but normalized so that summing along the sub-beams gives 1 for each beam.
+    Matrix [n\\_beam x n\\_direction]
+- `θ₁`: scattering angles used in the calculations. Vector [n\\_direction]
+"""
+function calculate_scattering_matrices(θ_lims, n_direction = 720)
+    μ_lims = cosd.(θ_lims)
+
+    θ₀ = Vector(0:(180/n_direction):180); θ₀ = deg2rad.((θ₀[1:end - 1] .+ θ₀[2:end]) / 2)
+    θ₁ = deg2rad.(0:(180/n_direction):180); θ₁ = θ₁[1:end-1]
+    ct₀ = cos.(θ₀)
+    st₀ = sin.(θ₀)
+    ct₁ = cos.(θ₁)
+    st₁ = sin.(θ₁)
+
+    Pmu2mup = Array{Float64}(undef, length(θ₀), length(θ₁), length(θ_lims) - 1)
+    theta2beamW = Array{Float64}(undef, length(θ_lims) - 1, length(θ₀))
+
+    #=
+    What this does:
+    - Take an initial angle θ₀
+    - Take a scattering angle θ₁
+    - Instead of manually doing a rotation around the vector defined by θ₀ and then taking
+        the z-component of each point, calculate analytically the distribution of the
+        projection on the z-axis of the scattering "circle". This is much faster (and more
+        accurate?)
+    =#
+    for i0 in length(θ₀):-1:1
+        for i1 in length(θ₁):-1:1
+            for iμ in (length(μ_lims) - 1):-1:1
+                # This is an analytical calculation of the distribution of the projection
+                # of the scattered vectors on the z-axis.
+                z₁ = μ_lims[iμ]
+                z₂ = μ_lims[iμ + 1]
+                Pmu2mup[i0, i1, iμ] = 1 / π *
+                                  (asin(clamp((z₂ - ct₀[i0]ct₁[i1]) / (st₀[i0]st₁[i1]), -1, 1)) -
+                                   asin(clamp((z₁ - ct₀[i0]ct₁[i1]) / (st₀[i0]st₁[i1]), -1, 1)))
+
+            end
+        end
+    end
+
+    # Normalize so that all sum(Pmu2mup[i, j, :], dims=3) = 1
+    Pmu2mup = Pmu2mup ./ repeat(sum(Pmu2mup, dims = 3), outer = (1, 1, size(Pmu2mup, 3)))
+    # Calculate the beam weight of each subdivision
+    for iμ in (length(μ_lims) - 1):-1:1
+        theta2beamW[iμ, :] .= abs.(sin.(θ₀)) .* (μ_lims[iμ] .< cos.(θ₀) .< μ_lims[iμ + 1])
+    end
+    # Normalize so that all sum(BeamWeight_relative, dims=2) = 1
+    BeamWeight_relative = theta2beamW ./ repeat(sum(theta2beamW, dims=2), 1, size(theta2beamW, 2))
+
+    return Pmu2mup, theta2beamW, BeamWeight_relative, θ₁
+end
+
+
+
+
+
+
+
+
+
+
+
+
+############################################################################################
+##                                       Legacy                                           ##
+############################################################################################
+
 # 144x faster than the Matlab code (24s instead of 1h for θ_lims = 180:-10:0 and
 # n_direction = 720)
 """
-    calculate_scattering_matrices(θ_lims, n_direction=720)
+    calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
 
 Calculate the scattering matrices for given pitch-angle limits `θ_lims` of the electron
 beams.
 
 # Calling
-`Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ =  calculate_scattering_matrices(θ_lims, n_direction)`
+`Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ =  calculate_scattering_matrices_legacy(θ_lims, n_direction)`
 
 # Inputs
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
@@ -109,7 +202,7 @@ beams.
     Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
-function calculate_scattering_matrices(θ_lims, n_direction=720)
+function calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
     μ_lims = cosd.(θ_lims)
 
     θ₀ = Vector(0:(180/n_direction):180); θ₀ = deg2rad.((θ₀[1:end - 1] .+ θ₀[2:end]) / 2)
@@ -144,6 +237,10 @@ function calculate_scattering_matrices(θ_lims, n_direction=720)
             for iϕ in length(ϕ):-1:1
                 rotation_axis = e0
                 μ[iϕ] = my_very_special_rotation(e1, ct[iϕ], st[iϕ], rotation_axis)
+                # rotation_angle = ϕ[iϕ]
+                # rotation_matrix = AngleAxis(rotation_angle, rotation_axis[1], rotation_axis[2], rotation_axis[3])
+                # es = rotation_matrix * e1
+                # μ[iϕ] = es[3]
             end
 
             for iμ in (length(μ_lims) - 1):-1:1
