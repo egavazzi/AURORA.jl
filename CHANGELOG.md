@@ -1,6 +1,7 @@
 # Changelog
 
 - Improved performances, making simulations around 3x faster to run [#64](https://github.com/egavazzi/AURORA.jl/pull/64)
+- Faster scattering calculations, can change results very slightly [#66](https://github.com/egavazzi/AURORA.jl/pull/66)
 
 ## v0.5.0 - 2025-05-01
 - Faster phase functions calculations [#62](https://github.com/egavazzi/AURORA.jl/pull/62)
