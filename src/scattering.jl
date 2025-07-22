@@ -133,6 +133,7 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
         projection on the z-axis of the scattering "circle". This is much faster (and more
         accurate?)
     =#
+    p = Progress(length(θ₀); desc=string("Calculating scattering matrices "), color=:blue);
     for i0 in length(θ₀):-1:1
         for i1 in length(θ₁):-1:1
             for iμ in (length(μ_lims) - 1):-1:1
@@ -146,6 +147,7 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
 
             end
         end
+        next!(p)
     end
 
     # Normalize so that all sum(Pmu2mup[i, j, :], dims=3) = 1
