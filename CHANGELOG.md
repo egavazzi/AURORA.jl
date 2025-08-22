@@ -1,5 +1,5 @@
 # Changelog
-
+- Push possible maximum energy [#67](https://github.com/egavazzi/AURORA.jl/pull/67)
 - Improved performances, making simulations around 3x faster to run [#64](https://github.com/egavazzi/AURORA.jl/pull/64)
 
 ## v0.5.0 - 2025-05-01
