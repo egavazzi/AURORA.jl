@@ -102,8 +102,11 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 - `dE`: energy bin sizes(eV). Vector [nE]
 """
 function make_energy_grid(E_max)
+    if E_max > 1e6
+        error("AURORA does not support energies above 1 MeV. Please use a lower value for E_max.")
+    end
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
-    E = cumsum(E_function.(0:4000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    E = cumsum(E_function.(0:100000, 0.15, 11.5, 0.05, 80)) .+ 1.9
     iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
     E = E[1:iE_max];                        # crop E accordingly
     dE = diff(E); dE = [dE; dE[end]]
