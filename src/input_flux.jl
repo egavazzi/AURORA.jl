@@ -261,7 +261,7 @@ julia> E, dE = make_energy_grid(100e3)
 julia> θ_lims = 180:-10:0
 julia> μ_center = mu_avg(θ_lims)
 julia> BeamWeight = [2, 1, 1]
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:3)
+julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeWeight, 1:3)
 ```
 """
 function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
