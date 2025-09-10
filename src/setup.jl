@@ -172,19 +172,21 @@ function load_neutral_densities(msis_file, h_atm)
     z_msis = data_msis[:, 1] # extract the z-grid of the msis data
     data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
 
-    # create the interpolator
-    msis_interpolator = [PCHIPInterpolation(data_msis[:, i], z_msis;
-                                            extrapolation = ExtrapolationType.Extension)
+    # Create the interpolator
+    # The interpolation is done in log space, with the benefit that the linear extrapolation
+    # is actually an exponential one when we move back to linear space
+    msis_interpolator = [PCHIPInterpolation(log10.(data_msis[:, i]), z_msis;
+                                            extrapolation = ExtrapolationType.Linear)
                          for i in axes(data_msis, 2)]
-    # interpolate the msis data over our h_atm grid
-    msis_interpolated = [msis_interpolator[i](h_atm / 1e3) for i in axes(data_msis, 2)]
+    msis_interpolated = [exp.(msis_interpolator[i](h_atm / 1e3)) for i in axes(data_msis, 2)]
 
-    # extract the neutral densities
+    # Extract the neutral densities
     nN2 = msis_interpolated[3] # already in m⁻³
     nO2 = msis_interpolated[4] # already in m⁻³
     nO = msis_interpolated[5]  # already in m⁻³
     Tn = msis_interpolated[6]
 
+    # Boundary conditions
     nO[end-2:end] .= 0
 	nN2[end-2:end] .= 0
 	nO2[end-2:end] .= 0
@@ -192,6 +194,11 @@ function load_neutral_densities(msis_file, h_atm)
 	nO[end-5:end-3] .= erf_factor .* nO[end-5:end-3]
 	nN2[end-5:end-3] .= erf_factor .* nN2[end-5:end-3]
 	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
+
+    # Ensure no negative densities
+    nO[nO .< 0] .= 0
+    nN2[nN2 .< 0] .= 0
+    nO2[nO2 .< 0] .= 0
 
     n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
     return n_neutrals, Tn
@@ -216,23 +223,25 @@ Load the electron density and temperature.
 - `Te`: e- temperature (K). Vector [nZ]
 """
 function load_electron_densities(iri_file, h_atm)
-    # read the file and extract z-grid of the iri data
+    # Read the file and extract z-grid of the iri data
     data_iri = readdlm(iri_file, skipstart=14)
     data_iri[isnan.(data_iri)] .= 0
 
     z_iri = data_iri[:, 1]
 
-    # create the interpolator
-    iri_interpolator = [PCHIPInterpolation(data_iri[:, i], z_iri;
-                                           extrapolation = ExtrapolationType.Extension)
+    # Create the interpolator
+    # The interpolation is done in log space, with the benefit that the linear extrapolation
+    # is actually an exponential one when we move back to linear space
+    iri_interpolator = [PCHIPInterpolation(log10.(data_iri[:, i]), z_iri;
+                                           extrapolation = ExtrapolationType.Linear)
                         for i in axes(data_iri, 2)]
-    # interpolate the iri data over our h_atm grid
-    iri_interpolated = [iri_interpolator[i](h_atm / 1e3) for i in axes(data_iri, 2)]
+    iri_interpolated = [exp.(iri_interpolator[i](h_atm / 1e3)) for i in axes(data_iri, 2)]
 
-    # extract electron density and temperature
+    # Extract electron density and temperature
     ne = iri_interpolated[2] # from cm⁻³ to m⁻³
     Te = iri_interpolated[5]
 
+    # Ensure no negative densities, and a default Te value of 350
     ne[ne .< 0] .= 1
     Te[Te .== -1] .= 350
 
