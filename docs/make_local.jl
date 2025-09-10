@@ -24,7 +24,8 @@ makedocs(sitename = "AURORA.jl",
                  "Get started" => "manual_get-started.md",
                  "Folder structure" => "manual_folder-structure.md"
              ],
-             "Troubleshooting" => "troubleshooting.md"
+             "Troubleshooting" => "troubleshooting.md",
+             "API" => "api.md"
          ],
          format = Documenter.HTML(prettyurls = false),
          warnonly = true)

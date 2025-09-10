@@ -14,6 +14,7 @@ makedocs(
                     "Folder structure" => "manual_folder-structure.md"
                     ],
                 "Troubleshooting" => "troubleshooting.md",
+                "API" => "api.md"
                 ],
         warnonly = true)
 

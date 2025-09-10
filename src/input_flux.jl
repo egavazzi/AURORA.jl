@@ -233,7 +233,7 @@ JGR 1989 (pages 13541-13552)
 - `low_energy_tail=true`: control the presence of a low energy tail
 
 # Returns:
-- `Ie_top`: differential electron energy flux (#e⁻/m²/s)
+- `Ie_top`: differential electron energy flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
 
 # Very important notes
 This is a corrected version of the equations present in Meier et al. 1989
