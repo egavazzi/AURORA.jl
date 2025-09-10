@@ -3,6 +3,13 @@
 using AURORA
 using Documenter
 
+DocMeta.setdocmeta!(
+    AURORA,
+    :DocTestSetup,
+    :(using AURORA);
+    recursive=true,
+    )
+
 makedocs(
         sitename = "AURORA.jl",
         modules = [AURORA],
@@ -16,7 +23,9 @@ makedocs(
                 "Troubleshooting" => "troubleshooting.md",
                 "API" => "api.md"
                 ],
-        warnonly = true)
+        warnonly = false,
+        checkdocs = :none,
+        )
 
 deploydocs(;
     repo="github.com/egavazzi/AURORA.jl.git",

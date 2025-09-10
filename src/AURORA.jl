@@ -20,7 +20,7 @@ include("scattering.jl")
 export setup, make_altitude_grid, make_energy_grid
 export find_nrlmsis_file
 export find_iri_file
-export Ie_top_from_file, Ie_top_flickering, Ie_top_constant
+export Ie_top_from_file, Ie_top_flickering, Ie_top_constant, Ie_with_LET
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 export loss_to_thermal_electrons, beams2beams, make_A, make_B, make_D
 export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,

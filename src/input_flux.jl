@@ -214,7 +214,7 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot
 end
 
 """
-    Ie_with_LET(E₀, Q, E, μ_center, Beams; low_energy_tail=true)
+    Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
 
 Return an electron spectra following a Maxwellian distribution with a low
 energy tail (LET)
@@ -235,7 +235,7 @@ JGR 1989 (pages 13541-13552)
 # Returns:
 - `Ie_top`: differential electron energy flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
 
-# Very important notes
+# Important notes
 This is a corrected version of the equations present in Meier et al. 1989
 to match the results presented in Fig. 4 of their paper.\\
 Changes were made to the factor `b`:
@@ -246,22 +246,32 @@ Changes were made to the factor `b`:
 Calling the function with flux only in the two first beams (0 to 20°) and an "isotropic"
 pitch-angle distribution.
 ```jldoctest
-julia> E, dE = make_energy_grid(100e3)
-julia> θ_lims = 180:-10:0
-julia> μ_center = mu_avg(θ_lims)
-julia> BeamWeight = beam_weight(180:-10:0)
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:2)
+julia> E, dE = make_energy_grid(100e3);
+
+julia> θ_lims = 180:-10:0;
+
+julia> μ_center = mu_avg(θ_lims);
+
+julia> BeamWeight = beam_weight(180:-10:0);
+
+julia> Ie = AURORA.Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:2);
+
 ```
 
 Calling the function with flux only in the three first beams (0 to 30°) and a
 custom pitch-angle distribution (1/2 of the total flux in the first beam,
 1/4 in the second beam and 1/4 in the third beam).
 ```jldoctest
-julia> E, dE = make_energy_grid(100e3)
-julia> θ_lims = 180:-10:0
-julia> μ_center = mu_avg(θ_lims)
-julia> BeamWeight = [2, 1, 1]
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeWeight, 1:3)
+julia> E, dE = make_energy_grid(100e3);
+
+julia> θ_lims = 180:-10:0;
+
+julia> μ_center = mu_avg(θ_lims);
+
+julia> BeamWeight = [2, 1, 1];
+
+julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:3);
+
 ```
 """
 function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
