@@ -175,7 +175,7 @@ function load_neutral_densities(msis_file, h_atm)
     # Create the interpolator
     # The interpolation is done in log space, with the benefit that the linear extrapolation
     # is actually an exponential one when we move back to linear space
-    msis_interpolator = [PCHIPInterpolation(log10.(data_msis[:, i]), z_msis;
+    msis_interpolator = [PCHIPInterpolation(log.(data_msis[:, i]), z_msis;
                                             extrapolation = ExtrapolationType.Linear)
                          for i in axes(data_msis, 2)]
     msis_interpolated = [exp.(msis_interpolator[i](h_atm / 1e3)) for i in axes(data_msis, 2)]
@@ -232,7 +232,7 @@ function load_electron_densities(iri_file, h_atm)
     # Create the interpolator
     # The interpolation is done in log space, with the benefit that the linear extrapolation
     # is actually an exponential one when we move back to linear space
-    iri_interpolator = [PCHIPInterpolation(log10.(data_iri[:, i]), z_iri;
+    iri_interpolator = [PCHIPInterpolation(log.(data_iri[:, i]), z_iri;
                                            extrapolation = ExtrapolationType.Linear)
                         for i in axes(data_iri, 2)]
     iri_interpolated = [exp.(iri_interpolator[i](h_atm / 1e3)) for i in axes(data_iri, 2)]
