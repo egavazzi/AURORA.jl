@@ -240,7 +240,6 @@ This is a corrected version of the equations present in Meier et al. 1989
 to match the results presented in Fig. 4 of their paper.\\
 Changes were made to the factor `b`:
 - no inverse
-- 0.35 is actually 350
 
 # Examples:
 Calling the function with flux only in the two first beams (0 to 20°) and an "isotropic"
@@ -281,12 +280,9 @@ function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_ta
 
     # Maxwellian spectra
     Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀) # π is gone as we do not normalize in /ster
-    # Parameter for the LET (equations as written in the paper)
-    # b = 1 / (0.8 * E₀) .* (E₀ < 500) +
-    #     1 / (0.1 * E₀ + .35) .* (E₀ >= 500)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
-        (0.1 * E₀ + 350) .* (E₀ >= 500)
+        (0.1 * E₀ + 350) .* (E₀ >= 500) # use 350 instead of .35 because we are in eV
 
     for i_μ in Beams
         if low_energy_tail
