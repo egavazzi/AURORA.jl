@@ -234,12 +234,12 @@ function load_electron_densities(iri_file, h_atm)
     # is actually an exponential one when we move back to linear space
     iri_interpolator = [PCHIPInterpolation(log.(data_iri[:, i]), z_iri;
                                            extrapolation = ExtrapolationType.Linear)
-                        for i in axes(data_iri, 2)]
-    iri_interpolated = [exp.(iri_interpolator[i](h_atm / 1e3)) for i in axes(data_iri, 2)]
+                        for i in [2, 5]]
+    iri_interpolated = [exp.(iri_interpolator[i](h_atm / 1e3)) for i in eachindex(iri_interpolator)]
 
     # Extract electron density and temperature
-    ne = iri_interpolated[2] # from cm⁻³ to m⁻³
-    Te = iri_interpolated[5]
+    ne = iri_interpolated[1] # already in m⁻³
+    Te = iri_interpolated[2]
 
     # Ensure no negative densities, and a default Te value of 350
     ne[ne .< 0] .= 1
