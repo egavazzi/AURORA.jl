@@ -1,4 +1,12 @@
-# push!(LOAD_PATH, "../src/")
+#=
+To run locally:
+- Install LiveServer.jl in your global environment
+- Move to the AURORA folder
+- Run
+    ```
+    $> julia --project=docs -e 'using AURORA, LiveServer; servedocs()`
+    ```
+=#
 
 using AURORA
 using Documenter

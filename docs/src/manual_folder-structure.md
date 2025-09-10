@@ -1,4 +1,5 @@
 # Folder structure
+!!! warning "This page is not up to date"
 
 The code is structured as follow
 ```

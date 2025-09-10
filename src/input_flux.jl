@@ -270,7 +270,7 @@ julia> μ_center = mu_avg(θ_lims);
 
 julia> BeamWeight = [2, 1, 1];
 
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeWeight, 1:3);
+julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:3);
 
 ```
 """
