@@ -196,9 +196,13 @@ function load_neutral_densities(msis_file, h_atm)
 	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
 
     # Ensure no negative densities
-    nO[nO .< 0] .= 0
-    nN2[nN2 .< 0] .= 0
-    nO2[nO2 .< 0] .= 0
+    if any(nO .< 0) || any(nN2 .< 0) || any(nO2 .< 0)
+        @warn "Negative densities found. They were set to 0, but you might want to check " *
+              "why that happened"
+        nO[nO .< 0] .= 0
+        nN2[nN2 .< 0] .= 0
+        nO2[nO2 .< 0] .= 0
+    end
 
     n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
     return n_neutrals, Tn
