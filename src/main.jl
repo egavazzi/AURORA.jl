@@ -149,8 +149,9 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
                                 INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.Beams,
                                 INPUT_OPTIONS.t0, INPUT_OPTIONS.t1)
     elseif INPUT_OPTIONS.input_type == "LET"
-        Ie_top = Ie_with_LET(INPUT_OPTIONS.E0, INPUT_OPTIONS.Q, E, μ_center,
-                             INPUT_OPTIONS.Beams, INPUT_OPTIONS.low_energy_tail)
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.E0, INPUT_OPTIONS.Q, E, dE, μ_center,
+                             μ_scatterings.BeamWeight, INPUT_OPTIONS.Beams;
+                             low_energy_tail = INPUT_OPTIONS.low_energy_tail)
     elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
         Ie_top = Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file);
     elseif INPUT_OPTIONS.input_type == "bgu_custom"
