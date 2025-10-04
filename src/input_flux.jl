@@ -224,7 +224,7 @@ JGR 1989 (pages 13541-13552)
 
 # Arguments
 - `E₀`: characteristic energy (eV)
-- `Q`: total energy flux (eV/m²/s)
+- `Q`: total energy flux into the ionosphere (eV/m²/s)
 - `E`: energy grid (eV). Vector [nE]
 - `dE`: energy bin sizes(eV). Vector [nE]
 - `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
@@ -279,7 +279,10 @@ function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_ta
     E_middle = E .+ dE / 2 # middle of the energy bins
 
     # Maxwellian spectra
-    Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀) # π is gone as we do not normalize in /ster
+    # π is gone as we do not normalize in /ster
+    # However we keep the 2 as it seems necessary to keep the total energy flux
+    # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get
+    Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
         (0.1 * E₀ + 350) .* (E₀ >= 500) # use 350 instead of .35 because we are in eV
