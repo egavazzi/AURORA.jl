@@ -26,8 +26,26 @@ using AURORA
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
-
-
+@testset "Does it actually run?" begin
+    # Setting parameters
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
+    E_max = 100;                   # (eV) upper limit to the energy grid
+    B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
+    msis_file = find_nrlmsis_file();
+    iri_file = find_iri_file();
+    savedir = make_savedir("", "")
+    # Define input parameters
+    input_type = "LET"
+    E0 = 50                 # characteristic energy (eV)
+    Q = 6.24151e15          # total energy flux (eV/m2/s) (1 mW = 24151e15 eV)
+    Beams = 1               # indices of the beams with precipitation
+    low_energy_tail = true  # with or without a low energy tail
+    INPUT_OPTIONS = (;input_type, E0, Q, Beams, low_energy_tail);
+    # Run simulation
+    calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
+                                       msis_file, iri_file, savedir, INPUT_OPTIONS)
+end
 
 
 
