@@ -811,7 +811,7 @@ function calculate_cascading_O(E_grid, dE)
                         result, _ = hcubature(integrand,
                                              [E_degraded_bin_min, 0.0],
                                              [E_degraded_bin_max, 1.0],
-                                             rtol=1e-4, atol=1e-10)
+                                             rtol=1e-4, atol=0)
                         Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                     end
                 end
