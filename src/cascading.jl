@@ -144,7 +144,7 @@ function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4)
         end
 
         progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("N₂ threshold ", i_threshold, "/", n_thresholds),
+                           desc=string("N₂ threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
                            color=:blue)
 
         # Loop over primary electron energy bins
@@ -298,7 +298,7 @@ function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2)
         end
 
         progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("O₂ threshold ", i_threshold, "/", n_thresholds),
+                           desc=string("O₂ threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
                            color=:blue)
 
         for i_primary in i_min_primary:n_energies
@@ -459,7 +459,7 @@ function calculate_cascading_O(E_grid, dE)
         E_primary_range = zeros(2)  # Will be updated for each primary energy bin
 
         progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("O threshold ", i_threshold, "/", n_thresholds),
+                           desc=string("O threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
                            color=:blue)
 
         # Loop over primary electron energy bins
