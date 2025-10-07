@@ -1,4 +1,5 @@
 # Changelog
+- Refactor the cascading functions for more clarity and better performance [#72](https://github.com/egavazzi/AURORA.jl/pull/72)
 - Fix and improve the `Ie_with_LET()` function [#71](https://github.com/egavazzi/AURORA.jl/pull/68)
 - Fix negative densities at very low altitudes (< 85km) [#69](https://github.com/egavazzi/AURORA.jl/pull/69)
 - Increase possible maximum energy [#67](https://github.com/egavazzi/AURORA.jl/pull/67)
