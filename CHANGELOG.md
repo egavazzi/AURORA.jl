@@ -1,4 +1,5 @@
 # Changelog
+- Fix and improve the `Ie_with_LET()` function [#71](https://github.com/egavazzi/AURORA.jl/pull/68)
 - Fix negative densities at very low altitudes (< 85km) [#69](https://github.com/egavazzi/AURORA.jl/pull/69)
 - Increase possible maximum energy [#67](https://github.com/egavazzi/AURORA.jl/pull/67)
 - Improve performances, making simulations around 3x faster to run [#64](https://github.com/egavazzi/AURORA.jl/pull/64)
