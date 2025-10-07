@@ -155,7 +155,7 @@ let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
                 println("Starting to calculate the requested cascading-matrices.")
 
                 # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_N2_quadgk(E_grid, dE, lorentzian_width)
+                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_N2(E_grid, dE, lorentzian_width)
 
                 # Save the results for future use
                 save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
@@ -220,7 +220,7 @@ let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
                 println("Starting to calculate the requested cascading-matrices.")
 
                 # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O2_quadgk(E_grid, dE, lorentzian_width)
+                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O2(E_grid, dE, lorentzian_width)
 
                 # Save the results for future use
                 save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
@@ -284,7 +284,7 @@ let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
                 println("Starting to calculate the requested cascading-matrices.")
 
                 # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O_quadgk(E_grid, dE)
+                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O(E_grid, dE)
 
                 # Save the results for future use
                 save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
