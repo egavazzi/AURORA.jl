@@ -21,7 +21,7 @@ using ProgressMeter: Progress, next!
 # end
 
 
-let Q = [], E4Q , E_ionizations
+let Q = [], E4Q = [] , E_ionizations = []
     global function cascading_N2(E_secondary, E_primary, E_ionization, s_or_c)
 
         # First we check if the cascading spectra has already been loaded by checking the
@@ -48,7 +48,7 @@ let Q = [], E4Q , E_ionizations
                             E_ionizations = read(file, "E_ionizations")
                             close(file)
                             found_them = 1
-                        break
+                            break
                         end
                     catch
                     end
@@ -141,7 +141,7 @@ let Q = [], E4Q , E_ionizations
 end
 
 
-let Q = [], E4Q , E_ionizations
+let Q = [], E4Q = [] , E_ionizations = []
     global function cascading_O2(E_secondary, E_primary, E_ionization, s_or_c)
 
         # First we check if the cascading spectra has already been loaded by checking the
@@ -168,7 +168,7 @@ let Q = [], E4Q , E_ionizations
                             E_ionizations = read(file, "E_ionizations")
                             close(file)
                             found_them = 1
-                        break
+                            break
                         end
                     end
                 catch
@@ -262,25 +262,13 @@ let Q = [], E4Q , E_ionizations
 end
 
 
-let Q = [], E4Q , E_ionizations
+let Q = [], E4Q = [] , E_ionizations = []
     global function cascading_O(E_secondary, E_primary, E_ionization, s_or_c)
 
-        #=== WHERE DOES THAT COME FROM ? ===#
         E_parameters = [100, 200, 500, 1000, 2000]
         B_p = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
         A_p = [12.6, 13.7, 14.1, 14.0, 13.7]
-        if (minimum(E_parameters) < E_primary) & (E_primary < maximum(E_parameters))
-            A = linear_interpolation(E_parameters, A_p)(E_primary)
-            B = linear_interpolation(E_parameters, B_p)(E_primary)
-        elseif E_primary <= minimum(E_parameters)
-            A = A_p[1]
-            B = B_p[1]
-        else
-            A = A_p[end]
-            B = B_p[end]
-        end
-        A = A*1.25
-        #===================================#
+
 
         # First we check if the cascading spectra has already been loaded by checking the
         # static/persistent local variables (namely Q, E4Q and E_ionizations)
@@ -305,7 +293,7 @@ let Q = [], E4Q , E_ionizations
                             E_ionizations = read(file, "E_ionizations")
                             close(file)
                             found_them = 1
-                        break
+                            break
                         end
                     catch
                     end
@@ -394,7 +382,22 @@ let Q = [], E4Q , E_ionizations
             end
         end
 
-
+        #=== WHERE DOES THAT COME FROM ? ===#
+        E_parameters = [100, 200, 500, 1000, 2000]
+        B_p = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
+        A_p = [12.6, 13.7, 14.1, 14.0, 13.7]
+        if (minimum(E_parameters) < E_primary) & (E_primary < maximum(E_parameters))
+            A = linear_interpolation(E_parameters, A_p)(E_primary)
+            B = linear_interpolation(E_parameters, B_p)(E_primary)
+        elseif E_primary <= minimum(E_parameters)
+            A = A_p[1]
+            B = B_p[1]
+        else
+            A = A_p[end]
+            B = B_p[end]
+        end
+        A = A*1.25
+        #===================================#
 
         if s_or_c == "s"
             # Calculating the spectra of the secondary e-
