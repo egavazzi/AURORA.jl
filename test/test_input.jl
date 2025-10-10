@@ -25,7 +25,7 @@
 end
 
 
-@testitem "Does it actually run?" begin
+@testitem "(SS) Does LET run?" begin
     # Setting parameters
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
@@ -43,9 +43,87 @@ end
     INPUT_OPTIONS = (;input_type, E0, Q, Beams, low_energy_tail);
     # Run simulation
     calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-                                       msis_file, iri_file, savedir, INPUT_OPTIONS)
+                                    msis_file, iri_file, savedir, INPUT_OPTIONS)
+    @test true
 end
 
+@testitem "(SS) Does constant onset run?" begin
+    # Setting parameters
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
+    E_max = 100;                 # (eV) upper limit to the energy grid
+    B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
+    msis_file = find_nrlmsis_file();
+    iri_file = find_iri_file();
+    savedir = make_savedir("", "")
+    # Define input parameters
+    input_type = "constant_onset"
+    IeE_tot = 1.0           # total energy flux (W/m²)
+    z₀ = 500.0              # altitude of the source (km)
+    E_min = 50.0            # minimum energy (eV)
+    Beams = 1:2             # indices of the beams with precipitation
+    t0 = 0.0                # onset start time (s)
+    t1 = 0.0                # onset end time (s)
+    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+    # Run simulation
+    calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
+                                    msis_file, iri_file, savedir, INPUT_OPTIONS)
+    @test true
+end
+
+@testitem "(TD) Does constant onset run?" begin
+    # Setting parameters
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
+    E_max = 100;                 # (eV) upper limit to the energy grid
+    B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
+    t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
+    n_loop = 2;                    # number of loops to run
+    CFL_number = 128;
+    msis_file = find_nrlmsis_file();
+    iri_file = find_iri_file();
+    savedir = make_savedir("", "")
+    # Define input parameters
+    input_type = "constant_onset"
+    IeE_tot = 1.0           # total energy flux (W/m²)
+    z₀ = 500.0              # altitude of the source (km)
+    E_min = 50.0            # minimum energy (eV)
+    Beams = 1:2             # indices of the beams with precipitation
+    t0 = 0.0                # onset start time (s)
+    t1 = 0.05               # onset end time (s)
+    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+    # Run simulation
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
+                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+    @test true
+end
+
+@testitem "(TD) Does flickering run?" begin
+    # Setting parameters
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
+    E_max = 100;                 # (eV) upper limit to the energy grid
+    B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
+    t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
+    n_loop = 2;                    # number of loops to run
+    CFL_number = 128;
+    msis_file = find_nrlmsis_file();
+    iri_file = find_iri_file();
+    savedir = make_savedir("", "")
+    # Define input parameters
+    input_type = "flickering";
+    IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
+    z₀ = 1000;                  # (km) altitude of the source
+    E_min = 50;                # (eV) bottom energy of the FAB
+    f = 5;                      # (Hz) frequence of the modulation
+    Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
+    modulation = "sinus";       # type of the modulation ("square" or "sinus")
+    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+    # Run simulation
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
+                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+    @test true
+end
 
 
 
