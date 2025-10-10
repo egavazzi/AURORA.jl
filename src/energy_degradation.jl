@@ -13,7 +13,7 @@ function demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_leve
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] .+ dE[iE] / 2, ne, Te) / dE[iE],
                                 outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
     end
 
@@ -38,7 +38,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] .+ dE[iE] / 2, ne, Te) / dE[iE],
                                    outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
     end
 
