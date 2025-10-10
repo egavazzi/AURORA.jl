@@ -1,7 +1,5 @@
-using MAT
-
-# Here we test that the O1S volume emission rate is the same as some reference results
-@testset "AURORA steady-state results" begin
+@testitem "AURORA steady-state results" begin
+    using MAT
     altitude_lims = [100, 500];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0;             # (°) angle-limits for the electron beams
     E_max = 1000;                   # (eV) upper limit to the energy grid

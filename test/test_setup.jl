@@ -1,4 +1,4 @@
-@testset "Neutral densities" begin
+@testitem "Neutral densities" begin
     h_atm = make_altitude_grid(50, 800)
     msis_file = find_nrlmsis_file()
 
@@ -16,7 +16,8 @@
     @test !any(Tn .< 0)
 end
 
-@testset "Electron densities" begin
+
+@testitem "Electron densities" begin
     h_atm = make_altitude_grid(50, 800)
     iri_file = find_iri_file()
     ne, Te = AURORA.load_electron_densities(iri_file, h_atm)

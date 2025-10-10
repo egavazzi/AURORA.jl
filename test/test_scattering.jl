@@ -1,18 +1,17 @@
-# Define some parameters for the tests
-θ_lims = 180:-10:0
-n_dirs = 720
-Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
-BeamW = beam_weight(θ_lims);
+@testitem "Rotation matrices" begin
+    # Define some parameters for the tests
+    θ_lims = 180:-10:0
+    n_dirs = 720
+    Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
+    BeamW = beam_weight(θ_lims);
 
-# check if θ_lims is symmetric
-check = false
-if iseven(length(θ_lims) - 1)
-    n_θhalf = Int((length(θ_lims) - 1) / 2)
-    check = all(θ_lims[1:n_θhalf + 1] .+ θ_lims[end:-1:n_θhalf + 1] .== 180)
-end
+    # check if θ_lims is symmetric
+    check = false
+    if iseven(length(θ_lims) - 1)
+        n_θhalf = Int((length(θ_lims) - 1) / 2)
+        check = all(θ_lims[1:n_θhalf + 1] .+ θ_lims[end:-1:n_θhalf + 1] .== 180)
+    end
 
-
-@testset "Rotation matrices" begin
     @testset "BeamWeight_relative" begin
         # check normalization
         @test all(sum(BeamWeight_relative, dims=2) .≈ 1)
@@ -36,10 +35,21 @@ end
     end
 end
 
+@testitem "B2B matrices" begin
+    # Define some parameters for the tests
+    θ_lims = 180:-10:0
+    n_dirs = 720
+    Pmu2mup, theta2beamW, BeamWeight_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
 
-# if θ_lims is symmetric, the B2B matrices should be symmetric
-if check
-    @testset "B2B matrices" begin
+    # check if θ_lims is symmetric
+    check = false
+    if iseven(length(θ_lims) - 1)
+        n_θhalf = Int((length(θ_lims) - 1) / 2)
+        check = all(θ_lims[1:n_θhalf + 1] .+ θ_lims[end:-1:n_θhalf + 1] .== 180)
+    end
+
+    # if θ_lims is symmetric, the B2B matrices should be symmetric
+    if check
         E, _ = AURORA.make_energy_grid(7000)
         phaseN2e, phaseN2i = phase_fcn_N2(θ₁, E);
         phaseO2e, phaseO2i = phase_fcn_O2(θ₁, E);

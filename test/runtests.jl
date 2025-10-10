@@ -1,7 +1,3 @@
-using Test
-using AURORA
+using TestItemRunner
 
-include("test_results.jl")
-include("test_scattering.jl")
-include("test_setup.jl")
-include("test_input.jl")
+@run_package_tests
