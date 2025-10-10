@@ -96,7 +96,7 @@ function make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
     end
 
     # add losses due to electron-electron collisions
-    A = A + loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE];
+    A = A + loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE];
 
     return A
 end
