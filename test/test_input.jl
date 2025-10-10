@@ -1,6 +1,4 @@
-using AURORA
-
-@testset "Maxwellian with LET" begin
+@testitem "Maxwellian with LET" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
@@ -26,7 +24,8 @@ using AURORA
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
-@testset "Does it actually run?" begin
+
+@testitem "Does it actually run?" begin
     # Setting parameters
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
