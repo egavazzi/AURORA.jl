@@ -44,7 +44,7 @@
 
     ## Print the actual maximum relative difference
     rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]))
+               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
     println("Maximum relative difference: ", maximum(rel_diff))
 
     rm("temp_results", recursive=true)
@@ -98,7 +98,7 @@ end
 
     ## Print the actual maximum relative difference
     rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]))
+               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
     println("Maximum relative difference: ", maximum(rel_diff))
 
     rm("temp_results", recursive=true)
