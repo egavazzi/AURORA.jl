@@ -1,8 +1,8 @@
 @testitem "AURORA steady-state results" begin
     using MAT
-    altitude_lims = [100, 500];     # (km) altitude limits of the ionosphere
-    θ_lims = 180:-10:0;             # (°) angle-limits for the electron beams
-    E_max = 1000;                   # (eV) upper limit to the energy grid
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
+    E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
     msis_file = find_nrlmsis_file(
@@ -29,19 +29,76 @@
 
     ## Run the simulation
     calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-        msis_file, iri_file, savedir, INPUT_OPTIONS);
+                                       msis_file, iri_file, savedir, INPUT_OPTIONS)
 
     ## Analyze the results
+    make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
+    make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = "reference_results/Qzt_all_L.mat"
+    reference_file = "reference_results/SS/Qzt_all_L.mat"
     data_ref = matread(reference_file)
     data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test isapprox(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4)
+    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
 
     ## Print the actual maximum relative difference
-    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./ max.(abs.(data_ref["QO1S"]), eps())
+    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
+               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]))
+    println("Maximum relative difference: ", maximum(rel_diff))
+
+    rm("temp_results", recursive=true)
+end
+
+
+@testitem "AURORA time-dependent results" begin
+    using MAT
+    altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
+    E_max = 500;                   # (eV) upper limit to the energy grid
+    B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
+
+    t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
+    n_loop = 2;                    # number of loops to run
+    CFL_number = 128;
+
+    msis_file = find_nrlmsis_file();
+    iri_file = find_iri_file();
+
+    ## Define where to save the results
+    root_savedir = "temp_results/"   # name of the root folder
+    name_savedir = "temp/"   # name of the experiment folder
+    savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
+
+    ## Define input parameters
+    input_type = "flickering";
+    IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
+    z₀ = 1000;                  # (km) altitude of the source
+    E_min = 100;                # (eV) bottom energy of the FAB
+    f = 5;                      # (Hz) frequence of the modulation
+    Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
+    modulation = "sinus";       # type of the modulation ("square" or "sinus")
+    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+
+    ## Run the simulation
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
+                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+
+    ## Analyze the results
+    make_Ie_top_file(savedir)
+    make_volume_excitation_file(savedir)
+    make_column_excitation_file(savedir)
+    make_current_file(savedir)
+
+    ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
+    reference_file = "reference_results/TD/Qzt_all_L.mat"
+    data_ref = matread(reference_file)
+    data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
+    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
+
+    ## Print the actual maximum relative difference
+    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
+               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]))
     println("Maximum relative difference: ", maximum(rel_diff))
 
     rm("temp_results", recursive=true)
