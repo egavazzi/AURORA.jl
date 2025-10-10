@@ -1,25 +1,53 @@
-function loss_to_thermal_electrons(E, ne, Te)
-    kB = 1.380662e-23;      # Boltzmann constant [J/K]
-    qₑ = 1.6021773e-19;    # elementary charge [C]
-    if length(E) > 1
-        sz_E = length(E);
-        sz_ne = length(ne);
+"""
+    loss_to_thermal_electrons(E, ne, Te)
 
-        ne = repeat(ne, outer=(1, sz_E));
-        Te = repeat(Te, outer=(1, sz_E));
-        E = repeat(E, outer=(1, sz_ne))';
+Suprathermal electron energy loss function due to electron-electron collisions.
 
-        Ee = kB / qₑ * Te;
+This function calculates the electron energy loss function due to electron-electron
+interaction. It uses the analytic form given for the energy-transfer rate from
+photoelectrons (or suprathermal electrons) to thermal electrons, given by Swartz
+and Nisbet (1971). The expression fits the classical formulation of Itikawa and
+Aono (1966) at low energies and gives a smooth transition to fit the quantum
+mechanical equation of Schunk and Hays (1971) at higher energies.
 
-        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee)) .^ 2.36 ./ E .^ .44 / v_of_E(E));
+# Arguments
+- `E::Real`: Energy level [eV]. Scalar value.
+- `ne::Vector`: Ambient electron concentration [/m³], length nZ.
+- `Te::Vector`: Electron temperature [K], length nZ.
 
-        Le[E .< Ee] .= 0;
-    else
-        Ee = 8.618e-5 * Te;
+# Returns
+- `Le::Vector`: Electron energy loss function [eV/m], length nZ.
 
-        Le = real(3.0271e-10 * ne .^ .97 .* ((E .- Ee) ./ (E .- 0.53 * Ee)) .^ 2.36 ./ E .^ .44 / v_of_E(E));
-        Le[E .< Ee] .= 0;
-    end
+# Notes
+The paper by Swartz and Nisbet uses electron density in cm⁻³; here the constant
+is rescaled to use m⁻³ instead. We calculate the loss function dE/ds(E,ne,Te)
+directly and not as in Swartz and Nisbet dE/ds(E,ne,Te)/ne.
+
+The loss is set to zero when the suprathermal electron energy E is below the
+thermal electron energy Ee = kB*Te/qₑ.
+
+# References
+- Swartz, W. E., J. S. Nisbet, and A. E. S. Green (1971), Analytic expression
+  for the energy transfer rate from photoelectrons to thermal electrons,
+  J. Geophys. Res., 76(34), 8425-8426, doi: 10.1029/JA076i034p08425.
+- Itikawa, Y., and O. Aono (1966), Energy change of a charged particle moving
+  in a plasma, Phys. Fluids, 9, 1259-1261.
+- Schunk, R. W., and P. B. Hays (1971), Photoelectron energy losses to thermal
+  electrons, Planet. Space Sci., 19, 113-117.
+"""
+function loss_to_thermal_electrons(E::Real, nₑ, Tₑ)
+    kB = 1.380662e-23     # Boltzmann constant [J/K]
+    qₑ = 1.6021773e-19    # elementary charge [C]
+
+    # Thermal electron energy in eV
+    Eₑ = kB / qₑ * Tₑ
+
+    # Calculate energy loss function using Swartz & Nisbet (1971) formula
+    Le = 3.0271e-10 * nₑ .^ 0.97 ./ E^0.44 .* ((E .- Eₑ) ./ (E .- 0.53 * Eₑ)) .^ 2.36  / v_of_E(E)
+
+    # Set loss to zero when E < Ee (below thermal energy)
+    Le[E .< Eₑ] .= 0
+
     return Le
 end
 
@@ -68,7 +96,7 @@ function make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
     end
 
     # add losses due to electron-electron collisions
-    A = A + loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE];
+    A = A + loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE];
 
     return A
 end
