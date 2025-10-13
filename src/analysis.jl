@@ -461,7 +461,7 @@ The einstein coefficient `A` and effective lifetime `τ` are optional (equal to 
 # Output
 - `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
 """
-function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
 
     ## Define constant
     c = 2.99792458e8 # speed of light (m/s)
@@ -535,6 +535,19 @@ function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     return I_lambda.u
 end
 
+## Steady-state version
+function q2colem(t::Real, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+
+    ## Apply the effective lifetime and the Einstein coefficient
+    Q = Q .* τ .* A
+
+    ## Simple 1D integration
+    problem = SampledIntegralProblem(Q, h_atm; dim=1)
+    method = TrapezoidalRule()
+    I_lambda = solve(problem, method)
+
+    return I_lambda.u
+end
 
 
 
