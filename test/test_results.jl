@@ -30,6 +30,7 @@
     ## Analyze the results
     make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
+    make_column_excitation_file(savedir)
     make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)

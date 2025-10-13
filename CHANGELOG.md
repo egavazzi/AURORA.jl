@@ -1,4 +1,5 @@
 # Changelog
+- Make it possible to produce column excitations from steady-state results [#76](https://github.com/egavazzi/AURORA.jl/pull/76)
 - Add analysis function to calculate heating rates [#73](https://github.com/egavazzi/AURORA.jl/pull/73) 
 - Refactor the cascading functions for more clarity and better performance [#72](https://github.com/egavazzi/AURORA.jl/pull/72)
 - Fix and improve the `Ie_with_LET()` function [#71](https://github.com/egavazzi/AURORA.jl/pull/68)
