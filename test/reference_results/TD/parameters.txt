@@ -10,5 +10,5 @@ n_loop = 2
 CFL_number = 128
 input_options = (input_type = "flickering", IeE_tot = 0.01, z₀ = 1000, E_min = 100, f = 5, Beams = 1, modulation = "sinus") 
 
-commit_hash = 45aa4ff155619c44befb791894493b22c62b6a16 
+commit_hash = 4425a6c73077b1e61222acf739c6e4ed2a682b57 
 version_AURORA = 0.5.0
