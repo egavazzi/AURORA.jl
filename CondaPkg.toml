@@ -1,5 +1,5 @@
 [deps]
-python = "3.11"
+python = "3.11.*"
 
 [pip.deps]
 iri2016 = ""
