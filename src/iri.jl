@@ -56,7 +56,6 @@ function find_iri_file(;
     # If we did not find a file matching the parameters, we need to download one
     if found_it == 0
         println(" no file was found.")
-        # iri_data, parameters = download_iri_data(year, month, day, hour, minute, lat, lon, height)
         iri_data, parameters = calculate_iri_data(year, month, day, hour, minute, lat, lon, height)
         # and save it
         file_to_load = save_iri_data(iri_data, parameters)
@@ -69,87 +68,6 @@ function find_iri_file(;
         error("This is not normal, something is wrong with find_iri_file()")
     end
 end
-
-
-
-function download_iri_data(year=2018, month=12, day=7, hour=11, minute=15,
-    lat = 76, lon = 5, height = 85:1:700)
-
-    println("Starting to download iri data from https://kauai.ccmc.gsfc.nasa.gov/instantrun/iri/. It can take a few minutes (on the server side)...")
-
-    # URL to the iri api
-    url = "https://kauai.ccmc.gsfc.nasa.gov/instantrun/api/iri/2020/"
-
-    # HEADERS, should not be changed
-    headers = Dict(
-        "Accept" => "application/json",
-        "Accept-Encoding" => "gzip, deflate, br",
-        "Accept-Language" => "no,sv;q=0.8,fr;q=0.6,en-GB;q=0.4,en;q=0.2",
-        "Cache-Control" => "no-cache",
-        "Connection" => "keep-alive",
-        "Content-Type" => "application/json",
-        "DNT" => "1",
-        "Host" => "kauai.ccmc.gsfc.nasa.gov",
-        "Origin" => "https://kauai.ccmc.gsfc.nasa.gov",
-        "Pragma" => "no-cache",
-        "Referer" => "https://kauai.ccmc.gsfc.nasa.gov/instantrun/iri/",
-        "Sec-Fetch-Dest" => "empty",
-        "Sec-Fetch-Mode" => "no-cors",
-        "Sec-Fetch-Site" => "same-origin",
-        "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
-        # "Content-Length" => "229", # that should not be fixed
-    )
-    # BODY, that's the part that changes
-    # format the time
-    datetime = DateTime(year, month, day, hour, minute)
-    datetime = Dates.format(datetime, "yyyy-mm-ddTHH:MM:SS.000Z")
-    body = Dict(
-        "timeType" => "ut",         # universal time
-        "coordinateType" => "geo",  # geographic
-        "datetime" => datetime,
-        "lat" => lat,
-        "lon" => lon,
-        "height" => 100,
-        "profileType" => 1,       # height profile
-        "start" => height[1],
-        "stop" => height[end],
-        "step" => step(height),
-
-        # Everything under are default parameters
-        "tecUpper" => 2000,
-        "tecLower" => 50,
-        "outputType" => 0,
-        "useOptionals" => false,
-        "layVersion" => false,
-        "NeTopside" => "NeQuick",
-        "fof2Model" => "URSI-88",
-        "fof2Storm" => true,
-        "NeTopsideStorm" => false,
-        "hmF2Model"=> "AMTB-model",
-        "bottomsideThicknessB0" => "ABT-2009",
-        "F1Model" => "Scotto-1997-no-L",
-        "EPeakAuroralStorm" => false,
-        "D" => "IRI-1990",
-        "Te" => "TBT-2012_PF107",
-        "Ti" => "Tru-2021",
-        "ionCompModel" => "RBV10/TBT15",
-        "auroralBoundaryModel" => false,
-    )
-    body = JSON.json(body) # convert to JSON
-    output_file_link = HTTP.request("POST", url; headers, body, connect_timeout = 300)     # request results
-    output_file_link = JSON.parse(String(output_file_link.body))    # from JSON to Julia
-    output_file_link = output_file_link["txt"]                      # get only the link
-
-
-    # read the results
-    iri_data = readdlm(Downloads.download(output_file_link))
-    println("Iri data succesfully downloaded.")
-
-
-    parameters = (; year, month, day, hour, minute, lat, lon, height)
-    return iri_data, parameters
-end
-
 
 
 using PythonCall: pyimport, pyconvert, Py
