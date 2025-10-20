@@ -21,23 +21,6 @@ A NamedTuple with the same fields as `iri_data`, but with interpolated profiles:
 - `Te`: interpolated electron temperature (K). Vector [nZ]
 - `nO⁺`, `nH⁺`, `nHe⁺`, etc.: interpolated ion densities (m⁻³). Vector [nZ]
 - `NmF2`, `hmF2`, `NmF1`, etc.: preserved scalar parameters (unchanged from input)
-
-# Example
-```julia
-# Load IRI data
-iri_file = find_iri_file()
-iri = load_iri(iri_file)
-
-# Create AURORA altitude grid
-h_atm = make_altitude_grid(80, 500)
-
-# Interpolate to AURORA grid
-iri_interp = interpolate_iri_to_grid(iri.data, h_atm)
-
-# Use the interpolated data
-ne = iri_interp.ne
-Te = iri_interp.Te
-```
 """
 function interpolate_iri_to_grid(iri_data, h_atm)
     # Extract altitude from IRI data

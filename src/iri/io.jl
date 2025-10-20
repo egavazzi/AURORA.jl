@@ -105,11 +105,6 @@ that were used for the IRI model calculation.
   - `lat::Real`: Latitude (degrees North)
   - `lon::Real`: Longitude (degrees East)
   - `height::AbstractRange`: Altitude range (km)
-
-# Notes
-- Reads only the first 12 lines of the file for efficiency
-- Handles both integer and floating-point values for lat/lon
-- Expected header format: `parameter = value`
 """
 function load_parameters_iri(iri_file)
     # Helper function to parse a value that could be Int or Float
@@ -168,10 +163,7 @@ other ionospheric parameters.
   - `foF2`: F2 critical frequency
 
 # Notes
-- Automatically locates the data header line in the file
-- All profile data are vectors with length equal to the altitude grid
-- **Cluster ions (nCI):** IRI-2016 outputs negative values for cluster ions to indicate
-  they are calculated from charge neutrality. Use `abs(nCI)` to get actual densities.
+- All profile data are vectors with length equal to the iri altitude grid
 """
 function load_iri_data(iri_file)
     # Read all lines from the file

@@ -26,16 +26,6 @@ and saves it to a file.
 # Returns
 - `String`: Full path to the IRI data file
 
-# Example
-```julia
-# Use default Visions2 conditions
-iri_file = find_iri_file()
-
-# Custom date and location
-iri_file = find_iri_file(year=2020, month=3, day=15, hour=18,
-                         lat=69.6, lon=19.2, height=80:2:600)
-```
-
 # Notes
 - Default parameters correspond to the Visions2 rocket launch conditions
 - Files are stored in `internal_data/data_electron/` directory
