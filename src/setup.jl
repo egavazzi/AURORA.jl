@@ -152,7 +152,10 @@ end
 """
     load_neutral_densities(msis_file, h_atm)
 
-Load the neutral densities and temperature.
+Load the neutral densities and temperature from a MSIS file that was generated and saved
+using AURORA's MSIS interface. Then interpolate the profiles over AURORA's altitude grid.
+
+Upper boundary conditions are applied to smoothly transition the densities to zero.
 
 # Calling
 `n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)`
@@ -164,48 +167,40 @@ Load the neutral densities and temperature.
 # Returns
 - `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
 - `Tn`: neutral temperature (K). Vector [nZ]
+
+# See also
+[`load_msis`](@ref), [`interpolate_msis_to_grid`](@ref)
 """
 function load_neutral_densities(msis_file, h_atm)
-    data_msis = readdlm(msis_file, skipstart=14) # read the file without the headers
-    data_msis[isnan.(data_msis)] .= 0
+    msis_raw = load_msis(msis_file)
+    msis = interpolate_msis_to_grid(msis_raw.data, h_atm)
+    nN2 = msis.N2
+    nO2 = msis.O2
+    nO = msis.O
 
-    z_msis = data_msis[:, 1] # extract the z-grid of the msis data
-    data_msis = data_msis[:, [1:5; end]] # keep only data of interest (and also avoid NaN values)
-
-    # Create the interpolator
-    # The interpolation is done in log space, with the benefit that the linear extrapolation
-    # is actually an exponential one when we move back to linear space
-    msis_interpolator = [PCHIPInterpolation(log.(data_msis[:, i]), z_msis;
-                                            extrapolation = ExtrapolationType.Linear)
-                         for i in axes(data_msis, 2)]
-    msis_interpolated = [exp.(msis_interpolator[i](h_atm / 1e3)) for i in axes(data_msis, 2)]
-
-    # Extract the neutral densities
-    nN2 = msis_interpolated[3] # already in m⁻³
-    nO2 = msis_interpolated[4] # already in m⁻³
-    nO = msis_interpolated[5]  # already in m⁻³
-    Tn = msis_interpolated[6]
-
-    # Boundary conditions
+    # Apply upper boundary conditions to smoothly transition densities to zero
+    # Set the last 3 points to zero
+    nN2[end-2:end] .= 0
+    nO2[end-2:end] .= 0
     nO[end-2:end] .= 0
-	nN2[end-2:end] .= 0
-	nO2[end-2:end] .= 0
+
+    # Apply smooth transition using error function for the 3 points below
     erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
-	nO[end-5:end-3] .= erf_factor .* nO[end-5:end-3]
-	nN2[end-5:end-3] .= erf_factor .* nN2[end-5:end-3]
-	nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
+    nN2[end-5:end-3] .= erf_factor .* nN2[end-5:end-3]
+    nO2[end-5:end-3] .= erf_factor .* nO2[end-5:end-3]
+    nO[end-5:end-3] .= erf_factor .* nO[end-5:end-3]
 
     # Ensure no negative densities
-    if any(nO .< 0) || any(nN2 .< 0) || any(nO2 .< 0)
+    if any(nN2 .< 0) || any(nO2 .< 0) || any(On .< 0)
         @warn "Negative densities found. They were set to 0, but you might want to check " *
               "why that happened"
-        nO[nO .< 0] .= 0
         nN2[nN2 .< 0] .= 0
         nO2[nO2 .< 0] .= 0
+        nO[nO .< 0] .= 0
     end
 
-    n_neutrals = (nN2 = nN2, nO2 = nO2, nO = nO)
-    return n_neutrals, Tn
+    n_neutrals = (; nN2, nO2, nO)
+    return n_neutrals, msis.T
 end
 
 
@@ -231,10 +226,10 @@ using AURORA's IRI interface. Then interpolate the profiles over AURORA's altitu
 [`load_iri`](@ref), [`interpolate_iri_to_grid`](@ref)
 """
 function load_electron_densities(iri_file, h_atm)
-    iri = load_iri(iri_file)
-    electron_params = interpolate_iri_to_grid(iri.data, h_atm)
+    iri_raw = load_iri(iri_file)
+    iri = interpolate_iri_to_grid(iri_raw.data, h_atm)
 
-    return electron_params.ne, electron_params.Te
+    return iri.ne, iri.Te
 end
 
 

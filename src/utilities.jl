@@ -1,3 +1,6 @@
+using DataInterpolations: PCHIPInterpolation, ExtrapolationType
+using Term: @bold
+
 """
     v_of_E(E)
 
@@ -445,4 +448,54 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     # new_θ_lims_temp = sort(unique(collect(Iterators.flatten(new_θ_lims_temp))); rev=true)
 
     return Ie_plot
+end
+
+
+
+## ====================================================================================== ##
+"""
+    interpolate_profile(data_values, data_altitude_km, target_altitude_m;
+                       log_interpolation=true)
+
+Interpolate a single profile from one altitude grid to another.
+
+This is a helper function for interpolating individual data profiles.
+Interpolation can be performed in linear or logarithmic space.
+
+# Arguments
+- `data_values::Vector`: The data to interpolate (e.g., density or temperature)
+- `data_altitude_km::Vector`: Altitude grid of the input data (km)
+- `target_altitude_m::Vector`: Target altitude grid for interpolation (m)
+
+# Keyword Arguments
+- `log_interpolation::Bool=true`: If `true`, interpolation is done in log space (exponential
+    extrapolation). Recommended for densities. Use `false` for temperatures.
+
+# Returns
+- `interpolated::Vector`: Interpolated data on the target altitude grid
+"""
+function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
+                             log_interpolation = true)
+    # Convert target altitude from meters to kilometers
+    target_altitude_km = target_altitude_m / 1e3
+
+    # Prepare data for interpolation
+    if log_interpolation
+        # Use log interpolation for exponential-like profiles (densities)
+        interpolator = PCHIPInterpolation(log.(data_values), data_altitude_km;
+                                          extrapolation = ExtrapolationType.Linear)
+        interpolated = exp.(interpolator(target_altitude_km))
+    else
+        # Use linear interpolation (e.g., for temperatures)
+        interpolator = PCHIPInterpolation(data_values, data_altitude_km;
+                                          extrapolation = ExtrapolationType.Linear)
+        interpolated = interpolator(target_altitude_km)
+    end
+
+    # Check for negative values and throw error if found
+    if any(interpolated .< 0)
+        error("Interpolation resulted in negative values. Check input data or interpolation method.")
+    end
+
+    return interpolated
 end
