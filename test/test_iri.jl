@@ -39,7 +39,7 @@ end
 
 @testitem "Loading" begin
     iri_file = AURORA.find_iri_file()
-    load_iri(iri_file)
+    AURORA.load_iri(iri_file)
     @test true
 end
 
