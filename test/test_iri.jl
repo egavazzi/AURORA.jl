@@ -24,7 +24,7 @@ end
                                                   lat = PARAMETERS[6],
                                                   lon = PARAMETERS[7],
                                                   height = PARAMETERS[8])
-    save_iri_data(iri_data, iri_parameters)
+    AURORA.save_iri_data(iri_data, iri_parameters)
     file_to_load = AURORA.search_existing_iri_file(;
                                             year = PARAMETERS[1],
                                             month = PARAMETERS[2],
