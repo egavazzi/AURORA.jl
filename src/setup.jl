@@ -213,7 +213,8 @@ end
 """
     load_electron_densities(iri_file, h_atm)
 
-Load the electron density and temperature.
+Load the electron density and temperature from an IRI file that was generated and saved
+using AURORA's IRI interface.
 
 # Calling
 `ne, Te = load_electron_densities(iri_file, h_atm)`
@@ -225,31 +226,17 @@ Load the electron density and temperature.
 # Returns
 - `ne`: e- density (m⁻³). Vector [nZ]
 - `Te`: e- temperature (K). Vector [nZ]
+
+# See also
+[`load_iri`](@ref), [`interpolate_iri_to_grid`](@ref)
 """
 function load_electron_densities(iri_file, h_atm)
-    # Read the file and extract z-grid of the iri data
-    data_iri = readdlm(iri_file, skipstart=14)
-    data_iri[isnan.(data_iri)] .= 0
+    # Load IRI data using the modern interface
+    iri = load_iri(iri_file)
+    # Interpolate to the target grid
+    electron_params = interpolate_iri_to_grid(iri.data, h_atm)
 
-    z_iri = data_iri[:, 1]
-
-    # Create the interpolator
-    # The interpolation is done in log space, with the benefit that the linear extrapolation
-    # is actually an exponential one when we move back to linear space
-    iri_interpolator = [PCHIPInterpolation(log.(data_iri[:, i]), z_iri;
-                                           extrapolation = ExtrapolationType.Linear)
-                        for i in [2, 5]]
-    iri_interpolated = [exp.(iri_interpolator[i](h_atm / 1e3)) for i in eachindex(iri_interpolator)]
-
-    # Extract electron density and temperature
-    ne = iri_interpolated[1] # already in m⁻³
-    Te = iri_interpolated[2]
-
-    # Ensure no negative densities, and a default Te value of 350
-    ne[ne .< 0] .= 1
-    Te[Te .== -1] .= 350
-
-    return ne, Te
+    return electron_params.ne, electron_params.Te
 end
 
 

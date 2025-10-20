@@ -8,7 +8,7 @@ include("../internal_data/data_electron/emission_cross_sections.jl")
 
 include("setup.jl")
 include("nrlmsis.jl")
-include("iri.jl")
+include("iri/iri.jl")
 include("input_flux.jl")
 include("phase_functions.jl")
 include("utilities.jl")
