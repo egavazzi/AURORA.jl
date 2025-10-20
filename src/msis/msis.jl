@@ -8,12 +8,13 @@ include("interpolation.jl")
 
 Find or create a MSIS model data file for the specified conditions.
 
-This function first searches for an existing MSIS file matching the given parameters.
+It first searches for an existing MSIS file matching the given parameters.
 If no matching file is found, it calculates new MSIS data using the Python pymsis package
-and saves it to a file.
+and saves it to a file. The pymsis package will download, compile and run some fortran code
+under the hood.
 
 # Keyword Arguments
-- `year::Int=2018`: Year (defaults to Visions2 launch conditions)
+- `year::Int=2018`: Year
 - `month::Int=12`: Month (1-12)
 - `day::Int=7`: Day of month (1-31)
 - `hour::Int=11`: Hour in Universal Time (0-23)
@@ -26,7 +27,7 @@ and saves it to a file.
 - `String`: Full path to the MSIS data file
 
 # Notes
-- Default parameters correspond to the Visions2 rocket launch conditions
+- Default parameters correspond to the VISIONS-2 rocket launch conditions
 - Files are stored in `internal_data/data_neutrals/` directory
 """
 function find_msis_file(;
