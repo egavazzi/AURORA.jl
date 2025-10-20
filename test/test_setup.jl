@@ -1,6 +1,6 @@
 @testitem "Neutral densities" begin
     h_atm = make_altitude_grid(50, 800)
-    msis_file = find_nrlmsis_file()
+    msis_file = find_msis_file()
 
     @test_nowarn n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, h_atm)
 

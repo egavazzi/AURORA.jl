@@ -11,7 +11,7 @@ n_loop = 10;                    # number of loops to run
 
 CFL_number = 128;
 
-msis_file = find_nrlmsis_file(
+msis_file = find_msis_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
     );
 iri_file = find_iri_file(
