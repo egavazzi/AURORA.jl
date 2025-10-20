@@ -214,7 +214,7 @@ end
     load_electron_densities(iri_file, h_atm)
 
 Load the electron density and temperature from an IRI file that was generated and saved
-using AURORA's IRI interface.
+using AURORA's IRI interface. Then interpolate the profiles over AURORA's altitude grid.
 
 # Calling
 `ne, Te = load_electron_densities(iri_file, h_atm)`
@@ -231,9 +231,7 @@ using AURORA's IRI interface.
 [`load_iri`](@ref), [`interpolate_iri_to_grid`](@ref)
 """
 function load_electron_densities(iri_file, h_atm)
-    # Load IRI data using the modern interface
     iri = load_iri(iri_file)
-    # Interpolate to the target grid
     electron_params = interpolate_iri_to_grid(iri.data, h_atm)
 
     return electron_params.ne, electron_params.Te
