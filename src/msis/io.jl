@@ -110,7 +110,6 @@ function load_parameters_msis(msis_file)
     # Helper function to parse a value that could be Int or Float
     parse_numeric(s) = something(tryparse(Int64, s), parse(Float64, s))
 
-    # Read only the first 12 lines directly in Julia (no shell command needed)
     lines = open(msis_file, "r") do io
         [readline(io) for _ in 1:12]
     end
@@ -167,7 +166,6 @@ other atmospheric parameters.
 - All data are vectors with length equal to the msis altitude grid
 """
 function load_msis_data(msis_file)
-    # Read all lines from the file
     lines = readlines(msis_file)
 
     # Find the line where the data starts (after the header line with column names)
@@ -176,10 +174,7 @@ function load_msis_data(msis_file)
         error("Could not find data header in MSIS file: $msis_file")
     end
 
-    # The actual data starts one line after the header
-    data_start_idx += 1
-
-    # Read the data using readdlm
+    data_start_idx += 1#  the actual data starts one line after the header
     data_matrix = readdlm(IOBuffer(join(lines[data_start_idx:end], "\n")))
 
     # Extract columns and create named tuple
@@ -259,7 +254,6 @@ function save_msis_data(msis_data, parameters)
     filename = splitpath(fullpath)[end] # update filename as fullpath has been updated
     # Write to the file
     open(fullpath, "w") do f
-        # First we write the parameters
         write(f, "Input parameters:\n")
         write(f, "\n")
         write(f, "year = $year\n")
@@ -273,7 +267,6 @@ function save_msis_data(msis_data, parameters)
         write(f, "time_type = Universal Time\n")
         write(f, "coordinate_type = Geographic\n")
         write(f, "\n")
-        # Then we write the data
         writedlm(f, msis_data)
     end
     println("File " * @bold("$filename") * " created under " * @underline("$directory") *

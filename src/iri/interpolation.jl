@@ -27,15 +27,13 @@ function interpolate_iri_to_grid(iri_data, h_atm)
     # Convert target altitude to km for output
     h_atm_km = h_atm / 1e3
 
-    # Interpolate electron density (log space)
-    ne = interpolate_profile(iri_data.ne, z_iri, h_atm; log_interpolation = true)
-
     # Interpolate temperatures (linear space)
     Tn = interpolate_profile(iri_data.Tn, z_iri, h_atm; log_interpolation = false)
     Ti = interpolate_profile(iri_data.Ti, z_iri, h_atm; log_interpolation = false)
     Te = interpolate_profile(iri_data.Te, z_iri, h_atm; log_interpolation = false)
 
-    # Interpolate ion densities (log space)
+    # Interpolate densities (log space)
+    ne = interpolate_profile(iri_data.ne, z_iri, h_atm; log_interpolation = true)
     nO⁺ = interpolate_profile(iri_data.nO⁺, z_iri, h_atm; log_interpolation = true)
     nH⁺ = interpolate_profile(iri_data.nH⁺, z_iri, h_atm; log_interpolation = true)
     nHe⁺ = interpolate_profile(iri_data.nHe⁺, z_iri, h_atm; log_interpolation = true)

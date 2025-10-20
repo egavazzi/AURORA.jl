@@ -110,7 +110,6 @@ function load_parameters_iri(iri_file)
     # Helper function to parse a value that could be Int or Float
     parse_numeric(s) = something(tryparse(Int64, s), parse(Float64, s))
 
-    # Read only the first 12 lines directly in Julia (no shell command needed)
     lines = open(iri_file, "r") do io
         [readline(io) for _ in 1:12]
     end
@@ -166,7 +165,6 @@ other ionospheric parameters.
 - All profile data are vectors with length equal to the iri altitude grid
 """
 function load_iri_data(iri_file)
-    # Read all lines from the file
     lines = readlines(iri_file)
 
     # Find the line where the data starts (after the header line with column names)
@@ -175,10 +173,7 @@ function load_iri_data(iri_file)
         error("Could not find data header in IRI file: $iri_file")
     end
 
-    # The actual data starts one line after the header
-    data_start_idx += 1
-
-    # Read the data using readdlm
+    data_start_idx += 1 # the actual data starts one line after the header
     data_matrix = readdlm(IOBuffer(join(lines[data_start_idx:end], "\n")))
 
     # Extract columns and create named tuple
@@ -264,10 +259,9 @@ function save_iri_data(iri_data, parameters)
     directory = pkgdir(AURORA, "internal_data", "data_electron")
     fullpath = joinpath(directory, filename)
     fullpath = rename_if_exists(fullpath) # to avoid writing over files
-    filename = splitpath(fullpath)[end] # update filename as fullpath has been updated
+    filename = splitpath(fullpath)[end]
     # Write to the file
     open(fullpath, "w") do f
-        # First we write the parameters
         write(f, "Input parameters:\n")
         write(f, "\n")
         write(f, "year = $year\n")
@@ -281,7 +275,6 @@ function save_iri_data(iri_data, parameters)
         write(f, "time_type = Universal Time\n")
         write(f, "coordinate_type = Geographic\n")
         write(f, "\n")
-        # Then we write the data
         writedlm(f, iri_data)
     end
     println("File " * @bold("$filename") * " created under " * @underline("$directory") *
