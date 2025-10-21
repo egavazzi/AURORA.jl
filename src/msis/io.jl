@@ -166,16 +166,12 @@ other atmospheric parameters.
 - All data are vectors with length equal to the msis altitude grid
 """
 function load_msis_data(msis_file)
+    # Find the header line with column names
     lines = readlines(msis_file)
-
-    # Find the line where the data starts (after the header line with column names)
     data_start_idx = findfirst(line -> startswith(line, "height(km)"), lines)
-    if isnothing(data_start_idx)
-        error("Could not find data header in MSIS file: $msis_file")
-    end
 
-    data_start_idx += 1#  the actual data starts one line after the header
-    data_matrix = readdlm(IOBuffer(join(lines[data_start_idx:end], "\n")))
+    # Use that information to load only the data
+    data_matrix = readdlm(msis_file, skipstart = data_start_idx)
 
     # Extract columns and create named tuple
     # Column names from the header
