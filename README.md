@@ -4,12 +4,11 @@
 |:-----------------:|:-------:|
 | [![docs-stable-img]][docs-stable-url] [![][docs-dev-img]][docs-dev-url] | [![][doi-img]][doi-url] |
 
-AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron-fluxes during periods of rapidly varying electron-precipitation (sub-second).
+AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron fluxes during periods of rapidly varying electron precipitation (sub-second timescales).
 
+This is a Julia implementation of the original AURORA code, which was written in MATLAB and is available at https://github.com/egavazzi/AURORA. We strongly recommend using the Julia version as it is much faster (~1000x) and has received several bug fixes.
 
-This is a Julia implementation of the original AURORA code written in MATLAB and available at https://github.com/egavazzi/AURORA. This version is the one we recommend to use. It is in active development, is much faster (~ 1000x), and produces more accurate results (i.e. bugs have been fixed).
-
-Below is an example of electron flux in the ionosphere produced by AURORA in response to Alfvénic precipitation.
+Below is an example of modeled ionospheric electron fluxes produced by AURORA in response to Alfvénic precipitation (visible in the top left panel).
 
 https://github.com/user-attachments/assets/e67fc4d3-1fe1-4c0b-a8f6-42275f6e4659
 
@@ -22,7 +21,7 @@ Descriptions of how the code works are available in Gustavsson (2022), in sectio
 
 
 ## Citation
-To cite this software, you can use the *Cite this repository* button in the **About** section. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all of its versions. To cite a specific version, you can find version specific DOIs on Zenodo.  
+To cite this software, you can use the *Cite this repository* button in the **About** section. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all its versions. Version-specific DOIs can be found on Zenodo.
 
 
 ## References
