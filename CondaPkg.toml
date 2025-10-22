@@ -1,5 +1,8 @@
 [deps]
 python = "3.11.*"
+cmake = ""
+ninja = ""
+gfortran = ""
 
 [pip.deps]
 iri2016 = ""
