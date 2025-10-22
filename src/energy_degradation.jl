@@ -32,9 +32,11 @@ end
 
 
 
-function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                       B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
                       μ_center, cache)
+
+    Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
     @views if iE > 1
