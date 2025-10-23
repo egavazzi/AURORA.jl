@@ -185,6 +185,80 @@ function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight, I0, z₀, E
 end
 
 
+"""
+    Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight)
+
+Create a constant (flat) electron flux distribution above E_min.
+
+Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated over
+energy, the total energy flux `IeE_tot` is recovered.
+
+The electron flux distribution that is created is flat when plotted in #e⁻/m²/s/eV over
+energy. The distribution that is returned might not be strictly flat if plotted in #e⁻/m²/s
+over energy due to the energy grid being non-uniform (different widths of bin which are
+accounted for when plotting in per eV).
+
+# Arguments
+- `IeE_tot`: total energy flux (W/m²)
+- `E_min`: minimum energy threshold (eV) - no flux below this energy
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy bin widths (eV). Vector [nE]
+- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `Beams`: indices of the electron beams with precipitating flux
+- `BeamWeight`: weights of the different beams. Vector [n_beams]
+
+# Returns
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
+
+# Physics
+The function distributes the total energy flux uniformly across all energy bins
+above E_min. The flux is weighted across beams according to BeamWeight.
+For each energy bin:
+- Ie_top[iE] is the differential number flux (#e⁻/m²/s) already integrated over the bin width
+- Ie_top[iE] * E_mid[iE] * qₑ gives energy flux in that bin (W/m²)
+- Sum over all bins and beams recovers IeE_tot
+"""
+function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight)
+    # Initialize output array [n_beams, n_time, n_energy]
+    Ie_top = zeros(length(μ_center), 1, length(E))
+
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    # Find index where E >= E_min
+    i_Emin = findfirst(E .>= E_min)
+
+    # Calculate middle of energy bins
+    E_mid = E .+ dE ./ 2
+
+    # Convert total energy flux from W/m² to eV/m²/s
+    IeE_tot_eV = IeE_tot / qₑ  # eV/m²/s
+
+    # Calculate normalization factor: ∫ E dE from E_min to E_max
+    # This is the "energy weight" for the integral
+    energy_integral = sum(E_mid[i_Emin:end] .* dE[i_Emin:end])
+
+    # Calculate differential number flux (per eV)
+    # We want: sum(Ie[i] * E_mid[i] * dE[i]) = IeE_tot_eV
+    # For a uniform Ie: Ie * sum(E_mid * dE) = IeE_tot_eV
+    # And we want a uniform electron flux over the precipitation
+    # range, so we have Ie = IeE_tot_eV / sum(E_mid * dE)
+    Ie_diff_per_eV = IeE_tot_eV / energy_integral  # #e⁻/m²/s/eV
+
+    # Distribute flux across specified beams, taking into account their weights
+    for i_μ in Beams
+        if μ_center[i_μ] < 0
+            beam_fraction = BeamWeight[i_μ] / sum(BeamWeight[Beams])
+            # Assign constant flux (#e⁻/m²/s/eV) to all energies above E_min
+            Ie_top[i_μ, 1, i_Emin:end] .= Ie_diff_per_eV * beam_fraction
+            # Then we convert from (#e⁻/m²/s/eV) to (#e⁻/m²/s)
+            Ie_top[i_μ, 1, i_Emin:end] .*= dE[i_Emin:end]
+        end
+    end
+
+    return Ie_top
+end
+
 
 function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot, z₀, E_min, Beams, t0, t1)
     Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
@@ -281,7 +355,7 @@ function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_ta
     # Maxwellian spectra
     # π is gone as we do not normalize in /ster
     # However we keep the 2 as it seems necessary to keep the total energy flux
-    # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get
+    # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get?
     Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
