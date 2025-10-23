@@ -10,18 +10,22 @@ using AURORA
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
     # Check that IeE_top is respected for a Maxwellian without LET (with a tolerance of 0.1%)
-    Ie_top = Ie_with_LET(100, 1e5, E, dE, μ_center, μ_scatterings.BeamWeight, 1, low_energy_tail = false)
-    IeE_top = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :)))
-    @test isapprox(IeE_top, 1e5, rtol = 0.001)
+    IeE_tot = 1e-2  # W/m²
+    Ie_top = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1, low_energy_tail = false)
+    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # Check that varying the beams does not change IeE_top
-    Ie_top_LET_1 = Ie_with_LET(100, 1e5, E, dE, μ_center, μ_scatterings.BeamWeight, 1, low_energy_tail = true)
-    Ie_top_LET_2 = Ie_with_LET(100, 1e5, E, dE, μ_center, μ_scatterings.BeamWeight, 1:2, low_energy_tail = true)
-    Ie_top_LET_3 = Ie_with_LET(100, 1e5, E, dE, μ_center, μ_scatterings.BeamWeight, [2, 5], low_energy_tail = true)
-    IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E .+ dE / 2, (1, 1, :)))
-    IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E .+ dE / 2, (1, 1, :)))
-    IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E .+ dE / 2, (1, 1, :)))
+    Ie_top_LET_1 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1, low_energy_tail = true)
+    Ie_top_LET_2 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1:2, low_energy_tail = true)
+    Ie_top_LET_3 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, [2, 5], low_energy_tail = true)
+    IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
 
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
@@ -37,11 +41,11 @@ end
     savedir = make_savedir("", "")
     # Define input parameters
     input_type = "LET"
-    E0 = 50                 # characteristic energy (eV)
-    Q = 6.24151e15          # total energy flux (eV/m2/s) (1 mW = 24151e15 eV)
-    Beams = 1               # indices of the beams with precipitation
-    low_energy_tail = true  # with or without a low energy tail
-    INPUT_OPTIONS = (;input_type, E0, Q, Beams, low_energy_tail);
+    IeE_tot = 1e-3              # total energy flux (W/m²)
+    E0 = 50                     # characteristic energy (eV)
+    Beams = 1                   # indices of the beams with precipitation
+    low_energy_tail = true      # with or without a low energy tail
+    INPUT_OPTIONS = (;input_type, IeE_tot, E0, Beams, low_energy_tail);
     # Run simulation
     calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                        msis_file, iri_file, savedir, INPUT_OPTIONS)

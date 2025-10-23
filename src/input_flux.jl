@@ -288,7 +288,7 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot
 end
 
 """
-    Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+    Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
 
 Return an electron spectra following a Maxwellian distribution with a low
 energy tail (LET)
@@ -297,8 +297,8 @@ This function is a **corrected** implementation of Meier/Strickland/Hecht/Christ
 JGR 1989 (pages 13541-13552)
 
 # Arguments
+- `IeE_tot`: total energy flux (W/m²)
 - `E₀`: characteristic energy (eV)
-- `Q`: total energy flux into the ionosphere (eV/m²/s)
 - `E`: energy grid (eV). Vector [nE]
 - `dE`: energy bin sizes(eV). Vector [nE]
 - `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
@@ -307,7 +307,7 @@ JGR 1989 (pages 13541-13552)
 - `low_energy_tail=true`: control the presence of a low energy tail
 
 # Returns:
-- `Ie_top`: differential electron energy flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
 
 # Important notes
 This is a corrected version of the equations present in Meier et al. 1989
@@ -327,7 +327,7 @@ julia> μ_center = mu_avg(θ_lims);
 
 julia> BeamWeight = beam_weight(180:-10:0);
 
-julia> Ie = AURORA.Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:2);
+julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:2);
 
 ```
 
@@ -343,12 +343,18 @@ julia> μ_center = mu_avg(θ_lims);
 
 julia> BeamWeight = [2, 1, 1];
 
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:3);
+julia> Ie = Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:3);
 
 ```
 """
-function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+function Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
     Ie_top = zeros(length(μ_center), 1, length(E))
+
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    # Convert total energy flux from W/m² to eV/m²/s
+    IeE_tot_eV = IeE_tot / qₑ  # eV/m²/s
 
     E_middle = E .+ dE / 2 # middle of the energy bins
 
@@ -356,7 +362,7 @@ function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_ta
     # π is gone as we do not normalize in /ster
     # However we keep the 2 as it seems necessary to keep the total energy flux
     # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get?
-    Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
+    Φₘ = IeE_tot_eV / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
         (0.1 * E₀ + 350) .* (E₀ >= 500) # use 350 instead of .35 because we are in eV
