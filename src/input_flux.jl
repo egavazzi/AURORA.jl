@@ -250,8 +250,8 @@ function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWei
     # Initialize output array [n_beams, n_time, n_energy]
     Ie_top = zeros(length(μ_center), n_time, length(E))
 
-    # Find index where E >= E_min
-    i_Emin = findfirst(E .>= E_min)
+    # Find index where E_min >= E
+    i_Emin = findlast(E .<= E_min)
     if isnothing(i_Emin)
         @error "E_min ($E_min eV) is larger than maximum energy in grid ($(E[end]) eV)"
     end
