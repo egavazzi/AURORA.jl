@@ -67,14 +67,14 @@ end
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD
     Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm)
-    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, high source altitude
     Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, 1000)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, delayed smooth onset
-    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, h_atm[end], 0.4, 0.8)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, altitude_lims[2], 0.4, 0.8)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end

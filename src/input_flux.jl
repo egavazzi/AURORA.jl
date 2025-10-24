@@ -240,8 +240,15 @@ For each energy bin:
 - Sum over all bins and beams recovers IeE_tot
 """
 function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
-                                t, n_loop, h_atm, z_source = h_atm[end], t_start = 0,
+                                t, n_loop, h_atm, z_source = h_atm[end] / 1e3, t_start = 0,
                                 t_end = 0)
+    if E_min < 0
+        error("E_min is negative ($E_min eV). E_min must be a positive value.")
+    end
+    if z_source < h_atm[end] / 1e3
+        error("z_source ($z_source km) is below the top of the simulated ionosphere ($(h_atm[end]/1e3) km). \
+        It must be above or equal.")
+    end
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
