@@ -186,12 +186,16 @@ end
 
 
 """
-    Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight)
+    Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                          t, n_loop, h_atm, z_source, t_start, t_end)
 
-Create a constant (flat) electron flux distribution above E_min.
+Create a constant (flat) electron flux distribution above E_min with optional time-dependent
+features including:
+- energy-dependent time delays
+- smooth onset/offset.
 
-Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated over
-energy, the total energy flux `IeE_tot` is recovered.
+Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated over energy,
+the total energy flux `IeE_tot` is recovered.
 
 The electron flux distribution that is created is flat when plotted in #e⁻/m²/s/eV over
 energy. The distribution that is returned might not be strictly flat if plotted in #e⁻/m²/s
@@ -206,27 +210,50 @@ accounted for when plotting in per eV).
 - `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
 - `Beams`: indices of the electron beams with precipitating flux
 - `BeamWeight`: weights of the different beams. Vector [n_beams]
+- `t`: time grid (s). Vector [n_t]
+- `n_loop`: number of loops (for repeated simulations)
+- `h_atm`: altitude grid (m). Vector [n_z]
+- `z_source`: altitude of the precipitation source (km)
+- `t_start`: start time for smooth flux onset (s). Set to 0 for immediate start
+- `t_end`: end time for smooth flux onset (s). Set to 0 for immediate start (no transition)
 
 # Returns
-- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, n_t, n_E]
 
 # Physics
 The function distributes the total energy flux uniformly across all energy bins
 above E_min. The flux is weighted across beams according to BeamWeight.
+
+**Time-dependent features:**
+1. **Energy- and angle- dependent arrival times**: Lower energy electrons travel slower, so
+   they arrive later at the top of the ionosphere. Similarly, electrons with a high
+   pitch-angle will travel a longer distance and also arrive later at the top of the
+   ionosphere. This creates a natural dispersion effect.
+
+2. **Smooth onset/offset**: If `t_start` and `t_end` are different, the flux smoothly
+   transitions from 0 to full strength between these times using a smooth step function.
+
 For each energy bin:
 - Ie_top[iE] is the differential number flux (#e⁻/m²/s) already integrated over the bin width
 - Ie_top[iE] * E_mid[iE] * qₑ gives energy flux in that bin (W/m²)
 - Sum over all bins and beams recovers IeE_tot
+```
 """
-function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight)
-    # Initialize output array [n_beams, n_time, n_energy]
-    Ie_top = zeros(length(μ_center), 1, length(E))
-
+function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                                t, n_loop, h_atm, z_source, t_start, t_end)
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
+    # Calculate total number of time steps
+    n_time = (n_loop - 1) * (length(t) - 1) + length(t)
+    # Initialize output array [n_beams, n_time, n_energy]
+    Ie_top = zeros(length(μ_center), n_time, length(E))
+
     # Find index where E >= E_min
     i_Emin = findfirst(E .>= E_min)
+    if isnothing(i_Emin)
+        @error "E_min ($E_min eV) is larger than maximum energy in grid ($(E[end]) eV)"
+    end
 
     # Calculate middle of energy bins
     E_mid = E .+ dE ./ 2
@@ -240,19 +267,40 @@ function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWei
 
     # Calculate differential number flux (per eV)
     # We want: sum(Ie[i] * E_mid[i] * dE[i]) = IeE_tot_eV
-    # For a uniform Ie: Ie * sum(E_mid * dE) = IeE_tot_eV
-    # And we want a uniform electron flux over the precipitation
-    # range, so we have Ie = IeE_tot_eV / sum(E_mid * dE)
+    # For a uniform Ie: Ie * sum(E_mid * dE) = IeE_tot_eV, and we want a uniform flux over
+    # the precipitation range
     Ie_diff_per_eV = IeE_tot_eV / energy_integral  # #e⁻/m²/s/eV
 
-    # Distribute flux across specified beams, taking into account their weights
+    # Create extended time grid for all loops
+    t_total = t[1]:Float64(t.step):(t[end] * n_loop)
+    # Calculate distance from source to top of ionosphere (m)
+    z_distance = z_source * 1e3 - h_atm[end]
+    # Calculate reference time shift (for highest energy in first beam)
+    # This is used to align all arrival times relative to the fastest electrons
+    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E[end]))
+
+    # Distribute flux across specified beams and energies
     for i_μ in Beams
-        if μ_center[i_μ] < 0
-            beam_fraction = BeamWeight[i_μ] / sum(BeamWeight[Beams])
-            # Assign constant flux (#e⁻/m²/s/eV) to all energies above E_min
-            Ie_top[i_μ, 1, i_Emin:end] .= Ie_diff_per_eV * beam_fraction
-            # Then we convert from (#e⁻/m²/s/eV) to (#e⁻/m²/s)
-            Ie_top[i_μ, 1, i_Emin:end] .*= dE[i_Emin:end]
+        if μ_center[i_μ] >= 0
+            continue  # Skip upward-going beams
+        end
+        beam_fraction = BeamWeight[i_μ] / sum(BeamWeight[Beams])
+
+        for iE in i_Emin:length(E)
+            # Calculate base flux (constant in energy, uniform distribution)
+            flux_base = Ie_diff_per_eV * beam_fraction * dE[iE]
+
+            # Calculate travel time for electrons of this energy and pitch angle
+            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E[iE]))
+            # Time-shifted grid: subtract the travel time difference relative to reference
+            # This creates energy dispersion - the field-aligned electron with highest
+            # energy arrive first, their (t_travel - t_ref) = 0
+            t_shifted = t_total .- (t_travel - t_ref)
+            # Apply smooth temporal onset
+            temporal_modulation = smooth_transition.(t_shifted, t_start, t_end)
+
+            # Assign flux: base_flux * temporal_modulation
+            Ie_top[i_μ, :, iE] = flux_base .* temporal_modulation
         end
     end
 
@@ -277,7 +325,7 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot
             IePnL = IeE_tot ./ qₑ ./
                     sum((E[i_Emin:end] .+ dE[i_Emin:end] ./ 2) .* dE[i_Emin:end]) .* dE
 
-            Ie_top[i_μ, :, iE] = IePnL[iE] .* f_smooth_transition.(t_shifted, t0, t1) .*
+            Ie_top[i_μ, :, iE] = IePnL[iE] .* smooth_transition.(t_shifted, t0, t1) .*
                                                 (E[iE] > E[i_Emin]) .*
                                                 BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
 

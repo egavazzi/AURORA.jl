@@ -299,30 +299,43 @@ end
 
 ## ====================================================================================== ##
 
-# function from Björn for smooth input onset
-function f_smooth_transition(x, a = 0, b = 1)
-    if (b - a) == 0
-        y = 1
-        return y
+"""
+    smooth_transition(x, x_start = 0.0, x_end = 1.0)
+
+Create a smooth transition from 0 to 1 over the interval `[x_start, x_end]` using a
+C∞-smooth (infinitely differentiable) function.
+
+- Returns 0 for `x < x_start`
+- Returns 1 for `x > x_end`
+- Smoothly transitions from 0 to 1 in between, with all derivatives continuous
+
+# Arguments
+- `x`: The input value at which to evaluate the transition
+- `x_start`: Start of the transition interval (default: 0.0)
+- `x_end`: End of the transition interval (default: 1.0)
+
+# Returns
+- A value between 0 and 1 representing the smooth transition
+"""
+function smooth_transition(x, x_start = 0.0, x_end = 1.0)
+    # If the interval has zero width, return step function
+    if iszero(x_end - x_start)
+        return x < x_start ? 0.0 : 1.0
     end
 
-    x = (x - a) / (b - a)
-    psi0P = psi(x)
-    psi1N = psi(1 - x)
+    # Normalize x to the interval [0, 1]
+    x_normalized = (x - x_start) / (x_end - x_start)
 
-    y = psi0P / (psi0P + psi1N)
+    # Smoothing function: exp(-1/x) for x > 0, otherwise 0
+    Ψ(x) = x <= 0 ? 0.0 : exp(-1 / x)
+    smoothing_lower = Ψ(x_normalized)      # Activates for x > x_start
+    smoothing_upper = Ψ(1 - x_normalized)  # Activates for x < x_end
 
-    return y
+    # Combine the parts to create smooth transition
+    transition_value = smoothing_lower / (smoothing_lower + smoothing_upper)
+
+    return transition_value
 end
-
-function psi(x)
-    PSI = exp(-1 / x)
-    if x <= 0
-        PSI = 0
-    end
-    return PSI
-end
-f_smooth_transition(0, 1, 0)
 
 ## ====================================================================================== ##
 
