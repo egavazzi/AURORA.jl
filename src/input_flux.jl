@@ -186,8 +186,8 @@ end
 
 
 """
-    Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
-                          t, n_loop, h_atm, z_source=h_atm[end]/1e3, t_start=0, t_end=0)
+    Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                   t, n_loop, h_atm, z_source=h_atm[end]/1e3, t_start=0, t_end=0)
 
 Create a constant (flat) electron flux distribution above E_min with optional time-dependent
 features including:
@@ -239,9 +239,9 @@ For each energy bin:
 - Ie_top[iE] * E_mid[iE] * qₑ gives energy flux in that bin (W/m²)
 - Sum over all bins and beams recovers IeE_tot
 """
-function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
-                                t, n_loop, h_atm, z_source = h_atm[end] / 1e3, t_start = 0,
-                                t_end = 0)
+function Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                        t, n_loop, h_atm, z_source = h_atm[end] / 1e3, t_start = 0,
+                        t_end = 0)
     if E_min < 0
         error("E_min is negative ($E_min eV). E_min must be a positive value.")
     end
@@ -309,34 +309,6 @@ function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWei
 
             # Assign flux: base_flux * temporal_modulation
             Ie_top[i_μ, :, iE] = flux_base .* temporal_modulation
-        end
-    end
-
-    return Ie_top
-end
-
-
-function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot, z₀, E_min, Beams, t0, t1)
-    Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
-    qₑ = 1.602176620898e-19
-    i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
-
-    z = z₀ * 1e3 - h_atm[end]   # distance between the source and the top of the ionosphere
-    t_tot = t[1]:Float64(t.step):(t[end] * n_loop)
-    t_shift₀ = z ./ (abs.(μ_center[Beams[1]]) * v_of_E(E[end]))
-
-    for i_μ in eachindex(μ_center[Beams])
-        for iE in eachindex(E)
-            t_shift = z ./ (abs.(μ_center[Beams[i_μ]]) .* v_of_E.(E[iE]))
-            t_shifted = t_tot .- (t_shift .- t_shift₀)
-
-            IePnL = IeE_tot ./ qₑ ./
-                    sum((E[i_Emin:end] .+ dE[i_Emin:end] ./ 2) .* dE[i_Emin:end]) .* dE
-
-            Ie_top[i_μ, :, iE] = IePnL[iE] .* smooth_transition.(t_shifted, t0, t1) .*
-                                                (E[iE] > E[i_Emin]) .*
-                                                BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
-
         end
     end
 
