@@ -13,7 +13,7 @@ function demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_leve
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE],
                                 outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
     end
 
@@ -38,7 +38,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE], ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE],
                                    outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
     end
 
@@ -302,13 +302,13 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
                 end
 
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "s");
                 # We use the average energy of the e- in the current energy bin
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* dE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "c");
 
                 if sum(secondary_e_spectra) > 0
                     # normalise
@@ -416,13 +416,13 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "s");
                 # We use the average energy of the e- in the current energy bin
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* dE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(E, E[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "c");
 
                 if sum(secondary_e_spectra) > 0
                     # normalise

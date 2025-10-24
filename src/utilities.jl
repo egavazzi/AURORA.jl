@@ -179,25 +179,26 @@ The function should support all types of extensions.
 `newsavefile = rename_if_exists(savefile)`
 """
 function rename_if_exists(savefile)
-    if isfile(savefile) # if a file already exists with that name
-        file_extension = split(savefile, ".")[end]
-        length_extension = length(file_extension) + 1
-        counter = 1
-        while isfile(savefile[1:end - length_extension] * "($counter)" * ".$file_extension")
-            counter += 1
-        end
-        newsavefile = savefile[1:end - length_extension] * "($counter)" * ".$file_extension"
-    elseif isdir(savefile) # if a folder already exists with that name
-        counter = 1
-        while isdir(savefile * "($counter)")
-            counter += 1
-        end
-        newsavefile = savefile * "($counter)"
-    else # there is no folder or file with that name
-        newsavefile = savefile
+    # Remove trailing slash (if any)
+    savefile_clean = rstrip(savefile, '/')
+
+    # Check if path exists (either as file or directory)
+    if !ispath(savefile_clean)
+        return savefile_clean
     end
 
-    return newsavefile
+    # Split filename and extension
+    dir, name = splitdir(savefile_clean)
+    name_without_ext, ext = splitext(name)
+
+    # Find next available counter
+    counter = 1
+    while true
+        new_name = "$(name_without_ext)($(counter))$(ext)"
+        new_path = joinpath(dir, new_name)
+        ispath(new_path) || return new_path
+        counter += 1
+    end
 end
 
 

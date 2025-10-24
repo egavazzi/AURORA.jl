@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.6"
+julia_version = "1.11.7"
 manifest_format = "2.0"
-project_hash = "0dc9ff84f8423732651e7f94edbe0e2c24080e59"
+project_hash = "ad922f8f2ec8e2934d50a3a197136e0e7f880c9b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1276,6 +1276,17 @@ version = "2.0.7"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 version = "1.11.0"
+
+[[deps.TestItemRunner]]
+deps = ["Pkg", "TOML", "Test", "TestItems", "UUIDs"]
+git-tree-sha1 = "068c8f3e8d2f3b5948a85f11412f047cbab4e6c0"
+uuid = "f8b46487-2199-4994-9208-9a1283c18c0a"
+version = "1.1.0"
+
+[[deps.TestItems]]
+git-tree-sha1 = "42fd9023fef18b9b78c8343a4e2f3813ffbcefcb"
+uuid = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+version = "1.0.0"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]

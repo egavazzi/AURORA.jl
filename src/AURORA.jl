@@ -37,7 +37,7 @@ export calculate_e_transport_steady_state
 
 include("analysis.jl")
 export make_density_file, downsampling_fluxes, make_volume_excitation_file,
-    make_column_excitation_file, make_Ie_top_file, make_current_file
+    make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file
 
 # Define and export functions to be extented by the AURORA_viz module
 function animate_IeztE_3Dzoft end

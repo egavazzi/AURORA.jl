@@ -47,6 +47,7 @@ function find_iri_file(;
                     found_it = 1
                     file_to_load = file
                     println(" found one!")
+                    println("   ∟ at $file_to_load")
                 end
             end
         end
