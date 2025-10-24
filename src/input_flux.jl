@@ -187,7 +187,7 @@ end
 
 """
     Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
-                          t, n_loop, h_atm, z_source, t_start, t_end)
+                          t, n_loop, h_atm, z_source=h_atm[end]/1e3, t_start=0, t_end=0)
 
 Create a constant (flat) electron flux distribution above E_min with optional time-dependent
 features including:
@@ -213,9 +213,9 @@ accounted for when plotting in per eV).
 - `t`: time grid (s). Vector [n_t]
 - `n_loop`: number of loops (for repeated simulations)
 - `h_atm`: altitude grid (m). Vector [n_z]
-- `z_source`: altitude of the precipitation source (km)
-- `t_start`: start time for smooth flux onset (s). Set to 0 for immediate start
-- `t_end`: end time for smooth flux onset (s). Set to 0 for immediate start (no transition)
+- `z_source`: altitude of the precipitation source (km). Default: top of ionosphere (h_atm[end]/1e3)
+- `t_start`: start time for smooth flux onset (s). Default: 0 (immediate start)
+- `t_end`: end time for smooth flux onset (s). Default: 0 (immediate start, no transition)
 
 # Returns
 - `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, n_t, n_E]
@@ -225,22 +225,23 @@ The function distributes the total energy flux uniformly across all energy bins
 above E_min. The flux is weighted across beams according to BeamWeight.
 
 **Time-dependent features:**
-1. **Energy- and angle- dependent arrival times**: Lower energy electrons travel slower, so
+1. **Energy- and angle-dependent arrival times**: Lower energy electrons travel slower, so
    they arrive later at the top of the ionosphere. Similarly, electrons with a high
    pitch-angle will travel a longer distance and also arrive later at the top of the
    ionosphere. This creates a natural dispersion effect.
 
 2. **Smooth onset/offset**: If `t_start` and `t_end` are different, the flux smoothly
-   transitions from 0 to full strength between these times using a smooth step function.
+   transitions from 0 to full strength between these times using a C∞-smooth step function.
+   When `t_start == t_end`, the function behaves as a Heaviside step function (sharp onset).
 
 For each energy bin:
 - Ie_top[iE] is the differential number flux (#e⁻/m²/s) already integrated over the bin width
 - Ie_top[iE] * E_mid[iE] * qₑ gives energy flux in that bin (W/m²)
 - Sum over all bins and beams recovers IeE_tot
-```
 """
 function Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
-                                t, n_loop, h_atm, z_source, t_start, t_end)
+                                t, n_loop, h_atm, z_source = h_atm[end], t_start = 0,
+                                t_end = 0)
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
