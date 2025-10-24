@@ -185,28 +185,130 @@ function Ie_top_Gaussian(t, E, n_loop, μ_center, h_atm, BeamWeight, I0, z₀, E
 end
 
 
+"""
+    Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                   t, n_loop, h_atm, z_source=h_atm[end]/1e3, t_start=0, t_end=0)
 
-function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot, z₀, E_min, Beams, t0, t1)
-    Ie_top = zeros(length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
-    qₑ = 1.602176620898e-19
-    i_Emin = findmin(abs.(E .- E_min))[2]   # find the index for the lower limit of the FAB
+Create a constant (flat) electron flux distribution above E_min with optional time-dependent
+features including:
+- energy-dependent time delays
+- smooth onset/offset.
 
-    z = z₀ * 1e3 - h_atm[end]   # distance between the source and the top of the ionosphere
-    t_tot = t[1]:Float64(t.step):(t[end] * n_loop)
-    t_shift₀ = z ./ (abs.(μ_center[Beams[1]]) * v_of_E(E[end]))
+Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated over energy,
+the total energy flux `IeE_tot` is recovered.
 
-    for i_μ in eachindex(μ_center[Beams])
-        for iE in eachindex(E)
-            t_shift = z ./ (abs.(μ_center[Beams[i_μ]]) .* v_of_E.(E[iE]))
-            t_shifted = t_tot .- (t_shift .- t_shift₀)
+The electron flux distribution that is created is flat when plotted in #e⁻/m²/s/eV over
+energy. The distribution that is returned might not be strictly flat if plotted in #e⁻/m²/s
+over energy due to the energy grid being non-uniform (different widths of bin which are
+accounted for when plotting in per eV).
 
-            IePnL = IeE_tot ./ qₑ ./
-                    sum((E[i_Emin:end] .+ dE[i_Emin:end] ./ 2) .* dE[i_Emin:end]) .* dE
+# Arguments
+- `IeE_tot`: total energy flux (W/m²)
+- `E_min`: minimum energy threshold (eV) - no flux below this energy
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy bin widths (eV). Vector [nE]
+- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `Beams`: indices of the electron beams with precipitating flux
+- `BeamWeight`: weights of the different beams. Vector [n_beams]
+- `t`: time grid (s). Vector [n_t]
+- `n_loop`: number of loops (for repeated simulations)
+- `h_atm`: altitude grid (m). Vector [n_z]
+- `z_source`: altitude of the precipitation source (km). Default: top of ionosphere (h_atm[end]/1e3)
+- `t_start`: start time for smooth flux onset (s). Default: 0 (immediate start)
+- `t_end`: end time for smooth flux onset (s). Default: 0 (immediate start, no transition)
 
-            Ie_top[i_μ, :, iE] = IePnL[iE] .* f_smooth_transition.(t_shifted, t0, t1) .*
-                                                (E[iE] > E[i_Emin]) .*
-                                                BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
+# Returns
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, n_t, n_E]
 
+# Physics
+The function distributes the total energy flux uniformly across all energy bins
+above E_min. The flux is weighted across beams according to BeamWeight.
+
+**Time-dependent features:**
+1. **Energy- and angle-dependent arrival times**: Lower energy electrons travel slower, so
+   they arrive later at the top of the ionosphere. Similarly, electrons with a high
+   pitch-angle will travel a longer distance and also arrive later at the top of the
+   ionosphere. This creates a natural dispersion effect.
+
+2. **Smooth onset/offset**: If `t_start` and `t_end` are different, the flux smoothly
+   transitions from 0 to full strength between these times using a C∞-smooth step function.
+   When `t_start == t_end`, the function behaves as a Heaviside step function (sharp onset).
+
+For each energy bin:
+- Ie_top[iE] is the differential number flux (#e⁻/m²/s) already integrated over the bin width
+- Ie_top[iE] * E_mid[iE] * qₑ gives energy flux in that bin (W/m²)
+- Sum over all bins and beams recovers IeE_tot
+"""
+function Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, BeamWeight,
+                        t, n_loop, h_atm, z_source = h_atm[end] / 1e3, t_start = 0,
+                        t_end = 0)
+    if E_min < 0
+        error("E_min is negative ($E_min eV). E_min must be a positive value.")
+    end
+    if z_source < h_atm[end] / 1e3
+        error("z_source ($z_source km) is below the top of the simulated ionosphere ($(h_atm[end]/1e3) km). \
+        It must be above or equal.")
+    end
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    # Calculate total number of time steps
+    n_time = (n_loop - 1) * (length(t) - 1) + length(t)
+    # Initialize output array [n_beams, n_time, n_energy]
+    Ie_top = zeros(length(μ_center), n_time, length(E))
+
+    # Find index where E_min >= E
+    i_Emin = findlast(E .<= E_min)
+    if isnothing(i_Emin)
+        @error "E_min ($E_min eV) is larger than maximum energy in grid ($(E[end]) eV)"
+    end
+
+    # Calculate middle of energy bins
+    E_mid = E .+ dE ./ 2
+
+    # Convert total energy flux from W/m² to eV/m²/s
+    IeE_tot_eV = IeE_tot / qₑ  # eV/m²/s
+
+    # Calculate normalization factor: ∫ E dE from E_min to E_max
+    # This is the "energy weight" for the integral
+    energy_integral = sum(E_mid[i_Emin:end] .* dE[i_Emin:end])
+
+    # Calculate differential number flux (per eV)
+    # We want: sum(Ie[i] * E_mid[i] * dE[i]) = IeE_tot_eV
+    # For a uniform Ie: Ie * sum(E_mid * dE) = IeE_tot_eV, and we want a uniform flux over
+    # the precipitation range
+    Ie_diff_per_eV = IeE_tot_eV / energy_integral  # #e⁻/m²/s/eV
+
+    # Create extended time grid for all loops
+    t_total = t[1]:Float64(t.step):(t[end] * n_loop)
+    # Calculate distance from source to top of ionosphere (m)
+    z_distance = z_source * 1e3 - h_atm[end]
+    # Calculate reference time shift (for highest energy in first beam)
+    # This is used to align all arrival times relative to the fastest electrons
+    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E[end]))
+
+    # Distribute flux across specified beams and energies
+    for i_μ in Beams
+        if μ_center[i_μ] >= 0
+            continue  # Skip upward-going beams
+        end
+        beam_fraction = BeamWeight[i_μ] / sum(BeamWeight[Beams])
+
+        for iE in i_Emin:length(E)
+            # Calculate base flux (constant in energy, uniform distribution)
+            flux_base = Ie_diff_per_eV * beam_fraction * dE[iE]
+
+            # Calculate travel time for electrons of this energy and pitch angle
+            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E[iE]))
+            # Time-shifted grid: subtract the travel time difference relative to reference
+            # This creates energy dispersion - the field-aligned electron with highest
+            # energy arrive first, their (t_travel - t_ref) = 0
+            t_shifted = t_total .- (t_travel - t_ref)
+            # Apply smooth temporal onset
+            temporal_modulation = smooth_transition.(t_shifted, t_start, t_end)
+
+            # Assign flux: base_flux * temporal_modulation
+            Ie_top[i_μ, :, iE] = flux_base .* temporal_modulation
         end
     end
 
@@ -214,7 +316,7 @@ function Ie_top_constant(t, E, dE, n_loop, μ_center, h_atm, BeamWeight, IeE_tot
 end
 
 """
-    Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+    Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
 
 Return an electron spectra following a Maxwellian distribution with a low
 energy tail (LET)
@@ -223,8 +325,8 @@ This function is a **corrected** implementation of Meier/Strickland/Hecht/Christ
 JGR 1989 (pages 13541-13552)
 
 # Arguments
+- `IeE_tot`: total energy flux (W/m²)
 - `E₀`: characteristic energy (eV)
-- `Q`: total energy flux into the ionosphere (eV/m²/s)
 - `E`: energy grid (eV). Vector [nE]
 - `dE`: energy bin sizes(eV). Vector [nE]
 - `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
@@ -233,7 +335,7 @@ JGR 1989 (pages 13541-13552)
 - `low_energy_tail=true`: control the presence of a low energy tail
 
 # Returns:
-- `Ie_top`: differential electron energy flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, nE]
 
 # Important notes
 This is a corrected version of the equations present in Meier et al. 1989
@@ -253,7 +355,7 @@ julia> μ_center = mu_avg(θ_lims);
 
 julia> BeamWeight = beam_weight(180:-10:0);
 
-julia> Ie = AURORA.Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:2);
+julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:2);
 
 ```
 
@@ -269,20 +371,26 @@ julia> μ_center = mu_avg(θ_lims);
 
 julia> BeamWeight = [2, 1, 1];
 
-julia> Ie = Ie_with_LET(1e3, 1e10, E, dE, μ_center, BeamWeight, 1:3);
+julia> Ie = Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:3);
 
 ```
 """
-function Ie_with_LET(E₀, Q, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+function Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
     Ie_top = zeros(length(μ_center), 1, length(E))
+
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    # Convert total energy flux from W/m² to eV/m²/s
+    IeE_tot_eV = IeE_tot / qₑ  # eV/m²/s
 
     E_middle = E .+ dE / 2 # middle of the energy bins
 
     # Maxwellian spectra
     # π is gone as we do not normalize in /ster
     # However we keep the 2 as it seems necessary to keep the total energy flux
-    # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get
-    Φₘ = Q / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
+    # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get?
+    Φₘ = IeE_tot_eV / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
         (0.1 * E₀ + 350) .* (E₀ >= 500) # use 350 instead of .35 because we are in eV
