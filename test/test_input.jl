@@ -3,7 +3,7 @@
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 100000;                 # (eV) upper limit to the energy grid
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
@@ -33,7 +33,7 @@ end
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 5000;                 # (eV) upper limit to the energy grid
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
@@ -45,27 +45,31 @@ end
     IeE_tot = 1e-2  # W/m²
     E_min = E_max - 100
     # SS
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_max - 1000, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_max - 1000, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_max - 10, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_max - 10, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+        # SS, different E_min
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_max, E, dE, μ_center, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, high source altitude
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, 1000)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, 1000)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, delayed smooth onset
-    Ie_top = Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, h_atm[end], 0.4, 0.8)
+    Ie_top = AURORA.Ie_top_constant_simple(IeE_tot, E_min, E, dE, μ_center, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, h_atm[end], 0.4, 0.8)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end
@@ -77,7 +81,7 @@ end
     θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
     E_max = 100;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     savedir = make_savedir("", "")
     # Define input parameters
@@ -99,7 +103,7 @@ end
     θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
     E_max = 100;                 # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     savedir = make_savedir("", "")
     # Define input parameters
@@ -126,7 +130,7 @@ end
     t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
     n_loop = 2;                    # number of loops to run
     CFL_number = 128;
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     savedir = make_savedir("", "")
     # Define input parameters
@@ -153,7 +157,7 @@ end
     t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
     n_loop = 2;                    # number of loops to run
     CFL_number = 128;
-    msis_file = find_nrlmsis_file();
+    msis_file = find_msis_file();
     iri_file = find_iri_file();
     savedir = make_savedir("", "")
     # Define input parameters
