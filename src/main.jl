@@ -8,13 +8,19 @@ using KLU: KLU, klu
 # Practical cache storage
 mutable struct Cache
     AB2B::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    # Fields for steady-state scheme
     KLU::KLU.KLUFactorization{Float64, Int64}
+    Mlhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    mapping::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
+    Ddz_Up::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    Ddz_Down::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    Ddiffusion::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
 end
 
 function Cache()
     AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
-    return Cache(AB2B, KLU)
+    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -197,12 +203,14 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
 
         # Compute the flux of e-
         if iE == length(E)
-            Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith),
+            # Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith),
+            Ie[:, 1, iE] = steady_state_scheme_optimized(h_atm ./ cosd(B_angle_to_zenith),
                                                           μ_center, A, B, D[iE, :],
                                                           Q[:, 1, iE], Ie_top_local[:, iE],
                                                           cache, first_iteration = true)
         else
-            Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center,
+            # Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center,
+            Ie[:, 1, iE] = steady_state_scheme_optimized(h_atm ./ cosd(B_angle_to_zenith), μ_center,
                                                A, B, D[iE, :], Q[:, 1, iE],
                                                Ie_top_local[:, iE], cache)
         end

@@ -35,6 +35,7 @@ include("main.jl")
 export calculate_e_transport
 
 include("steady_state.jl")
+include("steady_state_optimized.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
