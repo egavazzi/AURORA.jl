@@ -68,7 +68,7 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
         idx_ionization = (E_levels[:, 2] .> 0)
         if minimum(E_levels[idx_ionization, 1]) < E[iE]
             prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE)
+                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE, cache, i)
             prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
                                     σ, E_levels, cascading, E, dE, iE)
         end
@@ -149,8 +149,8 @@ end
 
 
 function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
-    # Initialize
-    Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
+    # Use cached matrix to avoid allocations
+    Ie_degraded = cache.Ie_degraded
 
     # Multiply each element of B2B with n (density vector) and resize to get a matrix that
     # can be multiplied with Ie
@@ -385,9 +385,11 @@ end
 ```
 =#
 function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE)
-    n_repeated_over_μt = repeat(n, length(μ_center), length(t))
-    n_repeated_over_t = repeat(n, 1, length(t))
+                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE,
+                                            cache, i_species)
+    # Use pre-filled cached matrices (filled at cache creation)
+    n_repeated_over_μt = cache.n_repeated_over_μt[i_species]
+    n_repeated_over_t = cache.n_repeated_over_t[i_species]
 
     # PRIMARY ELECTRONS
     Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);

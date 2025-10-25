@@ -19,12 +19,57 @@ mutable struct Cache
     Mrhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
     mapping_lhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
     mapping_rhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
+    # Cached repeated density matrices for ionization calculations (one per species)
+    n_repeated_over_μt::Vector{Matrix{Float64}}
+    n_repeated_over_t::Vector{Matrix{Float64}}
+    # Cached temporary matrix for inelastic collisions
+    Ie_degraded::Matrix{Float64}
 end
 
 function Cache()
     AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
-    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+    n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
+    n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
+    Ie_degraded = zeros(1, 1)
+    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_degraded)
+end
+
+# Constructor that pre-fills the density matrices
+function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int)
+    AB2B = spzeros(1, 1)
+    KLU = klu(spdiagm(0 => ones(1)))
+
+    number_species = length(n_neutrals)
+
+    # Pre-allocate and fill the density matrices for all species
+    n_repeated_over_μt = Vector{Matrix{Float64}}(undef, number_species)
+    n_repeated_over_t = Vector{Matrix{Float64}}(undef, number_species)
+
+    for i_species in 1:number_species
+        n = n_neutrals[i_species]
+
+        # Allocate and fill n_repeated_over_μt (size: n_z × n_μ, n_t)
+        n_repeated_over_μt[i_species] = Matrix{Float64}(undef, n_z * n_μ, n_t)
+        for i_t in 1:n_t
+            for i_μ in 1:n_μ
+                @views n_repeated_over_μt[i_species][(i_μ - 1) * n_z .+ (1:n_z), i_t] .= n
+            end
+        end
+
+        # Allocate and fill n_repeated_over_t (size: n_z, n_t)
+        n_repeated_over_t[i_species] = Matrix{Float64}(undef, n_z, n_t)
+        for i_t in 1:n_t
+            @views n_repeated_over_t[i_species][:, i_t] .= n
+        end
+    end
+
+    # Pre-allocate Ie_degraded matrix with correct size (n_z × n_μ, n_t)
+    Ie_degraded = Matrix{Float64}(undef, n_z * n_μ, n_t)
+
+    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_degraded)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -77,8 +122,8 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize cache
-    cache = Cache()
+    ## Initialize cache with pre-filled density matrices
+    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
@@ -184,8 +229,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize cache
-    cache = Cache()
+    ## Initialize cache with pre-filled density matrices
+    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
