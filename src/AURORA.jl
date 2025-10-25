@@ -19,6 +19,7 @@ include("phase_functions.jl")
 include("utilities.jl")
 include("matrix_building.jl")
 include("crank_nicolson.jl")
+include("crank_nicolson_optimized.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
@@ -35,6 +36,7 @@ include("main.jl")
 export calculate_e_transport
 
 include("steady_state.jl")
+include("steady_state_optimized.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
