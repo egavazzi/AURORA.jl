@@ -15,12 +15,16 @@ mutable struct Cache
     Ddz_Up::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
     Ddz_Down::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
     Ddiffusion::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    # Additional fields for Crank-Nicolson scheme
+    Mrhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    mapping_lhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
+    mapping_rhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
 end
 
 function Cache()
     AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
-    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing)
+    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -98,12 +102,14 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
             # Compute the flux of e-
             if iE == length(E)
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                Ie[:, :, iE] = Crank_Nicolson_optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
                                                          cache, first_iteration = true)
             else
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                Ie[:, :, iE] = Crank_Nicolson_optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                                                          A, B, D[iE, :], Q[:, :, iE],
                                                          Ie_top_local[:, :, iE], I0[:, iE],
                                                          cache)

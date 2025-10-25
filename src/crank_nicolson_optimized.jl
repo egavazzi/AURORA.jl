@@ -536,13 +536,11 @@ function Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache
         cache.Ddz_Up = Ddz_Up
         cache.Ddz_Down = Ddz_Down
         cache.Ddiffusion = Ddiffusion
-        cache.Ddt = Ddt
     else
         # Reuse cached matrices
         Ddz_Up = cache.Ddz_Up
         Ddz_Down = cache.Ddz_Down
         Ddiffusion = cache.Ddiffusion
-        Ddt = cache.Ddt
     end
 
     # Update matrix values (fast, no allocations)
