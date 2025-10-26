@@ -2,21 +2,6 @@ using KLU: klu, klu!
 using LinearAlgebra: Diagonal, ldiv!, mul!
 using SparseArrays: spdiagm, sparse, dropzeros!, findnz
 
-function d2M(z)
-    dzd = z[2:end-1] - z[1:end-2]
-    dzu = z[3:end]   - z[2:end-1]
-
-    dsup  = [2 ./ (dzd .* (dzd + dzu)) ; 0]
-    dMain = [0 ; -2 ./ (dzd .* dzu) ; 0]
-    dsub  = [0 ; 2 ./ (dzu .* (dzd + dzu))]
-
-    D2M = spdiagm( -1 => dsup,
-                    0 => dMain,
-                    1 => dsub)
-    return D2M
-end
-
-
 function Crank_Nicolson(t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
     Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
 

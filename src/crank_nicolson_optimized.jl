@@ -445,7 +445,7 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
 end
 
 """
-    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
 
 Optimized Crank-Nicolson time-stepping scheme using direct nzval modification.
 This is an in-place version that modifies `Ie` directly to avoid allocations.
@@ -498,19 +498,29 @@ Both matrices have the same block structure as in steady-state:
 - `h_atm`: altitude grid [km]
 - `μ`: cosine of pitch angle grid
 - `v`: electron velocity [km/s]
-- `A`: electron loss rate [s⁻¹]
-- `B`: scattering matrix [s⁻¹] (n_z × n_angle × n_angle)
-- `D`: pitch-angle diffusion coefficient [s⁻¹] (n_angle,)
-- `Q`: source term [m⁻² s⁻¹] at each time step
+- `matrices::TransportMatrices`: container with
+    - `A`: electron loss rate [s⁻¹]
+    - `B`: scattering matrix [s⁻¹] (n_z × n_angle × n_angle)
+    - `D`: pitch-angle diffusion coefficient [s⁻¹] (n_angle,)
+    - `Q`: source term [m⁻² s⁻¹] at each time step
+    - `Ddiffusion`: spatial diffusion matrix (n_z × n_z)
+- `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
 - `cache`: Cache object (must have fields for Mlhs, Mrhs, mappings, KLU, diff matrices)
 - `first_iteration`: whether this is the first call
 
 """
-function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
     n_z = length(h_atm)
     n_angle = length(μ)
+
+    # Extract matrices from container
+    A = matrices.A
+    B = matrices.B
+    D = @view(matrices.D[iE, :])  # Extract D slice for current energy
+    Q_slice = @view(matrices.Q[:, :, iE])  # Extract Q slice for current energy
+    Ddiffusion = matrices.Ddiffusion
 
     # Temporal differentiation matrix
     dt = t[2] - t[1]
@@ -525,21 +535,15 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, 
         Ddz_Down = spdiagm(0 => -1 ./ (2 .* diff(h4diffd[1:end])),
                            1 => 1 ./ (2 .* diff(h4diffd[1:(end - 1)])))
 
-        # Diffusion operator
-        Ddiffusion = d2M(h_atm)
-        Ddiffusion[1, 1] = 0
-
         # First time: create sparsity patterns and mappings
         cache.Mlhs, cache.Mrhs = create_crank_nicolson_sparsity_patterns(n_z, n_angle, μ, D, Ddiffusion)
         cache.mapping_lhs, cache.mapping_rhs = create_crank_nicolson_nzval_mappings(cache.Mlhs, cache.Mrhs, n_z, n_angle)
         cache.Ddz_Up = Ddz_Up
         cache.Ddz_Down = Ddz_Down
-        cache.Ddiffusion = Ddiffusion
     else
         # Reuse cached matrices
         Ddz_Up = cache.Ddz_Up
         Ddz_Down = cache.Ddz_Down
-        Ddiffusion = cache.Ddiffusion
     end
 
     # Update matrix values (fast, no allocations)
@@ -565,7 +569,7 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, 
     # Time-stepping loop
     for i_t in 1:(length(t) - 1)
         I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
-        Q_local = (@view(Q[:, i_t]) .+ @view(Q[:, i_t + 1])) ./ 2
+        Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
         Q_local[index_top_bottom] = I_top_bottom[:]
 
         # Crank-Nicolson step: Mlhs * Ie^(n+1) = Mrhs * Ie^n + Q
@@ -580,20 +584,4 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, 
     Ie[Ie .< 0] .= 0  # Fluxes should never be negative
 
     return nothing
-end
-
-"""
-    Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
-
-Non-mutating wrapper for `Crank_Nicolson_optimized!` for backwards compatibility.
-Allocates a new output array and calls the in-place version.
-
-For better performance, use the in-place version `Crank_Nicolson_optimized!` with a pre-allocated array.
-"""
-function Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
-    n_z = length(h_atm)
-    n_angle = length(μ)
-    Ie = Array{Float64}(undef, n_z * n_angle, length(t))
-    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = first_iteration)
-    return Ie
 end

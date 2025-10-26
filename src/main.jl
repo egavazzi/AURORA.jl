@@ -124,10 +124,9 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     ## Initialize transport matrices container
     matrices = initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
-    # Pre-compute the D matrix (energy × angle)
-    matrices.D .= make_D(E, dE, θ_lims)
-    # Pre-compute the diffusion operator (altitude x altitude)
-    matrices.Ddiffusion = d2M(h_atm ./ cosd(B_angle_to_zenith))
+    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
+    update_D!(matrices.D, E, dE, θ_lims)
+    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
     matrices.Ddiffusion[1, 1] = 0
 
     ## Precalculate the B2B fragment
@@ -243,12 +242,11 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
-    ## Initialize transport matrices container for steady state (1 time step)
+    ## Initialize transport matrices container
     matrices = initialize_transport_matrices(h_atm, μ_center, 1:1:1, E, dE, θ_lims)
-
-    matrices.D .= make_D(E, dE, θ_lims)
-    # Pre-compute the diffusion operator (altitude x altitude)
-    matrices.Ddiffusion = d2M(h_atm ./ cosd(B_angle_to_zenith))
+    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
+    update_D!(matrices.D, E, dE, θ_lims)
+    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
     matrices.Ddiffusion[1, 1] = 0
 
     ## Initialize the ionospheric flux
