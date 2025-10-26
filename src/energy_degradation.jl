@@ -41,11 +41,11 @@ function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals
                                    outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
     end
 
-    # TODO for later: move this outside of the energy loop and then just fill with zeros
-    Ionization_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
-    Ionizing_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
-    Ionization_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
-    Ionizing_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
+    # Get the pre-allocated ionization fragment arrays from cache
+    Ionization_fragment_1 = cache.Ionization_fragment_1
+    Ionizing_fragment_1 = cache.Ionizing_fragment_1
+    Ionization_fragment_2 = cache.Ionization_fragment_2
+    Ionizing_fragment_2 = cache.Ionizing_fragment_2
 
     # Loop over the neutral species
     for i in 1:length(n_neutrals)
@@ -57,11 +57,11 @@ function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
 
-        # TODO: that's if I will move things outside of the energy loop
-        # fill!(Ionization_fragment_1[i], 0)
-        # fill!(Ionizing_fragment_1[i], 0)
-        # fill!(Ionization_fragment_2[i], 0)
-        # fill!(Ionizing_fragment_2[i], 0)
+        # Zero out the ionization fragment arrays for this species
+        fill!(Ionization_fragment_1[i], 0)
+        fill!(Ionizing_fragment_1[i], 0)
+        fill!(Ionization_fragment_2[i], 0)
+        fill!(Ionizing_fragment_2[i], 0)
 
         # If the energy is too low, skip the ionization calculation (use zeros)
         idx_ionization = (E_levels[:, 2] .> 0)
@@ -380,12 +380,24 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
     Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
 
     # SECONDARY ELECTRONS (ISOTROPIC)
-    @views for i_μ1 in eachindex(μ_center)
-        for i_μ2 in eachindex(μ_center)
-            Ionization_fragment_1[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
-                n_repeated_over_t .*
-                    (Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                    BeamWeight[i_μ1] ./ sum(BeamWeight)
+    # Precompute constants
+    n_z = length(h_atm)
+    n_μ = length(μ_center)
+    n_t = size(Ie, 2)
+    sum_BeamWeight = sum(BeamWeight)
+
+    # Use @tturbo for vectorized computation
+    @tturbo for it in 1:n_t
+        for i_μ1 in 1:n_μ
+            for i_μ2 in 1:n_μ
+                for iz in 1:n_z
+                    row_μ1 = (i_μ1 - 1) * n_z + iz
+                    row_μ2 = (i_μ2 - 1) * n_z + iz
+                    Ionization_fragment_1[row_μ1, it] += n_repeated_over_t[iz, it] *
+                                                          Ie[row_μ2, it, iE] *
+                                                          BeamWeight[i_μ1] / sum_BeamWeight
+                end
+            end
         end
     end
 end

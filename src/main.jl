@@ -23,6 +23,11 @@ mutable struct Cache
     n_repeated_over_t::Vector{Matrix{Float64}}
     # Cached temporary matrix for scattered flux calculation (inelastic collisions)
     Ie_scatter::Matrix{Float64}
+    # Cached ionization fragment arrays (one per species)
+    Ionization_fragment_1::Vector{Matrix{Float64}}
+    Ionizing_fragment_1::Vector{Matrix{Float64}}
+    Ionization_fragment_2::Vector{Vector{Float64}}
+    Ionizing_fragment_2::Vector{Vector{Float64}}
 end
 
 function Cache()
@@ -30,12 +35,18 @@ function Cache()
     n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
     n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
     Ie_scatter = zeros(1, 1)
+    Ionization_fragment_1 = [zeros(1, 1) for _ in 1:3]
+    Ionizing_fragment_1 = [zeros(1, 1) for _ in 1:3]
+    Ionization_fragment_2 = [zeros(1) for _ in 1:3]
+    Ionizing_fragment_2 = [zeros(1) for _ in 1:3]
     return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter)
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+                 Ionization_fragment_1, Ionizing_fragment_1,
+                 Ionization_fragment_2, Ionizing_fragment_2)
 end
 
 # Constructor that pre-fills the density matrices
-function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int)
+function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
     KLU = klu(spdiagm(0 => ones(1)))
 
     number_species = length(n_neutrals)
@@ -65,8 +76,23 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int)
     # Pre-allocate Ie_scatter matrix with correct size (n_z × n_μ, n_t)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
 
+    # Pre-allocate ionization fragment arrays for all species
+    Ionization_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
+    Ionizing_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
+    Ionization_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
+    Ionizing_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
+
+    for i_species in 1:number_species
+        Ionization_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
+        Ionizing_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
+        Ionization_fragment_2[i_species] = zeros(n_E)
+        Ionizing_fragment_2[i_species] = zeros(n_E)
+    end
+
     return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter)
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+                 Ionization_fragment_1, Ionizing_fragment_1,
+                 Ionization_fragment_2, Ionizing_fragment_2)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -117,7 +143,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm))
+    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm), length(E))
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
@@ -237,7 +263,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), 1, length(h_atm))
+    cache = Cache(n_neutrals, length(μ_center), 1, length(h_atm), length(E))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);

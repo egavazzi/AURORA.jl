@@ -1,4 +1,5 @@
 using SparseArrays: SparseArrays, spdiagm
+using LoopVectorization: @tturbo
 
 """
     TransportMatrices
@@ -164,22 +165,34 @@ function update_B!(B, n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neut
         B2B_inelastic = beams2beams(phase_fcn_i, B2B_fragment);
 
         # add scattering from elastic collisions
-        for i1 in axes(B2B_elastic, 1)
-            for i2 in axes(B2B_elastic, 2)
-                B[:, i1, i2] .= @view(B[:, i1, i2]) .+ n .* σ[1, iE] .* B2B_elastic[i1, i2];
+        n_z = length(n)
+        n_angle = size(B2B_elastic, 1)
+        σ_elastic = σ[1, iE]
+
+        @tturbo for i2 in 1:n_angle
+            for i1 in 1:n_angle
+                for iz in 1:n_z
+                    B[iz, i1, i2] += n[iz] * σ_elastic * B2B_elastic[i1, i2]
+                end
             end
         end
 
         # add scattering from inelastic and ionization collisions
-        for i1 in 2:size(σ, 1)
-            for i2 in axes(B2B_inelastic, 1)
-                for i3 in axes(B2B_inelastic, 2)
-                    # The last factor corrects for the case where the energy loss
-                    # E_levels[i1, 1] is smaller than the width in energy of the energy bin.
-                    # That is, when dE[iE] > E_levels[i1,1], only the fraction
-                    # E_levels[i1,1] / dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
-                    B[:, i2, i3] .= @view(B[:, i2, i3]) .+ n .* σ[i1, iE] .* B2B_inelastic[i2, i3] .*
-                                                    max(0, 1 - E_levels[i1, 1] ./ dE[iE]);
+        n_collisions = size(σ, 1)
+        for i_coll in 2:n_collisions
+            σ_coll = σ[i_coll, iE]
+            E_loss = E_levels[i_coll, 1]
+            # The last factor corrects for the case where the energy loss
+            # E_levels[i_coll, 1] is smaller than the width in energy of the energy bin.
+            # That is, when dE[iE] > E_levels[i_coll,1], only the fraction
+            # E_levels[i_coll,1] / dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
+            correction_factor = max(0.0, 1.0 - E_loss / dE[iE])
+
+            @tturbo for i3 in 1:n_angle
+                for i2 in 1:n_angle
+                    for iz in 1:n_z
+                        B[iz, i2, i3] += n[iz] * σ_coll * B2B_inelastic[i2, i3] * correction_factor
+                    end
                 end
             end
         end
