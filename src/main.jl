@@ -7,7 +7,6 @@ using KLU: KLU, klu
 
 # Practical cache storage
 mutable struct Cache
-    AB2B::SparseArrays.SparseMatrixCSC{Float64, Int64}
     # Fields for steady-state scheme
     KLU::KLU.KLUFactorization{Float64, Int64}
     Mlhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
@@ -22,23 +21,21 @@ mutable struct Cache
     # Cached repeated density matrices for ionization calculations (one per species)
     n_repeated_over_μt::Vector{Matrix{Float64}}
     n_repeated_over_t::Vector{Matrix{Float64}}
-    # Cached temporary matrix for inelastic collisions
-    Ie_degraded::Matrix{Float64}
+    # Cached temporary matrix for scattered flux calculation (inelastic collisions)
+    Ie_scatter::Matrix{Float64}
 end
 
 function Cache()
-    AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
     n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
     n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
-    Ie_degraded = zeros(1, 1)
-    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_degraded)
+    Ie_scatter = zeros(1, 1)
+    return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter)
 end
 
 # Constructor that pre-fills the density matrices
 function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int)
-    AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
 
     number_species = length(n_neutrals)
@@ -65,11 +62,11 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int)
         end
     end
 
-    # Pre-allocate Ie_degraded matrix with correct size (n_z × n_μ, n_t)
-    Ie_degraded = Matrix{Float64}(undef, n_z * n_μ, n_t)
+    # Pre-allocate Ie_scatter matrix with correct size (n_z × n_μ, n_t)
+    Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
 
-    return Cache(AB2B, KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_degraded)
+    return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -230,7 +227,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm))
+    cache = Cache(n_neutrals, length(μ_center), 1, length(h_atm))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
