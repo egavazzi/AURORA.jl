@@ -145,16 +145,16 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
             # Compute the flux of e-
             if iE == length(E)
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                Ie[:, :, iE] = Crank_Nicolson_optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                                         A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache, first_iteration = true)
+                Crank_Nicolson_optimized!(@view(Ie[:, :, iE]), t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                                          A, B, D[iE, :], Q[:, :, iE],
+                                          Ie_top_local[:, :, iE], I0[:, iE],
+                                          cache, first_iteration = true)
             else
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                Ie[:, :, iE] = Crank_Nicolson_optimized(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                                         A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache)
+                Crank_Nicolson_optimized!(@view(Ie[:, :, iE]), t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                                          A, B, D[iE, :], Q[:, :, iE],
+                                          Ie_top_local[:, :, iE], I0[:, iE],
+                                          cache)
             end
 
             # Update the cascading of e-

@@ -445,9 +445,10 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
 end
 
 """
-    Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
 
 Optimized Crank-Nicolson time-stepping scheme using direct nzval modification.
+This is an in-place version that modifies `Ie` directly to avoid allocations.
 
 On first iteration, creates the sparsity pattern and mapping which are stored in cache.
 On subsequent iterations, only updates the nzval array directly.
@@ -492,6 +493,7 @@ Both matrices have the same block structure as in steady-state:
 ```
 
 # Arguments
+- `Ie`: pre-allocated output array [m⁻² s⁻¹] (n_z * n_angle × n_t) to store results
 - `t`: time grid [s]
 - `h_atm`: altitude grid [km]
 - `μ`: cosine of pitch angle grid
@@ -503,15 +505,12 @@ Both matrices have the same block structure as in steady-state:
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
 - `cache`: Cache object (must have fields for Mlhs, Mrhs, mappings, KLU, diff matrices)
-- `first_iteration`: whether this is the first call for a new energy
+- `first_iteration`: whether this is the first call
 
-# Returns
-- `Ie`: electron flux [m⁻² s⁻¹] at all times, altitudes, and angles, for one energy
 """
-function Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
     n_z = length(h_atm)
     n_angle = length(μ)
-    Ie = Array{Float64}(undef, n_z * n_angle, length(t))
 
     # Spatial differentiation matrices
     h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
@@ -580,5 +579,21 @@ function Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache
 
     Ie[Ie .< 0] .= 0  # Fluxes should never be negative
 
+    return Ie
+end
+
+"""
+    Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+
+Non-mutating wrapper for `Crank_Nicolson_optimized!` for backwards compatibility.
+Allocates a new output array and calls the in-place version.
+
+For better performance, use the in-place version `Crank_Nicolson_optimized!` with a pre-allocated array.
+"""
+function Crank_Nicolson_optimized(t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = false)
+    n_z = length(h_atm)
+    n_angle = length(μ)
+    Ie = Array{Float64}(undef, n_z * n_angle, length(t))
+    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, cache; first_iteration = first_iteration)
     return Ie
 end
