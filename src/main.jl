@@ -145,16 +145,17 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
             # Compute the flux of e-
             if iE == length(E)
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                Crank_Nicolson_optimized!(@view(Ie[:, :, iE]), t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                          A, B, D[iE, :], Q[:, :, iE],
-                                          Ie_top_local[:, :, iE], I0[:, iE],
-                                          cache, first_iteration = true)
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
+                                                 v_of_E(E[iE]), A, B, D[iE, :], Q[:, :, iE],
+                                                 Ie_top_local[:, :, iE], I0[:, iE], cache,
+                                                 first_iteration = true)
             else
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                Crank_Nicolson_optimized!(@view(Ie[:, :, iE]), t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                          A, B, D[iE, :], Q[:, :, iE],
-                                          Ie_top_local[:, :, iE], I0[:, iE],
-                                          cache)
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
+                                                 v_of_E(E[iE]), A, B, D[iE, :], Q[:, :, iE],
+                                                 Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
@@ -251,16 +252,16 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
 
         # Compute the flux of e-
         if iE == length(E)
-            # Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith),
-            Ie[:, 1, iE] = steady_state_scheme_optimized(h_atm ./ cosd(B_angle_to_zenith),
-                                                          μ_center, A, B, D[iE, :],
-                                                          Q[:, 1, iE], Ie_top_local[:, iE],
-                                                          cache, first_iteration = true)
+            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
+                                                  h_atm ./ cosd(B_angle_to_zenith),
+                                                  μ_center, A, B, D[iE, :], Q[:, 1, iE],
+                                                  Ie_top_local[:, iE], cache,
+                                                  first_iteration = true)
         else
-            # Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center,
-            Ie[:, 1, iE] = steady_state_scheme_optimized(h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                               A, B, D[iE, :], Q[:, 1, iE],
-                                               Ie_top_local[:, iE], cache)
+            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
+                                                  h_atm ./ cosd(B_angle_to_zenith),
+                                                  μ_center, A, B, D[iE, :], Q[:, 1, iE],
+                                                  Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-

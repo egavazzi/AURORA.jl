@@ -512,23 +512,23 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, 
     n_z = length(h_atm)
     n_angle = length(μ)
 
-    # Spatial differentiation matrices
-    h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
-    h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
-    Ddz_Up   = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
-                        0 =>  1 ./ (2 .* diff(h4diffu[1:end])))
-    Ddz_Down = spdiagm( 0 => -1 ./ (2 .* diff(h4diffd[1:end])),
-                        1 =>  1 ./ (2 .* diff(h4diffd[1:end-1])))
-
     # Temporal differentiation matrix
     dt = t[2] - t[1]
     Ddt = Diagonal([1 ./ (v * dt) for i in h_atm])
 
-    # Diffusion operator
-    Ddiffusion = d2M(h_atm)
-    Ddiffusion[1, 1] = 0
-
     if first_iteration
+        # Spatial differentiation matrices
+        h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]); h_atm]
+        h4diffd = [h_atm; h_atm[end] + (h_atm[end] - h_atm[end - 1])]
+        Ddz_Up = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
+                         0 => 1 ./ (2 .* diff(h4diffu[1:end])))
+        Ddz_Down = spdiagm(0 => -1 ./ (2 .* diff(h4diffd[1:end])),
+                           1 => 1 ./ (2 .* diff(h4diffd[1:(end - 1)])))
+
+        # Diffusion operator
+        Ddiffusion = d2M(h_atm)
+        Ddiffusion[1, 1] = 0
+
         # First time: create sparsity patterns and mappings
         cache.Mlhs, cache.Mrhs = create_crank_nicolson_sparsity_patterns(n_z, n_angle, μ, D, Ddiffusion)
         cache.mapping_lhs, cache.mapping_rhs = create_crank_nicolson_nzval_mappings(cache.Mlhs, cache.Mrhs, n_z, n_angle)
@@ -579,7 +579,7 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, A, B, D, Q, Ie_top, I0, 
 
     Ie[Ie .< 0] .= 0  # Fluxes should never be negative
 
-    return Ie
+    return nothing
 end
 
 """

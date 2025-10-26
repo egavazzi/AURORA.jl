@@ -321,9 +321,10 @@ function update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up,
 end
 
 """
-    steady_state_scheme_optimized(h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
+    steady_state_scheme_optimized!(Ie, h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
 
 Optimized steady-state scheme using direct nzval modification.
+This is an in-place version that modifies `Ie` directly to avoid allocations.
 This version avoids allocations by reusing the sparse matrix structure.
 
 On first iteration, creates the sparsity pattern and mapping which are stored in cache.
@@ -371,6 +372,7 @@ Jacobian = ∂f/∂Ie = Mlhs
 ```
 
 # Arguments
+- `Ie`: pre-allocated output array [m⁻² s⁻¹] (n_z * n_angle) to store results
 - `h_atm`: altitude grid [km]
 - `μ`: cosine of pitch angle grid
 - `A`: electron loss rate [s⁻¹] (n_z)
@@ -380,28 +382,25 @@ Jacobian = ∂f/∂Ie = Mlhs
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: Cache object storing Mlhs, mapping, KLU, and differentiation matrices
 - `first_iteration`: whether this is the first call (creates structure) or subsequent (reuses structure)
-
-# Returns
-- `Ie`: electron flux [m⁻² s⁻¹] at all altitudes and angles, for the current energy
 """
-function steady_state_scheme_optimized(h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
+function steady_state_scheme_optimized!(Ie, h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
     n_z = length(h_atm)
     n_angle = length(μ)
-    Ie = Array{Float64}(undef, length(h_atm) * length(μ))
 
-    # Spatial differentiation matrices
-    h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
-    h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
-    Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
-                        0 =>  1 ./ diff(h4diffu[1:end]))
-    Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
-                        1 =>  1 ./ diff(h4diffd[1:end-1]))
-
-    # Diffusion operator
-    Ddiffusion = d2M(h_atm)
-    Ddiffusion[1, 1] = 0
-
+    # Compute or retrieve differentiation matrices
     if first_iteration
+        # Spatial differentiation matrices
+        h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
+        h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
+        Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
+                            0 =>  1 ./ diff(h4diffu[1:end]))
+        Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
+                            1 =>  1 ./ diff(h4diffd[1:end-1]))
+
+        # Diffusion operator
+        Ddiffusion = d2M(h_atm)
+        Ddiffusion[1, 1] = 0
+
         # First time: create sparsity pattern and mapping
         cache.Mlhs = create_steady_state_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion)
         cache.mapping = create_steady_state_nzval_mapping(cache.Mlhs, n_z, n_angle)
@@ -434,9 +433,21 @@ function steady_state_scheme_optimized(h_atm, μ, A, B, D, Q, Ie_top, cache; fir
     Q_local[index_top_bottom] = I_top_bottom[:]
 
     # Solve system
-    Ie = cache.KLU \ Q_local
+    Ie .= cache.KLU \ Q_local
 
     Ie[Ie .< 0] .= 0; # the fluxes should never be negative
 
+    return nothing
+end
+
+"""
+    steady_state_scheme_optimized(h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
+
+Non-mutating wrapper for `steady_state_scheme_optimized!` for backwards compatibility.
+Allocates a new output vector and calls the in-place version.
+"""
+function steady_state_scheme_optimized(h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = false)
+    Ie = Array{Float64}(undef, length(h_atm) * length(μ))
+    steady_state_scheme_optimized!(Ie, h_atm, μ, A, B, D, Q, Ie_top, cache; first_iteration = first_iteration)
     return Ie
 end
