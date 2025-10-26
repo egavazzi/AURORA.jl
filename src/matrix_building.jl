@@ -1,3 +1,47 @@
+using SparseArrays: SparseArrays
+
+"""
+    TransportMatrices
+
+Container for the matrices used in the electron transport equations.
+
+# Fields
+- `A::Vector{Float64}`: Loss term matrix (altitude dimension)
+- `B::Array{Float64, 3}`: Scattering term matrix (altitude x angle x angle)
+- `D::Array{Float64, 2}`: Diffusion coefficient matrix (energy x angle)
+- `Q::Array{Float64, 3}`: Source term array (altitude*angle x time x energy)
+- `Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}`: Diffusion operator (altitude x altitude)
+
+The struct is mutable to allow efficient in-place updates of Q during the energy cascade.
+"""
+mutable struct TransportMatrices
+    A::Vector{Float64}
+    B::Array{Float64, 3}
+    D::Array{Float64, 2}
+    Q::Array{Float64, 3}
+    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
+end
+
+"""
+    TransportMatrices(n_altitude, n_angle, n_time, n_energy)
+
+Construct an empty TransportMatrices container with zeros.
+
+# Arguments
+- `n_altitude::Int`: Number of altitude grid points
+- `n_angle::Int`: Number of angle bins
+- `n_time::Int`: Number of time steps
+- `n_energy::Int`: Number of energy bins
+"""
+function TransportMatrices(n_altitude::Int, n_angle::Int, n_time::Int, n_energy::Int)
+    A = zeros(Float64, n_altitude)
+    B = zeros(Float64, n_altitude, n_angle, n_angle)
+    D = zeros(Float64, n_energy, n_angle)
+    Q = zeros(Float64, n_altitude * n_angle, n_time, n_energy)
+    Ddiffusion = SparseArrays.spzeros(Float64, n_altitude, n_altitude)
+    return TransportMatrices(A, B, D, Q, Ddiffusion)
+end
+
 """
     loss_to_thermal_electrons(E, ne, Te)
 
@@ -8,7 +52,7 @@ interaction. It uses the analytic form given for the energy-transfer rate from
 photoelectrons (or suprathermal electrons) to thermal electrons, given by Swartz
 and Nisbet (1971). The expression fits the classical formulation of Itikawa and
 Aono (1966) at low energies and gives a smooth transition to fit the quantum
-mechanical equation of Schunk and Hays (1971) at higher energies.
+mechanical equation of Schunk and Hays (1971).
 
 # Arguments
 - `E::Real`: Energy level [eV]. Scalar value.
@@ -177,4 +221,59 @@ function make_D(E, dE, θ_lims)
         end
     end
     return D_e
+end
+
+
+"""
+    update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te, E_levels_neutrals,
+                     phase_fcn_neutrals, E, dE, iE, B2B_fragment, finer_θ)
+
+Update the A and B matrices in place for a given energy level iE.
+
+# Arguments
+- `matrices::TransportMatrices`: Container to update
+- `n_neutrals, σ_neutrals, ne, Te, E_levels_neutrals, phase_fcn_neutrals`: Atmosphere and cross section data
+- `E, dE, iE`: Energy grid and current energy index
+- `B2B_fragment, finer_θ`: Pre-computed beam-to-beam fragments and angle grid
+
+# Returns
+- `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
+"""
+function update_matrices!(matrices::TransportMatrices, n_neutrals, σ_neutrals, ne, Te,
+                         E_levels_neutrals, phase_fcn_neutrals, E, dE, iE, B2B_fragment, finer_θ)
+    # Update A matrix
+    matrices.A .= make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
+
+    # Update B matrix and get B2B_inelastic
+    matrices.B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
+                                                 phase_fcn_neutrals, dE, iE, B2B_fragment, finer_θ)
+
+    return B2B_inelastic_neutrals
+end
+
+
+"""
+    initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+
+Create a TransportMatrices container initialized with zeros for A, B, D, Q and Ddiffusion.
+
+# Arguments
+- `h_atm`: Altitude grid
+- `μ_center`: Cosine of angle centers
+- `t`: Time grid
+- `E, dE`: Energy grid and bin widths
+- `θ_lims`: Angle bin limits
+
+# Returns
+- `matrices::TransportMatrices`: Initialized container for the transport matrices
+"""
+function initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+    n_altitude = length(h_atm)
+    n_angle = length(μ_center)
+    n_time = length(t)
+    n_energy = length(E)
+
+    matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
+
+    return matrices
 end

@@ -76,9 +76,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
 
-    ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
-
     ## CFL criteria
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
@@ -122,44 +119,57 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     ## Initialize cache with pre-filled density matrices
     cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm))
 
+    ## Initialise
+    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+
+    ## Initialize transport matrices container
+    matrices = initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+    # Pre-compute the D matrix (energy × angle)
+    matrices.D .= make_D(E, dE, θ_lims)
+    # Pre-compute the diffusion operator (altitude x altitude)
+    matrices.Ddiffusion = d2M(h_atm ./ cosd(B_angle_to_zenith))
+    matrices.Ddiffusion[1, 1] = 0
+
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
     ## Looping over n_loop
     for i in 1:n_loop
-        Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
+        # Initialize the ionospheric flux for the current loop
         Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
 
-        D = make_D(E, dE, θ_lims);
+        # Reset Q for each new loop
+        fill!(matrices.Q, 0.0)
+
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
 
         p = Progress(length(E); desc=string("Calculating flux for loop ", i, "/", n_loop), dt=1.0)
         # Looping over energy
         for iE in length(E):-1:1
-            A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
-
-            B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                                phase_fcn_neutrals, dE, iE, B2B_fragment, μ_scatterings.theta1);
+            # Update matrices A and B for current energy
+            B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
+                                                      E_levels_neutrals, phase_fcn_neutrals,
+                                                      E, dE, iE, B2B_fragment, μ_scatterings.theta1)
 
             # Compute the flux of e-
             if iE == length(E)
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                 @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
                                                  h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                                 v_of_E(E[iE]), A, B, D[iE, :], Q[:, :, iE],
+                                                 v_of_E(E[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache,
                                                  first_iteration = true)
             else
                 # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
                 @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
                                                  h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                                 v_of_E(E[iE]), A, B, D[iE, :], Q[:, :, iE],
+                                                 v_of_E(E[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q!(matrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
 
@@ -233,39 +243,44 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
-    ## No n_loop here
-    Q  = zeros(length(h_atm) * length(μ_center), 1, length(E));
+    ## Initialize transport matrices container for steady state (1 time step)
+    matrices = initialize_transport_matrices(h_atm, μ_center, 1:1:1, E, dE, θ_lims)
+
+    matrices.D .= make_D(E, dE, θ_lims)
+    # Pre-compute the diffusion operator (altitude x altitude)
+    matrices.Ddiffusion = d2M(h_atm ./ cosd(B_angle_to_zenith))
+    matrices.Ddiffusion[1, 1] = 0
+
+    ## Initialize the ionospheric flux
     Ie = zeros(length(h_atm) * length(μ_center), 1, length(E));
 
-    D = make_D(E, dE, θ_lims);
     # Extract the top flux for the current loop
     Ie_top_local = Ie_top[:, 1, :];
 
     p = Progress(length(E), desc=string("Calculating flux"))
     # Looping over energy
     for iE in length(E):-1:1
-        A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
-
-        B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                               phase_fcn_neutrals, dE, iE, B2B_fragment,
-                                               μ_scatterings.theta1)
+        # Update matrices A and B for current energy
+        B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
+                                                  E_levels_neutrals, phase_fcn_neutrals,
+                                                  E, dE, iE, B2B_fragment, μ_scatterings.theta1)
 
         # Compute the flux of e-
         if iE == length(E)
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
                                                   h_atm ./ cosd(B_angle_to_zenith),
-                                                  μ_center, A, B, D[iE, :], Q[:, 1, iE],
+                                                  μ_center, matrices, iE,
                                                   Ie_top_local[:, iE], cache,
                                                   first_iteration = true)
         else
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
                                                   h_atm ./ cosd(B_angle_to_zenith),
-                                                  μ_center, A, B, D[iE, :], Q[:, 1, iE],
+                                                  μ_center, matrices, iE,
                                                   Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-
-        update_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+        update_Q!(matrices, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                   B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                   μ_center, cache)
 
