@@ -9,15 +9,15 @@ using KLU: KLU, klu
 mutable struct Cache
     # Fields for steady-state scheme
     KLU::KLU.KLUFactorization{Float64, Int64}
-    Mlhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
-    mapping::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
-    Ddz_Up::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
-    Ddz_Down::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
-    Ddiffusion::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    mapping::Matrix{Dict{Tuple{Symbol,Int},Int}}
+    Ddz_Up::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    Ddz_Down::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
     # Additional fields for Crank-Nicolson scheme
-    Mrhs::Union{Nothing, SparseArrays.SparseMatrixCSC{Float64, Int64}}
-    mapping_lhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
-    mapping_rhs::Union{Nothing, Matrix{Dict{Tuple{Symbol,Int},Int}}}
+    Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    mapping_lhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
+    mapping_rhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
     # Cached repeated density matrices for ionization calculations (one per species)
     n_repeated_over_μt::Vector{Matrix{Float64}}
     n_repeated_over_t::Vector{Matrix{Float64}}
@@ -32,6 +32,18 @@ end
 
 function Cache()
     KLU = klu(spdiagm(0 => ones(1)))
+    Mlhs = spdiagm(0 => ones(1))
+    Mrhs = spdiagm(0 => ones(1))
+    Ddz_Up = spdiagm(0 => ones(1))
+    Ddz_Down = spdiagm(0 => ones(1))
+    Ddiffusion = spdiagm(0 => ones(1))
+    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+
     n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
     n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
     Ie_scatter = zeros(1, 1)
@@ -39,7 +51,7 @@ function Cache()
     Ionizing_fragment_1 = [zeros(1, 1) for _ in 1:3]
     Ionization_fragment_2 = [zeros(1) for _ in 1:3]
     Ionizing_fragment_2 = [zeros(1) for _ in 1:3]
-    return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
                  n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
                  Ionization_fragment_1, Ionizing_fragment_1,
                  Ionization_fragment_2, Ionizing_fragment_2)
@@ -89,7 +101,20 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
         Ionizing_fragment_2[i_species] = zeros(n_E)
     end
 
-    return Cache(KLU, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
+    # Create minimal placeholder matrices with concrete types
+    Mlhs = spdiagm(0 => ones(1))
+    Mrhs = spdiagm(0 => ones(1))
+    Ddz_Up = spdiagm(0 => ones(1))
+    Ddz_Down = spdiagm(0 => ones(1))
+    Ddiffusion = spdiagm(0 => ones(1))
+    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+
+    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
                  n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
                  Ionization_fragment_1, Ionizing_fragment_1,
                  Ionization_fragment_2, Ionizing_fragment_2)
