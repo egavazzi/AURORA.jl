@@ -7,14 +7,117 @@ using KLU: KLU, klu
 
 # Practical cache storage
 mutable struct Cache
-    AB2B::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    # Fields for steady-state scheme
     KLU::KLU.KLUFactorization{Float64, Int64}
+    Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    mapping::Matrix{Dict{Tuple{Symbol,Int},Int}}
+    Ddz_Up::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    Ddz_Down::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    # Additional fields for Crank-Nicolson scheme
+    Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    mapping_lhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
+    mapping_rhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
+    # Cached repeated density matrices for ionization calculations (one per species)
+    n_repeated_over_μt::Vector{Matrix{Float64}}
+    n_repeated_over_t::Vector{Matrix{Float64}}
+    # Cached temporary matrix for scattered flux calculation (inelastic collisions)
+    Ie_scatter::Matrix{Float64}
+    # Cached ionization fragment arrays (one per species)
+    Ionization_fragment_1::Vector{Matrix{Float64}}
+    Ionizing_fragment_1::Vector{Matrix{Float64}}
+    Ionization_fragment_2::Vector{Vector{Float64}}
+    Ionizing_fragment_2::Vector{Vector{Float64}}
 end
 
 function Cache()
-    AB2B = spzeros(1, 1)
     KLU = klu(spdiagm(0 => ones(1)))
-    return Cache(AB2B, KLU)
+    Mlhs = spdiagm(0 => ones(1))
+    Mrhs = spdiagm(0 => ones(1))
+    Ddz_Up = spdiagm(0 => ones(1))
+    Ddz_Down = spdiagm(0 => ones(1))
+    Ddiffusion = spdiagm(0 => ones(1))
+    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+
+    n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
+    n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
+    Ie_scatter = zeros(1, 1)
+    Ionization_fragment_1 = [zeros(1, 1) for _ in 1:3]
+    Ionizing_fragment_1 = [zeros(1, 1) for _ in 1:3]
+    Ionization_fragment_2 = [zeros(1) for _ in 1:3]
+    Ionizing_fragment_2 = [zeros(1) for _ in 1:3]
+    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+                 Ionization_fragment_1, Ionizing_fragment_1,
+                 Ionization_fragment_2, Ionizing_fragment_2)
+end
+
+# Constructor that pre-fills the density matrices
+function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
+    KLU = klu(spdiagm(0 => ones(1)))
+
+    number_species = length(n_neutrals)
+
+    # Pre-allocate and fill the density matrices for all species
+    n_repeated_over_μt = Vector{Matrix{Float64}}(undef, number_species)
+    n_repeated_over_t = Vector{Matrix{Float64}}(undef, number_species)
+
+    for i_species in 1:number_species
+        n = n_neutrals[i_species]
+
+        # Allocate and fill n_repeated_over_μt (size: n_z × n_μ, n_t)
+        n_repeated_over_μt[i_species] = Matrix{Float64}(undef, n_z * n_μ, n_t)
+        for i_t in 1:n_t
+            for i_μ in 1:n_μ
+                @views n_repeated_over_μt[i_species][(i_μ - 1) * n_z .+ (1:n_z), i_t] .= n
+            end
+        end
+
+        # Allocate and fill n_repeated_over_t (size: n_z, n_t)
+        n_repeated_over_t[i_species] = Matrix{Float64}(undef, n_z, n_t)
+        for i_t in 1:n_t
+            @views n_repeated_over_t[i_species][:, i_t] .= n
+        end
+    end
+
+    # Pre-allocate Ie_scatter matrix with correct size (n_z × n_μ, n_t)
+    Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
+
+    # Pre-allocate ionization fragment arrays for all species
+    Ionization_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
+    Ionizing_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
+    Ionization_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
+    Ionizing_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
+
+    for i_species in 1:number_species
+        Ionization_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
+        Ionizing_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
+        Ionization_fragment_2[i_species] = zeros(n_E)
+        Ionizing_fragment_2[i_species] = zeros(n_E)
+    end
+
+    # Create minimal placeholder matrices with concrete types
+    Mlhs = spdiagm(0 => ones(1))
+    Mrhs = spdiagm(0 => ones(1))
+    Ddz_Up = spdiagm(0 => ones(1))
+    Ddz_Down = spdiagm(0 => ones(1))
+    Ddiffusion = spdiagm(0 => ones(1))
+    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
+    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+
+    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
+                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+                 Ionization_fragment_1, Ionizing_fragment_1,
+                 Ionization_fragment_2, Ionizing_fragment_2)
 end
 
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
@@ -23,9 +126,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
-
-    ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
 
     ## CFL criteria
     # The time grid over which the simulation is run needs to be fine enough to ensure that
@@ -67,44 +167,59 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize cache
-    cache = Cache()
+    ## Initialize cache with pre-filled density matrices
+    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm), length(E))
+
+    ## Initialise
+    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+
+    ## Initialize transport matrices container
+    matrices = initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
+    update_D!(matrices.D, E, dE, θ_lims)
+    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
+    matrices.Ddiffusion[1, 1] = 0
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
     ## Looping over n_loop
     for i in 1:n_loop
-        Q  = zeros(length(h_atm) * length(μ_center), length(t), length(E));
+        # Initialize the ionospheric flux for the current loop
         Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
 
-        D = make_D(E, dE, θ_lims);
+        # Reset Q for each new loop
+        fill!(matrices.Q, 0.0)
+
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
 
         p = Progress(length(E); desc=string("Calculating flux for loop ", i, "/", n_loop), dt=1.0)
         # Looping over energy
         for iE in length(E):-1:1
-            A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
-
-            B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                                phase_fcn_neutrals, dE, iE, B2B_fragment, μ_scatterings.theta1);
+            # Update matrices A and B for current energy
+            B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
+                                                      E_levels_neutrals, phase_fcn_neutrals,
+                                                      E, dE, iE, B2B_fragment, μ_scatterings.theta1)
 
             # Compute the flux of e-
             if iE == length(E)
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                                         A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache, first_iteration = true)
+                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
+                                                 v_of_E(E[iE]), matrices, iE,
+                                                 Ie_top_local[:, :, iE], I0[:, iE], cache,
+                                                 first_iteration = true)
             else
-                Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                                                         A, B, D[iE, :], Q[:, :, iE],
-                                                         Ie_top_local[:, :, iE], I0[:, iE],
-                                                         cache)
+                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
+                                                 v_of_E(E[iE]), matrices, iE,
+                                                 Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
-            update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q!(matrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
 
@@ -172,43 +287,49 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
-    ## Initialize cache
-    cache = Cache()
+    ## Initialize cache with pre-filled density matrices
+    cache = Cache(n_neutrals, length(μ_center), 1, length(h_atm), length(E))
 
     ## Precalculate the B2B fragment
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
-    ## No n_loop here
-    Q  = zeros(length(h_atm) * length(μ_center), 1, length(E));
+    ## Initialize transport matrices container
+    matrices = initialize_transport_matrices(h_atm, μ_center, 1:1:1, E, dE, θ_lims)
+    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
+    update_D!(matrices.D, E, dE, θ_lims)
+    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
+    matrices.Ddiffusion[1, 1] = 0
+
+    ## Initialize the ionospheric flux
     Ie = zeros(length(h_atm) * length(μ_center), 1, length(E));
 
-    D = make_D(E, dE, θ_lims);
     # Extract the top flux for the current loop
     Ie_top_local = Ie_top[:, 1, :];
 
     p = Progress(length(E), desc=string("Calculating flux"))
     # Looping over energy
     for iE in length(E):-1:1
-        A = make_A(n_neutrals, σ_neutrals, ne, Te, E, dE, iE);
-
-        B, B2B_inelastic_neutrals = make_B(n_neutrals, σ_neutrals, E_levels_neutrals,
-                                               phase_fcn_neutrals, dE, iE, B2B_fragment,
-                                               μ_scatterings.theta1)
+        # Update matrices A and B for current energy
+        B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
+                                                  E_levels_neutrals, phase_fcn_neutrals,
+                                                  E, dE, iE, B2B_fragment, μ_scatterings.theta1)
 
         # Compute the flux of e-
         if iE == length(E)
-            Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith),
-                                                          μ_center, A, B, D[iE, :],
-                                                          Q[:, 1, iE], Ie_top_local[:, iE],
-                                                          cache, first_iteration = true)
+            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
+                                                  h_atm ./ cosd(B_angle_to_zenith),
+                                                  μ_center, matrices, iE,
+                                                  Ie_top_local[:, iE], cache,
+                                                  first_iteration = true)
         else
-            Ie[:, 1, iE] = steady_state_scheme(h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                               A, B, D[iE, :], Q[:, 1, iE],
-                                               Ie_top_local[:, iE], cache)
+            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
+                                                  h_atm ./ cosd(B_angle_to_zenith),
+                                                  μ_center, matrices, iE,
+                                                  Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-
-        update_Q!(Q, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+        update_Q!(matrices, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                   B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                   μ_center, cache)
 

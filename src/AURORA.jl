@@ -19,15 +19,16 @@ include("phase_functions.jl")
 include("utilities.jl")
 include("matrix_building.jl")
 include("crank_nicolson.jl")
+include("crank_nicolson_optimized.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
 export Ie_top_from_file, Ie_top_flickering, Ie_top_constant, Ie_with_LET
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
-export loss_to_thermal_electrons, beams2beams, make_A, make_B, make_D
+export loss_to_thermal_electrons, beams2beams, update_A!, update_B!, update_D!
 export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,
        f_smooth_transition, rename_if_exists, find_Ietop_file, make_savedir
-export d2M, Crank_Nicolson
+export update_Ddiffusion!, Crank_Nicolson
 export cascading_N2, cascading_O2, cascading_O
 export update_Q!
 
@@ -35,6 +36,7 @@ include("main.jl")
 export calculate_e_transport
 
 include("steady_state.jl")
+include("steady_state_optimized.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
