@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.0 - 2025-11-03
+## v0.6.0 - 2025-11-04
 - Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
 - Make it possible to produce column excitations from steady-state results [#76](https://github.com/egavazzi/AURORA.jl/pull/76)
 - Add analysis function to calculate heating rates [#73](https://github.com/egavazzi/AURORA.jl/pull/73) 
