@@ -1,4 +1,4 @@
-name: Tests
+name: Run tests
 
 on:
   push:
@@ -12,18 +12,26 @@ on:
     branches: 
       - main
 
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: ['1']
+        os: [ubuntu-latest]
+
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1'
+          version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v2
-
-      # - name: Install dependencies
-      #   run: julia --project -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Run tests
-        run: julia --project -e 'using Pkg; Pkg.test()'
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          annotate: true
