@@ -182,13 +182,13 @@ The function should support all types of extensions.
 `newsavefile = rename_if_exists(savefile)`
 """
 function rename_if_exists(savefile)
+    # Check if path exists (either as file or directory)
+    if !ispath(savefile)
+        return savefile
+    end
+
     # Remove trailing slash (if any)
     savefile_clean = rstrip(savefile, '/')
-
-    # Check if path exists (either as file or directory)
-    if !ispath(savefile_clean)
-        return savefile_clean
-    end
 
     # Split filename and extension
     dir, name = splitdir(savefile_clean)

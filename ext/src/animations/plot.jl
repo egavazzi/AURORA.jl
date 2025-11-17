@@ -19,7 +19,8 @@ To plot something, you need to give a `Ietop_struct` with
 =#
 function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
                                 time::Observable{String}, h_atm, E, angles_to_plot, color_limits,
-                                Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing))
+                                Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing,
+                                Ietop_angle_cone = nothing))
 
     # Slice the input Ie into its different pitch-angle components
     Ie_streams = Array{Observable}(nothing, length(angles_to_plot))
@@ -60,16 +61,18 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
         plot_hposition = 1:floor(Int, n_col / 2)
         gb = fig[0, plot_hposition] = GridLayout()
         ax_Ietop = Axis(gb[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
-                        title = "Incoming flux at the top",
-                        # title = string(180 - angle_cone[2], " - ", 180 - angle_cone[1], "° DOWN"),
+                        title = "Incoming energy flux",
                         yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                         xticklabelsvisible = true, xminorticksvisible = true,
                         xticksmirrored = true, yticksmirrored = true,
                         limits = ((0, 1), nothing))
-        hm = heatmap!(Ietop_struct.t_top, E, Ietop_struct.data_Ietop; colormap = :inferno, colorscale=log10, colorrange=(1e6, maximum(Ietop_struct.data_Ietop)))
+        hm = heatmap!(Ietop_struct.t_top, E, Ietop_struct.data_Ietop; colormap = :inferno,
+                      colorscale = log10,
+                      colorrange = (1e6, maximum(Ietop_struct.data_Ietop)))
         time_float64 = @lift(parse(Float64, $time[1:end-1]))
         vlines!(time_float64, linewidth = 3)
-        Colorbar(gb[1, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
+        angles = Ietop_struct.Ietop_angle_cone
+        Colorbar(gb[1, 2], hm; label = "IeE ($(180 - angles[2])°-$(180 - angles[1])°)\n(eV/m²/s/eV/ster)")
 
         time_hposition = ceil(Int, n_col / 2):n_col
         Label(fig[0, time_hposition], time; tellwidth = false, tellheight = false, fontsize=20)
