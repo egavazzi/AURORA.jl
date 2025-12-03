@@ -16,3 +16,8 @@ find_iri_file
 ```@docs
 Ie_with_LET
 ```
+
+## Visualization
+```@docs
+animate_Ie_in_time
+```
