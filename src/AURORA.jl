@@ -44,7 +44,6 @@ export make_density_file, downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file
 
 # Define and export functions to be extented by the AURORA_viz module
-
 """
     animate_Ie_in_time(directory_to_process; angles_to_plot=nothing, colorrange=nothing, ...)
 
@@ -75,7 +74,7 @@ from 0° to 180° (where 180° is field-aligned down and 0° is field-aligned up
 will be created for each matrix element at the corresponding row/column position.
 Angles > 90° are labeled as "DOWN", angles < 90° as "UP". Use `nothing` for empty panels.
 
-*Important*: The limits of the `angles_to_plot` need to match existing limits of the beams
+The limits of `angles_to_plot` need to match existing limits of the beams
 used in the simulation. E.g. if `θ_lims = 180:-10:0` was used in the simulation, `(150, 120)`
 will be fine as 150° and 120° exist as limits, but `(155, 120)` will not as 155° does not
 exist as a limit.
@@ -93,9 +92,9 @@ exist as a limit.
                           4 orders of magnitude.
 - `save_to_file = true`: if true, saves the animation to a .mp4 file in the data directory.
 - `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
-                        ionosphere by loading it from the file `Ie_top.mat`
+                        ionosphere by loading it from the file `Ie_top.mat`.
 - `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie
-                        to plot. 180 is field-aligned coming down.
+                        to plot.
 """
 function animate_Ie_in_time end
 export animate_Ie_in_time

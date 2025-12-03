@@ -18,6 +18,6 @@ Ie_with_LET
 ```
 
 ## Visualization
-```@docs
+```@docs; canonical = false
 animate_Ie_in_time
 ```
