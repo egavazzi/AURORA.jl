@@ -17,23 +17,31 @@ using Dates
     generate_default_angles(θ_lims)
 
 Generate a default `angles_to_plot` matrix from the simulation's θ_lims.
-Returns a 2-row matrix where row 1 is down-flux (angles > 90°) and row 2 is up-flux
-(angles < 90°). Angles are in the range 0-180° where 180° is field-aligned down and
-0° is field-aligned up.
+Returns a 2-row matrix where row 1 is down-flux (angles >= 90°) and row 2 is up-flux
+(angles <= 90°). Beams that cross 90° are included in the down-flux row.
+Angles are in the range 0-180° where 180° is field-aligned down and 0° is field-aligned up.
 """
 function generate_default_angles(θ_lims)
-    # θ_lims goes from 180 to 0
-    # Down-going: angles >= 90° (include 90° as boundary)
-    # Up-going: angles <= 90° (include 90° as boundary)
-    θ_down = sort(θ_lims[θ_lims .>= 90]; rev=true)  # e.g., [180, 135, 90]
-    θ_up = sort(θ_lims[θ_lims .<= 90])               # e.g., [0, 45, 90]
+    # Sort θ_lims from 180 to 0
+    θ_sorted = sort(collect(θ_lims); rev=true)
 
-    n_beams_down = length(θ_down) - 1
-    n_beams_up = length(θ_up) - 1
-    angles_down = [(θ_down[i], θ_down[i+1]) for i in 1:n_beams_down]  # e.g., [(180,135), (135,90)]
-    angles_up = [(θ_up[i], θ_up[i+1]) for i in 1:n_beams_up]          # e.g., [(0,45), (45,90)]
+    # Build all beams as consecutive pairs
+    all_beams = [(θ_sorted[i], θ_sorted[i+1]) for i in 1:(length(θ_sorted)-1)]
 
-    # Build matrix: row 1 = DOWN, row 2 = UP, columns = beams
+    # Separate into down (includes beams that touch or cross 90°) and up (fully below 90°)
+    angles_down = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] >= 90]  # beam starts at or above 90°
+    angles_up = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] < 90]     # beam starts below 90°
+
+    # Pad shorter row with nothing to match dimensions
+    n_cols = max(length(angles_down), length(angles_up))
+    while length(angles_down) < n_cols
+        push!(angles_down, nothing)
+    end
+    while length(angles_up) < n_cols
+        push!(angles_up, nothing)
+    end
+
+    # Build matrix: row 1 = DOWN, row 2 = UP
     return vcat(permutedims(angles_down), permutedims(angles_up))
 end
 
@@ -87,7 +95,7 @@ will be fine as 150° and 120° exist as limits, but `(155, 120)` will not as 15
 exist as a limit.
 
 # Arguments
-- `directory_to_process`: directory to process
+- `directory_to_process`: directory containing the simulation results (absolute or relative path).
 
 # Keyword Arguments
 - `angles_to_plot = nothing`: limits of the angles to plot as a matrix of tuples with angles
@@ -109,8 +117,13 @@ function AURORA.animate_Ie_in_time(directory_to_process;
                                      save_to_file = true,
                                      plot_Ietop = false,
                                      Ietop_angle_cone = [170, 180])
+    ## Resolve the directory path
+    full_path_to_directory = abspath(directory_to_process)
+    if !isdir(full_path_to_directory)
+        error("Directory not found: '$directory_to_process'")
+    end
+
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     n_files = length(files_to_process)
@@ -149,10 +162,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         # Convert from #e-/m²/s to #e-/m²/s/eV/ster
         for i_μ in eachindex(angles_to_plot_vert)
             isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
-            # beam_weight expects angles in [0, 90] range (distance from vertical)
             θ1, θ2 = angles_to_plot_vert[i_μ]
-            angles_normalized = (min(θ1, 180-θ1), min(θ2, 180-θ2))
-            Ie_plot[i_μ, :, :, :] ./= beam_weight(angles_normalized) .* reshape(dE, (1, 1, :))
+            Ie_plot[i_μ, :, :, :] ./= beam_weight([θ1, θ2]) .* reshape(dE, (1, 1, :))
         end
         return Ie_plot
     end

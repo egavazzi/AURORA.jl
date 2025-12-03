@@ -409,10 +409,10 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
         isnothing(new_θ_lims_flat[i]) && continue  # skip empty panels
         θ1, θ2 = new_θ_lims_flat[i]
         if θ1 ∉ θ_lims
-            error("The limit $θ1° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+            error("The limit $(θ1)° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
                   "Available limits: $(θ_lims_sorted)")
         elseif θ2 ∉ θ_lims
-            error("The limit $θ2° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+            error("The limit $(θ2)° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
                   "Available limits: $(θ_lims_sorted)")
         end
     end

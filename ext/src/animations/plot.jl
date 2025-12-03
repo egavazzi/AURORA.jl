@@ -32,6 +32,12 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     n_row = size(angles_to_plot, 1)
     n_col = size(angles_to_plot, 2)
     ga = fig[1:4, 1:n_col] = GridLayout()
+
+    # Helper: check if all panels below row i in column j are nothing
+    all_below_empty(i, j) = all(isnothing(angles_to_plot[k, j]) for k in (i+1):n_row)
+    # Helper: check if all panels to the left of column j in row i are nothing
+    all_left_empty(i, j) = all(isnothing(angles_to_plot[i, k]) for k in 1:(j-1))
+
     for i in axes(angles_to_plot, 1)
         for j in axes(angles_to_plot, 2)
             idx = (i - 1) * n_col  + j # goes along first row, then second row
@@ -46,20 +52,26 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
             # Generate title based on angle values (>90° = DOWN, <90° = UP)
             θ1, θ2 = angles_to_plot[i, j]
             avg_angle = (θ1 + θ2) / 2
-            direction = avg_angle > 90 ? "DOWN" : "UP"
+            direction = if θ1 < 90 < θ2 || θ2 < 90 < θ1
+                ""
+            elseif avg_angle >= 90
+                "DOWN"
+            else
+                "UP"
+            end
             ax.title = "$(Int(θ1))° - $(Int(θ2))° $direction"
 
-            # Only show x-axis labels on bottom row
-            if i < n_row
-                ax.xticklabelsvisible = false
-            else
+            # Show x-axis labels if on bottom row OR all panels below are empty
+            if i == n_row || all_below_empty(i, j)
                 ax.xlabel = "Energy (eV)"
-            end
-            # Only show y-axis labels on first column
-            if j > 1
-                ax.yticklabelsvisible = false
             else
+                ax.xticklabelsvisible = false
+            end
+            # Show y-axis labels if on first column OR all panels to the left are empty
+            if j == 1 || all_left_empty(i, j)
                 ax.ylabel = "Altitude (km)"
+            else
+                ax.yticklabelsvisible = false
             end
         end
     end
