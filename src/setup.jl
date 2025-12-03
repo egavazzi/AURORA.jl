@@ -168,14 +168,14 @@ function validate_θ_lims(θ_lims)
         throw(ArgumentError(
             "θ_lims must include 180° (field-aligned downward). " *
             "Got maximum of $(maximum(θ_lims))°. " *
-            "Example of valid input: 180:-10:0"
+            "Example of valid input: 180:-10:0."
         ))
     end
     if minimum(θ_lims) != 0
         throw(ArgumentError(
             "θ_lims must include 0° (field-aligned upward). " *
             "Got minimum of $(minimum(θ_lims))°. " *
-            "Example of valid input: 180:-10:0"
+            "Example of valid input: 180:-10:0."
         ))
     end
     if !issorted(θ_lims, rev=true)
