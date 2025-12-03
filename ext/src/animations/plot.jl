@@ -59,7 +59,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
             if j > 1
                 ax.yticklabelsvisible = false
             else
-                ax.ylabel = "Height (km)"
+                ax.ylabel = "Altitude (km)"
             end
         end
     end
