@@ -157,7 +157,15 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
         theta2beamW[iμ, :] .= abs.(sin.(θ₀)) .* (μ_lims[iμ] .< cos.(θ₀) .< μ_lims[iμ + 1])
     end
     # Normalize so that all sum(BeamWeight_relative, dims=2) = 1
-    BeamWeight_relative = theta2beamW ./ repeat(sum(theta2beamW, dims=2), 1, size(theta2beamW, 2))
+    beam_sums = sum(theta2beamW, dims=2)
+    if any(iszero, beam_sums)
+        error(
+            "Some pitch-angle beams have no sub-beam coverage. " *
+            "This typically happens when θ_lims doesn't span the full range from 180° to 0°. " *
+            "Make sure θ_lims includes both 180° and 0°."
+        )
+    end
+    BeamWeight_relative = theta2beamW ./ repeat(beam_sums, 1, size(theta2beamW, 2))
 
     return Pmu2mup, theta2beamW, BeamWeight_relative, θ₁
 end
