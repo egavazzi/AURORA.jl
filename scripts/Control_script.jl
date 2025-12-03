@@ -2,12 +2,12 @@ using AURORA
 
 ## Setting parameters
 altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
-θ_lims = 180:-45:0              # (°) angle-limits for the electron beams
-E_max = 1000;                   # (eV) upper limit to the energy grid
+θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
+E_max = 3000;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
 t_sampling = 0:0.001:0.1;       # (s) time-array over which data will be saved
-n_loop = 4;                    # number of loops to run
+n_loop = 10;                    # number of loops to run
 
 CFL_number = 128;
 
@@ -19,8 +19,8 @@ iri_file = find_iri_file(
     );
 
 ## Define where to save the results
-root_savedir = "pitch-angle-tests"   # name of the root folder
-name_savedir = "180:-45:0"   # name of the experiment folder
+root_savedir = ""   # name of the root folder
+name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
 ## Define input parameters
