@@ -1,5 +1,9 @@
 # Changelog
 
+- **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
+  - Comes with a few nice improvements to the function, see PR description
+
+
 ## v0.6.0 - 2025-11-04
 - Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
 - Make it possible to produce column excitations from steady-state results [#76](https://github.com/egavazzi/AURORA.jl/pull/76)
