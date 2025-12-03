@@ -26,7 +26,8 @@ makedocs(
                 "Manual" => [
                     "Installation" => "manual_installation.md",
                     "Get started" => "manual_get-started.md",
-                    "Folder structure" => "manual_folder-structure.md"
+                    "Folder structure" => "manual_folder-structure.md",
+                    "Visualization" => "manual_visualization.md"
                     ],
                 "Troubleshooting" => "troubleshooting.md",
                 "API" => "api.md"

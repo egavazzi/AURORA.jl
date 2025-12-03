@@ -16,3 +16,8 @@ find_iri_file
 ```@docs
 Ie_with_LET
 ```
+
+## Visualization
+```@docs; canonical = false
+animate_Ie_in_time
+```

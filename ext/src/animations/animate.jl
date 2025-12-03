@@ -2,7 +2,7 @@
 Functions to animate Ie(z, t, E).
 
 So far we have
-- animate_IeztE_3Dzoft: Ie as a heatmap over height and energy, animation in time.
+- animate_Ie_in_time: Ie as a heatmap over height and energy, animation in time.
 
 
 =#
@@ -13,63 +13,80 @@ using Term: @bold
 using Dates
 
 
+"""
+    generate_default_angles(θ_lims)
+
+Generate a default `angles_to_plot` matrix from the simulation's θ_lims.
+Returns a 2-row matrix where row 1 is down-flux (angles >= 90°) and row 2 is up-flux
+(angles <= 90°). Beams that cross 90° are included in the down-flux row.
+Angles are in the range 0-180° where 180° is field-aligned down and 0° is field-aligned up.
+"""
+function generate_default_angles(θ_lims)
+    # Sort θ_lims from 180 to 0
+    θ_sorted = sort(collect(θ_lims); rev=true)
+
+    # Build all beams as consecutive pairs
+    all_beams = [(θ_sorted[i], θ_sorted[i+1]) for i in 1:(length(θ_sorted)-1)]
+
+    # Separate into down (includes beams that touch or cross 90°) and up (fully below 90°)
+    angles_down = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] >= 90]  # beam starts at or above 90°
+    angles_up = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] < 90]     # beam starts below 90°
+
+    # Pad shorter row with nothing to match dimensions
+    n_cols = max(length(angles_down), length(angles_up))
+    while length(angles_down) < n_cols
+        push!(angles_down, nothing)
+    end
+    while length(angles_up) < n_cols
+        push!(angles_up, nothing)
+    end
+
+    # Build matrix: row 1 = DOWN, row 2 = UP
+    return vcat(permutedims(angles_down), permutedims(angles_up))
+end
+
+
+"""
+    compute_default_colorrange(Ie_plot)
+
+Compute a default colorrange based on the maximum value of the data.
+Returns (max_value / 1e4, max_value) to span 4 orders of magnitude.
+"""
+function compute_default_colorrange(Ie_plot)
+    max_val = maximum(filter(!isnan, Ie_plot))
+    return (max_val / 1e4, max_val)
+end
+
+
 # Main function
-"""
-    animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = false)
+function AURORA.animate_Ie_in_time(directory_to_process;
+                                     angles_to_plot = nothing,
+                                     colorrange = nothing,
+                                     save_to_file = true,
+                                     plot_Ietop = false,
+                                     Ietop_angle_cone = [170, 180])
+    ## Resolve the directory path
+    full_path_to_directory = abspath(directory_to_process)
+    if !isdir(full_path_to_directory)
+        error("Directory not found: '$directory_to_process'")
+    end
 
-Plot a heatmap of Ie over height and energy, and animate it in time. It will load the
-result files one by one. The animation will be saved as a .mp4 file under the
-`directory_to_process`.
-
-# Example
-```julia-repl
-julia> directory_to_process = "Visions2/Alfven_475s";
-julia> angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);   # DOWN
-                         (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)];  # UP
-julia> color_limits = (1e5, 1e9);
-julia> animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = true)
-```
-
-Note that the first row of `angles_to_plot` gives the angles for the down-flux, and the
-second row gives the angles for the up-flux. The angles are given from 0° to 90°, and the
-function takes care of merging the beams together while keeping the correct units.
-
-*Important*: Right now, the function only supports an `angles_to_plot` with **maximum two rows**.
-You can also use only one row which will plot only the down-flux.
-
-*Important*: The limits of the `angles_to_plot` needs to match existing limits of the beams
-used in the simulation. E.g. if `θ_lims = 180:-10:0` was used in the simulation, `(30, 60)`
-will be fine as 30° and 60° exist as limits, but `(35, 60)` will not as 35° does not exist
-as a limit.
-
-# Arguments
-- `directory_to_process`: directory to process
-- `angles_to_plot`: limits of the angles to plot
-- `color_limits`: limits for the colormap/colorbar
-
-# Keyword Arguments
-- `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
-                        ionosphere by loading it from the file `Ie_top.mat`
-- `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie
-                        to plot. 180 is field-aligned coming down.
-"""
-function AURORA.animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits;
-                                     plot_Ietop = false, Ietop_angle_cone = [170, 180])
     ## Find the files to process
-    full_path_to_directory = pkgdir(AURORA, "data", directory_to_process)
     files = readdir(full_path_to_directory, join=true)
     files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
     n_files = length(files_to_process)
 
     ## Create file name
-    video_filename = plot_Ietop ? "animation_with_precipitation.mp4" : "animation.mp4"
-    full_video_filename = rename_if_exists(joinpath(full_path_to_directory, video_filename))
-    println(@bold "The animation will be saved at $video_filename.")
+    if save_to_file
+        video_filename = plot_Ietop ? "animation_with_precipitation.mp4" : "animation.mp4"
+        full_video_filename = rename_if_exists(joinpath(full_path_to_directory, video_filename))
+        println(@bold "The animation will be saved at $video_filename.")
+    end
 
     ## Load data from the first file
     print("(1/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-    data = matread(files_to_process[1]);
-    Ie_raw = data["Ie_ztE"]; # size of [n_mu x nz, nt, nE]
+    data = matread(files_to_process[1])
+    Ie_raw = data["Ie_ztE"]  # size of [n_mu x nz, nt, nE]
     μ_lims = vec(data["mu_lims"])
     t_run = data["t_run"]
     E = data["E"]
@@ -78,15 +95,32 @@ function AURORA.animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color
     dE = diff(E); dE = [dE; dE[end]]
     θ_lims = round.(acosd.(μ_lims))
 
-    # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
-    Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_mu, nz, nt, nE]
-    # Merge the streams to angles_to_plot
-    Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
-    # Restructure `angles_to_plot` from a 2D array to a 1D vector, by concatenating the rows.
-    angles_to_plot_vert = vcat(eachrow(angles_to_plot)...) #
-    # Convert from #e-/m²/s to #e-/m²/s/eV/ster
-    for i_μ in eachindex(angles_to_plot_vert)
-        Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
+    # Use default angles_to_plot if not provided
+    if isnothing(angles_to_plot)
+        angles_to_plot = generate_default_angles(θ_lims)
+    end
+
+    # Restructure `angles_to_plot` from a 2D array to a 1D vector
+    angles_to_plot_vert = vec(permutedims(angles_to_plot))
+
+    # Helper function to process Ie data
+    function process_Ie(Ie_raw, t_run)
+        Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
+        Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
+        # Convert from #e-/m²/s to #e-/m²/s/eV/ster
+        for i_μ in eachindex(angles_to_plot_vert)
+            isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
+            θ1, θ2 = angles_to_plot_vert[i_μ]
+            Ie_plot[i_μ, :, :, :] ./= beam_weight([θ1, θ2]) .* reshape(dE, (1, 1, :))
+        end
+        return Ie_plot
+    end
+
+    Ie_plot = process_Ie(Ie_raw, t_run)
+
+    # Compute default colorrange if not provided
+    if isnothing(colorrange)
+        colorrange = compute_default_colorrange(Ie_plot)
     end
 
     # Load Ietop if requested
@@ -107,62 +141,45 @@ function AURORA.animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color
     print("create figure... ")
     Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
-    fig = make_IeztE_3Dzoft_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, color_limits, Ietop_struct)
+    fig = make_Ie_in_time_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, colorrange, Ietop_struct)
     display(fig)
 
     # Animate
-    n_t = length(t_run) # number of timesteps per file
-
-    # Create VideoStream
     framerate = 30
-    io = VideoStream(fig; framerate=framerate)
+    if save_to_file
+        io = VideoStream(fig; framerate=framerate, visible=true)
+    end
 
-    # # record(fig, video_filename) do io
-        for i_file in 1:n_files
-            if i_file == 1
-                # First file (already loaded)
-                i_t = 1
-                print("animate.")
-                while i_t <= n_t
-                    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
-                    time[] = @sprintf("%.3f s", t_run[i_t])
-                    notify(Ie_timeslice)
-                    sleep(0.01)
-                    i_t += 1
-                    recordframe!(io)
-                end
-            else
-                # Next files
-                # Load the data
-                print("($i_file/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-                data = matread(files_to_process[i_file]);
-                Ie_raw = data["Ie_ztE"]; # size of [n_μ x nz, nt, nE]
-                t_run = data["t_run"]
-                # Restructure from [n_mu x nz, nt, nE]  to [n_mu, nz, nt, nE]
-                Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E) # size [n_μ, nz, nt, nE]
-                # Merge the streams to angles_to_plot
-                Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot) # size [n_μ_new, nz, nt, nE]
-                # Convert from #e-/m²/s to #e-/m²/s/eV/ster
-                for i_μ in eachindex(angles_to_plot_vert)
-                    Ie_plot[i_μ, :, :, :] = Ie_plot[i_μ, :, :, :] ./ beam_weight(angles_to_plot_vert[i_μ]) ./ reshape(dE, (1, 1, :))
-                end
-                # Animate
-                println("animate.")
-                i_t = 2 # we skip the first timestamp as it is the same as the last element from the previous file.
-                while i_t <= n_t
-                    Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
-                    time[] = @sprintf("%.3f s", t_run[i_t])
-                    notify(Ie_timeslice)
-                    sleep(0.01)
-                    i_t += 1
-                    recordframe!(io)
-                end
-            end
+    for i_file in 1:n_files
+        # Load data (first file already loaded)
+        if i_file > 1
+            print("($i_file/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
+            data = matread(files_to_process[i_file])
+            Ie_raw = data["Ie_ztE"]
+            t_run = data["t_run"]
+            Ie_plot = process_Ie(Ie_raw, t_run)
         end
-    # # end
-    print("\nSaving animation... ")
-    save(full_video_filename, io)
-    println("done!")
 
-    return nothing
+        # Animate (skip first timestep for files after the first, as it duplicates the
+        # previous file's last frame)
+        i_t_start = i_file == 1 ? 1 : 2
+        println("animate.")
+        for i_t in i_t_start:length(t_run)
+            Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+            time[] = @sprintf("%.3f s", t_run[i_t])
+            notify(Ie_timeslice)
+            if save_to_file
+                recordframe!(io)
+            end
+            sleep(0.005)
+        end
+    end
+
+    if save_to_file
+        print("\nSaving animation... ")
+        save(full_video_filename, io)
+        println("done!")
+    end
+
+    return fig
 end
