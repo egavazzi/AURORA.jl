@@ -2,7 +2,7 @@
 Functions to animate Ie(z, t, E).
 
 So far we have
-- animate_IeztE_3Dzoft: Ie as a heatmap over height and energy, animation in time.
+- animate_Ie_in_time: Ie as a heatmap over height and energy, animation in time.
 
 
 =#
@@ -23,9 +23,7 @@ GLMakie.activate!()
 
 
 ## Calling the animate function
-directory_to_process = "Visions2/Alfven_475s"
-angles_to_plot = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
-                  (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
+directory_to_process = "pitch-angle-tests/180:-45:0"
 
-color_limits = (1e5, 1e9)
-animate_IeztE_3Dzoft(directory_to_process, angles_to_plot, color_limits; plot_Ietop = true)
+# animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange = (1e5, 1e9), plot_Ietop = true)
+animate_Ie_in_time(directory_to_process; save_to_file = true)

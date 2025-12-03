@@ -44,8 +44,8 @@ export make_density_file, downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file
 
 # Define and export functions to be extented by the AURORA_viz module
-function animate_IeztE_3Dzoft end
-export animate_IeztE_3Dzoft
+function animate_Ie_in_time end
+export animate_Ie_in_time
 
 # Precompile selected functions
 include("precompiles.jl")

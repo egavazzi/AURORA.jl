@@ -17,8 +17,8 @@ To plot something, you need to give a `Ietop_struct` with
 `Ie_top_struct.bool = true` as well as some values for `Ie_top_struct.t_top` and
 `Ie_top_struct.data_Ietop`.
 =#
-function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
-                                time::Observable{String}, h_atm, E, angles_to_plot, color_limits,
+function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
+                                time::Observable{String}, h_atm, E, angles_to_plot, colorrange,
                                 Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing,
                                 Ietop_angle_cone = nothing))
 
@@ -36,17 +36,26 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
         for j in axes(angles_to_plot, 2)
             idx = (i - 1) * n_col  + j # goes along first row, then second row
 
+            # Skip empty panels (nothing entries)
+            isnothing(angles_to_plot[i, j]) && continue
+
             ax = Axis(ga[i, j], xscale = log10, xminorticks = IntervalsBetween(9),
                       xminorticksvisible = true, yticks = 100:100:600)
-            heatmap!(E, h_atm / 1e3, Ie_streams[idx], colorrange = color_limits, colorscale = log10, colormap = :inferno)
+            heatmap!(E, h_atm / 1e3, Ie_streams[idx]; colorrange, colorscale = log10, colormap = :inferno)
 
-            if i == 1
-                ax.title = string(angles_to_plot[i, j][1], " - ", angles_to_plot[i, j][2], "° DOWN")
+            # Generate title based on angle values (>90° = DOWN, <90° = UP)
+            θ1, θ2 = angles_to_plot[i, j]
+            avg_angle = (θ1 + θ2) / 2
+            direction = avg_angle > 90 ? "DOWN" : "UP"
+            ax.title = "$(Int(θ1))° - $(Int(θ2))° $direction"
+
+            # Only show x-axis labels on bottom row
+            if i < n_row
                 ax.xticklabelsvisible = false
             else
-                ax.title = string(angles_to_plot[i, j][1], " - ", angles_to_plot[i, j][2], "° UP")
                 ax.xlabel = "Energy (eV)"
             end
+            # Only show y-axis labels on first column
             if j > 1
                 ax.yticklabelsvisible = false
             else
@@ -54,7 +63,7 @@ function make_IeztE_3Dzoft_plot(Ie_timeslice::Observable{Array{Float64, 3}},
             end
         end
     end
-    Colorbar(fig[:, end + 1]; limits = color_limits, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
+    Colorbar(fig[:, end + 1]; limits = colorrange, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
 
     # Plot Ie precipitating at the top (#TODO: this can probably be done in a better way than with a struct, or?)
     if Ietop_struct.bool

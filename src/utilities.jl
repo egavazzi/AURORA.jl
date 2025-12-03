@@ -223,7 +223,10 @@ return a string with the path to that file.
 """
 function find_Ietop_file(path_to_directory)
     incoming_files = filter(file -> startswith(file, "Ie_incoming_"), readdir(path_to_directory))
-    if length(incoming_files) > 1
+    if isempty(incoming_files)
+        error("No Ie_incoming_*.mat file found in $path_to_directory.\n" *
+              "Such a file is required when using `plot_Ietop = true`.")
+    elseif length(incoming_files) > 1
         error("More than one file contains incoming flux. This is not normal")
     else
         return Ietop_file = joinpath(path_to_directory, incoming_files[1])
@@ -357,14 +360,15 @@ Function that merges the streams of `Ie` that are given over `θ_lims` to fit th
 `new_θ_lims` of interest. It can be useful when wanting to merge some streams for plotting.
 
 For example, if we have `θ_lims = [180 160 140 120 100 90 80 60 40 20 0]`, and
-we want to plot with `new_θ_lims = [180 160 120 100 90 80 60 40 20 0]` (note that
-this should be an array of tuples, but to simplify the comparison we write it as a vector
-here), the function will merge the streams (160°-140°) and (140°-120°) together into a new
+we want to plot with `new_θ_lims = [(180, 160), (160, 120)]`, the function will keep the
+first stream as is and merge the streams (160°-140°) and (140°-120°) together into a new
 stream with limits (160°-120°).
 
 *Important*: The limits in `new_θ_lims` need to match some existing limits in `θ_lims`. In
-the example above, `new_θ_lims = [180 160 120 100 90 80 65 40 20 0]` would not have worked
-because 65° is not a limit that exists in `θ_lims`.
+the example above, `new_θ_lims = [(180, 165)]` would not have worked because 165° is not a
+limit that exists in `θ_lims`.
+
+Entries in `new_θ_lims` can be `nothing` to leave a panel empty.
 
 # Calling
 `Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)`
@@ -372,10 +376,12 @@ because 65° is not a limit that exists in `θ_lims`.
 # Arguments
 - `Ie`: array of electron flux with pitch-angle limits `θ_lims`. Of shape [n\\_μ, n\\_z, n\\_t, n\\_E].
 - `θ_lims`: pitch-angle limits. Usually a vector or range.
-- `new_θ_lims`: new pitch-angle limits. Given as an array of tuples with two rows, for example:
+- `new_θ_lims`: new pitch-angle limits. Given as an array of tuples with angles in the range
+                0-180° (where 180° is field-aligned down, 0° is field-aligned up). Use `nothing`
+                for empty panels. For example:
 ```
-julia> new_θ_lims = [(0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90);  # DOWN
-                     (0, 10)   (10, 30)   (30, 60)   (60, 80)   (80, 90)]  # UP
+julia> new_θ_lims = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);  # DOWN
+                     (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)]   # UP
 ```
 
 # Returns
@@ -394,58 +400,34 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     n_E = size(Ie, 4)
     Ie_plot = zeros(n_μ_new, n_z, n_t, n_E)
 
-    # Modify the values of the down-angles so that field aligned is 180°.
-    # For example new_θ_lims would go from something like
-    #   2×5 Matrix{Tuple{Int64, Int64}}:
-    #   (0, 10)  (10, 30)  (30, 60)  (60, 80)  (80, 90) # DOWN
-    #   (0, 10)  (10, 30)  (30, 60)  (60, 80)  (80, 90) # UP
-    # to
-    #   2×5 Matrix{Tuple{Int64, Int64}}:
-    #   (180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90) # DOWN
-    #   (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)  # UP
-    new_θ_lims_temp = copy(new_θ_lims)
-    new_θ_lims_temp[1, :] = map(x -> 180 .- x, new_θ_lims_temp[1, :] )
+    # Flatten new_θ_lims from a 2D array to a 1D vector (row by row)
+    new_θ_lims_flat = vec(permutedims(new_θ_lims))
 
-    # Restructure `new_θ_lims_temp` from a 2D array to a 1D vector, by concatenating the rows.
-    # Following the example from above, new_θ_lims would now be
-    #   10-element Vector{Tuple{Int64, Int64}}:
-    #   (180, 170)
-    #   (170, 150)
-    #   (150, 120)
-    #   (120, 100)
-    #   (100, 90)
-    #   (0, 10)
-    #   (10, 30)
-    #   (30, 60)
-    #   (60, 80)
-    #   (80, 90)
-    new_θ_lims_temp = vcat(eachrow(new_θ_lims_temp)...)
-
-    # Check if all the limits in new_θ_lims match some limits in θ_lims
-    for i in eachindex(new_θ_lims_temp)
-        if new_θ_lims_temp[i][1] ∉ θ_lims
-            error("The limit $(new_θ_lims_temp[i][1]) in `new_θ_lims` does not match any limit in `θ_lims`.")
-        elseif new_θ_lims_temp[i][2] ∉ θ_lims
-            error("The limit $(new_θ_lims_temp[i][2]) in `new_θ_lims` does not match any limit in `θ_lims`.")
+    # Check if all the limits in new_θ_lims match some limits in θ_lims (skip nothing entries)
+    θ_lims_sorted = sort(collect(θ_lims))
+    for i in eachindex(new_θ_lims_flat)
+        isnothing(new_θ_lims_flat[i]) && continue  # skip empty panels
+        θ1, θ2 = new_θ_lims_flat[i]
+        if θ1 ∉ θ_lims
+            error("The limit $θ1° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+                  "Available limits: $(θ_lims_sorted)")
+        elseif θ2 ∉ θ_lims
+            error("The limit $θ2° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+                  "Available limits: $(θ_lims_sorted)")
         end
     end
 
-
     # Restructure to [n_μ_new, n_z, n_t, n_E]
     # Loop over the new_θ_lims streams
-    @views for i in eachindex(new_θ_lims_temp)
+    @views for i in eachindex(new_θ_lims_flat)
+        isnothing(new_θ_lims_flat[i]) && continue  # skip empty panels
         # Find the indices of the streams from the simulation that should be merged in the stream new_θ_lims[i].
-        idx_θ = axes(Ie, 1)[minimum(new_θ_lims_temp[i]) .<= acosd.(mu_avg(θ_lims)) .<= maximum(new_θ_lims_temp[i])]
+        idx_θ = axes(Ie, 1)[minimum(new_θ_lims_flat[i]) .<= acosd.(mu_avg(θ_lims)) .<= maximum(new_θ_lims_flat[i])]
         # Loop over these streams and add them into the right stream of Ie_plot.
         for j in idx_θ
             Ie_plot[i, :, :, :] .+= Ie[j, :, :, :]
         end
     end
-
-    # # Extracts the values, remove the doublets and sort.
-    # # Continuing the example from above, this gives us
-    # #       [180 170 150 120 100 90 80 60 30 10 0]
-    # new_θ_lims_temp = sort(unique(collect(Iterators.flatten(new_θ_lims_temp))); rev=true)
 
     return Ie_plot
 end
