@@ -6,7 +6,7 @@ altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
 E_max = 3000;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-msis_file = find_nrlmsis_file(
+msis_file = find_msis_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
     );
 iri_file = find_iri_file(

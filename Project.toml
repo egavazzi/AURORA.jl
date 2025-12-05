@@ -1,7 +1,7 @@
 name = "AURORA"
 uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
 authors = ["Etienne <etienne.gavazzi@uit.no>"]
-version = "0.5.0"
+version = "0.6.0"
 
 [deps]
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
@@ -44,9 +44,10 @@ AURORA_viz = "Makie"
 [compat]
 DataInterpolations = "8.0.1"
 Integrals = "4.5.0"
-Interpolations = "0.15.1"
+Interpolations = "0.15, 0.16"
 PrecompileTools = "1.2.1"
 Statistics = "1.11.1"
 Test = "1.11.0"
 TestItemRunner = "1.1.0"
 TestItems = "1.0.0"
+Makie = "0.22, 0.23, 0.24"

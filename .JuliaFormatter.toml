@@ -1,5 +1,4 @@
 style = "sciml"
 margin = 92
-remove_extra_newlines = false
-always_use_return = false
+remove_extra_newlines = true
 yas_style_nesting = true

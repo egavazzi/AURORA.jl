@@ -122,18 +122,19 @@ end
     INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
     # Run simulation
     calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-                                    msis_file, iri_file, savedir, INPUT_OPTIONS)
+                                       msis_file, iri_file, savedir, INPUT_OPTIONS)
     @test true
 end
 
 @testitem "(TD) Does constant onset run?" begin
     # Setting parameters
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
-    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
-    E_max = 100;                 # (eV) upper limit to the energy grid
+    θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
+    E_max = 100;                    # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-    t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
-    n_loop = 2;                    # number of loops to run
+    t_total = 0.1;                  # (s) total simulation time
+    dt = 0.01;                      # (s) time step for saving data
+    n_loop = 2;                     # number of loops to run
     CFL_number = 128;
     msis_file = find_msis_file();
     iri_file = find_iri_file();
@@ -148,19 +149,20 @@ end
     t1 = 0.05               # onset end time (s)
     INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
     # Run simulation
-    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
+                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop)
     @test true
 end
 
 @testitem "(TD) Does flickering run?" begin
     # Setting parameters
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
-    θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
-    E_max = 100;                 # (eV) upper limit to the energy grid
+    θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
+    E_max = 100;                    # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-    t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
-    n_loop = 2;                    # number of loops to run
+    t_total = 0.1;                  # (s) total simulation time
+    dt = 0.01;                      # (s) time step for saving data
+    n_loop = 2;                     # number of loops to run
     CFL_number = 128;
     msis_file = find_msis_file();
     iri_file = find_iri_file();
@@ -175,8 +177,8 @@ end
     modulation = "sinus";       # type of the modulation ("square" or "sinus")
     INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
     # Run simulation
-    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
+                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop)
     @test true
 end
 

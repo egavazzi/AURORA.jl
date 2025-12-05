@@ -1,7 +1,4 @@
 using LoopVectorization: @tturbo
-using SparseArrays: sparse!
-
-
 
 #################################################################################
 #                                   Update Q                                    #
@@ -32,9 +29,11 @@ end
 
 
 
-function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                       B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
                       μ_center, cache)
+
+    Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
     @views if iE > 1
@@ -42,11 +41,11 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
                                    outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
     end
 
-    # TODO for later: move this outside of the energy loop and then just fill with zeros
-    Ionization_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
-    Ionizing_fragment_1 = [zeros(size(Ie, 1), size(Ie, 2)) for _ in 1:length(n_neutrals)]
-    Ionization_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
-    Ionizing_fragment_2 = [zeros(length(E)) for _ in 1:length(n_neutrals)]
+    # Get the pre-allocated ionization fragment arrays from cache
+    Ionization_fragment_1 = cache.Ionization_fragment_1
+    Ionizing_fragment_1 = cache.Ionizing_fragment_1
+    Ionization_fragment_2 = cache.Ionization_fragment_2
+    Ionizing_fragment_2 = cache.Ionizing_fragment_2
 
     # Loop over the neutral species
     for i in 1:length(n_neutrals)
@@ -58,17 +57,17 @@ function update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_ne
 
         add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
 
-        # TODO: that's if I will move things outside of the energy loop
-        # fill!(Ionization_fragment_1[i], 0)
-        # fill!(Ionizing_fragment_1[i], 0)
-        # fill!(Ionization_fragment_2[i], 0)
-        # fill!(Ionizing_fragment_2[i], 0)
+        # Zero out the ionization fragment arrays for this species
+        fill!(Ionization_fragment_1[i], 0)
+        fill!(Ionizing_fragment_1[i], 0)
+        fill!(Ionization_fragment_2[i], 0)
+        fill!(Ionizing_fragment_2[i], 0)
 
         # If the energy is too low, skip the ionization calculation (use zeros)
         idx_ionization = (E_levels[:, 2] .> 0)
         if minimum(E_levels[idx_ionization, 1]) < E[iE]
             prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE)
+                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE, cache, i)
             prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
                                     σ, E_levels, cascading, E, dE, iE)
         end
@@ -91,98 +90,83 @@ end
 #                               Inelastic collisions                            #
 #################################################################################
 
-# legacy demo function
-function make_big_B2B_matrix(B2B_inelastic, n, h_atm)
-    idx1 = Vector{Int}(undef, 0)
-    idx2 = Vector{Int}(undef, 0)
-    aB2B = Vector{Float64}(undef, 0)
-    for i1 in axes(B2B_inelastic, 1)
-        for i2 in axes(B2B_inelastic, 2)
-            append!(idx1, (i1 - 1) * length(h_atm) .+ (1:length(h_atm)))
-            append!(idx2, (i2 - 1) * length(h_atm) .+ (1:length(h_atm)))
-            append!(aB2B, n * B2B_inelastic[i1, i2])
-        end
-    end
-    AB2B = sparse!(idx1, idx2, aB2B)
-    return AB2B
-end
+"""
+    calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
 
-# New function, this is run one time (typically at first iteration of the energy loop) to
-# fully build the sparse B2B matrix
-function build_big_B2B(B2B_inelastic, n, h_atm)
-    n_elements = size(B2B_inelastic, 1) * size(B2B_inelastic, 2) * length(h_atm)
-    idx1 = Vector{Int}(undef, n_elements)
-    idx2 = Vector{Int}(undef, n_elements)
-    aB2B = Vector{Float64}(undef, n_elements)
-    counter = 1
-    for i1 in axes(B2B_inelastic, 1)
-        for i2 in axes(B2B_inelastic, 2)
-            idx_range = counter:(counter + length(h_atm) - 1)
-            idx1[idx_range] .= (i1 - 1) * length(h_atm) .+ (1:length(h_atm))
-            idx2[idx_range] .= (i2 - 1) * length(h_atm) .+ (1:length(h_atm))
-            aB2B[idx_range] .= n * B2B_inelastic[i1, i2]
-            counter += length(h_atm)
-        end
-    end
+Calculate the flux of electrons after pitch-angle scattering by inelastic collisions.
 
-    return sparse!(idx1, idx2, aB2B)
-end
+# Physics
+The scattered flux at each altitude and angle is computed as:
+    result[z, μ₁, t] = Σ_μ₂ n(z) x P(μ₁←μ₂) x Ie[z, μ₂, t]
 
-# New function, this is run every time we need to update the values in the B2B matrix (all
-# other iterations of the energy loop)
-# This was made possible after some trial and error to find out in what order the elements
-# of the B2B sparse matrix are stored in memory. Here we update these values in place.
-# What would'nt we do for better performance eh?
-function update_big_B2B!(AB2B, B2B_inelastic, n)
-    counter = 1
+where:
+- `n(z)` is the neutral density at altitude z
+- `P(μ₁←μ₂)` is the probability of scattering from pitch angle μ₂ to μ₁ (from B2B_inelastic)
+- `Ie[z, μ₂, t]` is the incident electron flux before scattering
+
+# Implementation
+This exploits the block-diagonal structure of the full scattering matrix to avoid storing
+and accessing a large sparse matrix. Instead, it computes the multiplication directly from
+the small scattering probability matrix and density profile.
+
+# Arguments
+- `result`: Output array (n_z x n_μ, n_t) - scattered electron flux
+- `B2B_inelastic`: Scattering probability matrix (n_μ, n_μ) - pitch angle redistribution
+- `n`: Neutral density profile (n_z,) - altitude-dependent density [m⁻³]
+- `Ie_slice`: Incident electron flux at the current energy (n_z x n_μ, n_t) - flux before scattering
+"""
+function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
+    # Zero out result first
+    # fill!(result, 0.0) # actually we don't need this because all values will get updated
+
+    n_z = length(n)
     n_μ = size(B2B_inelastic, 2)
-    @views for i1 in axes(B2B_inelastic, 2)
-        for i2 in eachindex(n)
-            idx_range = counter:(counter + n_μ - 1)
-            AB2B.nzval[idx_range] .= n[i2] .* B2B_inelastic[:, i1]
-            counter += n_μ
+    n_t = size(Ie_slice, 2)
+
+    @tturbo for it in 1:n_t
+        for i1 in 1:n_μ
+            for iz in 1:n_z
+                row = (i1 - 1) * n_z + iz
+                tmp = 0.0
+                for i2 in 1:n_μ
+                    col = (i2 - 1) * n_z + iz
+                    tmp += n[iz] * B2B_inelastic[i1, i2] * Ie_slice[col, it]
+                end
+                result[row, it] = tmp
+            end
         end
     end
+
     return nothing
 end
 
-
-
 function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
-    # Initialize
-    Ie_degraded = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
+    # Use cached matrices to avoid allocations
+    Ie_scatter = cache.Ie_scatter
 
-    # Multiply each element of B2B with n (density vector) and resize to get a matrix that
-    # can be multiplied with Ie
-    if iE == length(E)
-        # build the matrix the first time
-        cache.AB2B = build_big_B2B(B2B_inelastic, n, h_atm)
-    else
-        # then reuse the sparse structure and just update the values
-        update_big_B2B!(cache.AB2B, B2B_inelastic, n)
-    end
-
-    # Then calculate the flux of electrons that scatter
-    Ie_scatter = cache.AB2B * @view(Ie[:, :, iE])
+    # Calculate the flux of electrons after pitch-angle scattering by inelastic collisions
+    # This is computed ONCE for all energy levels of this species at this energy
+    calculate_scattered_flux!(Ie_scatter, B2B_inelastic, n, @view(Ie[:, :, iE]))
 
     # Loop over the energy levels of the collisions with the i-th neutral species
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
-            # The flux of e- degraded from energy bin [E[iE], E[iE] + dE[iE]] to any lower
-            # energy bin by excitation of the E_levels[i_level] state of the current
-            # species. The second factor corrects for the case where the energy loss is
-            # smaller than the width in energy of the energy bin. That is, when dE[iE] >
-            # E_levels[i_level,1], only the fraction E_levels[i_level,1] / dE[iE] is lost
-            # from the energy bin [E[iE], E[iE] + dE[iE]].
+            # Calculate the degradation factor combining:
+            # 1) Cross-section σ[i_level, iE] - collision probability
+            # 2) Energy loss correction min(1, E_loss/dE[iE]) - accounts for when the energy
+            #    loss is smaller than the bin width (prevents over-depleting the current bin)
+            factor = σ[i_level, iE] * min(1, E_levels[i_level, 1] / dE[iE])
 
-            Ie_degraded .= (σ[i_level, iE] * min(1, E_levels[i_level, 1] / dE[iE])) .* Ie_scatter
+            # Find the energy bins where electrons will end up after losing E_levels[i_level, 1] eV
+            E_loss = E_levels[i_level, 1]
+            E_min = E[iE] - E_loss           # Minimum energy after collision
+            E_max = E[iE] + dE[iE] - E_loss  # Maximum energy after collision
+            # Find indices where degraded electrons end up
+            i_min = searchsortedfirst(E .+ dE, E_min)  # First bin with E+dE > E_min
+            i_max = searchsortedlast(E, E_max)         # Last bin with E < E_max
+            i_degrade = i_min:i_max
+            partition_fraction = zeros(length(i_degrade)) # initialise
 
-            # Find the energy bins where the e- in the current energy bin will degrade when
-            # losing E_levels[i_level, 1] eV
-            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),      # find lowest bin
-                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level, 1], E))  # find highest bin
-
-            partition_fraction = zeros(size(i_degrade)) # initialise
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Distribute the degrading e- between those bins
                 partition_fraction[1] = min(1, (E[i_degrade[1]] .+ dE[i_degrade[1]] .-
@@ -196,14 +180,15 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
                     partition_fraction[end] = 0
                 end
 
-                # normalise
+                # Normalize partition fractions to sum to 1
                 partition_fraction = partition_fraction / sum(partition_fraction)
 
-                # and finally calculate the flux of degrading e-
+                # Add the degraded electron flux to Q
+                # Q[z,t,E'] += Ie_scatter[z,t] × partition_fraction[E'] × σ × min(1, E_loss/dE)
                 @tturbo for i_u in eachindex(findall(x -> x != 0, partition_fraction))
                     for j in axes(Q, 2)
                         for k in axes(Q, 1)
-                            Q[k, j, i_degrade[i_u]] +=  max(0, Ie_degraded[k, j]) * partition_fraction[i_u]
+                            Q[k, j, i_degrade[i_u]] += Ie_scatter[k, j] * partition_fraction[i_u] * factor
                         end
                     end
                 end
@@ -385,20 +370,34 @@ end
 ```
 =#
 function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE)
-    n_repeated_over_μt = repeat(n, length(μ_center), length(t))
-    n_repeated_over_t = repeat(n, 1, length(t))
+                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE,
+                                            cache, i_species)
+    # Use pre-filled cached matrices (filled at cache creation)
+    n_repeated_over_μt = cache.n_repeated_over_μt[i_species]
+    n_repeated_over_t = cache.n_repeated_over_t[i_species]
 
     # PRIMARY ELECTRONS
     Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
 
     # SECONDARY ELECTRONS (ISOTROPIC)
-    @views for i_μ1 in eachindex(μ_center)
-        for i_μ2 in eachindex(μ_center)
-            Ionization_fragment_1[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
-                n_repeated_over_t .*
-                    (Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                    BeamWeight[i_μ1] ./ sum(BeamWeight)
+    # Precompute constants
+    n_z = length(h_atm)
+    n_μ = length(μ_center)
+    n_t = size(Ie, 2)
+    sum_BeamWeight = sum(BeamWeight)
+
+    # Use @tturbo for vectorized computation
+    @tturbo for it in 1:n_t
+        for i_μ1 in 1:n_μ
+            for i_μ2 in 1:n_μ
+                for iz in 1:n_z
+                    row_μ1 = (i_μ1 - 1) * n_z + iz
+                    row_μ2 = (i_μ2 - 1) * n_z + iz
+                    Ionization_fragment_1[row_μ1, it] += n_repeated_over_t[iz, it] *
+                                                          Ie[row_μ2, it, iE] *
+                                                          BeamWeight[i_μ1] / sum_BeamWeight
+                end
+            end
         end
     end
 end
@@ -411,8 +410,13 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
         if E_levels[i_level, 2] > 0
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
-            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
-                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+            E_loss = E_levels[i_level, 1]
+            E_min = E[iE] - E_loss           # Minimum energy after collision
+            E_max = E[iE] + dE[iE] - E_loss  # Maximum energy after collision
+            # Find indices where degraded electrons end up
+            i_min = searchsortedfirst(E .+ dE, E_min)  # First bin with E+dE > E_min
+            i_max = searchsortedlast(E, E_max)         # Last bin with E < E_max
+            i_degrade = i_min:i_max
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-

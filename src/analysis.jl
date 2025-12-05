@@ -369,8 +369,8 @@ Reads into a folder `directory_to_process` containing results from an AURORA.jl 
 loads the volume excitation rates `Q_XXXX` (#excitation/m³/s) contained in the file `Qzt_all_L.mat`
 and integrate them in height, taking into account the finite speed of light.
 
-The calculated colum-integrated excitation rates are saved to a file named *I_lambda_of_t.mat*.
-The column-integrated excitation rates are named "I_4278, I_6730, ...". They are all vectors
+The calculated colum-integrated excitation rates are saved to a file named `I_lambda_of_t.mat`.
+The column-integrated excitation rates are named "I\\_4278, I\\_6730, ...". They are all vectors
 in time (length n\\_t), and have units of (#excitation/m²/s).
 
 Note that the function `make_volume_excitation_file()` needs to be run before this one, as
@@ -437,9 +437,10 @@ end
 using Integrals: SampledIntegralProblem, TrapezoidalRule, solve
 using Interpolations: interpolate, extrapolate, Gridded, Linear
 """
-    q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+    q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
 
 Integrate the volume-excitation-rate (#exc/m³/s) to column-excitation-rate (#exc/m²/s).
+
 Takes into account the time-delay between light emitted at different altitudes. Photons
 emitted at at altitude of 200km will arrive at the detector 100e3/3e8 = 0.333 ms later than
 electrons emitted at an altitude of 100km. This is a small time-shift, but it is close to
@@ -461,7 +462,7 @@ The einstein coefficient `A` and effective lifetime `τ` are optional (equal to 
 # Output
 - `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
 """
-function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
 
     ## Define constant
     c = 2.99792458e8 # speed of light (m/s)
@@ -529,6 +530,25 @@ function q2colem(t, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     # photons arriving at the bottom of the column for each height and time steps, we can
     # integrate it along the height.
     problem = SampledIntegralProblem(I, h_atm; dim=1)
+    method = TrapezoidalRule()
+    I_lambda = solve(problem, method)
+
+    return I_lambda.u
+end
+
+## Steady-state version
+"""
+    q2colem(t::Real, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+
+Same as above, except time is now a scalar (steady-state results). This is just a simple
+integration in height.
+"""
+function q2colem(t::Real, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+    ## Apply the effective lifetime and the Einstein coefficient
+    Q = Q .* τ .* A
+
+    ## Simple 1D integration
+    problem = SampledIntegralProblem(Q, h_atm; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)
 

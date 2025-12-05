@@ -1,11 +1,21 @@
 # Changelog
+
+- **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
+  - Comes with a few nice improvements to the function, see PR description
+- Throw an error when invalid pitch-angle limits are used as input [#90](https://github.com/egavazzi/AURORA.jl/pull/90)
+- Add mechanism for automatic time slicing of simulations [#91](https://github.com/egavazzi/AURORA.jl/pull/91)
+
+## v0.6.0 - 2025-11-04
+- Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
+- Make it possible to produce column excitations from steady-state results [#76](https://github.com/egavazzi/AURORA.jl/pull/76)
 - Add analysis function to calculate heating rates [#73](https://github.com/egavazzi/AURORA.jl/pull/73) 
-- Refactor the cascading functions for more clarity and better performance [#72](https://github.com/egavazzi/AURORA.jl/pull/72)
 - Fix and improve the `Ie_with_LET()` function [#71](https://github.com/egavazzi/AURORA.jl/pull/68)
 - Fix negative densities at very low altitudes (< 85km) [#69](https://github.com/egavazzi/AURORA.jl/pull/69)
-- Increase possible maximum energy [#67](https://github.com/egavazzi/AURORA.jl/pull/67)
-- Improve performances, making simulations around 3x faster to run [#64](https://github.com/egavazzi/AURORA.jl/pull/64)
-- Speed-up scattering calculations, can change results very slightly [#66](https://github.com/egavazzi/AURORA.jl/pull/66)
+- Increase possible maximum energy to 1 MeV (but please don't do that) [#67](https://github.com/egavazzi/AURORA.jl/pull/67)
+- Improve performances many places, making simulations 5x to 15x faster to run [#64](https://github.com/egavazzi/AURORA.jl/pull/64) [#81](https://github.com/egavazzi/AURORA.jl/pull/81)
+- Refactor and speed-up the cascading calculations [#72](https://github.com/egavazzi/AURORA.jl/pull/72)
+- Refactor and speed-up the scattering calculations, *can change results very slightly* [#66](https://github.com/egavazzi/AURORA.jl/pull/66)
+
 
 ## v0.5.0 - 2025-05-01
 - Faster phase functions calculations [#62](https://github.com/egavazzi/AURORA.jl/pull/62)

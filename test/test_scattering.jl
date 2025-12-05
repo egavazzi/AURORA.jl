@@ -1,3 +1,16 @@
+@testitem "θ_lims validation" begin
+    # Test that θ_lims must include 180°
+    @test_throws ArgumentError AURORA.validate_θ_lims(170:-10:0)
+    # Test that θ_lims must include 0°
+    @test_throws ArgumentError AURORA.validate_θ_lims(180:-10:10)
+    # Test that θ_lims must be in descending order
+    @test_throws ArgumentError AURORA.validate_θ_lims(0:10:180)
+    # Test that valid θ_lims passes
+    @test AURORA.validate_θ_lims(180:-10:0) === nothing
+    @test AURORA.validate_θ_lims(180:-45:0) === nothing
+    @test AURORA.validate_θ_lims([180, 140, 100, 80, 40, 0]) === nothing
+end
+
 @testitem "Rotation matrices" begin
     # Define some parameters for the tests
     θ_lims = 180:-10:0
