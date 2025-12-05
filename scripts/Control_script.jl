@@ -3,11 +3,15 @@ using AURORA
 ## Setting parameters
 altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
 θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
-E_max = 3000;                   # (eV) upper limit to the energy grid
+E_max = 1000;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.001:0.1;       # (s) time-array over which data will be saved
-n_loop = 10;                    # number of loops to run
+t_total = 0.5;                  # (s) total simulation time
+dt = 0.001;                     # (s) time step for saving data
+
+# Options to control how the simulation is split into time chunks to manage memory:
+# n_loop = 10;                  # (optional) define manually the number of loops to run
+# max_memory_gb = 8.0           # (optional) determine n_loop based on limit memory usage
 
 CFL_number = 128;
 
@@ -47,8 +51,8 @@ INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 # INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Run the simulation
-calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-    msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
+                      msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
 
 ## Run the analysis
 make_Ie_top_file(savedir)
