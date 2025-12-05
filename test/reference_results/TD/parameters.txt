@@ -3,12 +3,13 @@ altitude_lims = [100, 400]
 E_max = 500 
 B_angle_to_zenith = 13 
 
-t_sampling = 0.0:0.01:0.1 
-t = 0.0:0.0014285714285714286:0.1 
+t_total = 0.2 
+dt = 0.01 
+t = 0.0:0.0014285714285714286:0.2 
 n_loop = 2 
 
 CFL_number = 128
 input_options = (input_type = "flickering", IeE_tot = 0.01, z₀ = 1000, E_min = 100, f = 5, Beams = 1, modulation = "sinus") 
 
-commit_hash = 4425a6c73077b1e61222acf739c6e4ed2a682b57 
-version_AURORA = 0.5.0
+commit_hash = bd185c4022446ea9d59f17344fbc787680733c59 
+version_AURORA = 0.6.0
