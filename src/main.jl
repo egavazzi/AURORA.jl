@@ -120,8 +120,9 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
                  Ionization_fragment_2, Ionizing_fragment_2)
 end
 
-function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling,
-    n_loop, msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64)
+function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
+    msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
+    n_loop = nothing, max_memory_gb = 8)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
@@ -131,8 +132,21 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
-    t, CFL_factor = CFL_criteria(t_sampling, h_atm, v_of_E(E_max), CFL_number)
-    # TODO: fix properly the time sampling of incoming data from file   # What did I mean here?? /EG20250504
+    t, CFL_factor = CFL_criteria(t_total, dt, h_atm, v_of_E(E_max), CFL_number)
+
+    ## Calculate n_loop automatically if not provided
+    if isnothing(n_loop)
+        n_loop = calculate_n_loop(t, length(h_atm), length(μ_center), length(E);
+                                  max_memory_gb = max_memory_gb)
+    else
+        # User provided n_loop, warn if it smaller than recommended
+        recommended_n_loop = calculate_n_loop(t, length(h_atm), length(μ_center), length(E);
+                                              max_memory_gb = max_memory_gb, verbose = true)
+        if n_loop < recommended_n_loop
+            @warn "Provided n_loop=$n_loop is smaller than recommended ($recommended_n_loop). " *
+                  "This may cause out of memory issues and crashes."
+        end
+    end
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -163,18 +177,26 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t, n_loop,
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t, n_loop,
         CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
+    ## Calculate the number of time steps per loop
+    # Each loop processes (length(t) - 1) / n_loop + 1 time steps, with overlapping endpoints
+    n_t_per_loop = (length(t) - 1) ÷ n_loop + 1
+    t_per_loop = range(0, step = t[2] - t[1], length = n_t_per_loop)
+
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), length(t), length(h_atm), length(E))
+    cache = Cache(n_neutrals, length(μ_center), n_t_per_loop, length(h_atm), length(E))
 
     ## Initialise
     I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
+    Ie = zeros(length(h_atm) * length(μ_center), n_t_per_loop, length(E))
+    n_t_save = length(0:dt:t_per_loop[end])
+    Ie_save = zeros(length(h_atm) * length(μ_center), n_t_save, length(E))
 
     ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+    matrices = initialize_transport_matrices(h_atm, μ_center, t_per_loop, E, dE, θ_lims)
     # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
     update_D!(matrices.D, E, dE, θ_lims)
     update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
@@ -184,17 +206,16 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
 
     ## Looping over n_loop
-    for i in 1:n_loop
-        # Initialize the ionospheric flux for the current loop
-        Ie = zeros(length(h_atm) * length(μ_center), length(t), length(E));
+    for i_loop in 1:n_loop
 
-        # Reset Q for each new loop
+        # Reset Ie and Q for each new loop
+        fill!(Ie, 0.0)
         fill!(matrices.Q, 0.0)
 
         # Extract the top flux for the current loop
-        Ie_top_local = Ie_top[:, (1 + (i - 1) * (length(t) - 1)) : (length(t) + (i - 1) * (length(t) - 1)), :]
+        Ie_top_local = Ie_top[:, (1 + (i_loop - 1) * (n_t_per_loop - 1)) : (n_t_per_loop + (i_loop - 1) * (n_t_per_loop - 1)), :]
 
-        p = Progress(length(E); desc=string("Calculating flux for loop ", i, "/", n_loop), dt=1.0)
+        p = Progress(length(E); desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
         # Looping over energy
         for iE in length(E):-1:1
             # Update matrices A and B for current energy
@@ -204,22 +225,20 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
             # Compute the flux of e-
             if iE == length(E)
-                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop,
                                                  h_atm ./ cosd(B_angle_to_zenith), μ_center,
                                                  v_of_E(E[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache,
                                                  first_iteration = true)
             else
-                # Ie[:, :, iE] = Crank_Nicolson(t, h_atm ./ cosd(B_angle_to_zenith), μ_center, v_of_E(E[iE]),
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t,
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop,
                                                  h_atm ./ cosd(B_angle_to_zenith), μ_center,
                                                  v_of_E(E[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
-            update_Q!(matrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
+            update_Q!(matrices, Ie, h_atm, t_per_loop, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
                         B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
                         μ_center, cache)
 
@@ -227,10 +246,12 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         end
 
         # Update the starting e- flux profile
-        I0 = Ie[:, end, :]
+        I0 .= Ie[:, end, :]
 
+        # Subsample Ie into Ie_save buffer
+        Ie_save .= @view Ie[:, 1:CFL_factor:end, :]
         # Save results for the n_loop
-        save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
+        save_results(Ie_save, E, t_per_loop, μ_lims, h_atm, I0, μ_scatterings, i_loop, CFL_factor, savedir)
     end
 
 end
