@@ -247,9 +247,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         # Save results for the n_loop
         save_results(Ie_save, E, t_per_loop, μ_lims, h_atm, I0, μ_scatterings, i_loop, CFL_factor, savedir)
     end
-
-    # Clean up memory after the simulation
-    GC.gc()
 end
 
 
