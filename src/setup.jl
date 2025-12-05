@@ -2,6 +2,7 @@ using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using DelimitedFiles: readdlm
 using SpecialFunctions: erf
 
+
 """
     setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
 
@@ -137,6 +138,7 @@ Create an energy grid based on the maximum energy `E_max` given as input.
     + `theta1`: scattering angles used in the calculations. Vector [n_direction]
 """
 function load_scattering_matrices(θ_lims)
+    validate_θ_lims(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
@@ -145,6 +147,38 @@ function load_scattering_matrices(θ_lims)
                      BeamWeight = BeamWeight, theta1 = θ₁)
 
     return μ_lims, μ_center, μ_scatterings
+end
+
+
+
+"""
+    validate_θ_lims(θ_lims)
+
+Validate that the pitch-angle limits `θ_lims` are correctly specified.
+Throws an `ArgumentError` if:
+- `θ_lims` does not include 180° (field-aligned downward)
+- `θ_lims` does not include 0° (field-aligned upward)
+- `θ_lims` is not in descending order
+
+# Inputs
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0)
+"""
+function validate_θ_lims(θ_lims)
+    if maximum(θ_lims) != 180
+        throw(ArgumentError("θ_lims must include 180° (field-aligned downward). " *
+              "Got maximum of $(maximum(θ_lims))°. " *
+              "Example of valid input: 180:-10:0."))
+    end
+    if minimum(θ_lims) != 0
+        throw(ArgumentError("θ_lims must include 0° (field-aligned upward). " *
+              "Got minimum of $(minimum(θ_lims))°. " *
+              "Example of valid input: 180:-10:0."))
+    end
+    if !issorted(θ_lims, rev=true)
+        throw(ArgumentError("θ_lims must be in descending order (e.g., 180:-10:0). " *
+              "Got: $θ_lims"))
+    end
+    return nothing
 end
 
 
