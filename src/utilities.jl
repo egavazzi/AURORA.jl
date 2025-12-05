@@ -1,108 +1,6 @@
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using Term: @bold
 
-## ====================================================================================== ##
-## Memory estimation and automatic n_loop calculation
-## ====================================================================================== ##
-
-"""
-    estimate_simulation_memory(n_z, n_μ, n_t, n_E)
-
-Estimate the memory required for a single loop of the electron transport simulation.
-
-This function calculates the approximate memory usage based on the main arrays
-allocated during simulation: `Ie` and `Q`.
-
-# Arguments
-- `n_z::Int`: Number of altitude grid points
-- `n_μ::Int`: Number of pitch-angle beams
-- `n_t::Int`: Number of time steps (after CFL refinement)
-- `n_E::Int`: Number of energy grid points
-
-# Returns
-- `memory_gb::Float64`: Estimated memory usage in gigabytes
-
-# Notes
-The memory estimate includes:
-- Main flux array `Ie`: `(n_z × n_μ) × n_t × n_E` Float64 elements
-- Source term array `Q`: same size as `Ie`
-"""
-function estimate_simulation_memory(n_z, n_μ, n_t, n_E)
-    bytes_per_float64 = 8
-
-    # Main Ie array: (n_z * n_μ) × n_t × n_E
-    Ie_elements = n_z * n_μ * n_t * n_E
-    Ie_bytes = Ie_elements * bytes_per_float64
-
-    # Total memory
-    # Q_array will have the same size as Ie, so we x2
-    # We also need some extra memory for temporary arrays during calculations, we use
-    # a x1.5 for that
-    total_memory_bytes = 2 * Ie_bytes * 1.5
-    memory_gb = total_memory_bytes / 1e9
-
-    return memory_gb
-end
-
-
-"""
-    calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
-
-Calculate the optimal number of loops (`n_loop`) for the electron transport simulation
-based on memory constraints.
-
-This function determines how many time-slices the simulation should be divided into
-to stay within the specified memory limit.
-
-# Arguments
-- `t`: Time array after CFL refinement (from `CFL_criteria`)
-- `n_z::Int`: Number of altitude grid points
-- `n_μ::Int`: Number of pitch-angle beams
-- `n_E::Int`: Number of energy grid points
-
-# Keyword Arguments
-- `max_memory_gb`: Maximum memory to use (GB). Defaults to 8 GB.
-- `verbose::Bool=true`: If true, print some information about the calculation
-
-# Returns
-- `n_loop::Int`: Recommended number of loops
-
-# Example
-```julia
-t, CFL_factor = CFL_criteria(1.0, 0.001, h_atm, v_of_E(10000))
-n_loop = calculate_n_loop(t, length(h_atm), n_μ, n_E)
-```
-"""
-function calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
-    # Number of time points after CFL refinement
-    n_t = length(t)
-    # Estimate memory for one loop
-    memory_total = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
-
-    # Calculate minimum n_loop needed
-    if memory_total <= max_memory_gb
-        n_loop = 1
-    else
-        n_loop = ceil(Int, memory_total / max_memory_gb)
-    end
-
-    if verbose
-        println("Automatic n_loop calculation:")
-        println("  Grid dimensions:")
-        println("    Altitude points (n_z):     $n_z")
-        println("    Pitch-angle beams (n_μ):   $n_μ")
-        println("    Time steps (n_t):          $n_t")
-        println("    Energy points (n_E):       $n_E")
-        println("  ─────────────────────────────────────────")
-        println("  Total estimated memory use:  $(round(memory_total, digits=3)) GB")
-        println("  Total RAM detected:          $(round(Sys.total_memory() / 1e9, digits=2)) GB")
-        println("  Max memory limit:            $(round(max_memory_gb, digits=2)) GB")
-        println("  ─────────────────────────────────────────")
-        println("  Calculated n_loop:           $n_loop")
-    end
-
-    return n_loop
-end
 
 
 ## ====================================================================================== ##
@@ -586,4 +484,105 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
     end
 
     return interpolated
+end
+
+
+
+## ====================================================================================== ##
+## Memory estimation and automatic n_loop calculation
+## ====================================================================================== ##
+
+
+"""
+    calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
+
+Calculate the optimal number of loops (`n_loop`) for the electron transport simulation
+based on memory constraints.
+
+This function determines how many time-slices the simulation should be divided into
+to stay within the specified memory limit.
+
+# Arguments
+- `t`: Time array after CFL refinement (from `CFL_criteria`)
+- `n_z::Int`: Number of altitude grid points
+- `n_μ::Int`: Number of pitch-angle beams
+- `n_E::Int`: Number of energy grid points
+
+# Keyword Arguments
+- `max_memory_gb`: Maximum memory to use (GB). Defaults to 8 GB.
+- `verbose::Bool=true`: If true, print some information about the calculation
+
+# Returns
+- `n_loop::Int`: Recommended number of loops
+
+# Example
+```julia
+t, CFL_factor = CFL_criteria(1.0, 0.001, h_atm, v_of_E(10000))
+n_loop = calculate_n_loop(t, length(h_atm), n_μ, n_E)
+```
+"""
+function calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
+    # Number of time points after CFL refinement
+    n_t = length(t)
+    # Estimate memory for one loop
+    memory_total = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
+
+    # Calculate minimum n_loop needed
+    if memory_total <= max_memory_gb
+        n_loop = 1
+    else
+        n_loop = ceil(Int, memory_total / max_memory_gb)
+    end
+
+    if verbose
+        println("Automatic n_loop calculation:")
+        println("  Grid dimensions:")
+        println("    Altitude points (n_z):     $n_z")
+        println("    Pitch-angle beams (n_μ):   $n_μ")
+        println("    Time steps (n_t):          $n_t")
+        println("    Energy points (n_E):       $n_E")
+        println("  ─────────────────────────────────────────")
+        println("  Total estimated memory use:  $(round(memory_total, digits=3)) GB")
+        println("  Total RAM detected:          $(round(Sys.total_memory() / 1e9, digits=2)) GB")
+        println("  Max memory limit:            $(round(max_memory_gb, digits=2)) GB")
+        println("  ─────────────────────────────────────────")
+        println("  Calculated n_loop:           $n_loop")
+    end
+
+    return n_loop
+end
+
+function check_n_loop(n_loop, n_z, n_μ, n_t, n_E)
+    total_ram_gb = Sys.total_memory() / 1024^3
+    estimated_memory_gb = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
+    memory_per_loop_gb = estimated_memory_gb / n_loop
+    if memory_per_loop_gb > total_ram_gb * 0.5
+        warn("The n_loop = $n_loop may lead to high memory usage.\n" *
+             "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
+             "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
+             "Consider increasing `n_loop` or or decreasing `max_memory_gb` to avoid issues.")
+    elseif memory_per_loop_gb > total_ram_gb
+        error("The n_loop = $n_loop is too small for simulations to fit in available RAM.\n" *
+              "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
+              "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
+              "Please increase `n_loop` to at least $(ceil(Int, estimated_memory_gb / total_ram_gb)) " *
+              "or decrease `max_memory_gb`.")
+    end
+end
+
+function estimate_simulation_memory(n_z::Int, n_μ::Int, n_t::Int, n_E::Int)
+    bytes_per_float64 = 8
+
+    # Main Ie array: (n_z * n_μ) × n_t × n_E
+    Ie_elements = n_z * n_μ * n_t * n_E
+    Ie_bytes = Ie_elements * bytes_per_float64
+
+    # Total memory
+    # Q_array will have the same size as Ie, so we x2
+    # We also need some extra memory for temporary arrays during calculations, we use
+    # a factor x1.5 for that
+    total_memory_bytes = 2 * Ie_bytes * 1.5
+    memory_gb = total_memory_bytes / 1e9
+
+    return memory_gb
 end

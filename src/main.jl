@@ -134,19 +134,13 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # accordingly
     t, CFL_factor = CFL_criteria(t_total, dt, h_atm, v_of_E(E_max), CFL_number)
 
-    ## Calculate n_loop automatically if not provided
+    ## Calculate n_loop if not provided
     if isnothing(n_loop)
         n_loop = calculate_n_loop(t, length(h_atm), length(μ_center), length(E);
                                   max_memory_gb = max_memory_gb)
-    else
-        # User provided n_loop, warn if it smaller than recommended
-        recommended_n_loop = calculate_n_loop(t, length(h_atm), length(μ_center), length(E);
-                                              max_memory_gb = max_memory_gb, verbose = true)
-        if n_loop < recommended_n_loop
-            @warn "Provided n_loop=$n_loop is smaller than recommended ($recommended_n_loop). " *
-                  "This may cause out of memory issues and crashes."
-        end
     end
+    ## Check that n_loop won't cause memory issues
+    check_n_loop(n_loop, length(h_atm), length(μ_center), length(t), length(E))
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_old_matlab_file"
@@ -178,7 +172,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     ## And save the simulation parameters in it
     save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t, n_loop,
-        CFL_number, INPUT_OPTIONS, savedir)
+                    CFL_number, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
     ## Calculate the number of time steps per loop
@@ -254,6 +248,8 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         save_results(Ie_save, E, t_per_loop, μ_lims, h_atm, I0, μ_scatterings, i_loop, CFL_factor, savedir)
     end
 
+    # Clean up memory after the simulation
+    GC.gc()
 end
 
 
@@ -304,7 +300,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 1:1:1, 1:1:1, 1,
+    ## And save the simulation parameters in it
+    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 0, 0, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
     save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
 
