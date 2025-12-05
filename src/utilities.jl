@@ -1,6 +1,11 @@
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using Term: @bold
 
+
+
+## ====================================================================================== ##
+
+
 """
     v_of_E(E)
 
@@ -23,22 +28,22 @@ function v_of_E(E)
 	return v
 end
 
-function CFL_criteria(t, h_atm, v, CFL_number=64)
+function CFL_criteria(t_total, dt, h_atm, v, CFL_number=64)
     # The Courant-Freidrichs-Lewy (CFL) number normally hase to be small (<4) to ensure numerical
     # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
     # should be careful about numerical accuracy though.
     # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
     # on the results, while reducing computational time tremendously
-    dt = t[2] - t[1]
     dz = h_atm[2] - h_atm[1]
     # Calculate the maximum dt that still satisfies the CFL criteria.
     dt_max = CFL_number * dz / v
     # Then find the smallest integer that dt can be divided to become smaller than dt_max.
     CFL_factor = ceil(Int, dt / dt_max) # that integer is the CFL_factor
-    # Now make t_finer using the CFL_factor
-    t_finer = range(t[1], t[end], CFL_factor * (length(t) - 1) + 1)
+    # Build the time array with the finer time step
+    n_t_sampling = length(0:dt:t_total)
+    t = range(0, t_total, CFL_factor * (n_t_sampling - 1) + 1)
 
-    return t_finer, CFL_factor
+    return t, CFL_factor
 end
 
 
@@ -96,7 +101,7 @@ end
 
 import LibGit2
 import Pkg
-function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, t,
+function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t,
     n_loop, CFL_number, INPUT_OPTIONS, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
@@ -111,7 +116,8 @@ function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sam
         write(f, "E_max = $E_max \n")
         write(f, "B_angle_to_zenith = $B_angle_to_zenith \n")
         write(f, "\n")
-        write(f, "t_sampling = $t_sampling \n")
+        write(f, "t_total = $t_total \n")
+        write(f, "dt = $dt \n")
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
@@ -142,13 +148,11 @@ end
 
 using MAT: matopen
 using Printf: @sprintf
-function save_results(Ie, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
+function save_results(Ie_save, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     # Extract the time array for the current loop
 	t_run = collect(t .+ t[end] * (i - 1))
-
-    # Reduce t_run and Ie to match the t_sampling
+    # Reduce t_run to match the t_sampling
     t_run = t_run[1:CFL_factor:end]
-    Ie_save = Ie[:, 1:CFL_factor:end, :]
 
     savefile = joinpath(savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
@@ -480,4 +484,105 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
     end
 
     return interpolated
+end
+
+
+
+## ====================================================================================== ##
+## Memory estimation and automatic n_loop calculation
+## ====================================================================================== ##
+
+
+"""
+    calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
+
+Calculate the optimal number of loops (`n_loop`) for the electron transport simulation
+based on memory constraints.
+
+This function determines how many time-slices the simulation should be divided into
+to stay within the specified memory limit.
+
+# Arguments
+- `t`: Time array after CFL refinement (from `CFL_criteria`)
+- `n_z::Int`: Number of altitude grid points
+- `n_μ::Int`: Number of pitch-angle beams
+- `n_E::Int`: Number of energy grid points
+
+# Keyword Arguments
+- `max_memory_gb`: Maximum memory to use (GB). Defaults to 8 GB.
+- `verbose::Bool=true`: If true, print some information about the calculation
+
+# Returns
+- `n_loop::Int`: Recommended number of loops
+
+# Example
+```julia
+t, CFL_factor = CFL_criteria(1.0, 0.001, h_atm, v_of_E(10000))
+n_loop = calculate_n_loop(t, length(h_atm), n_μ, n_E)
+```
+"""
+function calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
+    # Number of time points after CFL refinement
+    n_t = length(t)
+    # Estimate memory for one loop
+    memory_total = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
+
+    # Calculate minimum n_loop needed
+    if memory_total <= max_memory_gb
+        n_loop = 1
+    else
+        n_loop = ceil(Int, memory_total / max_memory_gb)
+    end
+
+    if verbose
+        println("Automatic n_loop calculation:")
+        println("  Grid dimensions:")
+        println("    Altitude points (n_z):     $n_z")
+        println("    Pitch-angle beams (n_μ):   $n_μ")
+        println("    Time steps (n_t):          $n_t")
+        println("    Energy points (n_E):       $n_E")
+        println("  ─────────────────────────────────────────")
+        println("  Total estimated memory use:  $(round(memory_total, digits=3)) GB")
+        println("  Total RAM detected:          $(round(Sys.total_memory() / 1e9, digits=2)) GB")
+        println("  Max memory limit:            $(round(max_memory_gb, digits=2)) GB")
+        println("  ─────────────────────────────────────────")
+        println("  Calculated n_loop:           $n_loop")
+    end
+
+    return n_loop
+end
+
+function check_n_loop(n_loop, n_z, n_μ, n_t, n_E)
+    total_ram_gb = Sys.total_memory() / 1024^3
+    estimated_memory_gb = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
+    memory_per_loop_gb = estimated_memory_gb / n_loop
+    if memory_per_loop_gb > total_ram_gb * 0.5
+        warn("The n_loop = $n_loop may lead to high memory usage.\n" *
+             "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
+             "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
+             "Consider increasing `n_loop` or or decreasing `max_memory_gb` to avoid issues.")
+    elseif memory_per_loop_gb > total_ram_gb
+        error("The n_loop = $n_loop is too small for simulations to fit in available RAM.\n" *
+              "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
+              "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
+              "Please increase `n_loop` to at least $(ceil(Int, estimated_memory_gb / total_ram_gb)) " *
+              "or decrease `max_memory_gb`.")
+    end
+end
+
+function estimate_simulation_memory(n_z::Int, n_μ::Int, n_t::Int, n_E::Int)
+    bytes_per_float64 = 8
+
+    # Main Ie array: (n_z * n_μ) × n_t × n_E
+    Ie_elements = n_z * n_μ * n_t * n_E
+    Ie_bytes = Ie_elements * bytes_per_float64
+
+    # Total memory
+    # Q_array will have the same size as Ie, so we x2
+    # We also need some extra memory for temporary arrays during calculations, we use
+    # a factor x1.5 for that
+    total_memory_bytes = 2 * Ie_bytes * 1.5
+    memory_gb = total_memory_bytes / 1e9
+
+    return memory_gb
 end
