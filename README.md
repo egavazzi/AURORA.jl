@@ -1,18 +1,14 @@
-<div align="center">
-
-| **Documentation** | **DOI** |
-|:-----------------:|:-------:|
-| [![][docs-stable-img]][docs-stable-url] [![][docs-dev-img]][docs-dev-url] | [![][doi-img]][doi-url] |
-
-</div>
-
 # AURORA.jl
+[![][docs-stable-img]][docs-stable-url]
+[![][docs-dev-img]][docs-dev-url]\
+[![][doi-img]][doi-url]
+[![][license-img]][license-url]
 
-AURORA is a time-dependent multi-stream electron transport code, suitable for modeling ionospheric electron fluxes during periods of rapidly varying electron precipitation (sub-second timescales).
+AURORA is a time-dependent multi-stream electron transport code.
 
-This is a Julia implementation of the original AURORA code, which was written in MATLAB and is available at https://github.com/egavazzi/AURORA. We strongly recommend using the Julia version as it is much faster (~1000x) and has received several bug fixes.
+It is suitable for modeling the ionospheric electron fluxes when the electron precipitation varies rapidly, typically on sub-second timescales.
 
-Below is an example of modeled ionospheric electron fluxes produced by AURORA in response to Alfvénic precipitation (visible in the top left panel).
+Below is an example of modeled ionospheric electron fluxes in response to a suprathermal electron burst measured by a rocket.
 
 https://github.com/user-attachments/assets/e67fc4d3-1fe1-4c0b-a8f6-42275f6e4659
 
@@ -37,9 +33,11 @@ Gustavsson, B. (2022). Time-Dependent Electron Transport I: Modelling of Supra-T
 
 
 <!-- Badge definitions -->
-[docs-dev-img]: https://img.shields.io/badge/documentation-dev-orange.svg
+[docs-dev-img]: https://img.shields.io/badge/Documentation-dev-orange?logo=julia
 [docs-dev-url]: https://egavazzi.github.io/AURORA.jl/dev/
-[docs-stable-img]: https://img.shields.io/badge/documentation-stable-blue.svg
+[docs-stable-img]: https://img.shields.io/badge/Documentation-stable-blue?logo=julia
 [docs-stable-url]: https://egavazzi.github.io/AURORA.jl/stable/
 [doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.11238620.svg
 [doi-url]: https://doi.org/10.5281/zenodo.11238620
+[license-img]: https://img.shields.io/badge/License-GNU%20GPLv3-green.svg
+[license-url]: https://github.com/egavazzi/AURORA.jl/blob/main/LICENSE.md
