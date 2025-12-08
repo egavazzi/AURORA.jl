@@ -43,9 +43,11 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     print("Calculating iri data...")
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
-    # import iri2016 model from the Python package 'iri2016'
     redirect_stdio(stdout=devnull) do # hide all the extra verbosity from iri2016
+        # import iri2016 model from the Python package 'iri2016'
         global iri2016 = pyimport("iri2016.profile")
+        # run the model
+        global iri_data = iri2016.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
     end
     # iri2016 = pyimport("iri2016.profile")
     # run the model
