@@ -1,59 +1,5 @@
 using MAT: matopen
 
-function Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, filename)
-    Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
-
-    file = matopen(filename)
-    Ie_top_raw = read(file, "Ie_total")
-    close(file)
-
-    # for constant input flux (e.g. first run), we need to resize the matrix from
-    # [1, n_μ * [n_E, 1]] to [1, n_μ * [n_E, n_t]]
-    if size(Ie_top_raw[1], 2) == 1
-        for i_μ in eachindex(μ_center)
-            Ie_top_raw[i_μ] = Ie_top_raw[i_μ] * ones(1, length(t) + (n_loop - 1) * (length(t) - 1)) # (e-/m²/s)
-        end
-    end
-
-    # then we resize the matrix from [1, n_μ * [n_E, n_t]] to [n_μ, n_t, n_E] to be consistent with
-    # the other flux matrices
-    for i_μ in eachindex(μ_center)
-        Ie_top[i_μ, :,  :] = Ie_top_raw[i_μ][1:length(E), :]' # (e-/m²/s)
-    end
-
-    return Ie_top
-end
-
-
-function Ie_top_from_ketchup(t, E, n_loop, μ_center, filename)
-    Ie_top = Array{Float64}(undef, length(μ_center), (n_loop - 1) * (length(t) - 1) + length(t), length(E))
-
-    file = matopen(filename)
-    Ie_top_raw = read(file, "Ie_total")
-    close(file)
-
-    # for constant input flux (e.g. first run), we need to resize the matrix from
-    # [1, n_μ * [n_E, 1]] to [1, n_μ * [n_E, n_t]]
-    if size(Ie_top_raw[1], 2) == 1 && length(t) > 1
-        for i_μ in eachindex(μ_center)
-            Ie_top_raw[i_μ] = repeat(Ie_top_raw[i_μ], outer=(1, length(t) + (n_loop - 1) * (length(t) - 1)))
-        end
-    end
-
-    # then we resize the matrix from [1, n_μ * [n_E, n_t]] to [n_μ, n_t, n_E] to be consistent with
-    # the other flux matrices
-    for i_μ in 1:Int(length(μ_center) / 2) # down-flux
-        Ie_top[i_μ, :,  :] = Ie_top_raw[i_μ][1:length(E), :]' # (e-/m²/s)
-    end
-    # set the input up-flux to 0
-    Ie_top[μ_center .> 0, :, :] .= 0
-
-
-
-    return Ie_top
-end
-
-
 
 function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     Nt = (n_loop - 1) * (length(t) - 1) + length(t)
@@ -153,109 +99,9 @@ end
 
 
 
-## ====================================================================================== ##
-## Helper functions for Ie_top_modulated
-## ====================================================================================== ##
-
-"""
-    _flat_spectrum(IeE_tot_eV, E, dE, E_min)
-
-Compute a flat (constant) differential number flux spectrum above E_min, normalized so that
-the total energy flux equals IeE_tot_eV.
-
-Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
-The flux is zero below E_min.
-"""
-function _flat_spectrum(IeE_tot_eV, E, dE, E_min)
-    E_mid = E .+ dE ./ 2
-
-    # Find first index where E >= E_min
-    i_Emin = findlast(E .<= E_min)
-    if isnothing(i_Emin)
-        i_Emin = 1
-    end
-
-    # Calculate normalization: ∑ E_mid[i] * dE[i] for i >= i_Emin
-    energy_integral = sum(E_mid[i_Emin:end] .* dE[i_Emin:end])
-
-    # Differential number flux (constant above E_min)
-    Φ = zeros(length(E))
-    Φ[i_Emin:end] .= IeE_tot_eV / energy_integral
-
-    return Φ  # #e⁻/m²/s/eV
-end
-
-
-"""
-    _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
-
-Compute a Gaussian differential number flux spectrum centered at E₀ with width ΔE,
-normalized so that the total energy flux equals IeE_tot_eV.
-
-The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
-
-Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
-"""
-function _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
-    E_mid = E .+ dE ./ 2
-
-    # Unnormalized Gaussian shape
-    Φ_shape = exp.(-(E_mid .- E₀).^2 ./ ΔE^2)
-
-    # Calculate normalization: we want ∑ Φ[i] * E_mid[i] * dE[i] = IeE_tot_eV
-    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_mid[i] * dE[i])
-    energy_integral = sum(Φ_shape .* E_mid .* dE)
-
-    # Normalized differential number flux
-    Φ = Φ_shape .* (IeE_tot_eV / energy_integral)
-
-    return Φ  # #e⁻/m²/s/eV
-end
-
-
-"""
-    _apply_modulation(t_shifted, modulation, f, amplitude, t_start, t_end)
-
-Apply temporal modulation to the flux based on the shifted time grid.
-
-# Arguments
-- `t_shifted`: time grid shifted for energy/angle-dependent delays
-- `modulation`: `:none`, `:sinus`, or `:square`
-- `f`: frequency for sinus/square modulation (Hz)
-- `amplitude`: modulation depth (0 = constant, 1 = full on/off)
-- `t_start`, `t_end`: smooth onset interval (only used for `:none`)
-
-# Returns
-- Vector of modulation factors (0 to 1) for each time step
-"""
-function _apply_modulation(t_shifted, modulation, f, amplitude, t_start, t_end)
-    if modulation == :none
-        # Smooth onset/offset using smooth_transition
-        return _smooth_transition.(t_shifted, t_start, t_end)
-    elseif modulation == :sinus
-        # Sinusoidal modulation: oscillates between (1-amplitude) and 1
-        # Base pattern: (1 - cos²(πft)) goes from 0 to 1
-        base_modulation = 1.0 .- cos.(π * f .* t_shifted).^2
-        # Scale by amplitude and shift: result goes from (1-amplitude) to 1
-        modulated = (1.0 - amplitude) .+ amplitude .* base_modulation
-        # Apply onset (Heaviside at t=0)
-        return modulated .* (t_shifted .>= 0)
-    elseif modulation == :square
-        # Square wave modulation: oscillates between (1-amplitude) and 1
-        # Base pattern: (1 + square(...))/2 goes from 0 to 1
-        base_modulation = (1.0 .+ square.(2π * f .* t_shifted .- π/2)) ./ 2
-        # Scale by amplitude and shift
-        modulated = (1.0 - amplitude) .+ amplitude .* base_modulation
-        # Apply onset (Heaviside at t=0)
-        return modulated .* (t_shifted .>= 0)
-    else
-        error("Unknown modulation type: $modulation. Must be :none, :sinus, or :square.")
-    end
-end
-
 
 ## ====================================================================================== ##
-## Main Ie_top_modulated function
+## Ie_top_modulated function
 ## ====================================================================================== ##
 
 """
@@ -508,6 +354,10 @@ function Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, h_atm;
 end
 
 
+## ====================================================================================== ##
+## Ie_with_LET function – for steady-state only
+## ====================================================================================== ##
+
 """
     Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
 
@@ -600,4 +450,106 @@ function Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_ene
     end
 
     return Ie_top
+end
+
+
+
+## ====================================================================================== ##
+## Helper functions for Ie_top_modulated
+## ====================================================================================== ##
+
+"""
+    _flat_spectrum(IeE_tot_eV, E, dE, E_min)
+
+Compute a flat (constant) differential number flux spectrum above E_min, normalized so that
+the total energy flux equals IeE_tot_eV.
+
+Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
+The flux is zero below E_min.
+"""
+function _flat_spectrum(IeE_tot_eV, E, dE, E_min)
+    E_mid = E .+ dE ./ 2
+
+    # Find first index where E >= E_min
+    i_Emin = findlast(E .<= E_min)
+    if isnothing(i_Emin)
+        i_Emin = 1
+    end
+
+    # Calculate normalization: ∑ E_mid[i] * dE[i] for i >= i_Emin
+    energy_integral = sum(E_mid[i_Emin:end] .* dE[i_Emin:end])
+
+    # Differential number flux (constant above E_min)
+    Φ = zeros(length(E))
+    Φ[i_Emin:end] .= IeE_tot_eV / energy_integral
+
+    return Φ  # #e⁻/m²/s/eV
+end
+
+
+"""
+    _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
+
+Compute a Gaussian differential number flux spectrum centered at E₀ with width ΔE,
+normalized so that the total energy flux equals IeE_tot_eV.
+
+The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
+
+Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
+"""
+function _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
+    E_mid = E .+ dE ./ 2
+
+    # Unnormalized Gaussian shape
+    Φ_shape = exp.(-(E_mid .- E₀).^2 ./ ΔE^2)
+
+    # Calculate normalization: we want ∑ Φ[i] * E_mid[i] * dE[i] = IeE_tot_eV
+    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_mid[i] * dE[i])
+    energy_integral = sum(Φ_shape .* E_mid .* dE)
+
+    # Normalized differential number flux
+    Φ = Φ_shape .* (IeE_tot_eV / energy_integral)
+
+    return Φ  # #e⁻/m²/s/eV
+end
+
+
+"""
+    _apply_modulation(t_shifted, modulation, f, amplitude, t_start, t_end)
+
+Apply temporal modulation to the flux based on the shifted time grid.
+
+# Arguments
+- `t_shifted`: time grid shifted for energy/angle-dependent delays
+- `modulation`: `:none`, `:sinus`, or `:square`
+- `f`: frequency for sinus/square modulation (Hz)
+- `amplitude`: modulation depth (0 = constant, 1 = full on/off)
+- `t_start`, `t_end`: smooth onset interval (only used for `:none`)
+
+# Returns
+- Vector of modulation factors (0 to 1) for each time step
+"""
+function _apply_modulation(t_shifted, modulation, f, amplitude, t_start, t_end)
+    if modulation == :none
+        # Smooth onset/offset using smooth_transition
+        return _smooth_transition.(t_shifted, t_start, t_end)
+    elseif modulation == :sinus
+        # Sinusoidal modulation: oscillates between (1-amplitude) and 1
+        # Base pattern: (1 - cos²(πft)) goes from 0 to 1
+        base_modulation = 1.0 .- cos.(π * f .* t_shifted).^2
+        # Scale by amplitude and shift: result goes from (1-amplitude) to 1
+        modulated = (1.0 - amplitude) .+ amplitude .* base_modulation
+        # Apply onset (Heaviside at t=0)
+        return modulated .* (t_shifted .>= 0)
+    elseif modulation == :square
+        # Square wave modulation: oscillates between (1-amplitude) and 1
+        # Base pattern: (1 + square(...))/2 goes from 0 to 1
+        base_modulation = (1.0 .+ square.(2π * f .* t_shifted .- π/2)) ./ 2
+        # Scale by amplitude and shift
+        modulated = (1.0 - amplitude) .+ amplitude .* base_modulation
+        # Apply onset (Heaviside at t=0)
+        return modulated .* (t_shifted .>= 0)
+    else
+        error("Unknown modulation type: $modulation. Must be :none, :sinus, or :square.")
+    end
 end

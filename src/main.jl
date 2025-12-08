@@ -143,9 +143,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     check_n_loop(n_loop, length(h_atm), length(μ_center), length(t), length(E))
 
     ## Load incoming flux
-    if INPUT_OPTIONS.input_type == "from_old_matlab_file"
-        Ie_top = Ie_top_from_old_matlab_file(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
-    elseif INPUT_OPTIONS.input_type == "from_file"
+    if INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(t, E, μ_center, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
         Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
@@ -163,8 +161,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                   modulation=:none,
                                   z_source=INPUT_OPTIONS.z₀,
                                   t_start=INPUT_OPTIONS.t0, t_end=INPUT_OPTIONS.t1)
-    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
-        Ie_top = Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -269,15 +265,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
 
     ## Load incoming flux
-    if INPUT_OPTIONS.input_type == "from_old_matlab_file"
-        Ie_top = Ie_top_from_old_matlab_file(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file);
-    elseif INPUT_OPTIONS.input_type == "from_file"
+    if INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(E, μ_center, INPUT_OPTIONS.input_file)
-    elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
-                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                  h_atm;
-                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
         Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
                                   INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
@@ -287,10 +276,6 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, E, dE, μ_center,
                              μ_scatterings.BeamWeight, INPUT_OPTIONS.Beams;
                              low_energy_tail = INPUT_OPTIONS.low_energy_tail)
-    elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
-        Ie_top = Ie_top_from_ketchup(1:1:1, E, 1, μ_center, INPUT_OPTIONS.input_file);
-    elseif INPUT_OPTIONS.input_type == "bgu_custom"
-        Ie_top = INPUT_OPTIONS.Ie_top
     end
 
     ## Calculate the phase functions and put them in a Tuple
