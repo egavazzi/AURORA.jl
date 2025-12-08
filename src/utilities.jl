@@ -311,7 +311,7 @@ end
 ## ====================================================================================== ##
 
 """
-    smooth_transition(x, x_start = 0.0, x_end = 1.0)
+    _smooth_transition(x, x_start = 0.0, x_end = 1.0)
 
 Create a smooth transition from 0 to 1 over the interval `[x_start, x_end]` using a
 C∞-smooth (infinitely differentiable) function.
@@ -328,7 +328,7 @@ C∞-smooth (infinitely differentiable) function.
 # Returns
 - A value between 0 and 1 representing the smooth transition
 """
-function smooth_transition(x, x_start = 0.0, x_end = 1.0)
+function _smooth_transition(x, x_start = 0.0, x_end = 1.0)
     # If the interval has zero width, return step function
     if iszero(x_end - x_start)
         return x < x_start ? 0.0 : 1.0

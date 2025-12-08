@@ -23,7 +23,7 @@ include("crank_nicolson_optimized.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
-export Ie_top_from_file, Ie_top_flickering, Ie_top_constant, Ie_with_LET
+export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 export loss_to_thermal_electrons, beams2beams, update_A!, update_B!, update_D!
 export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,

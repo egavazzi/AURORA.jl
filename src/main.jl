@@ -148,15 +148,21 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     elseif INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(t, E, μ_center, n_loop, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_flickering(t, E, dE, n_loop, μ_center, h_atm,
-                                    μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
-                                    INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f,
-                                    INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
+                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
+                                  t, n_loop, h_atm;
+                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
+                                  modulation=Symbol(INPUT_OPTIONS.modulation),
+                                  f=INPUT_OPTIONS.f, amplitude=1.0,
+                                  z_source=INPUT_OPTIONS.z₀)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_constant(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E_min, E, dE,
-                                μ_center, INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                t, n_loop, h_atm, INPUT_OPTIONS.z₀, INPUT_OPTIONS.t0,
-                                INPUT_OPTIONS.t1)
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
+                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
+                                  t, n_loop, h_atm;
+                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
+                                  modulation=:none,
+                                  z_source=INPUT_OPTIONS.z₀,
+                                  t_start=INPUT_OPTIONS.t0, t_end=INPUT_OPTIONS.t1)
     elseif INPUT_OPTIONS.input_type == "from_ketchup_file"
         Ie_top = Ie_top_from_ketchup(t, E, n_loop, μ_center, INPUT_OPTIONS.input_file);
     end
@@ -268,15 +274,21 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     elseif INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(1:1:1, E, μ_center, 1, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_flickering(1:1:1, E, dE, 1, μ_center, h_atm,
-                                    μ_scatterings.BeamWeight, INPUT_OPTIONS.IeE_tot,
-                                    INPUT_OPTIONS.z₀, INPUT_OPTIONS.E_min, INPUT_OPTIONS.f,
-                                    INPUT_OPTIONS.Beams, INPUT_OPTIONS.modulation)
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
+                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
+                                  1:1:1, 1, h_atm;
+                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
+                                  modulation=Symbol(INPUT_OPTIONS.modulation),
+                                  f=INPUT_OPTIONS.f, amplitude=1.0,
+                                  z_source=INPUT_OPTIONS.z₀)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_constant(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E_min, E, dE,
-                                μ_center, INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                1:1:1, 1, h_atm, INPUT_OPTIONS.z₀, INPUT_OPTIONS.t0,
-                                INPUT_OPTIONS.t1)
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
+                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
+                                  1:1:1, 1, h_atm;
+                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
+                                  modulation=:none,
+                                  z_source=INPUT_OPTIONS.z₀,
+                                  t_start=INPUT_OPTIONS.t0, t_end=INPUT_OPTIONS.t1)
     elseif INPUT_OPTIONS.input_type == "LET"
         Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, E, dE, μ_center,
                              μ_scatterings.BeamWeight, INPUT_OPTIONS.Beams;

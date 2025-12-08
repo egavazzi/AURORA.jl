@@ -28,7 +28,7 @@
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
-@testitem "Constant onset" begin
+@testitem "Ie_top_modulated - flat spectrum" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
@@ -46,37 +46,141 @@ end
     E_min = E_max - 100
     Beams = [1, 2]
     # SS
-    Ie_top = Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_min)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different Beams
-    Ie_top = Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, [1, 3, 4], μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, [1, 3, 4], μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_min)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_constant(IeE_tot, E_max - 1000, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_max - 1000)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_constant(IeE_tot, E_max - 10, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_max - 10)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_constant(IeE_tot, E_max, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_max)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD
-    Ie_top = Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_min)
     IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, high source altitude
-    Ie_top = Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, 1000)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_min, z_source=1000.0)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, delayed smooth onset
-    Ie_top = Ie_top_constant(IeE_tot, E_min, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm, altitude_lims[2], 0.4, 0.8)
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm;
+                              spectrum=:flat, E_min=E_min, z_source=altitude_lims[2],
+                              t_start=0.4, t_end=0.8)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+end
+
+
+@testitem "Ie_top_modulated - gaussian spectrum" begin
+    ## Setting parameters
+    altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
+    E_max = 10000;                  # (eV) upper limit to the energy grid
+    msis_file = find_msis_file();
+    iri_file = find_iri_file();
+    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    IeE_tot = 1e-2  # W/m²
+    E₀ = 5000.0     # center energy (eV)
+    ΔE = 500.0      # energy width (eV)
+    Beams = [1, 2]
+
+    # SS - check energy flux is conserved
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+
+    # SS, different Beams
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, [1, 3, 4], μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+
+    # SS, different E₀ and ΔE
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 1:1:1, 1, h_atm;
+                              spectrum=:gaussian, E₀=3000.0, ΔE=1000.0)
+    IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+
+    # TD
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.01:1, 1, h_atm;
+                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
+    @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
+end
+
+
+@testitem "Ie_top_modulated - modulation types" begin
+    ## Setting parameters
+    altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
+    θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
+    E_max = 5000;                   # (eV) upper limit to the energy grid
+    msis_file = find_msis_file();
+    iri_file = find_iri_file();
+    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
+    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+
+    # Physical constants
+    qₑ = 1.602176620898e-19  # Elementary charge (C)
+
+    IeE_tot = 1e-2  # W/m²
+    E_min = 4000.0
+    Beams = [1, 2]
+    f = 10.0  # Hz
+
+    # Sinus modulation
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.001:0.5, 1, h_atm;
+                              spectrum=:flat, E_min=E_min, modulation=:sinus, f=f, amplitude=0.8)
+    # At t where modulation is at peak (sin²(πft) = 1), flux should be IeE_tot
+    # This happens when πft = π/2, i.e., t = 0.05s for f=10Hz
+    t_peak_idx = round(Int, 0.05 / 0.001) + 1  # index for t=0.05s
+    IeE_at_peak = sum(Ie_top[:, t_peak_idx, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
+    @test isapprox(IeE_at_peak, IeE_tot, rtol = 0.001)
+    # At t where modulation is at minimum (sin²(πft) = 0), flux should be (1 - amplitude)*IeE_tot
+    # This happens when πft = 0, i.e. t = 0.1s for f=10Hz
+    t_min_idx = round(Int, 0.1 / 0.001) + 1  # index for t=0.1s
+    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
+    @test isapprox(IeE_at_min, 0.2 * IeE_tot, rtol = 0.001)
+
+    # Square modulation
+    Ie_top = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.001:0.5, 1, h_atm;
+                              spectrum=:flat, E_min=E_min, modulation=:square, f=f, amplitude=0.2)
+    IeE_in_time = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :)) * qₑ, dims = (1, 3))
+    # The maximum value should be equal to IeE_tot
+    @test isapprox(maximum(IeE_in_time), IeE_tot, rtol=0.001)
+    # The minimum value should be equal to 0.8 * IeE_tot
+    @test isapprox(minimum(IeE_in_time), 0.8 * IeE_tot, rtol=0.001)
+
+    # Partial amplitude modulation (amplitude=0.5)
+    Ie_top_partial = Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, μ_scatterings.BeamWeight, 0:0.001:0.5, 1, h_atm;
+                                      spectrum=:flat, E_min=E_min, modulation=:sinus, f=f, amplitude=0.5)
+    # At minimum of sinus (where sin²(πft)=0), flux should be 0.5*IeE_tot
+    t_min_idx = 1 # at t=0, sin²(0)=0 (modulation minimum)
+    IeE_at_min = sum(Ie_top_partial[:, t_min_idx, :] .* reshape(E .+ dE / 2, (1, :))) * qₑ
+    @test isapprox(IeE_at_min, 0.5 * IeE_tot, rtol=0.001)
 end
 
 
