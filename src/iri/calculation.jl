@@ -51,7 +51,7 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     end
     # iri2016 = pyimport("iri2016.profile")
     # run the model
-    iri_data = iri2016.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
+    # iri_data = iri2016.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
     # convert the Python Dataset to a DataArray
     iri_data = iri_data.to_dataarray()
     # convert from Python array to Julia array
