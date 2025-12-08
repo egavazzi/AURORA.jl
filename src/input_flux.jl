@@ -296,10 +296,15 @@ The function creates an electron precipitation spectrum with:
 Flat spectrum with smooth onset:
 ```jldoctest
 julia> E, dE = make_energy_grid(10e3);
+
 julia> θ_lims = 180:-10:0;
+
 julia> μ_center = mu_avg(θ_lims);
+
 julia> BeamWeight = beam_weight(θ_lims);
+
 julia> h_atm = make_altitude_grid(100, 600);
+
 julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, 0:0.01:1, 1, h_atm;
                              spectrum=:flat, E_min=9000.0, t_start=0.0, t_end=0.1);
 ```
@@ -307,10 +312,15 @@ julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, 0:0.01:1, 
 Gaussian spectrum with sinusoidal modulation at 10 Hz:
 ```jldoctest
 julia> E, dE = make_energy_grid(10e3);
+
 julia> θ_lims = 180:-10:0;
+
 julia> μ_center = mu_avg(θ_lims);
+
 julia> BeamWeight = beam_weight(θ_lims);
+
 julia> h_atm = make_altitude_grid(100, 600);
+
 julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, 0:0.001:0.5, 1, h_atm;
                              spectrum=:gaussian, E₀=5000.0, ΔE=500.0,
                              modulation=:sinus, f=10.0, amplitude=1.0);
