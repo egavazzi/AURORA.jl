@@ -3,12 +3,13 @@ altitude_lims = [100, 400]
 E_max = 500 
 B_angle_to_zenith = 13 
 
-t_sampling = 1:1:1 
+t_total = 0 
+dt = 0 
 t = 1:1:1 
 n_loop = 1 
 
 CFL_number = 0
 input_options = (input_type = "constant_onset", IeE_tot = 0.01, z₀ = 400, E_min = 400, Beams = 1:2, t0 = 0, t1 = 0) 
 
-commit_hash = 4425a6c73077b1e61222acf739c6e4ed2a682b57 
-version_AURORA = 0.5.0
+commit_hash = bd185c4022446ea9d59f17344fbc787680733c59 
+version_AURORA = 0.6.0

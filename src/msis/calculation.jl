@@ -1,5 +1,5 @@
 using PythonCall: pyimport, pyconvert, Py
-using HTTP: HTTP
+using Downloads: Downloads
 using DelimitedFiles: writedlm
 
 """
@@ -65,9 +65,10 @@ function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minu
     os = pyimport("os")
     path_to_pymsis = os.path.dirname(msis.__file__)
     path_to_pymsis = pyconvert(String, path_to_pymsis)
-    if isfile(joinpath(path_to_pymsis, "SW-All.csv")) == false
+    SW_file = joinpath(path_to_pymsis, "SW-All.csv")
+    if isfile(SW_file) == false
         print(" downloading ap and F10.7 data from (https://celestrak.org/SpaceData/SW-All.csv)...")
-        HTTP.download("https://celestrak.org/SpaceData/SW-All.csv", path_to_pymsis)
+        Downloads.download("https://celestrak.org/SpaceData/SW-All.csv", SW_file)
     end
 
     # run the model
