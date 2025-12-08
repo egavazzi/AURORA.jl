@@ -61,7 +61,8 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     ## load the file
     file = matopen(filename)
         Ie_top_raw = read(file, "Ie_total")
-        t_top = read(file, "t_top")
+        # if t_top not present, assume steady-state
+        t_top = haskey(file, "t_top") ? read(file, "t_top") : [0.0]
     close(file)
 
     ## check that Ie_top is matching our simulation grid
@@ -124,6 +125,30 @@ function Ie_top_from_file(t, E, μ_center, n_loop, filename)
     Ie_top[μ_center .> 0, :, :] .= 0
 
     return Ie_top
+end
+
+
+"""
+    Ie_top_from_file(E, μ_center, filename)
+
+Steady-state version of `Ie_top_from_file` that loads electron flux from a file
+without time-dependent behavior.
+
+# Arguments
+- `E`: energy grid (eV). Vector [nE]
+- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `filename`: path to the .mat file containing the flux data
+
+# Returns
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, n_E]
+
+# Notes
+The file must contain the `Ie_total` variable. The `t_top` variable is optional. When
+multiple time steps are present, only the first one is used.
+"""
+function Ie_top_from_file(E, μ_center, filename)
+    # Call time-dependent version with dummy time grid
+    return Ie_top_from_file(1:1:1, E, μ_center, 1, filename)
 end
 
 
@@ -426,6 +451,62 @@ function Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, t, n_loo
 
     return Ie_top
 end
+
+
+"""
+    Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, h_atm;
+                     spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
+
+Steady-state version of `Ie_top_modulated` that does not include time-dependent behavior.
+
+This overload is designed for steady-state simulations and eliminates the need to specify
+time-related parameters (`t`, `n_loop`, `modulation`, `f`, `amplitude`, `z_source`, etc.).
+It internally calls the time-dependent version with minimal time grid (`1:1:1`) and `n_loop=1`.
+
+# Arguments
+- `IeE_tot`: total energy flux (W/m²)
+- `E`: energy grid (eV). Vector [nE]
+- `dE`: energy bin widths (eV). Vector [nE]
+- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `Beams`: indices of the electron beams with precipitating flux
+- `BeamWeight`: weights of the different beams. Vector [n_beams]
+- `h_atm`: altitude grid (m). Vector [n_z]
+
+# Keyword Arguments
+- `spectrum=:flat`: energy spectrum type. Either `:flat` or `:gaussian`
+- `E_min=0.0`: minimum energy threshold (eV) - only used for `spectrum=:flat`
+- `E₀=nothing`: characteristic/center energy (eV) - required for `spectrum=:gaussian`
+- `ΔE=nothing`: energy width (eV) - required for `spectrum=:gaussian`
+
+# Returns
+- `Ie_top`: differential electron number flux (#e⁻/m²/s). Matrix [n_beams, 1, n_E]
+
+# Examples
+```jldoctest
+julia> E, dE = make_energy_grid(10e3);
+
+julia> θ_lims = 180:-10:0;
+
+julia> μ_center = mu_avg(θ_lims);
+
+julia> BeamWeight = beam_weight(θ_lims);
+
+julia> h_atm = make_altitude_grid(100, 600);
+
+julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, h_atm;
+                             spectrum=:flat, E_min=9000.0);
+```
+"""
+function Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, h_atm;
+                          spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
+    # Call time-dependent version with dummy time grid and default time-related parameters
+    return Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight,
+                           1:1:1, 1, h_atm;
+                           spectrum=spectrum, E_min=E_min, E₀=E₀, ΔE=ΔE,
+                           modulation=:none, f=0.0, amplitude=1.0,
+                           z_source=h_atm[end]/1e3, t_start=0.0, t_end=0.0)
+end
+
 
 """
     Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
