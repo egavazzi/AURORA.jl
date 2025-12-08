@@ -45,7 +45,7 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
     # Suppress verbose output from iri2016 build
-    iri_data = redirect_stdio(stdout=devnull, stderr=devnull) do
+    iri_data = redirect_stdio(stdout=devnull) do
         # import iri2016 model from the Python package 'iri2016'
         iri2016 = pyimport("iri2016.profile")
         # run the model and return result
