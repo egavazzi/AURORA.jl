@@ -1,0 +1,11 @@
+exclude = [
+  "@ref",
+  "@cite",
+  "^https://github.com/.*/releases/tag/v.*$",
+  "^https://egavazzi.github.io/AURORA.jl/stable$",
+  "https://doi.org/10.1029/2019JA027608",
+]
+
+exclude_path = [
+  "docs/build"
+]
