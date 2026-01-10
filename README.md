@@ -27,7 +27,7 @@ Descriptions of how the code works are available in Gustavsson (2022), in sectio
 
 
 ## Citation
-If you use AURORA.jl in your work, please cite using the reference given in [CITATION.cff](https://github.com/egavazzi/AURORA.jl/blob/main/CITATION.cff). Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all its versions. Version-specific DOIs can be found on Zenodo.
+If you use AURORA.jl in your work, please cite using the reference given in the *Cite this repository* button in the **About** section of this page. Note that the DOI ![10.5281/zenodo.11238620](https://doi.org/10.5281/zenodo.11238620) refers to the general project and all its versions. Version-specific DOIs can be found on Zenodo.
 
 
 
