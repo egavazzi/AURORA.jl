@@ -1,0 +1,40 @@
+# Changes here will be overwritten by Copier
+AddAllcontributors: false
+AddCitationCFF: true
+AddCodeOfConduct: false
+AddContributionDocs: false
+AddCopierCI: true
+AddDocs: true
+AddDocsCI: true
+AddFormatterAndLinterConfigFiles: true
+AddGitHubPRTemplate: false
+AddGitHubTemplates: false
+AddLintCI: true
+AddLychee: true
+AddMacToCI: true
+AddPrecommit: false
+AddTagBotCI: true
+AddTestCI: true
+AddWinToCI: true
+Authors: Etienne <etienne.gavazzi@uit.no>
+CheckExplicitImports: true
+ConfigIndentation: 2
+ExplicitImportsChecklist: exclude_all_qualified_accesses_are_public
+GitHubActionVersionAutoUpdate: dependabot
+JuliaCompatAutoUpdate: dependabot
+JuliaIndentation: 4
+JuliaMinCIVersion: lts
+JuliaMinVersion: '1.10'
+License: GPL-3.0
+LicenseCopyrightHolders: Etienne Gavazzi
+MarkdownIndentation: 2
+PackageName: AURORA
+PackageOwner: egavazzi
+PackageUUID: 4b0706e8-6e74-4116-ab4c-be5c58cc7d1d
+RunJuliaNightlyOnCI: false
+StrategyConfirmIncluded: true
+StrategyLevel: 1
+StrategyReviewExcluded: false
+TestingStrategy: testitem_basic
+UseCirrusCI: false
+_src_path: /home/etienne/.julia/packages/BestieTemplate/jBHga
