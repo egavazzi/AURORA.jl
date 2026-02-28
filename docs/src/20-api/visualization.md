@@ -29,6 +29,6 @@ using GLMakie
 
 ## Functions
 
-```@docs
+```@docs; canonical=false
 animate_Ie_in_time
 ```

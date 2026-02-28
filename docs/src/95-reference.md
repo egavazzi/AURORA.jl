@@ -12,6 +12,6 @@ Pages = ["95-reference.md"]
 Pages = ["95-reference.md"]
 ```
 
-```@autodocs; canonical=false
+```@autodocs
 Modules = [AURORA]
 ```
