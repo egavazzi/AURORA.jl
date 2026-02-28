@@ -6,7 +6,7 @@ DocMeta.setdocmeta!(AURORA, :DocTestSetup, :(using AURORA); recursive = true)
 # Add titles of sections and overrides page titles
 const titles = Dict(
     "10-manual" => "Manual",
-    "91-developer.md" => "Developer docs",
+    "20-api" => "API Reference",
 )
 
 function recursively_list_pages(folder; path_prefix="")
