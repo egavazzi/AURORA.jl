@@ -1,3 +1,131 @@
+@testitem "Ie_top_from_file" begin
+    using MAT: matwrite
+
+    # Dummy grids and parameters
+    n_μ = 2
+    n_E = 4
+    n_t_file = 5
+    μ_center = [-0.8, 0.8] # beam 1 is down-going, beam 2 is up-going
+    E = [100, 200, 300, 400]
+
+    # Helper: write a .mat file and return its path
+    function write_mat(filename, Ie; t_top=nothing)
+        data = Dict{String,Any}("Ie_total" => Ie)
+        if !isnothing(t_top)
+            data["t_top"] = t_top
+        end
+        matwrite(filename, data)
+        return filename
+    end
+
+    # Reference flux
+    ref_flux = ones(n_μ, n_t_file, n_E)
+
+    mktempdir() do tmpdir
+        ## ── Test 1: constant flux (no t_top in file) ────────────────────────────────
+        path = write_mat(joinpath(tmpdir, "test_constant.mat"),
+                        ones(n_μ, 1, n_E))
+        t_sim = 0.0:0.01:0.1
+        Ie = Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, :, :] .== 1.0)      # down-going beam kept
+        @test all(Ie[2, :, :] .== 0.0)      # up-going beam zeroed
+
+        ## ── Test 2: matching time grids (same dt, same length) ──────────────────────
+        t_file = collect(0.0:0.01:0.04)
+        path = write_mat(joinpath(tmpdir, "test_match.mat"), ref_flux; t_top=t_file)
+        Ie = Ie_top_from_file(t_file, E, μ_center, path) # use same time grid
+        @test size(Ie) == (n_μ, length(t_file), n_E)
+        @test all(Ie[1, :, :] .== 1.0)
+        @test all(Ie[2, :, :] .== 0.0)
+
+        ## ── Test 3: file dt coarser than simulation dt ───────────────────────────────
+        # file: 5 steps with dt=0.02 s  →  simulation: 9 steps with dt=0.01 s
+        # (non-integer ratio tested in Test 5)
+        t_file = collect(0.0:0.02:0.08)
+        path = write_mat(joinpath(tmpdir, "test_coarse.mat"), ref_flux; t_top=t_file)
+        t_sim = 0.0:0.01:0.08
+        Ie = Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, :, :] .== 1.0)
+        @test all(Ie[2, :, :] .== 0.0)
+
+        ## ── Test 4: file dt finer than simulation dt ────────────────────────────────
+        # file: 5 steps with dt=0.005 s  →  simulation: 3 steps with dt=0.01 s
+        n_t_fine = 5
+        t_file = collect(0.0:0.005:0.02)
+        flux_fine = ones(n_μ, n_t_fine, n_E)
+        flux_fine[2, :, :] .= 0.0
+        path = write_mat(joinpath(tmpdir, "test_fine.mat"), flux_fine; t_top=t_file)
+        t_sim = 0.0:0.01:0.02
+        # A warning should be issued because file dt < sim dt
+        Ie = @test_warn r"finer" Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, :, :] .== 1.0)
+        @test all(Ie[2, :, :] .== 0.0)
+
+        ## ── Test 5: non-integer dt ratio ─────────────────────────────────────────────
+        # file dt = 0.03 s, simulation dt = 0.01 s  → ratio = 3
+        # file dt = 0.03 s, simulation dt = 0.02 s  → ratio = 1.5 (non-integer)
+        n_t_nonint = 4
+        t_file = collect(0.0:0.03:0.09)
+        flux_nonint = ones(n_μ, n_t_nonint, n_E)
+        flux_nonint[2, :, :] .= 0.0
+        path = write_mat(joinpath(tmpdir, "test_nonint.mat"), flux_nonint; t_top=t_file)
+        t_sim = 0.0:0.02:0.08
+        Ie = Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, :, :] .== 1.0)
+
+        ## ── Test 6: file shorter than simulation → zero padding + warning ────────────
+        t_file = collect(0.0:0.01:0.02)     # 3 steps, ends at 0.02 s
+        n_t_short = 3
+        flux_short = ones(n_μ, n_t_short, n_E)
+        flux_short[2, :, :] .= 0.0
+        path = write_mat(joinpath(tmpdir, "test_short.mat"), flux_short; t_top=t_file)
+        t_sim = 0.0:0.01:0.09               # 10 steps, ends at 0.09 s  (longer than file)
+        Ie = @test_warn r"shorter" Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, 1:3, :] .== 1.0) # first 3 steps should have flux = 1
+        @test all(Ie[1, 4:end, :] .== 0.0) # but the rest should have flux = 0
+
+        ## ── Test 7: file longer than simulation → truncated ─────────────────────────
+        t_file = collect(0.0:0.01:0.04)     # 5 steps
+        path = write_mat(joinpath(tmpdir, "test_long.mat"), ref_flux; t_top=t_file)
+        t_sim = 0.0:0.01:0.02               # only 3 steps
+        Ie = Ie_top_from_file(t_sim, E, μ_center, path)
+        @test size(Ie) == (n_μ, length(t_sim), n_E)
+        @test all(Ie[1, :, :] .== 1.0)
+
+        ## ── Test 8: interpolation keywords ──────────────────────────────────────────
+        # Ramp flux from 0 to 1 over 5 file steps; check that linear interp gives
+        # intermediate values on a finer simulation grid
+        t_file = collect(0.0:0.1:0.4)       # 5 steps
+        flux_ramp = zeros(n_μ, 5, n_E)
+        for k in 1:5
+            flux_ramp[1, k, :] .= (k - 1) / 4.0   # 0, 0.25, 0.5, 0.75, 1.0
+        end
+        path = write_mat(joinpath(tmpdir, "test_linear.mat"), flux_ramp; t_top=t_file)
+        t_sim = 0.0:0.05:0.4                # finer grid, 9 steps
+        Ie_const  = Ie_top_from_file(t_sim, E, μ_center, path; interpolation=:constant)
+        Ie_linear = Ie_top_from_file(t_sim, E, μ_center, path; interpolation=:linear)
+        # At t=0.05 (between 0.0 and 0.1 in file):
+        #   constant holds 0.0  →  Ie_const[1, 2, 1] ≈ 0.0
+        #   linear gives 0.125  →  Ie_linear[1, 2, 1] ≈ 0.125
+        @test Ie_const[1, 2, 1] ≈ 0.0
+        @test Ie_linear[1, 2, 1] ≈ 0.125
+
+        ## ── Test 9: energy dim in file larger than simulation E grid → trimmed ──────
+        n_E_big = n_E + 3
+        flux_big = ones(n_μ, n_t_file, n_E_big)
+        path = write_mat(joinpath(tmpdir, "test_bigE.mat"), flux_big; t_top=collect(0.0:0.01:0.04))
+        Ie = Ie_top_from_file(0.0:0.01:0.04, E, μ_center, path)
+        @test size(Ie, 3) == n_E
+        @test all(Ie[1, :, :] .== 1.0)
+        @test all(Ie[2, :, :] .== 0.0)
+    end # of mktempdir
+end
+
 @testitem "Maxwellian with LET" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
@@ -285,6 +413,9 @@ end
                           msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop)
     @test true
 end
+
+
+
 
 
 

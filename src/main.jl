@@ -144,7 +144,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(t, E, μ_center, n_loop, INPUT_OPTIONS.input_file)
+        Ie_top = Ie_top_from_file(t, E, μ_center, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
         Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
                                   INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
@@ -266,7 +266,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(E, μ_center, INPUT_OPTIONS.input_file)
+        Ie_top = Ie_top_from_file(1:1:1, E, μ_center, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
         Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
                                   INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
