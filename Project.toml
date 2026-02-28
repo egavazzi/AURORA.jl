@@ -1,7 +1,7 @@
 name = "AURORA"
 uuid = "4b0706e8-6e74-4116-ab4c-be5c58cc7d1d"
-authors = ["Etienne <etienne.gavazzi@uit.no>"]
 version = "0.6.0"
+authors = ["Etienne <etienne.gavazzi@uit.no>"]
 
 [deps]
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
@@ -11,7 +11,6 @@ DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 HCubature = "19dc6840-f33b-545b-b366-655c7e3ffd49"
-HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
@@ -47,7 +46,6 @@ CondaPkg = "0.2"
 DataInterpolations = "8.8"
 DelimitedFiles = "1.9"
 HCubature = "1.8"
-HTTP = "1.10"
 Integrals = "4.8, 5.1"
 Interpolations = "0.16"
 JSON = "1.3"
