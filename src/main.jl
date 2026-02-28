@@ -120,9 +120,36 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
                  Ionization_fragment_2, Ionizing_fragment_2)
 end
 
+"""
+    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
+        msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
+        n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
+
+Run a time-dependent electron transport simulation and save the results to `savedir`.
+
+# Arguments
+- `altitude_lims`: altitude range of the simulation (km). Tuple or Vector
+- `θ_lims`: pitch-angle beam limits (degrees). Range or Vector `[n_beams + 1]`
+- `E_max`: maximum energy of the simulation (eV)
+- `B_angle_to_zenith`: angle between the magnetic field and the zenith (degrees)
+- `t_total`: total simulation time (s)
+- `dt`: output time step (s)
+- `msis_file`: path to the MSIS neutral atmosphere file
+- `iri_file`: path to the IRI ionosphere file
+- `savedir`: path to the directory where results will be saved
+- `INPUT_OPTIONS`: NamedTuple describing the incoming electron flux source
+- `CFL_number`: CFL multiplier used to sub-sample the time grid (default: `64`)
+
+# Keyword Arguments
+- `n_loop`: number of loops to split the time grid into. Computed automatically from
+  `max_memory_gb` if not provided
+- `max_memory_gb`: memory budget used to compute `n_loop` automatically
+- `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
+  `Ie_incoming.mat` in `savedir` before the simulation starts
+"""
 function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
     msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
-    n_loop = nothing, max_memory_gb = 8)
+    n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
 
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
@@ -161,6 +188,11 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
                                   modulation=:none,
                                   z_source=INPUT_OPTIONS.z₀,
                                   t_start=INPUT_OPTIONS.t0, t_end=INPUT_OPTIONS.t1)
+    end
+
+    ## Optionally save the input flux to the output folder
+    if save_input_flux
+        save_Ie_top(Ie_top, E, collect(μ_lims), t, savedir)
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -255,8 +287,28 @@ end
 
 
 
+"""
+    calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
+        msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
+
+Run a steady-state electron transport simulation and save the results to `savedir`.
+
+# Arguments
+- `altitude_lims`: altitude range of the simulation (km). Tuple or Vector
+- `θ_lims`: pitch-angle beam limits (degrees). Range or Vector `[n_beams + 1]`
+- `E_max`: maximum energy of the simulation (eV)
+- `B_angle_to_zenith`: angle between the magnetic field and the zenith (degrees)
+- `msis_file`: path to the MSIS neutral atmosphere file
+- `iri_file`: path to the IRI ionosphere file
+- `savedir`: path to the directory where results will be saved
+- `INPUT_OPTIONS`: NamedTuple describing the incoming electron flux source
+
+# Keyword Arguments
+- `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
+  `Ie_incoming.mat` in `savedir` before the simulation starts
+"""
 function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, savedir, INPUT_OPTIONS)
+    msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
     ## Get atmosphere
     h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
     μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
@@ -276,6 +328,11 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, E, dE, μ_center,
                              μ_scatterings.BeamWeight, INPUT_OPTIONS.Beams;
                              low_energy_tail = INPUT_OPTIONS.low_energy_tail)
+    end
+
+    ## Optionally save the input flux to the output folder
+    if save_input_flux
+        save_Ie_top(Ie_top, E, collect(μ_lims), 1:1:1, savedir)
     end
 
     ## Calculate the phase functions and put them in a Tuple

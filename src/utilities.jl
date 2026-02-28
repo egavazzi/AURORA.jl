@@ -147,6 +147,18 @@ end
 
 
 using MAT: matopen
+function save_Ie_top(Ie_top, E, μ_lims, t, savedir)
+    savefile = joinpath(savedir, "Ie_incoming.mat")
+    file = matopen(savefile, "w")
+        write(file, "Ie_total", Ie_top)
+        write(file, "E", E)
+        write(file, "mu_lims", μ_lims)
+        write(file, "t_top", collect(Float64, t))
+    close(file)
+end
+
+
+using MAT: matopen
 using Printf: @sprintf
 function save_results(Ie_save, E, t, μ_lims, h_atm, I0, μ_scatterings, i, CFL_factor, savedir)
     # Extract the time array for the current loop
