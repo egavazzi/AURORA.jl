@@ -29,6 +29,4 @@ using GLMakie
 
 ## Functions
 
-```@docs
-animate_Ie_in_time
-```
+See [`animate_Ie_in_time`](@ref) for animating results over time.

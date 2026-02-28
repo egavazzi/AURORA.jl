@@ -1,4 +1,6 @@
-style = "sciml"
+indent = 4
 margin = 92
+normalize_line_endings = "unix"
+style = "sciml"
 remove_extra_newlines = true
 yas_style_nesting = true

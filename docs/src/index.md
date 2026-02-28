@@ -1,6 +1,8 @@
-# This is the AURORA.jl documentation
+```@meta
+CurrentModule = AURORA
+```
 
-Welcome to the documentation.
+# AURORA
 
-!!! note "Work in progress"
-    This project is still in progress. Be aware that the documentation might not be up to date.
+Documentation for [AURORA](https://github.com/egavazzi/AURORA.jl).
+
