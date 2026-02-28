@@ -3,7 +3,14 @@
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
   - Comes with a few nice improvements to the function, see PR description
 - Throw an error when invalid pitch-angle limits are used as input [#90](https://github.com/egavazzi/AURORA.jl/pull/90)
-- Add mechanism for automatic time slicing of simulations [#91](https://github.com/egavazzi/AURORA.jl/pull/91)
+- **Breaking** Add mechanism for automatic time slicing of simulations [#91](https://github.com/egavazzi/AURORA.jl/pull/91)
+  - **Breaking** `calculate_e_transport()` now takes `t_total` and `dt` (in seconds) instead of `t_sampling` and `n_loop`
+  - `n_loop` is now automatically calculated to keep memory usage below a configurable limit (default: 8 GB), but can still be overridden by passing it as a keyword argument
+- **Breaking** Rework the input flux functions [#68](https://github.com/egavazzi/AURORA.jl/pull/68)
+  - **Breaking** Merge `Ie_top_constant()`, `Ie_top_flickering()`, and `Ie_top_Gaussian()` into a single unified `Ie_top_modulated()` function, with keyword arguments to control the energy spectrum (`:flat` or `:gaussian`) and temporal modulation (`:none`, `:sinus`, or `:square`)
+  - **Breaking** `Ie_top_from_file()` has a new, simplified interface: the `n_loop` argument is removed, and the function now supports arbitrary time grids in the file (different `dt`, different length) via interpolation (`:constant` or `:linear`)
+  - **Breaking** `Ie_with_LET()` now takes `IeE_tot` in W/m² (instead of `Q` in eV/m²/s) as its first argument
+  - **Breaking** `make_altitude_grid()` now ensures the last grid point is strictly below the requested top altitude (the grid can be one step smaller than before)
 
 ## v0.6.0 - 2025-11-04
 - Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
