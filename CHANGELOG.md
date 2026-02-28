@@ -11,6 +11,8 @@
   - **Breaking** `Ie_top_from_file()` has a new, simplified interface: the `n_loop` argument is removed, and the function now supports arbitrary time grids in the file (different `dt`, different length) via interpolation (`:constant` or `:linear`)
   - **Breaking** `Ie_with_LET()` now takes `IeE_tot` in W/m² (instead of `Q` in eV/m²/s) as its first argument
   - **Breaking** `make_altitude_grid()` now ensures the last grid point is strictly below the requested top altitude (the grid can be one step smaller than before)
+- Add possibility to save the input flux to the output directory [#103](https://github.com/egavazzi/AURORA.jl/pull/103)
+  - `calculate_e_transport()` and `calculate_e_transport_steady_state()` now accept a `save_input_flux` keyword argument (default: `true`) that saves the top-boundary flux to `Ie_incoming.mat` in the output directory
 
 ## v0.6.0 - 2025-11-04
 - Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
