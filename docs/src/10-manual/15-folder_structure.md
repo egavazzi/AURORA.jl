@@ -1,36 +1,84 @@
 # Folder structure
-!!! warning "This page is not up to date"
 
-The code is structured as follow
+The package is structured as follows:
+
 ```
-AURORA/
+AURORA.jl/
 ├── data/
-│   └── 20220926/...
+│   └── <simulation_name>/...
 │   └── ...
 │
 ├── docs/...
-│ 
-├── e_cascading_data/
-│   └── N2/...
-│   └── O2/...
-│   └── O/...
+│
+├── ext/
+│   ├── AURORA_viz.jl
+│   └── src/
+│       └── animations/
+│
+├── internal_data/
+│   ├── data_electron/
+│   ├── data_neutrals/
+│   ├── e_cascading/
+│   │   ├── N2/
+│   │   ├── O/
+│   │   └── O2/
+│   └── e_scattering/
 │
 ├── scripts/
-│   └── Control_script.jl
-│   └── ...
-│ 
-└── src/
-    └── main.jl
-    └── cascading.jl
-    └── setup.jl
+│   ├── Control_script.jl
+│   ├── Control_script_SteadyState.jl
+│   ├── analysing/
+│   │   ├── Calculate_densities.jl
+│   │   └── Downsampling_fluxes.jl
+│   └── plotting/
+│       ├── Compare_Ie.jl
+│       ├── Compare_emission_rate.jl
+│       ├── Compare_ionization_rate.jl
+│       ├── Control_animations.jl
+│       ├── Plot_densities.jl
+│       ├── Plot_emission_rate.jl
+│       ├── Plot_ionization_rate.jl
+│       ├── Plot_phase_functions.jl
+│       └── Plot_setup.jl
+│
+├── src/
+│   ├── AURORA.jl
+│   ├── main.jl
+│   ├── setup.jl
+│   ├── input.jl
+│   ├── cascading.jl
+│   ├── scattering.jl
+│   ├── phase_functions.jl
+│   ├── energy_degradation.jl
+│   ├── matrix_building.jl
+│   ├── crank_nicolson.jl
+│   ├── steady_state.jl
+│   ├── analysis.jl
+│   ├── utilities.jl
+│   ├── iri/
+│   └── msis/
+│
+└── test/
+    ├── runtests.jl
     └── ...
 ```
-The folder `data/` contains the subfolders where simulation results are saved.
+
+The folder `data/` contains the subfolders where simulation results are saved. Each simulation run creates its own subfolder named after the simulation.
 
 The folder `docs/` contains all the necessary scripts to power this documentation.
 
-The folder `e_cascading_data/` is where the cascading data produced by the simulations are saved for future use by the program itself. The cascading data are saved by species in the subfolders `N2/`, `O2/` and `O/`. You should not need to venture into this folder.
+The folder `ext/` contains the package extensions. Currently it holds `AURORA_viz`, an extension that is loaded when visualization packages (such as Makie) are available, providing plotting and animation capabilities for simulation results.
 
-The folder `scripts/` contains the scripts for the user to start the simulations and plot some of the results.
+The folder `internal_data/` holds data used internally by the package:
+- `data_electron/` and `data_neutrals/` contain cross-section and atmospheric species data.
+- `e_cascading/` is where the electron cascading data produced by the simulations are cached for future use. The data are organized by species in the subfolders `N2/`, `O2/` and `O/`. You should not need to venture into this folder.
+- `e_scattering/` contains precomputed electron scattering matrices.
 
-The folder `src/` contains the source code of the model.
+The folder `scripts/` contains scripts for users to run simulations and analyse or plot results:
+- `Control_script.jl` and `Control_script_SteadyState.jl` are the main entry points for running time-dependent and steady-state simulations respectively.
+- `analysing/` contains scripts for post-processing simulation outputs.
+- `plotting/` contains scripts for visualising simulation results.
+
+The folder `src/` contains the source code of the model. The `iri/` and `msis/` subfolders contain the interfaces to the IRI and MSIS atmospheric models respectively.
+
+The folder `test/` contains the automated tests for the package.

@@ -1,3 +1,19 @@
+#=
+REMINDER: FOR LOCAL BUILD, ADD AURORA AS DEV
+```
+$> julia --project="docs/" -e 'import Pkg; Pkg.develop(path=".")'
+```
+
+Then build locally
+```
+$> julia --project="docs/" docs/make.jl
+```
+
+And THEN serve
+```
+$> julia -e 'using LiveServer; serve(dir="docs/build")'
+```
+=#
 using AURORA
 using Documenter
 
@@ -6,7 +22,7 @@ DocMeta.setdocmeta!(AURORA, :DocTestSetup, :(using AURORA); recursive = true)
 # Add titles of sections and overrides page titles
 const titles = Dict(
     "10-manual" => "Manual",
-    "91-developer.md" => "Developer docs",
+    "20-api" => "API Reference",
 )
 
 function recursively_list_pages(folder; path_prefix="")
@@ -61,7 +77,7 @@ end
 makedocs(;
     modules = [AURORA],
     authors = "Etienne <etienne.gavazzi@uit.no>",
-    repo = "https://github.com/egavazzi/AURORA.jl/blob/{commit}{path}#{line}",
+    repo =  Documenter.Remotes.GitHub("egavazzi", "AURORA.jl"),
     sitename = "AURORA.jl",
     format = Documenter.HTML(; canonical = "https://egavazzi.github.io/AURORA.jl"),
     pages = list_pages(),

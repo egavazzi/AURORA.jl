@@ -493,15 +493,15 @@ Both matrices have the same block structure as in steady-state:
 ```
 
 # Arguments
-- `Ie`: pre-allocated output array [m⁻² s⁻¹] (n_z * n_angle × n_t) to store results
+- `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle × n_t) to store results
 - `t`: time grid [s]
 - `h_atm`: altitude grid [km]
 - `μ`: cosine of pitch angle grid
 - `v`: electron velocity [km/s]
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
-    - `B`: scattering matrix [s⁻¹] (n_z × n_angle × n_angle)
-    - `D`: pitch-angle diffusion coefficient [s⁻¹] (n_angle,)
+    - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
+    - `D`: pitch-angle diffusion coefficient [s⁻¹], size (n_angle,)
     - `Q`: source term [m⁻² s⁻¹] at each time step
     - `Ddiffusion`: spatial diffusion matrix (n_z × n_z)
 - `iE`: current energy index

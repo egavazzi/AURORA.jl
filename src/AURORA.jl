@@ -14,7 +14,7 @@ include("msis/msis.jl")
 export find_msis_file, find_nrlmsis_file
 export find_iri_file
 
-include("input_flux.jl")
+include("input.jl")
 include("phase_functions.jl")
 include("utilities.jl")
 include("matrix_building.jl")
