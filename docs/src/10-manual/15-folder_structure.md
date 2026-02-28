@@ -10,6 +10,11 @@ AURORA.jl/
 │
 ├── docs/...
 │
+├── ext/
+│   ├── AURORA_viz.jl
+│   └── src/
+│       └── animations/
+│
 ├── internal_data/
 │   ├── data_electron/
 │   ├── data_neutrals/
@@ -61,6 +66,8 @@ AURORA.jl/
 The folder `data/` contains the subfolders where simulation results are saved. Each simulation run creates its own subfolder named after the simulation.
 
 The folder `docs/` contains all the necessary scripts to power this documentation.
+
+The folder `ext/` contains the package extensions. Currently it holds `AURORA_viz`, an extension that is loaded when visualization packages (such as Makie) are available, providing plotting and animation capabilities for simulation results.
 
 The folder `internal_data/` holds data used internally by the package:
 - `data_electron/` and `data_neutrals/` contain cross-section and atmospheric species data.
