@@ -372,15 +372,15 @@ Jacobian = ∂f/∂Ie = Mlhs
 ```
 
 # Arguments
-- `Ie`: pre-allocated output array [m⁻² s⁻¹] (n_z * n_angle) to store results
+- `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle) to store results
 - `h_atm`: altitude grid [km]
 - `μ`: cosine of pitch angle grid
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
-    - `B`: scattering matrix [s⁻¹] (n_z × n_angle × n_angle)
-    - `D`: pitch-angle diffusion coefficient [s⁻¹] (n_angle,)
-    - `Q`: source term [m⁻² s⁻¹] at each time step
-    - `Ddiffusion`: spatial diffusion matrix (n_z × n_z)
+    - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
+    - `D`: pitch-angle diffusion coefficient [s⁻¹], size (n_angle,)
+    - `Q`: source term [m⁻² s⁻¹], size (n_z × n_angle × n_energy)
+    - `Ddiffusion`: spatial diffusion matrix, size (n_z × n_z)
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: Cache object storing Mlhs, mapping, KLU, and differentiation matrices
