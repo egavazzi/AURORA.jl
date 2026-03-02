@@ -30,10 +30,12 @@ The `.mat` file must contain:
 
 # Time grid handling
 The file's time grid (`t_top`) does not need to match the simulation time grid.
+It is treated as **relative**: `t_top[1]` is always aligned with `t[1]`, regardless of the
+absolute values stored in the file. Only the **duration** and **spacing** of `t_top` matter.
 Any combination of time step sizes and grid lengths is supported:
 - **Different dt**: the file is resampled onto the simulation grid via interpolation.
 - **File finer than simulation**: the flux is point-sampled, which may miss rapid variations.
-- **File shorter than simulation**: flux is set to zero for times beyond `t_top[end]`.
+- **File shorter than simulation**: flux is set to zero for times beyond the file duration.
 - **File longer than simulation**: the file is simply evaluated up to `t[end]`.
 
 # Notes
@@ -77,10 +79,15 @@ function Ie_top_from_file(t, E, μ_center, filename; interpolation=:constant)
     if length(t_top) == 1
         Ie_top .= Ie_top_file[:, 1:1, 1:n_E] # this repeats the unique time slice from Ie_top_file
     else
-        if t_top[end] < t[end]
-            @warn """The time grid in the file ends at $(t_top[end]) s, which is shorter \
-            than the simulation end time $(t[end]) s. \
-            The precipitating flux will be set to zero for t > $(t_top[end]) s."""
+        # Shift t_top so it starts at t[1], i.e treat file times as relative to simulation start
+        t_top = t_top .- t_top[1] .+ t[1]
+
+        t_duration_file = t_top[end] - t_top[1]
+        t_duration_sim  = t[end]    - t[1]
+        if t_duration_file < t_duration_sim
+            @warn """The time grid in the file covers $(t_duration_file) s, which is shorter \
+            than the simulation duration $(t_duration_sim) s. \
+            The precipitating flux will be set to zero for t > t[1] + $(t_duration_file) s."""
         end
 
         dt_file = t_top[2] - t_top[1]
