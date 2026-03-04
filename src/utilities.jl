@@ -363,6 +363,14 @@ end
 ## ====================================================================================== ##
 
 # Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [n_mu, nz, nt, nE]
+#=
+TODO:
+If I restructure to [nz, n_mu, nt, nE] instead, I can just use a
+    return reshape(Ie_raw, n_z, n_μ, n_t, n_E)
+without the need for extra memory allocation which should be quite faster.
+But I will have to make sure I change all functions calling this one to work with the new
+layout.
+=#
 function restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
     n_μ = length(μ_lims) - 1
     n_z = length(h_atm)
