@@ -365,7 +365,7 @@ end
 ## ====================================================================================== ##
 
 """
-    Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+    Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
 
 Return an electron spectra following a Maxwellian distribution with a low
 energy tail (LET)
@@ -376,11 +376,10 @@ JGR 1989 (pages 13541-13552)
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
 - `E₀`: characteristic energy (eV)
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy bin sizes(eV). Vector [nE]
-- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
-- `BeamWeight`: weights of the different beams. Vector [n_beams]
+- `state`: simulation state NamedTuple from `setup(...)`
 - `Beams`: indices of the electron beams with a precipitating flux
+
+# Keyword Arguments
 - `low_energy_tail=true`: control the presence of a low energy tail
 
 # Returns:
@@ -396,15 +395,9 @@ Changes were made to the factor `b`:
 Calling the function with flux only in the two first beams (0 to 20°) and an "isotropic"
 pitch-angle distribution.
 ```jldoctest
-julia> E, dE = make_energy_grid(100e3);
+julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> θ_lims = 180:-10:0;
-
-julia> μ_center = mu_avg(θ_lims);
-
-julia> BeamWeight = beam_weight(180:-10:0);
-
-julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:2);
+julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, state, 1:2);
 
 ```
 
@@ -412,19 +405,18 @@ Calling the function with flux only in the three first beams (0 to 30°) and a
 custom pitch-angle distribution (1/2 of the total flux in the first beam,
 1/4 in the second beam and 1/4 in the third beam).
 ```jldoctest
-julia> E, dE = make_energy_grid(100e3);
+julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> θ_lims = 180:-10:0;
-
-julia> μ_center = mu_avg(θ_lims);
-
-julia> BeamWeight = [2, 1, 1];
-
-julia> Ie = Ie_with_LET(1e-2, 1e3, E, dE, μ_center, BeamWeight, 1:3);
+julia> Ie = Ie_with_LET(1e-2, 1e3, state, 1:3);
 
 ```
 """
-function Ie_with_LET(IeE_tot, E₀, E, dE, μ_center, BeamWeight, Beams; low_energy_tail=true)
+function Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
+    E = state.energy_grid.E
+    dE = state.energy_grid.dE
+    μ_center = state.pitch_angle_grid.μ_center
+    BeamWeight = state.scattering.BeamWeight
+
     Ie_top = zeros(length(μ_center), 1, length(E))
 
     # Physical constants
