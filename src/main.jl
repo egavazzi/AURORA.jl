@@ -349,8 +349,8 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
         Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, state, INPUT_OPTIONS.Beams;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min)
     elseif INPUT_OPTIONS.input_type == "LET"
-        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, E, dE, μ_center,
-                             scattering.BeamWeight, INPUT_OPTIONS.Beams;
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, state,
+                             INPUT_OPTIONS.Beams;
                              low_energy_tail = INPUT_OPTIONS.low_energy_tail)
     end
 

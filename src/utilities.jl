@@ -312,13 +312,6 @@ function make_savedir(root_savedir, name_savedir; behavior = "default")
     return savedir
 end
 
-## ====================================================================================== ##
-
-
-function square(x)
-    ifelse(mod2pi(x) < π, 1.0, -1.0)
-end
-
 
 ## ====================================================================================== ##
 

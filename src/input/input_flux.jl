@@ -551,3 +551,7 @@ function _apply_modulation(t_shifted, modulation, f, amplitude, t_start, t_end)
         error("Unknown modulation type: $modulation. Must be :none, :sinus, or :square.")
     end
 end
+
+function square(x)
+    ifelse(mod2pi(x) < π, 1.0, -1.0)
+end

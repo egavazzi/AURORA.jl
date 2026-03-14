@@ -1,10 +1,7 @@
 module AURORA
 
 # AURORA functions
-include("../internal_data/data_electron/e_N2_cross_sections.jl")
-include("../internal_data/data_electron/e_O2_cross_sections.jl")
-include("../internal_data/data_electron/e_O_cross_sections.jl")
-include("../internal_data/data_electron/emission_cross_sections.jl")
+
 
 include("setup.jl")
 export setup, make_altitude_grid, make_energy_grid
@@ -13,35 +10,41 @@ include("grids/abstract_grid.jl")
 include("grids/altitude_grid.jl")
 include("grids/energy_grid.jl")
 include("grids/pitch_angle_grid.jl")
-include("atmosphere/ionosphere.jl")
-include("physics/scattering_data.jl")
-include("physics/cross_sections.jl")
-export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid,
-    ScatteringData, Ionosphere, CrossSectionData, n_neutrals
+export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid
 
-include("iri/iri.jl")
-include("msis/msis.jl")
+include("ionosphere/ionosphere.jl")
+export Ionosphere, n_neutrals
+include("ionosphere/iri/iri.jl")
+include("ionosphere/msis/msis.jl")
 export find_msis_file, find_nrlmsis_file
 export find_iri_file
 
-include("input.jl")
-include("phase_functions.jl")
+include("input/input_flux.jl")
+export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
+
 include("utilities.jl")
+export v_of_E, CFL_criteria, mu_avg, beam_weight,
+        make_savedir,
+        rename_if_exists,
+        find_Ietop_file
+
 include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 include("solvers/crank_nicolson.jl")
 include("solvers/crank_nicolson_optimized.jl")
-include("cascading.jl")
-include("energy_degradation.jl")
-include("scattering.jl")
-export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
+
+include("physics/cross_sections/e_N2_cross_sections.jl")
+include("physics/cross_sections/e_O2_cross_sections.jl")
+include("physics/cross_sections/e_O_cross_sections.jl")
+include("physics/cross_sections/emission_cross_sections.jl")
+include("physics/cross_sections/cross_sections.jl")
+export CrossSectionData
+include("physics/cascading.jl")
+include("physics/energy_degradation.jl")
+include("physics/scattering.jl")
+export ScatteringData
+include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
-export loss_to_thermal_electrons, beams2beams, update_A!, update_B!, update_D!
-export v_of_E, CFL_criteria, mu_avg, beam_weight, save_parameters, save_results,
-       rename_if_exists, find_Ietop_file, make_savedir
-export update_Ddiffusion!, Crank_Nicolson
-export cascading_N2, cascading_O2, cascading_O
-export update_Q!
 
 include("main.jl")
 export calculate_e_transport

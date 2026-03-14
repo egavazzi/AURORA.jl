@@ -64,19 +64,19 @@ end
     # if θ_lims is symmetric, the B2B matrices should be symmetric
     if check
         E, _ = AURORA.make_energy_grid(7000)
-        phaseN2e, phaseN2i = phase_fcn_N2(θ₁, E);
-        phaseO2e, phaseO2i = phase_fcn_O2(θ₁, E);
-        phaseOe, phaseOi = phase_fcn_O(θ₁, E);
+        phaseN2e, phaseN2i = AURORA.phase_fcn_N2(θ₁, E);
+        phaseO2e, phaseO2i = AURORA.phase_fcn_O2(θ₁, E);
+        phaseOe, phaseOi = AURORA.phase_fcn_O(θ₁, E);
         phase_fcn = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
 
         B2B_fragment = AURORA.prepare_beams2beams(BeamWeight_relative, Pmu2mup);
 
         iE = 400 # ~3730 eV (just to pick one)
         for i in 1:3
-            phase_fcn_e = convert_phase_fcn_to_3D(phase_fcn[i][1][:, iE], θ₁);
-            phase_fcn_i = convert_phase_fcn_to_3D(phase_fcn[i][2][:, iE], θ₁);
-            B2B_elastic = beams2beams(phase_fcn_e, B2B_fragment);
-            B2B_inelastic = beams2beams(phase_fcn_i, B2B_fragment);
+            phase_fcn_e = AURORA.convert_phase_fcn_to_3D(phase_fcn[i][1][:, iE], θ₁);
+            phase_fcn_i = AURORA.convert_phase_fcn_to_3D(phase_fcn[i][2][:, iE], θ₁);
+            B2B_elastic = AURORA.beams2beams(phase_fcn_e, B2B_fragment);
+            B2B_inelastic = AURORA.beams2beams(phase_fcn_i, B2B_fragment);
 
             @test all(sum(B2B_elastic, dims = 1) .≈ 1)
             @test all(sum(B2B_inelastic, dims = 1) .≈ 1)

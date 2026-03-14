@@ -145,18 +145,14 @@ end
 
     # Check that IeE_top is respected for a Maxwellian without LET (with a tolerance of 0.1%)
     IeE_tot = 1e-2  # W/m²
-    Ie_top = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1,
-                         low_energy_tail = false)
+    Ie_top = Ie_with_LET(IeE_tot, 100, sim, 1; low_energy_tail = false)
     IeE_top_check = sum(Ie_top .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # Check that varying the beams does not change IeE_top
-    Ie_top_LET_1 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1,
-                               low_energy_tail = true)
-    Ie_top_LET_2 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, 1:2,
-                               low_energy_tail = true)
-    Ie_top_LET_3 = Ie_with_LET(IeE_tot, 100, E, dE, μ_center, μ_scatterings.BeamWeight, [2, 5],
-                               low_energy_tail = true)
+    Ie_top_LET_1 = Ie_with_LET(IeE_tot, 100, sim, 1; low_energy_tail = true)
+    Ie_top_LET_2 = Ie_with_LET(IeE_tot, 100, sim, 1:2; low_energy_tail = true)
+    Ie_top_LET_3 = Ie_with_LET(IeE_tot, 100, sim, [2, 5]; low_energy_tail = true)
     IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
     IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E .+ dE / 2, (1, 1, :))) * qₑ
