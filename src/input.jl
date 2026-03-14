@@ -136,10 +136,10 @@ end
 ## ====================================================================================== ##
 
 """
-    Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, t, n_loop, h_atm;
+    Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
                      spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing,
                      modulation=:none, f=0.0, amplitude=1.0,
-                     z_source=h_atm[end]/1e3, t_start=0.0, t_end=0.0)
+                     z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
 
 Create a time-dependent electron flux distribution with configurable energy spectrum shape
 and temporal modulation.
@@ -149,14 +149,10 @@ Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated
 
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy bin widths (eV). Vector [nE]
-- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `state`: simulation state NamedTuple from `setup(...)`
 - `Beams`: indices of the electron beams with precipitating flux
-- `BeamWeight`: weights of the different beams. Vector [n_beams]
 - `t`: time grid (s). Range or Vector [n_t]
 - `n_loop`: number of loops (for repeated simulations)
-- `h_atm`: altitude grid (m). Vector [n_z]
 
 # Keyword Arguments
 ## Energy spectrum shape
@@ -197,41 +193,31 @@ The function creates an electron precipitation spectrum with:
 # Examples
 Flat spectrum with smooth onset:
 ```jldoctest
-julia> E, dE = make_energy_grid(10e3);
+julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> θ_lims = 180:-10:0;
-
-julia> μ_center = mu_avg(θ_lims);
-
-julia> BeamWeight = beam_weight(θ_lims);
-
-julia> h_atm = make_altitude_grid(100, 600);
-
-julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, 0:0.01:1, 1, h_atm;
+julia> Ie = Ie_top_modulated(1e-2, state, 1:2, 0:0.01:1, 1;
                              spectrum=:flat, E_min=9000.0, t_start=0.0, t_end=0.1);
 ```
 
 Gaussian spectrum with sinusoidal modulation at 10 Hz:
 ```jldoctest
-julia> E, dE = make_energy_grid(10e3);
+julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> θ_lims = 180:-10:0;
-
-julia> μ_center = mu_avg(θ_lims);
-
-julia> BeamWeight = beam_weight(θ_lims);
-
-julia> h_atm = make_altitude_grid(100, 600);
-
-julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, 0:0.001:0.5, 1, h_atm;
+julia> Ie = Ie_top_modulated(1e-2, state, 1:2, 0:0.001:0.5, 1;
                              spectrum=:gaussian, E₀=5000.0, ΔE=500.0,
                              modulation=:sinus, f=10.0, amplitude=1.0);
 ```
 """
-function Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, t, n_loop, h_atm;
+function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
                           spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing,
                           modulation=:none, f=0.0, amplitude=1.0,
-                          z_source=h_atm[end]/1e3, t_start=0.0, t_end=0.0)
+                          z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
+
+    E = state.energy_grid.E
+    dE = state.energy_grid.dE
+    μ_center = state.pitch_angle_grid.μ_center
+    BeamWeight = state.scattering.BeamWeight
+    h_atm = state.altitude_grid.h
 
     ## ==================== Input validation ==================== ##
     if spectrum == :flat
@@ -331,7 +317,7 @@ end
 
 
 """
-    Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, h_atm;
+    Ie_top_modulated(IeE_tot, state, Beams;
                      spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
 
 Steady-state version of `Ie_top_modulated` that does not include time-dependent behavior.
@@ -342,12 +328,8 @@ It internally calls the time-dependent version with minimal time grid (`1:1:1`) 
 
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy bin widths (eV). Vector [nE]
-- `μ_center`: electron beams average pitch angle cosine. Vector [n_beams]
+- `state`: simulation state NamedTuple from `setup(...)`
 - `Beams`: indices of the electron beams with precipitating flux
-- `BeamWeight`: weights of the different beams. Vector [n_beams]
-- `h_atm`: altitude grid (m). Vector [n_z]
 
 # Keyword Arguments
 - `spectrum=:flat`: energy spectrum type. Either `:flat` or `:gaussian`
@@ -360,25 +342,18 @@ It internally calls the time-dependent version with minimal time grid (`1:1:1`) 
 
 # Examples
 ```jldoctest
-julia> E, dE = make_energy_grid(10e3);
+julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> θ_lims = 180:-10:0;
-
-julia> μ_center = mu_avg(θ_lims);
-
-julia> BeamWeight = beam_weight(θ_lims);
-
-julia> h_atm = make_altitude_grid(100, 600);
-
-julia> Ie = Ie_top_modulated(1e-2, E, dE, μ_center, 1:2, BeamWeight, h_atm;
+julia> Ie = Ie_top_modulated(1e-2, state, 1:2;
                              spectrum=:flat, E_min=9000.0);
 ```
 """
-function Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight, h_atm;
+function Ie_top_modulated(IeE_tot, state, Beams;
                           spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
+    h_atm = state.altitude_grid.h
     # Call time-dependent version with dummy time grid and default time-related parameters
-    return Ie_top_modulated(IeE_tot, E, dE, μ_center, Beams, BeamWeight,
-                           1:1:1, 1, h_atm;
+    return Ie_top_modulated(IeE_tot, state, Beams,
+                            1:1:1, 1;
                            spectrum=spectrum, E_min=E_min, E₀=E₀, ΔE=ΔE,
                            modulation=:none, f=0.0, amplitude=1.0,
                            z_source=h_atm[end]/1e3, t_start=0.0, t_end=0.0)

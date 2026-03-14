@@ -4,13 +4,12 @@ using SpecialFunctions: erf
 
 
 """
-    setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
 
-Load the atmosphere, the energy grid, the collision cross-sections, ...
+Load the atmosphere, the energy grid, and the collision data.
 
 ## Calling
-`h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, θ_lims, μ_lims,
-μ_center, μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)`
+`state = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)`
 
 ## Inputs
 - `altitude_lims`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
@@ -19,41 +18,31 @@ Load the atmosphere, the energy grid, the collision cross-sections, ...
 - `E_max`: upper limit for the energy grid (in eV)
 - `msis_file`: path to the msis file to use
 - `iri_file`: path to the iri file to use
+- `B_angle_to_zenith`: angle between magnetic field and zenith (degrees)
 
-## Outputs
-- `h_atm`: altitude (m). Vector [nZ]
-- `ne`: e- density (m⁻³). Vector [nZ]
-- `Te`: e- temperature (K). Vector [nZ]
-- `Tn`: neutral temperature (K). Vector [nZ]
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy bin sizes(eV). Vector [nE]
-- `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
-- `E_levels_neutrals`: collisions energy levels and number of secondary e- produced. Named
-    tuple of matrices ([n`_`levels x 2], ..., [n`_`levels x 2])
-- `σ_neutrals`: collision cross-sections (m⁻²). Named tuple of matrices ([n`_`levels x nE],
-    ..., [n`_`levels x nE])
-- `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
-- `μ_scatterings`: Named tuple with several of the scattering informations, namely
-    μ`_`scatterings = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
-    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
-    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
-    + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
-    + `theta1`: scattering angles used in the calculations. Vector [n_direction]
+## Returns
+A NamedTuple with fields:
+- `altitude_grid::AltitudeGrid`
+- `energy_grid::EnergyGrid`
+- `pitch_angle_grid::PitchAngleGrid`
+- `scattering::ScatteringData`
+- `ionosphere::Ionosphere`
+- `cross_sections::CrossSectionData`
+- `B_angle_to_zenith::Real`
+- `h_field_line::Vector`
 """
-function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    h_atm = make_altitude_grid(altitude_lims[1], altitude_lims[2])
-    E, dE = make_energy_grid(E_max)
-    μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)
-    n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
-    ne, Te = load_electron_densities(iri_file, h_atm)
-    E_levels_neutrals = load_excitation_threshold()
-    σ_neutrals = load_cross_sections(E, dE)
+function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+    altitude_grid = AltitudeGrid(altitude_lims[1], altitude_lims[2])
+    energy_grid = EnergyGrid(E_max)
+    pitch_angle_grid = PitchAngleGrid(θ_lims)
+    scattering = ScatteringData(θ_lims)
+    ionosphere = Ionosphere(msis_file, iri_file, altitude_grid.h)
+    cross_sections = CrossSectionData(energy_grid.E, energy_grid.dE)
+    h_field_line = altitude_grid.h ./ cosd(B_angle_to_zenith)
 
-    return h_atm, ne, Te, Tn, E, dE,
-    n_neutrals, E_levels_neutrals, σ_neutrals,
-    μ_lims, μ_center, μ_scatterings
+    return (; altitude_grid, energy_grid, pitch_angle_grid,
+              scattering, ionosphere, cross_sections,
+              B_angle_to_zenith, h_field_line)
 end
 
 
@@ -65,7 +54,7 @@ Create an altitude grid based on the altitude limits given as input. It uses
 constant steps of 150m for altitudes below 100km, and a non-linear grid above 100km.
 
 # Calling
-`h_atm = make_altitude_grid(bottom_altitude, top_altitude; max_dz=25)
+`h_atm = make_altitude_grid(bottom_altitude, top_altitude; max_dz=25)`
 
 # Arguments
 - `bottom_altitude`: altitude, in km, for the bottom of the simulation

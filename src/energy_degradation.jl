@@ -29,9 +29,19 @@ end
 
 
 
-function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                      B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
-                      μ_center, cache)
+function update_Q!(matrices::TransportMatrices, Ie, state, t,
+                   B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
+
+    h_atm = state.altitude_grid.h
+    ne = state.ionosphere.ne
+    Te = state.ionosphere.Te
+    n_neutrals_data = n_neutrals(state.ionosphere)
+    σ_neutrals = state.cross_sections.σ_neutrals
+    E_levels_neutrals = state.cross_sections.E_levels_neutrals
+    E = state.energy_grid.E
+    dE = state.energy_grid.dE
+    BeamWeight = state.scattering.BeamWeight
+    μ_center = state.pitch_angle_grid.μ_center
 
     Q = matrices.Q  # Extract Q for convenient access
 
@@ -48,8 +58,8 @@ function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals
     Ionizing_fragment_2 = cache.Ionizing_fragment_2
 
     # Loop over the neutral species
-    for i in 1:length(n_neutrals)
-        n = n_neutrals[i]                          # Neutral density
+    for i in 1:length(n_neutrals_data)
+        n = n_neutrals_data[i]                          # Neutral density
         σ = σ_neutrals[i]                          # Array with collision cross sections
         E_levels = E_levels_neutrals[i]            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam

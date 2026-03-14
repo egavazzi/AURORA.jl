@@ -321,7 +321,7 @@ function update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up,
 end
 
 """
-    steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cache; first_iteration = false)
+    steady_state_scheme_optimized!(Ie, state, matrices, iE, Ie_top, cache; first_iteration = false)
 
 Optimized steady-state scheme using direct nzval modification.
 This is an in-place version that modifies `Ie` directly to avoid allocations.
@@ -373,8 +373,7 @@ Jacobian = ∂f/∂Ie = Mlhs
 
 # Arguments
 - `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle) to store results
-- `h_atm`: altitude grid [km]
-- `μ`: cosine of pitch angle grid
+- `state`: simulation state NamedTuple (`h_field_line` and `pitch_angle_grid.μ_center` are used)
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
     - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
@@ -386,7 +385,9 @@ Jacobian = ∂f/∂Ie = Mlhs
 - `cache`: Cache object storing Mlhs, mapping, KLU, and differentiation matrices
 - `first_iteration`: whether this is the first call (creates structure) or subsequent (reuses structure)
 """
-function steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cache; first_iteration = false)
+function steady_state_scheme_optimized!(Ie, state, matrices, iE, Ie_top, cache; first_iteration = false)
+    h_atm = state.h_field_line
+    μ = state.pitch_angle_grid.μ_center
     n_z = length(h_atm)
     n_angle = length(μ)
 

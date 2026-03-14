@@ -9,6 +9,16 @@ include("../internal_data/data_electron/emission_cross_sections.jl")
 include("setup.jl")
 export setup, make_altitude_grid, make_energy_grid
 
+include("grids/abstract_grid.jl")
+include("grids/altitude_grid.jl")
+include("grids/energy_grid.jl")
+include("grids/pitch_angle_grid.jl")
+include("atmosphere/ionosphere.jl")
+include("physics/scattering_data.jl")
+include("physics/cross_sections.jl")
+export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid,
+    ScatteringData, Ionosphere, CrossSectionData, n_neutrals
+
 include("iri/iri.jl")
 include("msis/msis.jl")
 export find_msis_file, find_nrlmsis_file
@@ -17,9 +27,10 @@ export find_iri_file
 include("input.jl")
 include("phase_functions.jl")
 include("utilities.jl")
-include("matrix_building.jl")
-include("crank_nicolson.jl")
-include("crank_nicolson_optimized.jl")
+include("solvers/transport_matrices.jl")
+include("solvers/matrix_building.jl")
+include("solvers/crank_nicolson.jl")
+include("solvers/crank_nicolson_optimized.jl")
 include("cascading.jl")
 include("energy_degradation.jl")
 include("scattering.jl")
@@ -35,8 +46,8 @@ export update_Q!
 include("main.jl")
 export calculate_e_transport
 
-include("steady_state.jl")
-include("steady_state_optimized.jl")
+include("solvers/steady_state.jl")
+include("solvers/steady_state_optimized.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")

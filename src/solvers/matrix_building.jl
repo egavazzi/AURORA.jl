@@ -82,12 +82,12 @@ end
 
 ## ----------------------------------------------------- ##
 
-function update_A!(A, ionosphere::Ionosphere, cross_sections::CrossSectionData,
-                   energy_grid::EnergyGrid, iE)
+function update_A!(A, state, iE)
+    ionosphere = state.ionosphere
+    cross_sections = state.cross_sections
+    energy_grid = state.energy_grid
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
-    ne = ionosphere.ne
-    Te = ionosphere.Te
     E = energy_grid.E
     dE = energy_grid.dE
 
@@ -95,7 +95,7 @@ function update_A!(A, ionosphere::Ionosphere, cross_sections::CrossSectionData,
     # Loop over the neutral species
     for i1 in 1:length(n_neutrals_data)
         n = n_neutrals_data[i1];  # Neutral density
-        σ = σ_neutrals[i1];       # Array with collision cross sections
+        σ = σ_neutrals[i1];  # Array with collision cross sections
 
         # add elastic collisions
         A .+= n .* σ[1, iE];
@@ -107,14 +107,16 @@ function update_A!(A, ionosphere::Ionosphere, cross_sections::CrossSectionData,
     end
 
     # add losses due to electron-electron collisions
-    A .+= loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) ./ dE[iE];
+    A .+= loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ionosphere.ne, ionosphere.Te) ./ dE[iE];
 
     return nothing
 end
 
-function update_B!(B, ionosphere::Ionosphere, cross_sections::CrossSectionData,
-                   phase_fcn_neutrals, energy_grid::EnergyGrid, iE,
-                   B2B_fragment, scattering::ScatteringData)
+function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
+    ionosphere = state.ionosphere
+    cross_sections = state.cross_sections
+    energy_grid = state.energy_grid
+    scattering = state.scattering
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
     E_levels_neutrals = cross_sections.E_levels_neutrals
@@ -126,7 +128,7 @@ function update_B!(B, ionosphere::Ionosphere, cross_sections::CrossSectionData,
     B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(n_neutrals_data));
     # Loop over the neutral species
     for i in 1:length(n_neutrals_data)
-        n = n_neutrals_data[i];             # Neutral density
+        n = n_neutrals_data[i];                  # Neutral density
         σ = σ_neutrals[i];                  # Array with collision cross sections
         E_levels = E_levels_neutrals[i];    # Array with collision enery levels and number of secondary e-
         phase_fcn = phase_fcn_neutrals[i];   # Tuple with two phase function arrays, the first for elastic collisions
@@ -177,11 +179,12 @@ function update_B!(B, ionosphere::Ionosphere, cross_sections::CrossSectionData,
     return B2B_inelastic_neutrals
 end
 
-function update_D!(D, energy_grid::EnergyGrid, pitch_angle_grid::PitchAngleGrid)
+function update_D!(D, state)
+    energy_grid = state.energy_grid
+    pitch_angle_grid = state.pitch_angle_grid
     E = energy_grid.E
     dE = energy_grid.dE
     θ_lims = pitch_angle_grid.θ_lims
-
     θ_lims_rad = deg2rad.(θ_lims)
     nE = 3
     nθ = 3
@@ -212,7 +215,8 @@ function update_D!(D, energy_grid::EnergyGrid, pitch_angle_grid::PitchAngleGrid)
     return nothing
 end
 
-function update_Ddiffusion!(Ddiffusion, z)
+function update_Ddiffusion!(Ddiffusion, state)
+    z = state.h_field_line
     dzd = z[2:end-1] - z[1:end-2]
     dzu = z[3:end]   - z[2:end-1]
 
@@ -233,56 +237,37 @@ function update_Ddiffusion!(Ddiffusion, z)
 end
 
 """
-    update_matrices!(matrices, ionosphere, cross_sections, phase_fcn_neutrals,
-                     energy_grid, iE, B2B_fragment, scattering)
+    update_matrices!(matrices, state, phase_fcn_neutrals, iE, B2B_fragment)
 
 Update the A and B matrices in place for a given energy level iE.
 
 # Arguments
 - `matrices::TransportMatrices`: Container to update
-- `ionosphere::Ionosphere`: Ionosphere data (neutral densities, ne, Te)
-- `cross_sections::CrossSectionData`: Cross section data (σ_neutrals, E_levels_neutrals)
-- `phase_fcn_neutrals`: Phase function arrays for each neutral species
-- `energy_grid::EnergyGrid`: Energy grid
+- `state`: Setup state NamedTuple (grids + atmosphere + physics)
+- `phase_fcn_neutrals`: Phase functions for all species
 - `iE`: Current energy index
 - `B2B_fragment`: Pre-computed beam-to-beam fragments
-- `scattering::ScatteringData`: Scattering data (angle grid)
 
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, ionosphere::Ionosphere,
-                          cross_sections::CrossSectionData, phase_fcn_neutrals,
-                          energy_grid::EnergyGrid, iE, B2B_fragment,
-                          scattering::ScatteringData)
-    update_A!(matrices.A, ionosphere, cross_sections, energy_grid, iE)
-    return update_B!(matrices.B, ionosphere, cross_sections, phase_fcn_neutrals,
-                     energy_grid, iE, B2B_fragment, scattering)
+function update_matrices!(matrices::TransportMatrices, state, phase_fcn_neutrals,
+                          iE, B2B_fragment)
+    update_A!(matrices.A, state, iE)
+    return update_B!(matrices.B, state, phase_fcn_neutrals, iE, B2B_fragment)
 end
 
 
 """
-    initialize_transport_matrices(altitude_grid, pitch_angle_grid, t, energy_grid)
+    initialize_transport_matrices(state, t)
 
-Create a TransportMatrices container initialized with zeros for A, B, D, Q and Ddiffusion.
-
-# Arguments
-- `altitude_grid::AltitudeGrid`: Altitude grid
-- `pitch_angle_grid::PitchAngleGrid`: Pitch angle grid
-- `t`: Time grid
-- `energy_grid::EnergyGrid`: Energy grid
-
-# Returns
-- `matrices::TransportMatrices`: Initialized container for the transport matrices
+Create a `TransportMatrices` container initialized with zeros for A, B, D, Q and Ddiffusion.
 """
-function initialize_transport_matrices(altitude_grid::AltitudeGrid,
-                                       pitch_angle_grid::PitchAngleGrid,
-                                       t,
-                                       energy_grid::EnergyGrid)
-    n_altitude = length(altitude_grid.h)
-    n_angle = length(pitch_angle_grid.μ_center)
+function initialize_transport_matrices(state, t)
+    n_altitude = length(state.altitude_grid.h)
+    n_angle = length(state.pitch_angle_grid.μ_center)
     n_time = length(t)
-    n_energy = length(energy_grid.E)
+    n_energy = length(state.energy_grid.E)
 
     matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
 
