@@ -162,7 +162,6 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     z = altitude_grid.h
     E_centers = energy_grid.E_centers
-    E_edges = energy_grid.E_edges
     n_E = energy_grid.n
     μ_lims = pitch_angle_grid.μ_lims
     μ_center = pitch_angle_grid.μ_center
@@ -211,9 +210,9 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     ## Calculate the phase functions and put them in a Tuple
     print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, @view(E_edges[1:end-1]))
-    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, @view(E_edges[1:end-1]))
-    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, @view(E_edges[1:end-1]))
+    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
     println(" done ✅")
@@ -268,12 +267,12 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
             # Compute the flux of e-
             if iE == n_E
                 @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, state,
-                                                 v_of_E(E_edges[iE]), matrices, iE,
+                                                 v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache,
                                                  first_iteration = true)
             else
                 @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, state,
-                                                 v_of_E(E_edges[iE]), matrices, iE,
+                                                 v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
@@ -332,7 +331,6 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
 
     z = altitude_grid.h
     E_centers = energy_grid.E_centers
-    E_edges = energy_grid.E_edges
     n_E = energy_grid.n
     μ_lims = pitch_angle_grid.μ_lims
     μ_center = pitch_angle_grid.μ_center
@@ -363,9 +361,9 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
 
     ## Calculate the phase functions and put them in a Tuple
     print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, @view(E_edges[1:end-1]))
-    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, @view(E_edges[1:end-1]))
-    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, @view(E_edges[1:end-1]))
+    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
     println(" done ✅")

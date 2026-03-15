@@ -214,7 +214,6 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
                           z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
 
     E_centers = state.energy_grid.E_centers
-    E_edges = state.energy_grid.E_edges
     ΔE_grid = state.energy_grid.ΔE
     μ_center = state.pitch_angle_grid.μ_center
     Ω_beam = state.scattering.Ω_beam
@@ -280,7 +279,7 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
 
     # Calculate reference time shift (for highest energy in first beam)
     # Used to align all arrival times relative to the fastest electrons
-    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E_edges[end-1]))
+    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E_centers[end]))
 
     ## ==================== Main loop ==================== ##
     for i_μ in Beams
@@ -299,7 +298,7 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
             flux_base = Φ_spectrum[iE] * beam_fraction * ΔE_grid[iE]
 
             # Calculate travel time for electrons of this energy and pitch angle
-            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E_edges[iE]))
+            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E_centers[iE]))
 
             # Time-shifted grid: subtract travel time difference relative to reference
             t_shifted = t_total .- (t_travel - t_ref)

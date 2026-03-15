@@ -57,10 +57,11 @@ end
 
     # if θ_lims is symmetric, the B2B matrices should be symmetric
     if check
-        E_edges, _ = AURORA.make_energy_grid(7000)
-        phaseN2e, phaseN2i = AURORA.phase_fcn_N2(θ₁, E_edges);
-        phaseO2e, phaseO2i = AURORA.phase_fcn_O2(θ₁, E_edges);
-        phaseOe, phaseOi = AURORA.phase_fcn_O(θ₁, E_edges);
+        E_edges, ΔE = AURORA.make_energy_grid(7000)
+        E_centers = E_edges[1:end-1] .+ ΔE ./ 2
+        phaseN2e, phaseN2i = AURORA.phase_fcn_N2(θ₁, E_centers);
+        phaseO2e, phaseO2i = AURORA.phase_fcn_O2(θ₁, E_centers);
+        phaseOe, phaseOi = AURORA.phase_fcn_O(θ₁, E_centers);
         phase_fcn = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
 
         B2B_fragment = AURORA.prepare_beams2beams(Ω_beam_relative, P_scatter);
