@@ -90,13 +90,14 @@ end
 Create an energy grid based on the maximum energy `E_max` given as input.
 
 # Calling
-`E_edges, ΔE = make_energy_grid(E_max)`
+`E_edges, E_centers, ΔE = make_energy_grid(E_max)`
 
 # Inputs
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
 - `E_edges`: energy bin edges (eV). Vector [nE + 1] (includes the last upper edge)
+- `E_centers`: energy bin centers (eV). Vector [nE]
 - `ΔE`: energy bin widths (eV). Vector [nE]
 """
 function make_energy_grid(E_max)
@@ -109,7 +110,8 @@ function make_energy_grid(E_max)
     E = E[1:iE_max];                        # crop E accordingly
     ΔE = diff(E); ΔE = [ΔE; ΔE[end]]
     E_edges = [E; E[end] + ΔE[end]]         # add the last upper edge
-    return E_edges, ΔE
+    E_centers = E_edges[1:end-1] .+ ΔE ./ 2
+    return E_edges, E_centers, ΔE
 end
 
 

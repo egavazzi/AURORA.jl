@@ -19,8 +19,7 @@ struct EnergyGrid{FT, V<:AbstractVector{FT}} <: AbstractGrid
 end
 
 function EnergyGrid(E_max)
-    E_edges, ΔE = make_energy_grid(E_max)
-    E_centers = E_edges[1:end-1] .+ ΔE ./ 2
+    E_edges, E_centers, ΔE = make_energy_grid(E_max)
     FT = eltype(E_edges)
     return EnergyGrid{FT, typeof(E_edges)}(E_edges, E_centers, ΔE, length(ΔE), FT(E_max))
 end
