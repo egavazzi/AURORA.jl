@@ -11,7 +11,7 @@ Pre-computed scattering probability matrices for beam-to-beam scattering.
 """
 struct ScatteringData{FT, A<:AbstractArray{FT}, M<:AbstractMatrix{FT}, V<:AbstractVector{FT}}
     P_scatter::A
-    Ω_beam_relative::M
+    Ω_subbeam_relative::M
     Ω_beam::V
     θ_scatter::V
 end
@@ -19,10 +19,10 @@ end
 function ScatteringData(θ_lims; n_direction=720)
     validate_θ_lims(θ_lims)
     Ω_beam = beam_weight(θ_lims)
-    P_scatter, _, Ω_beam_relative, θ1 = find_scattering_matrices(θ_lims, n_direction)
+    P_scatter, Ω_subbeam_relative, θ1 = find_scattering_matrices(θ_lims, n_direction)
     FT = eltype(P_scatter)
-    return ScatteringData{FT, typeof(P_scatter), typeof(Ω_beam_relative), typeof(Ω_beam)}(
-        P_scatter, Ω_beam_relative, Ω_beam, vec(θ1)
+    return ScatteringData{FT, typeof(P_scatter), typeof(Ω_subbeam_relative), typeof(Ω_beam)}(
+        P_scatter, Ω_subbeam_relative, Ω_beam, vec(θ1)
     )
 end
 
@@ -50,7 +50,7 @@ of direction/sub-beams `n_direction`. If a file is found, the scattering matrice
 directly loaded. Otherwise, they are calculated and saved to a file.
 
 # Calling
-`P_scatter, Ω_beam_relative, θ₁ = find_scattering_matrices(θ_lims, n_direction)`
+`P_scatter, Ω_subbeam_relative, θ₁ = find_scattering_matrices(θ_lims, n_direction)`
 
 # Inputs
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
@@ -61,12 +61,9 @@ directly loaded. Otherwise, they are calculated and saved to a file.
 # Outputs
 - `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
     n`_`direction]
-- `Ω_beam_relative`: relative weight of each sub-beam within each beam, normalized so that
+- `Ω_subbeam_relative`: relative weight of each sub-beam within each beam, normalized so that
     summing along the sub-beams gives 1 for each beam. Matrix [n`_`beam x n`_`direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
-
-Note: the intermediate `theta2beamW` (sub-beam weights) is loaded from legacy files but
-discarded. Only its normalized form `Ω_beam_relative` is returned.
 """
 function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
     scattering_files = readdir(pkgdir(AURORA, "internal_data", "e_scattering"))
@@ -82,10 +79,9 @@ function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
                 if θ_lims == θ_lims_file && n_direction == n_direction_file
                     verbose && print("Loading scattering-matrices from file: ", scattering_files[i1])
                     file = matopen(filename)
-                    P_scatter = read(file, "Pmu2mup")
-                    _ = read(file, "theta2beamW")  # loaded for compatibility but not used
-                    Ω_beam_relative = read(file, "BeamWeight_relative")
-                    θ₁ = read(file, "theta1")
+                    P_scatter = read(file, "P_scatter")
+                    Ω_subbeam_relative = read(file, "subbeamweight_relative")
+                    θ₁ = read(file, "theta_scatter")
                     close(file)
                     found_them = 1
                     verbose && println(" ✅")
@@ -99,23 +95,23 @@ function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
         verbose && println("Could not find file with matching pitch-angle grid.")
         verbose && println("Starting to calculate the requested scattering-matrices.")
 
-        P_scatter, _, Ω_beam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)
+        P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)
 
-        # Save the results for future use (keep legacy key names for file compatibility)
+        # Save the results for future use using the current internal naming scheme.
         filename = pkgdir(AURORA, "internal_data", "e_scattering",
                             string(length(θ_lims) - 1, "_streams_",
                             Dates.format(now(), "yyyymmdd-HHMMSS"),
                             ".mat"))
         file = matopen(filename, "w")
-        write(file, "Pmu2mup", P_scatter)
-        write(file, "BeamWeight_relative", Ω_beam_relative)
-        write(file, "theta1", θ₁)
+        write(file, "P_scatter", P_scatter)
+        write(file, "subbeamweight_relative", Ω_subbeam_relative)
+        write(file, "theta_scatter", θ₁)
         write(file, "theta_lims", Vector(θ_lims))
         write(file, "n_direction", n_direction)
         close(file)
     end
 
-    return P_scatter, nothing, Ω_beam_relative, θ₁
+    return P_scatter, Ω_subbeam_relative, θ₁
 end
 
 
@@ -133,7 +129,7 @@ beams. Uses 720 directions by default for the start angle and the scattering ang
 equivalent to (1/4)° steps.
 
 # Calling
-`P_scatter, Ω_beam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)`
+`P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)`
 
 # Inputs
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
@@ -143,7 +139,7 @@ equivalent to (1/4)° steps.
 
 # Outputs
 - `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n\\_direction x n\\_direction x n\\_beam]
-- `Ω_beam_relative`: relative weight of each sub-beam within each beam, normalized so that
+- `Ω_subbeam_relative`: relative weight of each sub-beam within each beam, normalized so that
     summing along the sub-beams gives 1 for each beam. Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n\\_direction]
 """
@@ -192,7 +188,7 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
     for iμ in (length(μ_lims) - 1):-1:1
         Ω_subbeam[iμ, :] .= abs.(sin.(θ₀)) .* (μ_lims[iμ] .< cos.(θ₀) .< μ_lims[iμ + 1])
     end
-    # Normalize so that all sum(Ω_beam_relative, dims=2) = 1
+    # Normalize so that all sum(Ω_subbeam_relative, dims=2) = 1
     beam_sums = sum(Ω_subbeam, dims=2)
     if any(iszero, beam_sums)
         error(
@@ -201,9 +197,9 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
             "Make sure θ_lims includes both 180° and 0°."
         )
     end
-    Ω_beam_relative = Ω_subbeam ./ repeat(beam_sums, 1, size(Ω_subbeam, 2))
+    Ω_subbeam_relative = Ω_subbeam ./ repeat(beam_sums, 1, size(Ω_subbeam, 2))
 
-    return P_scatter, nothing, Ω_beam_relative, θ₁
+    return P_scatter, Ω_subbeam_relative, θ₁
 end
 
 

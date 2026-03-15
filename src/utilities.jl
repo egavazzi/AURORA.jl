@@ -180,7 +180,7 @@ function save_results(Ie_save, energy_grid, t, μ_lims, z, I0, scattering, i, CF
 		write(file, "I0", I0)
 		write(file, "mu_scatterings", Dict(
 			"P_scatter" => scattering.P_scatter,
-			"BeamWeight_relative" => scattering.Ω_beam_relative,
+            "BeamWeight_relative" => scattering.Ω_subbeam_relative,
 			"BeamWeight" => scattering.Ω_beam,
 			"theta_scatter" => scattering.θ_scatter))
 	close(file)

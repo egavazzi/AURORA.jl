@@ -55,19 +55,19 @@ function loss_to_thermal_electrons(E::Real, nₑ, Tₑ)
 end
 
 # Depreciated function, for demo
-function beams2beams_demo(phase_fcn, P_scatter, Ω_beam_relative)
+function beams2beams_demo(phase_fcn, P_scatter, Ω_subbeam_relative)
     B2B = zeros(size(P_scatter, 3),size(P_scatter, 3));
     for i = size(P_scatter, 3):-1:1
-        B2B[i, :] = Ω_beam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
+        B2B[i, :] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
     end
     return B2B
 end
 
 # The new functions, for faster calculations
-function prepare_beams2beams(Ω_beam_relative, P_scatter)
-    B2B_fragment = zeros(size(Ω_beam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
+function prepare_beams2beams(Ω_subbeam_relative, P_scatter)
+    B2B_fragment = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
     for i = size(P_scatter, 3):-1:1
-        B2B_fragment[:, :, i] = Ω_beam_relative * (@view(P_scatter[:, :, i]));
+        B2B_fragment[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
     end
     return B2B_fragment
 end

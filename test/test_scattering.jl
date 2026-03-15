@@ -15,7 +15,7 @@ end
     # Define some parameters for the tests
     θ_lims = 180:-10:0
     n_dirs = 720
-    P_scatter, _, Ω_beam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
+    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
     BeamW = beam_weight(θ_lims);
 
     # check if θ_lims is symmetric
@@ -25,9 +25,9 @@ end
         check = all(θ_lims[1:n_θhalf + 1] .+ θ_lims[end:-1:n_θhalf + 1] .== 180)
     end
 
-    @testset "Ω_beam_relative" begin
+    @testset "Ω_subbeam_relative" begin
         # check normalization
-        @test all(sum(Ω_beam_relative, dims=2) .≈ 1)
+        @test all(sum(Ω_subbeam_relative, dims=2) .≈ 1)
     end
 
     @testset "P_scatter" begin
@@ -46,7 +46,7 @@ end
     # Define some parameters for the tests
     θ_lims = 180:-10:0
     n_dirs = 720
-    P_scatter, _, Ω_beam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
+    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
 
     # check if θ_lims is symmetric
     check = false
@@ -63,7 +63,7 @@ end
         phaseOe, phaseOi = AURORA.phase_fcn_O(θ₁, E_centers);
         phase_fcn = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
 
-        B2B_fragment = AURORA.prepare_beams2beams(Ω_beam_relative, P_scatter);
+        B2B_fragment = AURORA.prepare_beams2beams(Ω_subbeam_relative, P_scatter);
 
         iE = 400 # ~3730 eV (just to pick one)
         for i in 1:3

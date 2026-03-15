@@ -244,7 +244,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     matrices.Ddiffusion[1, 1] = 0
 
     ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(scattering.Ω_beam_relative, scattering.P_scatter)
+    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
 
     ## Looping over n_loop
     for i_loop in 1:n_loop
@@ -378,7 +378,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     cache = Cache(neutral_densities, length(μ_center), 1, length(z), n_E)
 
     ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(scattering.Ω_beam_relative, scattering.P_scatter)
+    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
 
     ## Initialize transport matrices container
     matrices = initialize_transport_matrices(state, 1:1:1)

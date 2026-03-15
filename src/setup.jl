@@ -131,9 +131,9 @@ Load the scattering matrices for the given pitch-angle limits.
 - `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
 - `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
 - `scattering`: Tuple with several of the scattering informations, namely scattering
-    = `(P_scatter, Ω_beam_relative, Ω_beam)`
+    = `(P_scatter, Ω_subbeam_relative, Ω_beam)`
     + `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
-    + `Ω_beam_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
+    + `Ω_subbeam_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
     + `Ω_beam`: solid angle for each stream (ster). Vector [n_beam]
     + `θ_scatter`: scattering angles used in the calculations. Vector [n_direction]
 """
@@ -142,8 +142,8 @@ function load_scattering_matrices(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
     Ω_beam = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    P_scatter, _, Ω_beam_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
-    scattering = (P_scatter = P_scatter, Ω_beam_relative = Ω_beam_relative,
+    P_scatter, Ω_subbeam_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
+    scattering = (P_scatter = P_scatter, Ω_subbeam_relative = Ω_subbeam_relative,
                      Ω_beam = Ω_beam, θ_scatter = θ₁)
 
     return μ_lims, μ_center, scattering
