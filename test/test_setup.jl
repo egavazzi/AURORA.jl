@@ -1,10 +1,10 @@
 @testitem "Neutral densities" begin
-    h_atm = make_altitude_grid(50, 800)
+    z = make_altitude_grid(50, 800)
     msis_file = find_msis_file()
 
-    @test_nowarn n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, h_atm)
+    @test_nowarn n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
 
-    n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, h_atm)
+    n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
     for i in eachindex(n_neutrals)
         @test !any(isnan.(n_neutrals[i]))
         @test !any(isinf.(n_neutrals[i]))
@@ -18,9 +18,9 @@ end
 
 
 @testitem "Electron densities" begin
-    h_atm = make_altitude_grid(50, 800)
+    z = make_altitude_grid(50, 800)
     iri_file = find_iri_file()
-    ne, Te = AURORA.load_electron_densities(iri_file, h_atm)
+    ne, Te = AURORA.load_electron_densities(iri_file, z)
 
     @test !any(isnan.(ne))
     @test !any(isinf.(ne))

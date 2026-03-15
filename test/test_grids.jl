@@ -22,11 +22,15 @@ end
     @test grid isa EnergyGrid
     @test grid isa AURORA.AbstractGrid
     @test grid.E_max == 50_000
-    @test length(grid.E) == grid.n
-    @test length(grid.dE) == grid.n
-    @test grid.E[1] > 0
-    @test grid.E[end] ≤ 50_000
-    @test all(grid.dE .> 0) # ensure grid is strictly increasing
+    @test length(grid.E_edges) == grid.n + 1
+    @test length(grid.E_centers) == grid.n
+    @test length(grid.ΔE) == grid.n
+    @test grid.E_edges[1] > 0
+    # TODO: should we allow E_edges to exceed E_max? or stricly enforce E_centers to be below?
+    # right now only E_edges[end -1] is guaranteed to be below E_max, but E_edges[end] and
+    # E_centers[end] can exceed it
+    @test grid.E_edges[end - 1] ≤ 50_000
+    @test all(grid.ΔE .> 0)
 end
 
 @testitem "EnergyGrid invalid input" begin

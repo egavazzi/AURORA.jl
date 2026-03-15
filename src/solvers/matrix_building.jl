@@ -55,19 +55,19 @@ function loss_to_thermal_electrons(E::Real, nₑ, Tₑ)
 end
 
 # Depreciated function, for demo
-function beams2beams_demo(phase_fcn, Pmu2mup, BeamWeight_relative)
-    B2B = zeros(size(Pmu2mup, 3),size(Pmu2mup, 3));
-    for i = size(Pmu2mup, 3):-1:1
-        B2B[i, :] = BeamWeight_relative * (@view(Pmu2mup[:, :, i]) * phase_fcn);
+function beams2beams_demo(phase_fcn, P_scatter, Ω_beam_relative)
+    B2B = zeros(size(P_scatter, 3),size(P_scatter, 3));
+    for i = size(P_scatter, 3):-1:1
+        B2B[i, :] = Ω_beam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
     end
     return B2B
 end
 
 # The new functions, for faster calculations
-function prepare_beams2beams(BeamWeight_relative, Pmu2mup)
-    B2B_fragment = zeros(size(BeamWeight_relative, 1), size(Pmu2mup, 2), size(Pmu2mup, 3))
-    for i = size(Pmu2mup, 3):-1:1
-        B2B_fragment[:, :, i] = BeamWeight_relative * (@view(Pmu2mup[:, :, i]));
+function prepare_beams2beams(Ω_beam_relative, P_scatter)
+    B2B_fragment = zeros(size(Ω_beam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
+    for i = size(P_scatter, 3):-1:1
+        B2B_fragment[:, :, i] = Ω_beam_relative * (@view(P_scatter[:, :, i]));
     end
     return B2B_fragment
 end
@@ -88,8 +88,8 @@ function update_A!(A, state, iE)
     energy_grid = state.energy_grid
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
-    E = energy_grid.E
-    dE = energy_grid.dE
+    E_centers = energy_grid.E_centers
+    ΔE = energy_grid.ΔE
 
     fill!(A, 0.0)
     # Loop over the neutral species
@@ -107,7 +107,7 @@ function update_A!(A, state, iE)
     end
 
     # add losses due to electron-electron collisions
-    A .+= loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ionosphere.ne, ionosphere.Te) ./ dE[iE];
+    A .+= loss_to_thermal_electrons(E_centers[iE], ionosphere.ne, ionosphere.Te) ./ ΔE[iE];
 
     return nothing
 end
@@ -119,9 +119,9 @@ function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
     scattering = state.scattering
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
-    E_levels_neutrals = cross_sections.E_levels_neutrals
-    dE = energy_grid.dE
-    finer_θ = scattering.theta1
+    collision_levels = cross_sections.collision_levels
+    ΔE = energy_grid.ΔE
+    finer_θ = scattering.θ_scatter
 
     # Zero out B in place
     fill!(B, 0.0)
@@ -130,7 +130,7 @@ function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
     for i in 1:length(n_neutrals_data)
         n = n_neutrals_data[i];                  # Neutral density
         σ = σ_neutrals[i];                  # Array with collision cross sections
-        E_levels = E_levels_neutrals[i];    # Array with collision enery levels and number of secondary e-
+        E_levels = collision_levels[i];    # Array with collision enery levels and number of secondary e-
         phase_fcn = phase_fcn_neutrals[i];   # Tuple with two phase function arrays, the first for elastic collisions
                                                     # and the second for inelastic collisions
 
@@ -162,7 +162,7 @@ function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
             # E_levels[i_coll, 1] is smaller than the width in energy of the energy bin.
             # That is, when dE[iE] > E_levels[i_coll,1], only the fraction
             # E_levels[i_coll,1] / dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
-            correction_factor = max(0.0, 1.0 - E_loss / dE[iE])
+            correction_factor = max(0.0, 1.0 - E_loss / ΔE[iE])
 
             @tturbo for i3 in 1:n_angle
                 for i2 in 1:n_angle
@@ -182,16 +182,16 @@ end
 function update_D!(D, state)
     energy_grid = state.energy_grid
     pitch_angle_grid = state.pitch_angle_grid
-    E = energy_grid.E
-    dE = energy_grid.dE
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     θ_lims = pitch_angle_grid.θ_lims
     θ_lims_rad = deg2rad.(θ_lims)
     nE = 3
     nθ = 3
     # n_ti = 701
     # n_thi = 401
-    for iE in length(E):-1:1
-        v = range(v_of_E(E[iE]), v_of_E(E[iE] + dE[iE]), length=nE)
+    for iE in energy_grid.n:-1:1
+        v = range(v_of_E(E_edges[iE]), v_of_E(E_edges[iE+1]), length=nE)
         for iθ in 1:(length(θ_lims_rad) - 1)
             θa = θ_lims_rad[iθ]
             θb = θ_lims_rad[iθ + 1]
@@ -216,7 +216,7 @@ function update_D!(D, state)
 end
 
 function update_Ddiffusion!(Ddiffusion, state)
-    z = state.h_field_line
+    z = state.s_field
     dzd = z[2:end-1] - z[1:end-2]
     dzu = z[3:end]   - z[2:end-1]
 
@@ -267,7 +267,7 @@ function initialize_transport_matrices(state, t)
     n_altitude = length(state.altitude_grid.h)
     n_angle = length(state.pitch_angle_grid.μ_center)
     n_time = length(t)
-    n_energy = length(state.energy_grid.E)
+    n_energy = state.energy_grid.n
 
     matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
 

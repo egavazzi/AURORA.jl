@@ -29,7 +29,7 @@ A NamedTuple with fields:
 - `ionosphere::Ionosphere`
 - `cross_sections::CrossSectionData`
 - `B_angle_to_zenith::Real`
-- `h_field_line::Vector`
+- `s_field::Vector`
 """
 function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
     altitude_grid = AltitudeGrid(altitude_lims[1], altitude_lims[2])
@@ -37,12 +37,12 @@ function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_ze
     pitch_angle_grid = PitchAngleGrid(θ_lims)
     scattering = ScatteringData(θ_lims)
     ionosphere = Ionosphere(msis_file, iri_file, altitude_grid.h)
-    cross_sections = CrossSectionData(energy_grid.E, energy_grid.dE)
-    h_field_line = altitude_grid.h ./ cosd(B_angle_to_zenith)
+    cross_sections = CrossSectionData(energy_grid)
+    s_field = altitude_grid.h ./ cosd(B_angle_to_zenith)
 
     return (; altitude_grid, energy_grid, pitch_angle_grid,
               scattering, ionosphere, cross_sections,
-              B_angle_to_zenith, h_field_line)
+              B_angle_to_zenith, s_field)
 end
 
 
@@ -90,14 +90,14 @@ end
 Create an energy grid based on the maximum energy `E_max` given as input.
 
 # Calling
-`E, dE = make_energy_grid(E_max)`
+`E_edges, ΔE = make_energy_grid(E_max)`
 
 # Inputs
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy bin sizes(eV). Vector [nE]
+- `E_edges`: energy bin edges (eV). Vector [nE + 1] (includes the last upper edge)
+- `ΔE`: energy bin widths (eV). Vector [nE]
 """
 function make_energy_grid(E_max)
     if E_max > 1e6
@@ -107,8 +107,9 @@ function make_energy_grid(E_max)
     E = cumsum(E_function.(0:100000, 0.15, 11.5, 0.05, 80)) .+ 1.9
     iE_max = findmin(abs.(E .- E_max))[2];  # find the index for the upper limit of the energy grid
     E = E[1:iE_max];                        # crop E accordingly
-    dE = diff(E); dE = [dE; dE[end]]
-    return E, dE
+    ΔE = diff(E); ΔE = [ΔE; ΔE[end]]
+    E_edges = [E; E[end] + ΔE[end]]         # add the last upper edge
+    return E_edges, ΔE
 end
 
 
@@ -116,10 +117,10 @@ end
 """
     load_scattering_matrices(θ_lims)
 
-Create an energy grid based on the maximum energy `E_max` given as input.
+Load the scattering matrices for the given pitch-angle limits.
 
 # Calling
-`μ_lims, μ_center, μ_scatterings = load_scattering_matrices(θ_lims)`
+`μ_lims, μ_center, scattering = load_scattering_matrices(θ_lims)`
 
 # Inputs
 - `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
@@ -127,23 +128,23 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 # Outputs
 - `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
 - `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
-- `μ_scatterings`: Tuple with several of the scattering informations, namely μ`_`scatterings
-    = `(Pmu2mup, BeamWeight_relative, BeamWeight)`
-    + `Pmu2mup`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
-    + `BeamWeight_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
-    + `BeamWeight`: solid angle for each stream (ster). Vector [n_beam]
-    + `theta1`: scattering angles used in the calculations. Vector [n_direction]
+- `scattering`: Tuple with several of the scattering informations, namely scattering
+    = `(P_scatter, Ω_beam_relative, Ω_beam)`
+    + `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
+    + `Ω_beam_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
+    + `Ω_beam`: solid angle for each stream (ster). Vector [n_beam]
+    + `θ_scatter`: scattering angles used in the calculations. Vector [n_direction]
 """
 function load_scattering_matrices(θ_lims)
     validate_θ_lims(θ_lims)
     μ_lims = cosd.(θ_lims);
     μ_center = mu_avg(θ_lims);
-    BeamWeight = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
-    Pmu2mup, _, BeamWeight_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
-    μ_scatterings = (Pmu2mup = Pmu2mup, BeamWeight_relative = BeamWeight_relative,
-                     BeamWeight = BeamWeight, theta1 = θ₁)
+    Ω_beam = beam_weight(θ_lims); # this beam weight is calculated in a continuous way
+    P_scatter, _, Ω_beam_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
+    scattering = (P_scatter = P_scatter, Ω_beam_relative = Ω_beam_relative,
+                     Ω_beam = Ω_beam, θ_scatter = θ₁)
 
-    return μ_lims, μ_center, μ_scatterings
+    return μ_lims, μ_center, scattering
 end
 
 
@@ -274,10 +275,10 @@ files. The corresponding names of the states can be found in the XX_levels.name 
 refers to N2, O2 or O.
 
 # Calling
-`E_levels_neutrals = load_excitation_threshold()`
+`collision_levels = load_excitation_threshold()`
 
 # Returns
-- `E_levels_neutrals`: A named tuple of matrices, namely `(N2_levels, O2_levels, O_levels)`.
+- `collision_levels`: A named tuple of matrices, namely `(N2_levels, O2_levels, O_levels)`.
     The matrices have shape [n`_`levels x 2]. The first column contains the energy levels
     and the second column contains the number of secondaries associated to that level (is
     non-zero only for ionized states).
@@ -291,67 +292,73 @@ function load_excitation_threshold()
 	O2_levels = readdlm(file_O2_levels, comments=true, comment_char='%')
 	O_levels = readdlm(file_O_levels, comments=true, comment_char='%')
 
-	E_levels_neutrals = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels)
-    return E_levels_neutrals
+	collision_levels = (N2_levels = N2_levels, O2_levels = O2_levels, O_levels = O_levels)
+    return collision_levels
 end
 
 
 
 """
-    load_cross_sections(E, dE)
+    load_cross_sections(energy_grid)
+    load_cross_sections(E_centers::AbstractVector)
 
 Load the cross-sections of the neutrals species for their different energy states.
 
 # Calling
-`σ_neutrals = load_cross_sections(E, dE)`
+`σ_neutrals = load_cross_sections(energy_grid)`
+`σ_neutrals = load_cross_sections(E_centers)`
 
 # Inputs
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy grid step size (eV). Vector [nE]
+- `energy_grid`: an `EnergyGrid` object, or
+- `E_centers`: energy bin centers (eV). Vector [n\\_E]
 
 # Returns
 - `σ_neutrals`: A named tuple containing the cross-sections (m⁻²) for N2, O2, and O.
 """
-function load_cross_sections(E, dE)
-    σ_N2 = get_cross_section("N2", E, dE)
-    σ_O2 = get_cross_section("O2", E, dE)
-    σ_O = get_cross_section("O", E, dE)
+function load_cross_sections(E_centers::AbstractVector)
+    σ_N2 = get_cross_section("N2", E_centers)
+    σ_O2 = get_cross_section("O2", E_centers)
+    σ_O = get_cross_section("O", E_centers)
 
     σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
     return σ_neutrals
 end
 
+load_cross_sections(energy_grid::EnergyGrid) = load_cross_sections(energy_grid.E_centers)
+
 
 
 """
-    get_cross_section(species_name, E, dE)
+    get_cross_section(species_name, energy_grid)
+    get_cross_section(species_name, E_centers::AbstractVector)
 
 Calculate the cross-section for a given species and their different energy states.
 
 # Calling
-`σ_N2 = get_cross_section("N2", E, dE)`
+`σ_N2 = get_cross_section("N2", energy_grid)`
+`σ_N2 = get_cross_section("N2", E_centers)`
 
 # Inputs
 - `species_name`: name of the species. String
-- `E`: energy grid (eV). Vector [nE]
-- `dE`: energy grid step size (eV). Vector [nE]
+- `energy_grid`: an `EnergyGrid` object, or
+- `E_centers`: energy bin centers (eV). Vector [n\\_E]
 
 # Outputs
 - `σ_species`: A matrix of cross-section values for each energy state, for the defined
   species
 """
-function get_cross_section(species_name, E, dE)
+function get_cross_section(species_name, E_centers::AbstractVector)
     filename =  pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
     state_name = readdlm(filename, String, comments=true, comment_char='%')
     function_name = "e_" * species_name .* state_name
 
-    σ_species = zeros(size(state_name, 1), length(E))
+    σ_species = zeros(size(state_name, 1), length(E_centers))
     for i_state in axes(state_name, 1) # loop over the different energy states
         func = getfield(AURORA, Symbol(function_name[i_state])) # get the corresponding function name
-        σ_species[i_state, :] .= func(E .+ dE/2) # calculate the corresponding cross-section
-        # Note that we use `E .+ dE/2` as input to the cross-section functions, as this
-        # corresponds to the middle energy of the energy bins (E is the energy *grid*).
+        σ_species[i_state, :] .= func(E_centers) # calculate the corresponding cross-section
     end
 
     return σ_species
 end
+
+get_cross_section(species_name, energy_grid::EnergyGrid) = get_cross_section(species_name, energy_grid.E_centers)

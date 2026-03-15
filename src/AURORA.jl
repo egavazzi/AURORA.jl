@@ -3,14 +3,14 @@ module AURORA
 # AURORA functions
 
 
-include("setup.jl")
-export setup, make_altitude_grid, make_energy_grid
-
 include("grids/abstract_grid.jl")
 include("grids/altitude_grid.jl")
 include("grids/energy_grid.jl")
 include("grids/pitch_angle_grid.jl")
 export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid
+
+include("setup.jl")
+export setup, make_altitude_grid, make_energy_grid
 
 include("ionosphere/ionosphere.jl")
 export Ionosphere, n_neutrals

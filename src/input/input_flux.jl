@@ -43,7 +43,7 @@ Any combination of time step sizes and grid lengths is supported:
 - The energy dimension of the file may be larger than `length(E)`; only the first
   `length(E)` bins are used. It cannot be smaller.
 """
-function Ie_top_from_file(t, E, μ_center, filename; interpolation=:constant)
+function Ie_top_from_file(t, E_centers, μ_center, filename; interpolation=:constant)
     ## Load file
     file = matopen(filename)
         Ie_top_file = read(file, "Ie_total")
@@ -58,10 +58,10 @@ function Ie_top_from_file(t, E, μ_center, filename; interpolation=:constant)
         Got $(size(Ie_top_file, 1)), expected $(length(μ_center)). \
         Remember that Ie_total should have the shape [n_μ, n_t, n_E].""")
     end
-    if size(Ie_top_file, 3) < length(E)
+    if size(Ie_top_file, 3) < length(E_centers)
         error("""
         The incoming flux `Ie_total` has too few energy bins (dim 3). \
-        Got $(size(Ie_top_file, 3)), expected at least $(length(E)). \
+        Got $(size(Ie_top_file, 3)), expected at least $(length(E_centers)). \
         Remember that Ie_total should have the shape [n_μ, n_t, n_E].""")
     end
     if length(t_top) > 1 && size(Ie_top_file, 2) != length(t_top)
@@ -73,7 +73,7 @@ function Ie_top_from_file(t, E, μ_center, filename; interpolation=:constant)
     ## Resample onto simulation grid
     n_μ = length(μ_center)
     n_t = length(t)
-    n_E = length(E)
+    n_E = length(E_centers)
     Ie_top = zeros(n_μ, n_t, n_E)
 
     if length(t_top) == 1
@@ -213,19 +213,20 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
                           modulation=:none, f=0.0, amplitude=1.0,
                           z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
 
-    E = state.energy_grid.E
-    dE = state.energy_grid.dE
+    E_centers = state.energy_grid.E_centers
+    E_edges = state.energy_grid.E_edges
+    ΔE_grid = state.energy_grid.ΔE
     μ_center = state.pitch_angle_grid.μ_center
-    BeamWeight = state.scattering.BeamWeight
-    h_atm = state.altitude_grid.h
+    Ω_beam = state.scattering.Ω_beam
+    z = state.altitude_grid.h
 
     ## ==================== Input validation ==================== ##
     if spectrum == :flat
         if E_min < 0
             error("E_min is negative ($E_min eV). E_min must be a positive value.")
         end
-        if E_min > E[end] + dE[end]/2
-            error("E_min ($E_min eV) is larger than the maximum energy in the grid ($(E[end]) eV).")
+        if E_min > E_centers[end]
+            error("E_min ($E_min eV) is larger than the maximum energy in the grid ($(E_centers[end]) eV).")
         end
     elseif spectrum == :gaussian
         if isnothing(E₀) || isnothing(ΔE)
@@ -242,9 +243,9 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
         error("Unknown modulation type: $modulation. Must be :none, :sinus, or :square.")
     end
 
-    if z_source < h_atm[end] / 1e3
+    if z_source < z[end] / 1e3
         error("z_source ($z_source km) is below the top of the simulated ionosphere \
-        ($(h_atm[end]/1e3) km). It must be above or equal.")
+        ($(z[end]/1e3) km). It must be above or equal.")
     end
 
     if amplitude < 0 || amplitude > 1
@@ -259,46 +260,46 @@ function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
     n_time = (n_loop - 1) * (length(t) - 1) + length(t)
 
     # Initialize output array [n_beams, n_time, n_energy]
-    Ie_top = zeros(length(μ_center), n_time, length(E))
+    Ie_top = zeros(length(μ_center), n_time, length(E_centers))
 
     # Convert total energy flux from W/m² to eV/m²/s
     IeE_tot_eV = IeE_tot / qₑ
 
     # Compute energy spectrum (differential flux per eV)
     if spectrum == :flat
-        Φ_spectrum = _flat_spectrum(IeE_tot_eV, E, dE, E_min)
+        Φ_spectrum = _flat_spectrum(IeE_tot_eV, E_centers, ΔE_grid, E_min)
     else  # :gaussian
-        Φ_spectrum = _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
+        Φ_spectrum = _gaussian_spectrum(IeE_tot_eV, E_centers, ΔE_grid, E₀, ΔE)
     end
 
     # Create extended time grid for all loops
     t_total = t[1]:Float64(t.step):(t[end] * n_loop)
 
     # Calculate distance from source to top of ionosphere (m)
-    z_distance = z_source * 1e3 - h_atm[end]
+    z_distance = z_source * 1e3 - z[end]
 
     # Calculate reference time shift (for highest energy in first beam)
     # Used to align all arrival times relative to the fastest electrons
-    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E[end]))
+    t_ref = z_distance / (abs(μ_center[Beams[1]]) * v_of_E(E_edges[end-1]))
 
     ## ==================== Main loop ==================== ##
     for i_μ in Beams
         if μ_center[i_μ] >= 0
             continue  # Skip upward-going beams
         end
-        beam_fraction = BeamWeight[i_μ] / sum(BeamWeight[Beams])
+        beam_fraction = Ω_beam[i_μ] / sum(Ω_beam[Beams])
 
-        for iE in eachindex(E)
+        for iE in eachindex(E_centers)
             # Skip if no flux at this energy
             if Φ_spectrum[iE] ≈ 0
                 continue
             end
 
             # Calculate base flux for this beam and energy bin
-            flux_base = Φ_spectrum[iE] * beam_fraction * dE[iE]
+            flux_base = Φ_spectrum[iE] * beam_fraction * ΔE_grid[iE]
 
             # Calculate travel time for electrons of this energy and pitch angle
-            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E[iE]))
+            t_travel = z_distance / (abs(μ_center[i_μ]) * v_of_E(E_edges[iE]))
 
             # Time-shifted grid: subtract travel time difference relative to reference
             t_shifted = t_total .- (t_travel - t_ref)
@@ -350,13 +351,13 @@ julia> Ie = Ie_top_modulated(1e-2, state, 1:2;
 """
 function Ie_top_modulated(IeE_tot, state, Beams;
                           spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
-    h_atm = state.altitude_grid.h
+    z = state.altitude_grid.h
     # Call time-dependent version with dummy time grid and default time-related parameters
     return Ie_top_modulated(IeE_tot, state, Beams,
                             1:1:1, 1;
                            spectrum=spectrum, E_min=E_min, E₀=E₀, ΔE=ΔE,
                            modulation=:none, f=0.0, amplitude=1.0,
-                           z_source=h_atm[end]/1e3, t_start=0.0, t_end=0.0)
+                           z_source=z[end]/1e3, t_start=0.0, t_end=0.0)
 end
 
 
@@ -412,12 +413,12 @@ julia> Ie = Ie_with_LET(1e-2, 1e3, state, 1:3);
 ```
 """
 function Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
-    E = state.energy_grid.E
-    dE = state.energy_grid.dE
+    E_centers = state.energy_grid.E_centers
+    ΔE = state.energy_grid.ΔE
     μ_center = state.pitch_angle_grid.μ_center
-    BeamWeight = state.scattering.BeamWeight
+    Ω_beam = state.scattering.Ω_beam
 
-    Ie_top = zeros(length(μ_center), 1, length(E))
+    Ie_top = zeros(length(μ_center), 1, length(E_centers))
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
@@ -425,13 +426,11 @@ function Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
     # Convert total energy flux from W/m² to eV/m²/s
     IeE_tot_eV = IeE_tot / qₑ  # eV/m²/s
 
-    E_middle = E .+ dE / 2 # middle of the energy bins
-
     # Maxwellian spectra
     # π is gone as we do not normalize in /ster
     # However we keep the 2 as it seems necessary to keep the total energy flux
     # Either the Meier et al. conversion to ster is slightly wrong, or there is something I don't get?
-    Φₘ = IeE_tot_eV / (2 * E₀^3) .* E_middle .* exp.(-E_middle ./ E₀)
+    Φₘ = IeE_tot_eV / (2 * E₀^3) .* E_centers .* exp.(-E_centers ./ E₀)
     # Parameter for the LET (corrected equations to match the Fig. 4)
     b = (0.8 * E₀) .* (E₀ < 500) +
         (0.1 * E₀ + 350) .* (E₀ >= 500) # use 350 instead of .35 because we are in eV
@@ -439,11 +438,11 @@ function Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
     for i_μ in Beams
         if low_energy_tail
             Ie_max = maximum(Φₘ) # max of the Maxwellian - to scale LET amplitude
-            Ie_top[i_μ, 1, :] = (Φₘ .+ 0.4 * Ie_max * (E₀ ./ E_middle) .* exp.(-E_middle ./ b)) .*
-                                dE * BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
+            Ie_top[i_μ, 1, :] = (Φₘ .+ 0.4 * Ie_max * (E₀ ./ E_centers) .* exp.(-E_centers ./ b)) .*
+                                ΔE * Ω_beam[i_μ] ./ sum(Ω_beam[Beams])
         else
             Ie_top[i_μ, 1, :] = Φₘ .*
-                                dE * BeamWeight[i_μ] ./ sum(BeamWeight[Beams])
+                                ΔE * Ω_beam[i_μ] ./ sum(Ω_beam[Beams])
         end
     end
 
@@ -465,20 +464,18 @@ the total energy flux equals IeE_tot_eV.
 Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
 The flux is zero below E_min.
 """
-function _flat_spectrum(IeE_tot_eV, E, dE, E_min)
-    E_mid = E .+ dE ./ 2
-
-    # Find first index where E >= E_min
-    i_Emin = findlast(E .<= E_min)
+function _flat_spectrum(IeE_tot_eV, E_centers, ΔE, E_min)
+    # Find first index where bin lower edge <= E_min
+    i_Emin = findlast((E_centers .- ΔE./2) .<= E_min)
     if isnothing(i_Emin)
         i_Emin = 1
     end
 
-    # Calculate normalization: ∑ E_mid[i] * dE[i] for i >= i_Emin
-    energy_integral = sum(E_mid[i_Emin:end] .* dE[i_Emin:end])
+    # Calculate normalization: ∑ E_centers[i] * ΔE[i] for i >= i_Emin
+    energy_integral = sum(E_centers[i_Emin:end] .* ΔE[i_Emin:end])
 
     # Differential number flux (constant above E_min)
-    Φ = zeros(length(E))
+    Φ = zeros(length(E_centers))
     Φ[i_Emin:end] .= IeE_tot_eV / energy_integral
 
     return Φ  # #e⁻/m²/s/eV
@@ -495,15 +492,13 @@ The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
 
 Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
 """
-function _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
-    E_mid = E .+ dE ./ 2
-
+function _gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, E₀, ΔE_gauss)
     # Unnormalized Gaussian shape
-    Φ_shape = exp.(-(E_mid .- E₀).^2 ./ ΔE^2)
+    Φ_shape = exp.(-(E_centers .- E₀).^2 ./ ΔE_gauss^2)
 
-    # Calculate normalization: we want ∑ Φ[i] * E_mid[i] * dE[i] = IeE_tot_eV
-    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_mid[i] * dE[i])
-    energy_integral = sum(Φ_shape .* E_mid .* dE)
+    # Calculate normalization: we want ∑ Φ[i] * E_centers[i] * ΔE[i] = IeE_tot_eV
+    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_centers[i] * ΔE[i])
+    energy_integral = sum(Φ_shape .* E_centers .* ΔE)
 
     # Normalized differential number flux
     Φ = Φ_shape .* (IeE_tot_eV / energy_integral)

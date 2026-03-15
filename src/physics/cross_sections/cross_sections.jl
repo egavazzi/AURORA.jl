@@ -5,13 +5,13 @@ Collision cross-sections and excitation thresholds for all neutral species.
 """
 struct CrossSectionData{NT1<:NamedTuple, NT2<:NamedTuple}  # More explicit
     σ_neutrals::NT1
-    E_levels_neutrals::NT2
+    collision_levels::NT2
 end
 
-function CrossSectionData(E::AbstractVector, dE::AbstractVector)
-    σ_neutrals = load_cross_sections(E, dE)
-    E_levels_neutrals = load_excitation_threshold()
-    return CrossSectionData(σ_neutrals, E_levels_neutrals)
+function CrossSectionData(energy_grid::EnergyGrid)
+    σ_neutrals = load_cross_sections(energy_grid)
+    collision_levels = load_excitation_threshold()
+    return CrossSectionData(σ_neutrals, collision_levels)
 end
 
 function Base.show(io::IO, cs::CrossSectionData)
@@ -21,9 +21,9 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", cs::CrossSectionData)
     nE = size(cs.σ_neutrals.σ_N2, 2)
-    n_levels_N2 = size(cs.E_levels_neutrals.N2_levels, 1)
-    n_levels_O2 = size(cs.E_levels_neutrals.O2_levels, 1)
-    n_levels_O = size(cs.E_levels_neutrals.O_levels, 1)
+    n_levels_N2 = size(cs.collision_levels.N2_levels, 1)
+    n_levels_O2 = size(cs.collision_levels.O2_levels, 1)
+    n_levels_O = size(cs.collision_levels.O_levels, 1)
     println(io, "CrossSectionData:")
     println(io, "├── Energy bins: $(nE)")
     println(io, "├── N2 levels: $(n_levels_N2)")

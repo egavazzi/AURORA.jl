@@ -35,21 +35,17 @@ function make_density_file(directory_to_process)
 
     ## Extract simulation grid
     f = matopen(files_to_process[1])
-        E = read(f, "E")
+        E_centers = read(f, "E_centers")
         μ_lims = vec(read(f, "mu_lims"))
         t_run = read(f, "t_run")
-        h_atm = read(f, "h_atm")
+        z = read(f, "h_atm")
     close(f)
-    ## Calculate E_middle_bin from E-grid
-    E_grid = E
-    ΔE = diff(E_grid); ΔE = [ΔE; ΔE[end]]
-    E_middle_bin = E_grid + ΔE / 2
     ## Calculate the velocities
-    v = v_of_E.(E_middle_bin)
+    v = v_of_E.(E_centers)
 
     # Initiate variables
-    n_e_local = zeros(length(h_atm), length(t_run), length(E_middle_bin));
-    n_e = zeros(length(h_atm), length(t_run), length(E_middle_bin));
+    n_e_local = zeros(length(z), length(t_run), length(E_centers));
+    n_e = zeros(length(z), length(t_run), length(E_centers));
     t = t_run
     ## Calculate the densities
     for (i_file, file) in enumerate(files_to_process)
@@ -62,8 +58,8 @@ function make_density_file(directory_to_process)
             t_run = read(f, "t_run")
         close(f)
 
-        # calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e_local) # when Ie is in #e-/m²/s
-        calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie .* 1e4, n_e_local) # when Ie is in #e-/cm²/s
+        # calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e_local) # when Ie is in #e-/m²/s
+        calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie .* 1e4, n_e_local) # when Ie is in #e-/cm²/s
 
         if i_file == 1
             n_e .= n_e_local
@@ -79,15 +75,15 @@ function make_density_file(directory_to_process)
     savefile = joinpath(directory_to_process, "superthermal_e_density.mat")
     f = matopen(savefile, "w")
         write(f, "n_e", n_e)
-        write(f, "E", E)
+        write(f, "E_centers", E_centers)
         write(f, "t", t)
-        write(f, "h_atm", h_atm)
+        write(f, "h_atm", z)
     close(f)
 end
 
 
 """
-    calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
+    calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)
 
 This function converts a particle flux `Ie` (#e⁻/m²/s) into a number density `n_e` (#e⁻/m³).
 
@@ -97,24 +93,24 @@ grid. That way, we have the density of electrons with a certain energy at a spec
 altitude and time.
 
 # Calling
-`calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)`
+`calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)`
 
 # Inputs
-- `h_atm`: altitude (m), vector [nz]
+- `z`: altitude (m), vector [nz]
 - `t_run`: time (s), vector [nt]
 - `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
-- `E_middle_bin`: middle energy of the energy bins (eV), vector [nE]
-- `v`: velocity corresponding to the `E_middle_bin` (m/s), vector [nE]
+- `E_centers`: center energy of the energy bins (eV), vector [nE]
+- `v`: velocity corresponding to the `E_centers` (m/s), vector [nE]
 - `Ie`: electron flux (#e⁻/m²/s), 3D array [n_beam * nz, nt, nE]
 - `n_e`: electron density (#e⁻/m³), **empty** 3D array [nz, nt, nE]
 """
-function calculate_density_from_Ie!(h_atm, t_run, μ_lims, E_middle_bin, v, Ie, n_e)
+function calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)
     Threads.@threads for i_t in eachindex(t_run)
         for i_μ in 1:(length(μ_lims) - 1)
-            for i_z in eachindex(h_atm)
-                for i_E in eachindex(E_middle_bin)
+            for i_z in eachindex(z)
+                for i_E in eachindex(E_centers)
                     n_e[i_z, i_t, i_E] += 1 / v[i_E] *
-                                            Ie[(i_μ - 1) * length(h_atm) + i_z, i_t, i_E]
+                                            Ie[(i_μ - 1) * length(z) + i_z, i_t, i_E]
                 end
             end
         end
@@ -158,10 +154,9 @@ function make_volume_excitation_file(directory_to_process)
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
-        h_atm = read(f, "h_atm")
-        E = read(f, "E")
+        z = read(f, "h_atm")
+        E_centers = read(f, "E_centers")
     close(f)
-    dE = diff(E); dE = [dE; dE[end]]
 
     ## Load simulation neutral densities
     data = matread(joinpath(directory_to_process, "neutral_atm.mat"))
@@ -170,16 +165,16 @@ function make_volume_excitation_file(directory_to_process)
     nN2 = data["nN2"]
 
     ## Load the emission cross-sections
-    σ_4278 = excitation_4278(E .+ dE/2)
-    σ_6730 = excitation_6730_N2(E .+ dE/2)
-    σ_7774_O = excitation_7774_O(E .+ dE/2)
-    σ_7774_O2 = excitation_7774_O2(E .+ dE/2)
-    σ_8446_O = excitation_8446_O(E .+ dE/2)
-    σ_8446_O2 = excitation_8446_O2(E .+ dE/2)
-    σ_O1D = excitation_O1D(E .+ dE/2)
-    σ_O1S = excitation_O1S(E .+ dE/2)
+    σ_4278 = excitation_4278(E_centers)
+    σ_6730 = excitation_6730_N2(E_centers)
+    σ_7774_O = excitation_7774_O(E_centers)
+    σ_7774_O2 = excitation_7774_O2(E_centers)
+    σ_8446_O = excitation_8446_O(E_centers)
+    σ_8446_O2 = excitation_8446_O2(E_centers)
+    σ_O1D = excitation_O1D(E_centers)
+    σ_O1S = excitation_O1S(E_centers)
     ## Load/calculate the ionization cross-sections
-    σ_N2, σ_O2, σ_O = load_cross_sections(E, dE) # load the cross-sections
+    σ_N2, σ_O2, σ_O = load_cross_sections(E_centers) # load the cross-sections
     N2_levels, O2_levels, O_levels = load_excitation_threshold() # load the energy levels
     σ_Oi = σ_O' * O_levels[:, 2] # basically do sum(cross_section_for_each_reaction * number_of_ionizations_per_reaction)
     σ_O2i = σ_O2' * O2_levels[:, 2]
@@ -228,7 +223,7 @@ function make_volume_excitation_file(directory_to_process)
         same size so it is not of big use. But this is not a bottleneck anyway and it allows
         for using time slices with different n_t sizes in the future. // EG 20241221
         =#
-        n_z = length(h_atm)
+        n_z = length(z)
         n_μ = size(Ie_ztE, 1) ÷ n_z # (÷ returns an Int)
         n_t = size(Ie_ztE, 2)
         n_E = size(Ie_ztE, 3)
@@ -250,20 +245,20 @@ function make_volume_excitation_file(directory_to_process)
         # end
 
         ## Calculate Q (volume-excitation-rate) for various optical emissions
-        Q4278_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_4278, nN2)
-        Q6730_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_6730, nN2)
-        Q7774_O_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_7774_O, nO)
-        Q7774_O2_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_7774_O2, nO2)
+        Q4278_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_4278, nN2)
+        Q6730_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_6730, nN2)
+        Q7774_O_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_7774_O, nO)
+        Q7774_O2_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_7774_O2, nO2)
         Q7774_local = Q7774_O_local + Q7774_O2_local
-        Q8446_O_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_8446_O, nO)
-        Q8446_O2_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_8446_O2, nO2)
+        Q8446_O_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_8446_O, nO)
+        Q8446_O2_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_8446_O2, nO2)
         Q8446_local = Q8446_O_local + Q8446_O2_local
-        QO1D_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O1D, nO) # quenching is not taken into account
-        QO1S_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O1S, nO) # quenching is not taken into account
+        QO1D_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_O1D, nO) # quenching is not taken into account
+        QO1S_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_O1S, nO) # quenching is not taken into account
         # Calculate Q (volume-excitation-rate) for ionizations
-        QOi_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_Oi, nO)
-        QO2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_O2i, nO2)
-        QN2i_local = calculate_volume_excitation(h_atm, t_local, Ie_ztE_omni, σ_N2i, nN2)
+        QOi_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_Oi, nO)
+        QO2i_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_O2i, nO2)
+        QN2i_local = calculate_volume_excitation(z, t_local, Ie_ztE_omni, σ_N2i, nN2)
 
         ## Push the newly calculated Q_local for the current time-slice into a vector
         # We get something like Q4278 = [[n_z, n_t1], [n_z, n_t2], ...]
@@ -305,7 +300,7 @@ function make_volume_excitation_file(directory_to_process)
     ## Save results
     savefile = joinpath(directory_to_process, "Qzt_all_L.mat")
     f = matopen(savefile, "w")
-        write(f, "h_atm", h_atm)
+        write(f, "h_atm", z)
         write(f, "t", t)
         write(f, "Q4278", Q4278)
         write(f, "Q6730", Q6730)
@@ -329,7 +324,7 @@ end
 
 
 """
-    calculate_volume_excitation(h_atm, t, Ie_ztE_omni, σ, n)
+    calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
 
 Calculate the volume-excitation-rate for an excitation of interest, produced by the electron
 flux `Ie_ztE_omni` that is summed over the beams (omnidirectional).
@@ -339,18 +334,18 @@ Note that the neutral density `n` should match the excitation of interest (e.g. 
 calculating the volume-excitation-rate of the 4278Å optical emission).
 
 # Calling
-`Q = calculate_volume_excitation(h_atm, t, Ie_ztE, σ, n)``
+`Q = calculate_volume_excitation(z, t, Ie_ztE, σ, n)``
 
 # Inputs
-- `h_atm`: altitude (m). Vector [n\\_z]
+- `z`: altitude (m). Vector [n\\_z]
 - `t`: time (s). Vector [n\\_t]
 - `Ie_ztE_omni`: omnidirectional electron flux (#e⁻/m²/s). 3D array [n\\_z, n\\_t, n\\_E]
 - `σ`: excitation cross-section (m⁻²). Vector [n\\_E]
 - `n`: density of exciteable atmospheric specie (m⁻³). Vector [n\\_z]
 """
-function calculate_volume_excitation(h_atm, t, Ie_ztE_omni, σ, n)
+function calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
     # Initialize
-    n_z = length(h_atm)
+    n_z = length(z)
     n_t = length(t)
     Q = zeros(n_z, n_t)
     # Calculate Q for each time step
@@ -388,7 +383,7 @@ function make_column_excitation_file(directory_to_process)
 
     ## Load volume-excitation-rates
     data = matread(Q_file)
-    h_atm = data["h_atm"]
+    z = data["h_atm"]
     t = data["t"]
     Q4278 = data["Q4278"]
     Q6730 = data["Q6730"]
@@ -402,16 +397,16 @@ function make_column_excitation_file(directory_to_process)
     QO1S = data["QO1S"]
 
     ## Integrate in altitude, taking into account finite photon velocity and path length.
-    I_4278 = q2colem(t, h_atm, Q4278)
-    I_6730 = q2colem(t, h_atm, Q6730)
-    I_7774 = q2colem(t, h_atm, Q7774)
-    I_7774_O = q2colem(t, h_atm, Q7774_O)
-    I_7774_O2 = q2colem(t, h_atm, Q7774_O2)
-    I_8446 = q2colem(t, h_atm, Q8446)
-    I_8446_O = q2colem(t, h_atm, Q8446_O)
-    I_8446_O2 = q2colem(t, h_atm, Q8446_O2)
-    I_O1D = q2colem(t, h_atm, QO1D)
-    I_O1S = q2colem(t, h_atm, QO1S)
+    I_4278 = q2colem(t, z, Q4278)
+    I_6730 = q2colem(t, z, Q6730)
+    I_7774 = q2colem(t, z, Q7774)
+    I_7774_O = q2colem(t, z, Q7774_O)
+    I_7774_O2 = q2colem(t, z, Q7774_O2)
+    I_8446 = q2colem(t, z, Q8446)
+    I_8446_O = q2colem(t, z, Q8446_O)
+    I_8446_O2 = q2colem(t, z, Q8446_O2)
+    I_O1D = q2colem(t, z, QO1D)
+    I_O1S = q2colem(t, z, QO1S)
 
     ## Save results
     savefile = joinpath(directory_to_process, "I_lambda_of_t.mat")
@@ -437,7 +432,7 @@ end
 using Integrals: SampledIntegralProblem, TrapezoidalRule, solve
 using Interpolations: interpolate, extrapolate, Gridded, Linear
 """
-    q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+    q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
 
 Integrate the volume-excitation-rate (#exc/m³/s) to column-excitation-rate (#exc/m²/s).
 
@@ -450,10 +445,10 @@ the time-differences corresponding to the phase-shifts between auroral emissions
 The einstein coefficient `A` and effective lifetime `τ` are optional (equal to one by default).
 
 # Calling
-`I = q2colem(t, h_atm, Q, A, τ)`
+`I = q2colem(t, z, Q, A, τ)`
 
 # Inputs
-- `h_atm`: altitude (m). Vector [n\\_z]
+- `z`: altitude (m). Vector [n\\_z]
 - `t`: time (s). Vector [n\\_t]
 - `Q`: volume-excitation-rate (#exc/m³/s) of the wavelength of interest. 2D array [n\\_z, n\\_t]
 - `A`: einstein coefficient (s⁻¹). Scalar (Float or Int)
@@ -462,7 +457,7 @@ The einstein coefficient `A` and effective lifetime `τ` are optional (equal to 
 # Output
 - `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
 """
-function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
 
     ## Define constant
     c = 2.99792458e8 # speed of light (m/s)
@@ -488,14 +483,14 @@ function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     #         3
     #         4
     #         5
-    #     julia> h_atm
+    #     julia> z
     #     5-element Vector{Int64}:
     #         1
     #         2
     #         3
     #         4
     #         5
-    nodes = (h_atm, t)
+    nodes = (z, t)
     itp = interpolate(nodes, Q, Gridded(Linear()))
     itp = extrapolate(itp, 0.0) # allows for extrapolation but set those values to 0.0
 
@@ -503,10 +498,10 @@ function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     # We shift the values in time.
     # For each height (index i) and time (index j) position in the Q matrix, we calculate at
     # what time the corresponding photons will reach the bottom of the height column. That new
-    # time is given by the formula `t[j] - (h_atm[i] - h_atm[1]) / c`. We use that new time as
+    # time is given by the formula `t[j] - (z[i] - z[1]) / c`. We use that new time as
     # input to the interpolator `itp`,  which has for effect to "shift" that value in time.
     # Continuing our example from above, and taking c = 1 for simplicity, we get
-    #     julia> I = [itp(h_atm[i], (t[j] - (h_atm[i] - h_atm[1]) / 1)) for i in eachindex(h_atm), j in eachindex(t)]
+    #     julia> I = [itp(z[i], (t[j] - (z[i] - z[1]) / 1)) for i in eachindex(z), j in eachindex(t)]
     #     5×5 Matrix{Float64}:
     #     0.65745  0.0652896  0.313073  0.4075    0.811552
     #     0.0      0.780153   0.530831  0.546205  0.575431
@@ -514,8 +509,8 @@ function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     #     0.0      0.0        0.0       0.865137  0.141949
     #     0.0      0.0        0.0       0.0       0.707699
     # We can see that the values have been shifted/delayed in time.
-    # For the first time t = 1, only photons from the height h_atm = 1 are arriving. For the
-    # time t = 2, photons from the height h_atm = 2 that were emitted at time t = 1 are now
+    # For the first time t = 1, only photons from the height z = 1 are arriving. For the
+    # time t = 2, photons from the height z = 2 that were emitted at time t = 1 are now
     # arriving. Etc. etc.
 
     # We used a 2D interpolation. As the height are unchanged, we could have also done a 1D
@@ -523,13 +518,13 @@ function q2colem(t::Vector, h_atm, Q, A = 1, τ = ones(length(h_atm)))
     # us to have only one interpolatior object (instead of one per height). This is also
     # closest to the method used in the legacy Matlab code from which this function is
     # inspired.
-    I = [itp(h_atm[i], (t[j] - (h_atm[i] - h_atm[1]) / c)) for i in eachindex(h_atm), j in eachindex(t)]
+    I = [itp(z[i], (t[j] - (z[i] - z[1]) / c)) for i in eachindex(z), j in eachindex(t)]
 
     ## Integrate in height
     # Now that we have the matrix I which contains the information about the number of
     # photons arriving at the bottom of the column for each height and time steps, we can
     # integrate it along the height.
-    problem = SampledIntegralProblem(I, h_atm; dim=1)
+    problem = SampledIntegralProblem(I, z; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)
 
@@ -538,17 +533,17 @@ end
 
 ## Steady-state version
 """
-    q2colem(t::Real, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+    q2colem(t::Real, z, Q, A = 1, τ = ones(length(z)))
 
 Same as above, except time is now a scalar (steady-state results). This is just a simple
 integration in height.
 """
-function q2colem(t::Real, h_atm, Q, A = 1, τ = ones(length(h_atm)))
+function q2colem(t::Real, z, Q, A = 1, τ = ones(length(z)))
     ## Apply the effective lifetime and the Einstein coefficient
     Q = Q .* τ .* A
 
     ## Simple 1D integration
-    problem = SampledIntegralProblem(Q, h_atm; dim=1)
+    problem = SampledIntegralProblem(Q, z; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)
 
@@ -592,13 +587,13 @@ function make_Ie_top_file(directory_to_process)
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
-        h_atm = read(f, "h_atm")
-        E = read(f, "E")
-        μ_scatterings = read(f, "mu_scatterings")
+        z = read(f, "h_atm")
+        E_centers = read(f, "E_centers")
+        ΔE = read(f, "dE")
+        scattering_data = read(f, "mu_scatterings")
     close(f)
-    n_z = length(h_atm)
-    dE = diff(E); dE = [dE; dE[end]]
-    BeamWeight = μ_scatterings["BeamWeight"]
+    n_z = length(z)
+    Ω_beam = scattering_data["BeamWeight"]
 
     ## Initialize arrays to store the results for each time-slice
     Ie_top = Vector{Array{Float64, 3}}()
@@ -639,14 +634,14 @@ function make_Ie_top_file(directory_to_process)
 
     ## Play with the units
     Ie_top_raw = copy(Ie_top) # in #e-/m²/s
-    Ie_top = Ie_top ./ reshape(dE, (1, 1, :)) ./ BeamWeight # in #e-/m²/s/eV/ster
+    Ie_top = Ie_top ./ reshape(ΔE, (1, 1, :)) ./ Ω_beam # in #e-/m²/s/eV/ster
 
     ## Save results
     savefile = joinpath(directory_to_process, "Ie_top.mat")
     f = matopen(savefile, "w")
-        write(f, "E", E)
-        write(f, "dE", dE)
-        write(f, "BeamW", BeamWeight)
+        write(f, "E_centers", E_centers)
+        write(f, "dE", ΔE)
+        write(f, "BeamW", Ω_beam)
         write(f, "t", t)
         write(f, "Ie_top_raw", Ie_top_raw)
         write(f, "Ie_top", Ie_top)
@@ -688,11 +683,10 @@ function make_current_file(directory_to_process)
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
-        h_atm = read(f, "h_atm")
-        E = read(f, "E")
+        z = read(f, "h_atm")
+        E_centers = read(f, "E_centers")
         μ_lims = read(f, "mu_lims")
     close(f)
-    dE = diff(E); dE = [dE; dE[end]]
     μ_center = mu_avg(acosd.(μ_lims))
 
     ## Initialize arrays to store the results for each time-slice
@@ -723,7 +717,7 @@ function make_current_file(directory_to_process)
         end
 
         ## Calculate the field aligned currents and energy flux
-        n_z = length(h_atm)
+        n_z = length(z)
         n_μ = length(μ_center)
         n_t = size(Ie_ztE, 2)
         J_up_local = zeros(n_z, n_t)
@@ -733,10 +727,10 @@ function make_current_file(directory_to_process)
         @views for i_μ in 1:n_μ
             if μ_center[i_μ] > 0
                 J_up_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
-                IeE_up_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E, (1, 1, :)), dims=3)
+                IeE_up_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E_centers, (1, 1, :)), dims=3)
             else
                 J_down_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
-                IeE_down_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E, (1, 1, :)), dims=3)
+                IeE_down_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E_centers, (1, 1, :)), dims=3)
             end
         end
 
@@ -762,7 +756,7 @@ function make_current_file(directory_to_process)
     ## Save results
     savefile = joinpath(directory_to_process, "J.mat")
     f = matopen(savefile, "w")
-        write(f, "h_atm", h_atm)
+        write(f, "h_atm", z)
         write(f, "t", t)
         write(f, "J_up", J_up)
         write(f, "J_down", J_down)
@@ -806,12 +800,13 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
     for j in files_to_process
         f = matopen(j)
             Ie = read(f, "Ie_ztE") # [n_μ * nz, nt, nE]
-            E = read(f, "E")
+            E_centers = read(f, "E_centers")
+            ΔE = read(f, "dE")
             t_run = read(f, "t_run")
             μ_lims = read(f, "mu_lims")
-            h_atm = read(f, "h_atm")
+            z = read(f, "h_atm")
             I0 = read(f, "I0")
-            μ_scatterings = read(f, "mu_scatterings")
+            scattering_data = read(f, "mu_scatterings")
         close(f)
 
         # downsample the data
@@ -832,12 +827,14 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
         full_path_to_new_filename = joinpath(full_path_to_new_subdir, new_filename)
         file = matopen(full_path_to_new_filename, "w")
             write(file, "Ie_ztE", Ie)
-            write(file, "E", E)
+            write(file, "E_centers", E_centers)
+            write(file, "E_edges", E_edges)
+            write(file, "dE", ΔE)
             write(file, "t_run", t_run)
             write(file, "mu_lims", μ_lims)
-            write(file, "h_atm", h_atm)
+            write(file, "h_atm", z)
             write(file, "I0", I0)
-            write(file, "mu_scatterings", μ_scatterings)
+            write(file, "mu_scatterings", scattering_data)
         close(file)
     end
 
@@ -884,11 +881,9 @@ function make_heating_rate_file(directory_to_process)
 
     ## Load simulation grid
     f = matopen(files_to_process[1])
-        h_atm = read(f, "h_atm")
-        E = read(f, "E")
+        z = read(f, "h_atm")
+        E_centers = read(f, "E_centers")
     close(f)
-    dE = diff(E); dE = [dE; dE[end]]
-    E_middle_bin = E + dE / 2
 
     ## Load thermal electron density and temperature
     data = matread(joinpath(directory_to_process, "neutral_atm.mat"))
@@ -917,7 +912,7 @@ function make_heating_rate_file(directory_to_process)
         end
 
         ## Sum Ie over the beams
-        n_z = length(h_atm)
+        n_z = length(z)
         n_μ = size(Ie_ztE, 1) ÷ n_z # (÷ returns an Int)
         n_t = size(Ie_ztE, 2)
         n_E = size(Ie_ztE, 3)
@@ -927,7 +922,7 @@ function make_heating_rate_file(directory_to_process)
         end
 
         ## Calculate heating rate
-        heating_rate_local = calculate_heating_rate(h_atm, t_local, Ie_ztE_omni, E_middle_bin, ne, Te)
+        heating_rate_local = calculate_heating_rate(z, t_local, Ie_ztE_omni, E_centers, ne, Te)
 
         ## Push the heating rate of the current time-slice into a vector
         push!(heating_rate, heating_rate_local)
@@ -943,7 +938,7 @@ function make_heating_rate_file(directory_to_process)
     ## Save results
     savefile = joinpath(directory_to_process, "heating_rate.mat")
     f = matopen(savefile, "w")
-        write(f, "h_atm", h_atm)
+        write(f, "h_atm", z)
         write(f, "t", t)
         write(f, "heating_rate", heating_rate)
     close(f)
@@ -955,38 +950,38 @@ end
 
 
 """
-    calculate_heating_rate(h_atm, t, Ie_ztE_omni, E, ne, Te)
+    calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
 
 Calculate the heating rate of thermal electrons by superthermal electrons through Coulomb
 collisions. The heating rate is the rate at which energy is transferred from superthermal
 electrons to thermal electrons.
 
 # Calling
-`heating_rate = calculate_heating_rate(h_atm, t, Ie_ztE_omni, E, ne, Te)`
+`heating_rate = calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)`
 
 # Inputs
-- `h_atm`: altitude (m). Vector [n\\_z]
+- `z`: altitude (m). Vector [n\\_z]
 - `t`: time (s). Vector [n\\_t]
 - `Ie_ztE_omni`: omnidirectional electron flux (#e⁻/m²/s). 3D array [n\\_z, n\\_t, n\\_E]
-- `E`: energy (eV). Vector [n\\_E]
+- `E_centers`: energy bin centers (eV). Vector [n\\_E]
 - `ne`: thermal electron density (m⁻³). Vector [n\\_z]
 - `Te`: thermal electron temperature (K). Vector [n\\_z]
 
 # Output
 - `heating_rate`: heating rate (eV/m³/s). 2D array [n\\_z, n\\_t]
 """
-function calculate_heating_rate(h_atm, t, Ie_ztE_omni, E, ne, Te)
+function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
     # Initialize
-    n_z = length(h_atm)
+    n_z = length(z)
     n_t = length(t)
-    n_E = length(E)
+    n_E = length(E_centers)
     heating_rate = zeros(n_z, n_t)
 
     # Calculate the energy loss rate to thermal electrons for each energy
     # loss_to_thermal_electrons returns the energy loss rate in eV/m
     L_th = zeros(n_z, n_E)
-    for i_E in eachindex(E)
-        L_th[:, i_E] .= loss_to_thermal_electrons(E[i_E], ne, Te)
+    for i_E in eachindex(E_centers)
+        L_th[:, i_E] .= loss_to_thermal_electrons(E_centers[i_E], ne, Te)
     end
 
     # Calculate heating rate for each time step

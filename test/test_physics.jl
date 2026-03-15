@@ -4,21 +4,21 @@
 
     @test sd isa AURORA.ScatteringData
     n_beams = length(θ_lims) - 1
-    @test size(sd.BeamWeight_relative, 1) == n_beams
-    @test size(sd.Pmu2mup, 1) == size(sd.Pmu2mup, 2)
-    @test length(sd.BeamWeight) == n_beams
-    @test length(sd.theta1) > 0
+    @test size(sd.Ω_beam_relative, 1) == n_beams
+    @test size(sd.P_scatter, 1) == size(sd.P_scatter, 2)
+    @test length(sd.Ω_beam) == n_beams
+    @test length(sd.θ_scatter) > 0
 end
 
 @testitem "CrossSectionData construction" begin
-    E, dE = AURORA.make_energy_grid(500)
-    cs = AURORA.CrossSectionData(E, dE)
+    energy_grid = AURORA.EnergyGrid(500)
+    cs = AURORA.CrossSectionData(energy_grid)
 
     @test cs isa AURORA.CrossSectionData
-    @test size(cs.σ_neutrals.σ_N2, 2) == length(E)
-    @test size(cs.σ_neutrals.σ_O2, 2) == length(E)
-    @test size(cs.σ_neutrals.σ_O, 2) == length(E)
-    @test size(cs.E_levels_neutrals.N2_levels, 2) == 2
-    @test size(cs.E_levels_neutrals.O2_levels, 2) == 2
-    @test size(cs.E_levels_neutrals.O_levels, 2) == 2
+    @test size(cs.σ_neutrals.σ_N2, 2) == energy_grid.n
+    @test size(cs.σ_neutrals.σ_O2, 2) == energy_grid.n
+    @test size(cs.σ_neutrals.σ_O, 2) == energy_grid.n
+    @test size(cs.collision_levels.N2_levels, 2) == 2
+    @test size(cs.collision_levels.O2_levels, 2) == 2
+    @test size(cs.collision_levels.O_levels, 2) == 2
 end
