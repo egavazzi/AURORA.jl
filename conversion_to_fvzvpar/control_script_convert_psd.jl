@@ -32,7 +32,7 @@ include(joinpath(@__DIR__, "convert_Ie_to_psd.jl"))
 main_dir = "data/Visions2/"
 
 # Select subdirectories to process (adjust the filter string as needed)
-dir_filter = "335"
+dir_filter = "335s_pchip"
 
 # Pattern matching simulation output files
 file_pattern = r"IeFlickering\-[0-9]+\.mat"
@@ -51,6 +51,7 @@ for current_dir in directories_to_process
 
     files = readdir(current_dir, join=true)
     input_files = filter(f -> !isnothing(match(file_pattern, basename(f))), files)
+    input_files = sort(input_files, by=f -> parse(Int, match(r"(\d+)", basename(f)).captures[1]))
 
     if isempty(input_files)
         @warn "  No IeFlickering files found in $current_dir, skipping."
@@ -164,3 +165,42 @@ ax = Axis(fig[1, 1], xlabel="v‖ [m/s]", ylabel="F(v‖) [s m⁻⁴]",
 l = scatter!(vpar, F[:, iz, it], markersize=4)
 ylims!(maximum(F[:, iz, it]) / 1e8, maximum(F[:, iz, it]) * 10)
 display(fig)
+
+
+
+##
+using AURORA
+using Printf
+using MAT
+
+include(joinpath(@__DIR__, "convert_Ie_to_psd.jl"))
+
+
+file = "data/Visions2/Alfven_train_335s_pchip/IeFlickering-20.mat"
+data = load_Ie(file)
+
+vpar_edges = range(0, v_of_E.(data.E[end]), length=100)
+vpar_edges = vcat(-reverse(vpar_edges), vpar_edges[2:end])  # symmetric edges around zero
+res = make_psd_from_AURORA(file, compute=:F_only, vpar_edges=vpar_edges)
+
+
+conserved_density = dropdims(sum(data.Ie ./ reshape(res.v, 1, 1, 1, :); dims=(2, 4)), dims=(2, 4))
+reduced_density = dropdims(sum(res.F .* reshape(res.Δvpar, :, 1, 1); dims=1), dims=1)
+
+##
+i_t = 40
+i_z = 300
+
+using CairoMakie
+f = Figure(size = (1600, 1200))
+ax = Axis(f[1, 1], xlabel="v‖ [m/s]", ylabel="F(v‖) [s m⁻⁴]",
+            title="F(v‖), z=$(round(res.h_atm[i_z]/1e3, digits=1)) km, t=$(round(res.t_run[i_t], digits=2)) s",
+            yscale=log10)
+scatter!(res.vpar_centres, res.F[:, i_z, i_t])
+f
+
+
+
+comparison = matread("data/Visions2/Alfven_train_335s_pchip/psd/psd-20.mat")
+scatter!(comparison["vpar_centres"], comparison["F"][:, i_z, i_t] .* m_e, color=:red)
+f
