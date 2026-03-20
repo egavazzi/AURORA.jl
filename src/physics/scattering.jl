@@ -26,6 +26,69 @@ function ScatteringData(θ_lims; n_direction=720)
     )
 end
 
+"""
+    load_scattering_matrices(θ_lims)
+
+Load the scattering matrices for the given pitch-angle limits.
+
+# Calling
+`μ_lims, μ_center, scattering = load_scattering_matrices(θ_lims)`
+
+# Inputs
+- `θ_lims`: pitch angle limits of the e- beams (deg). Vector [n_beam + 1]
+
+# Outputs
+- `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
+- `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
+- `scattering`: Tuple with several of the scattering informations, namely scattering
+    = `(P_scatter, Ω_subbeam_relative, Ω_beam)`
+    + `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x n`_`direction]
+    + `Ω_subbeam_relative`: relative contribution from within each beam. Matrix [n`_`beam x n`_`direction]
+    + `Ω_beam`: solid angle for each stream (ster). Vector [n_beam]
+    + `θ_scatter`: scattering angles used in the calculations. Vector [n_direction]
+"""
+function load_scattering_matrices(θ_lims)
+    validate_θ_lims(θ_lims)
+    μ_lims = cosd.(θ_lims)
+    μ_center = mu_avg(θ_lims)
+    Ω_beam = beam_weight(θ_lims) # this beam weight is calculated in a continuous way
+    P_scatter, Ω_subbeam_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
+    scattering = (P_scatter = P_scatter, Ω_subbeam_relative = Ω_subbeam_relative,
+                     Ω_beam = Ω_beam, θ_scatter = θ₁)
+
+    return μ_lims, μ_center, scattering
+end
+
+"""
+    validate_θ_lims(θ_lims)
+
+Validate that the pitch-angle limits `θ_lims` are correctly specified.
+Throws an `ArgumentError` if:
+- `θ_lims` does not include 180° (field-aligned downward)
+- `θ_lims` does not include 0° (field-aligned upward)
+- `θ_lims` is not in descending order
+
+# Inputs
+- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0)
+"""
+function validate_θ_lims(θ_lims)
+    if maximum(θ_lims) != 180
+        throw(ArgumentError("θ_lims must include 180° (field-aligned downward). " *
+              "Got maximum of $(maximum(θ_lims))°. " *
+              "Example of valid input: 180:-10:0."))
+    end
+    if minimum(θ_lims) != 0
+        throw(ArgumentError("θ_lims must include 0° (field-aligned upward). " *
+              "Got minimum of $(minimum(θ_lims))°. " *
+              "Example of valid input: 180:-10:0."))
+    end
+    if !issorted(θ_lims, rev=true)
+        throw(ArgumentError("θ_lims must be in descending order (e.g., 180:-10:0). " *
+              "Got: $θ_lims"))
+    end
+    return nothing
+end
+
 function Base.show(io::IO, sd::ScatteringData)
     n_beams = length(sd.Ω_beam)
     n_dir = length(sd.θ_scatter)
