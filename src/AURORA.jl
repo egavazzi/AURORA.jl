@@ -1,16 +1,10 @@
 module AURORA
 
-# AURORA functions
-
-
 include("grids/abstract_grid.jl")
 include("grids/altitude_grid.jl")
 include("grids/energy_grid.jl")
 include("grids/pitch_angle_grid.jl")
 export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid
-
-include("setup.jl")
-export AuroraModel, make_altitude_grid, make_energy_grid
 
 include("ionosphere/ionosphere.jl")
 export Ionosphere, n_neutrals
@@ -19,39 +13,45 @@ include("ionosphere/msis/msis.jl")
 export find_msis_file, find_nrlmsis_file
 export find_iri_file
 
-include("input/input_flux.jl")
-export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
-
-include("utilities.jl")
-export v_of_E, CFL_criteria, mu_avg, beam_weight,
-        make_savedir,
-        rename_if_exists,
-        find_Ietop_file
-
-include("solvers/transport_matrices.jl")
-include("solvers/matrix_building.jl")
-include("solvers/crank_nicolson.jl")
-include("solvers/crank_nicolson_optimized.jl")
-
 include("physics/cross_sections/e_N2_cross_sections.jl")
 include("physics/cross_sections/e_O2_cross_sections.jl")
 include("physics/cross_sections/e_O_cross_sections.jl")
 include("physics/cross_sections/emission_cross_sections.jl")
 include("physics/cross_sections/cross_sections.jl")
 export CrossSectionData
-include("physics/cascading.jl")
-include("physics/energy_degradation.jl")
+
 include("physics/scattering.jl")
 export ScatteringData
 include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 
-include("main.jl")
-export calculate_e_transport
+include("setup.jl")
+export AuroraModel, make_altitude_grid, make_energy_grid
 
+include("input/input_flux.jl")
+export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
+
+
+include("solvers/transport_matrices.jl")
+include("solvers/matrix_building.jl")
+
+include("physics/cascading.jl")
+include("physics/energy_degradation.jl")
+
+include("solvers/crank_nicolson.jl")
+include("solvers/crank_nicolson_optimized.jl")
 include("solvers/steady_state.jl")
 include("solvers/steady_state_optimized.jl")
+
+include("main.jl")
+export calculate_e_transport
 export calculate_e_transport_steady_state
+
+include("utilities.jl")
+export v_of_E, CFL_criteria, mu_avg, beam_weight,
+        make_savedir,
+        rename_if_exists,
+        find_Ietop_file
 
 include("analysis.jl")
 export make_density_file, downsampling_fluxes, make_volume_excitation_file,
