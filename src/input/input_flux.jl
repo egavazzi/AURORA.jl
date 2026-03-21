@@ -193,7 +193,11 @@ The function creates an electron precipitation spectrum with:
 # Examples
 Flat spectrum with smooth onset:
 ```jldoctest
-julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> msis_file = find_msis_file(verbose=false);
+
+julia> iri_file = find_iri_file(verbose=false);
+
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, msis_file, iri_file; verbose=false);
 
 julia> Ie = Ie_top_modulated(1e-2, model, 1:2, 0:0.01:1, 1;
                              spectrum=:flat, E_min=9000.0, t_start=0.0, t_end=0.1);
@@ -402,7 +406,11 @@ Changes were made to the factor `b`:
 Calling the function with flux only in the two first beams (0 to 20°) and an "isotropic"
 pitch-angle distribution.
 ```jldoctest
-julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> msis_file = find_msis_file(verbose=false);
+
+julia> iri_file = find_iri_file(verbose=false);
+
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, msis_file, iri_file; verbose=false);
 
 julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, model, 1:2);
 
