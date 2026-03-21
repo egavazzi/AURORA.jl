@@ -39,8 +39,8 @@ The returned matrix contains the following columns:
 21. foF2: F2 critical frequency
 """
 function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                             lat = 76, lon = 5, height = 85:1:700)
-    print("Calculating iri data...")
+               lat = 76, lon = 5, height = 85:1:700, verbose=true)
+    verbose && print("Calculating iri data...")
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
@@ -63,6 +63,6 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     # add a header with the name of columns
     iri_data = vcat(["height(km)" "ne(m-3)" "Tn(K)" "Ti(K)" "Te(K)" "nO+(m-3)" "nH+(m-3)" "nHe+(m-3)" "nO2+(m-3)" "nNO+(m-3)" "nCI(m-3)" "nN+(m-3)" "NmF2" "hmF2" "NmF1" "hmF1" "NmE" "hmE" "TEC" "EqVertIonDrift" "foF2"], iri_data)
     parameters = (; year, month, day, hour, minute, lat, lon, height)
-    println(" done.")
+    verbose && println(" done.")
     return iri_data, parameters
 end

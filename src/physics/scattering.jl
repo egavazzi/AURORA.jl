@@ -16,10 +16,11 @@ struct ScatteringData{FT, A<:AbstractArray{FT}, M<:AbstractMatrix{FT}, V<:Abstra
     θ_scatter::V
 end
 
-function ScatteringData(θ_lims; n_direction=720)
+function ScatteringData(θ_lims; n_direction=720, verbose=true)
     validate_θ_lims(θ_lims)
     Ω_beam = beam_weight(θ_lims)
-    P_scatter, Ω_subbeam_relative, θ1 = find_scattering_matrices(θ_lims, n_direction)
+    P_scatter, Ω_subbeam_relative, θ1 = find_scattering_matrices(θ_lims, n_direction;
+                                                                 verbose)
     FT = eltype(P_scatter)
     return ScatteringData{FT, typeof(P_scatter), typeof(Ω_subbeam_relative), typeof(Ω_beam)}(
         P_scatter, Ω_subbeam_relative, Ω_beam, vec(θ1)
@@ -140,14 +141,13 @@ function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
                 n_direction_file = read(file, "n_direction")
                 close(file)
                 if θ_lims == θ_lims_file && n_direction == n_direction_file
-                    verbose && print("Loading scattering-matrices from file: ", scattering_files[i1])
                     file = matopen(filename)
                     P_scatter = read(file, "P_scatter")
                     Ω_subbeam_relative = read(file, "subbeamweight_relative")
                     θ₁ = read(file, "theta_scatter")
                     close(file)
                     found_them = 1
-                    verbose && println(" ✅")
+                    verbose && println("Loading scattering-matrices from file: ", scattering_files[i1], " ✅")
                     break
                 end
             catch

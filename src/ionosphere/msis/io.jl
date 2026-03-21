@@ -27,12 +27,13 @@ pre-check on filenames before loading and comparing full parameters.
 # Returns
 - `Union{String, Nothing}`: Full path to matching file, or `nothing` if not found
 """
-function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height)
+function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height,
+                                    verbose=true)
     data_neutrals_directory = pkgdir(AURORA, "internal_data", "data_neutrals")
     data_neutrals_files = readdir(data_neutrals_directory)
     msis_files = data_neutrals_files[contains.(data_neutrals_files, "msis")]
     msis_files_fullpath = joinpath.(data_neutrals_directory, msis_files)
-    print("Looking for an msis file that matches the parameters...")
+    verbose && print("Looking for an msis file that matches the parameters...")
 
     for (i, file) in enumerate(msis_files_fullpath)
         if msis_files[i][5] == '_' # Check that the file is not an old msis file
@@ -49,15 +50,15 @@ function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, h
                 # Now we check if all the parameters are the same
                 if parameters == parameters_file
                     # If it is the case, that will be the file to load
-                    println(" found one!")
-                    println("   ∟ at $file")
+                    verbose && println(" found one!")
+                    verbose && println("   ∟ at $file")
                     return file
                 end
             end
         end
     end
 
-    println(" no file was found.")
+    verbose && println(" no file was found.")
     return nothing
 end
 
@@ -226,7 +227,7 @@ The file contains:
 - Files are saved to `internal_data/data_neutrals/` directory
 - Existing files are not overwritten; a suffix is added to the filename
 """
-function save_msis_data(msis_data, parameters)
+function save_msis_data(msis_data, parameters; verbose=true)
     # Unpack the parameters
     year = parameters.year
     month = parameters.month
@@ -265,8 +266,8 @@ function save_msis_data(msis_data, parameters)
         write(f, "\n")
         writedlm(f, msis_data)
     end
-    println("File " * @bold("$filename") * " created under " * @underline("$directory") *
-            ".")
+    verbose && println("File " * @bold("$filename") * " created under " *
+            @underline("$directory") * ".")
 
     return fullpath
 end

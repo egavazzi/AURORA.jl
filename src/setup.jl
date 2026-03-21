@@ -17,7 +17,8 @@ struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
 end
 
 """
-    AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+    AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
+                verbose=true)
 
 Load the atmosphere, the energy grid, and the collision data into an `AuroraModel`.
 
@@ -32,6 +33,7 @@ Load the atmosphere, the energy grid, and the collision data into an `AuroraMode
 - `msis_file`: path to the msis file to use
 - `iri_file`: path to the iri file to use
 - `B_angle_to_zenith`: angle between magnetic field and zenith (degrees)
+- `verbose=true`: print progress messages when loading stuff
 
 ## Returns
 An `AuroraModel` with fields:
@@ -44,11 +46,12 @@ An `AuroraModel` with fields:
 - `B_angle_to_zenith::Real`
 - `s_field::Vector`
 """
-function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
+                     verbose=true)
     altitude_grid = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
-    scattering = ScatteringData(θ_lims)
+    scattering = ScatteringData(θ_lims; verbose)
     ionosphere = Ionosphere(msis_file, iri_file, altitude_grid.h)
     cross_sections = CrossSectionData(energy_grid)
     s_field = altitude_grid.h ./ cosd(B_angle_to_zenith)

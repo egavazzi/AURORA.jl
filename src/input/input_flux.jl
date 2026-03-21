@@ -201,7 +201,11 @@ julia> Ie = Ie_top_modulated(1e-2, model, 1:2, 0:0.01:1, 1;
 
 Gaussian spectrum with sinusoidal modulation at 10 Hz:
 ```jldoctest
-julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> msis_file = find_msis_file(verbose=false);
+
+julia> iri_file = find_iri_file(verbose=false);
+
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, msis_file, iri_file; verbose=false);
 
 julia> Ie = Ie_top_modulated(1e-2, model, 1:2, 0:0.001:0.5, 1;
                              spectrum=:gaussian, E₀=5000.0, ΔE=500.0,
@@ -342,10 +346,13 @@ It internally calls the time-dependent version with minimal time grid (`1:1:1`) 
 
 # Examples
 ```jldoctest
-julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> msis_file = find_msis_file(verbose=false);
 
-julia> Ie = Ie_top_modulated(1e-2, model, 1:2;
-                             spectrum=:flat, E_min=9000.0);
+julia> iri_file = find_iri_file(verbose=false);
+
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, msis_file, iri_file; verbose=false);
+
+julia> Ie = Ie_top_modulated(1e-2, model, 1:2; spectrum=:flat, E_min=9000.0);
 ```
 """
 function Ie_top_modulated(IeE_tot, model::AuroraModel, Beams;
@@ -405,10 +412,13 @@ Calling the function with flux only in the three first beams (0 to 30°) and a
 custom pitch-angle distribution (1/2 of the total flux in the first beam,
 1/4 in the second beam and 1/4 in the third beam).
 ```jldoctest
-julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> msis_file = find_msis_file(verbose=false);
+
+julia> iri_file = find_iri_file(verbose=false);
+
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, msis_file, iri_file; verbose=false);
 
 julia> Ie = Ie_with_LET(1e-2, 1e3, model, 1:3);
-
 ```
 """
 function Ie_with_LET(IeE_tot, E₀, model::AuroraModel, Beams; low_energy_tail=true)

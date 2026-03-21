@@ -38,17 +38,20 @@ function find_iri_file(;
                        minute = 15,
                        lat = 76,
                        lon = 5,
-                       height = 85:1:700)
+                       height = 85:1:700,
+                       verbose = true)
 
     # First check if we have an iri file with these parameters
-    file_to_load = search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height)
+    file_to_load = search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height,
+                                            verbose)
     if !isnothing(file_to_load)
         return file_to_load
     end
 
     # Otherwise, calculate and save new IRI data
-    iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon, height)
-    file_to_load = save_iri_data(iri_data, parameters)
+    iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
+                                              height, verbose)
+    file_to_load = save_iri_data(iri_data, parameters; verbose)
 
     return file_to_load
 end
