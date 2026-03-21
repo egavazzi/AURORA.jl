@@ -29,20 +29,20 @@ end
 
 
 
-function update_Q!(matrices::TransportMatrices, Ie, state, t,
+function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                    B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
 
-    z = state.altitude_grid.h
-    ne = state.ionosphere.ne
-    Te = state.ionosphere.Te
-    n_neutrals_data = n_neutrals(state.ionosphere)
-    σ_neutrals = state.cross_sections.σ_neutrals
-    collision_levels = state.cross_sections.collision_levels
-    E_edges = state.energy_grid.E_edges
-    E_centers = state.energy_grid.E_centers
-    ΔE = state.energy_grid.ΔE
-    Ω_beam = state.scattering.Ω_beam
-    μ_center = state.pitch_angle_grid.μ_center
+    z = model.altitude_grid.h
+    ne = model.ionosphere.ne
+    Te = model.ionosphere.Te
+    n_neutrals_data = n_neutrals(model.ionosphere)
+    σ_neutrals = model.cross_sections.σ_neutrals
+    collision_levels = model.cross_sections.collision_levels
+    E_edges = model.energy_grid.E_edges
+    E_centers = model.energy_grid.E_centers
+    ΔE = model.energy_grid.ΔE
+    Ω_beam = model.scattering.Ω_beam
+    μ_center = model.pitch_angle_grid.μ_center
 
     Q = matrices.Q  # Extract Q for convenient access
 

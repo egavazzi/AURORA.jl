@@ -445,7 +445,7 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
 end
 
 """
-    Crank_Nicolson_optimized!(Ie, t, state, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson_optimized!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
 
 Optimized Crank-Nicolson time-stepping scheme using direct nzval modification.
 This is an in-place version that modifies `Ie` directly to avoid allocations.
@@ -495,7 +495,7 @@ Both matrices have the same block structure as in steady-state:
 # Arguments
 - `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle × n_t) to store results
 - `t`: time grid [s]
-- `state`: simulation state NamedTuple (`s_field` and `pitch_angle_grid.μ_center` are used)
+- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `v`: electron velocity [km/s]
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
@@ -510,9 +510,9 @@ Both matrices have the same block structure as in steady-state:
 - `first_iteration`: whether this is the first call
 
 """
-function Crank_Nicolson_optimized!(Ie, t, state, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
-    z = state.s_field
-    μ = state.pitch_angle_grid.μ_center
+function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    z = model.s_field
+    μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
     n_angle = length(μ)
 

@@ -136,10 +136,10 @@ end
 ## ====================================================================================== ##
 
 """
-    Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
+    Ie_top_modulated(IeE_tot, model, Beams, t, n_loop;
                      spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing,
                      modulation=:none, f=0.0, amplitude=1.0,
-                     z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
+                     z_source=model.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
 
 Create a time-dependent electron flux distribution with configurable energy spectrum shape
 and temporal modulation.
@@ -149,7 +149,7 @@ Returns an electron flux distribution (in #e⁻/m²/s) such that when integrated
 
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
-- `state`: simulation state NamedTuple from `setup(...)`
+- `model`: `AuroraModel` describing the grids and atmosphere
 - `Beams`: indices of the electron beams with precipitating flux
 - `t`: time grid (s). Range or Vector [n_t]
 - `n_loop`: number of loops (for repeated simulations)
@@ -193,31 +193,31 @@ The function creates an electron precipitation spectrum with:
 # Examples
 Flat spectrum with smooth onset:
 ```jldoctest
-julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> Ie = Ie_top_modulated(1e-2, state, 1:2, 0:0.01:1, 1;
+julia> Ie = Ie_top_modulated(1e-2, model, 1:2, 0:0.01:1, 1;
                              spectrum=:flat, E_min=9000.0, t_start=0.0, t_end=0.1);
 ```
 
 Gaussian spectrum with sinusoidal modulation at 10 Hz:
 ```jldoctest
-julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> Ie = Ie_top_modulated(1e-2, state, 1:2, 0:0.001:0.5, 1;
+julia> Ie = Ie_top_modulated(1e-2, model, 1:2, 0:0.001:0.5, 1;
                              spectrum=:gaussian, E₀=5000.0, ΔE=500.0,
                              modulation=:sinus, f=10.0, amplitude=1.0);
 ```
 """
-function Ie_top_modulated(IeE_tot, state, Beams, t, n_loop;
+function Ie_top_modulated(IeE_tot, model::AuroraModel, Beams, t, n_loop;
                           spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing,
                           modulation=:none, f=0.0, amplitude=1.0,
-                          z_source=state.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
+                          z_source=model.altitude_grid.h[end]/1e3, t_start=0.0, t_end=0.0)
 
-    E_centers = state.energy_grid.E_centers
-    ΔE_grid = state.energy_grid.ΔE
-    μ_center = state.pitch_angle_grid.μ_center
-    Ω_beam = state.scattering.Ω_beam
-    z = state.altitude_grid.h
+    E_centers = model.energy_grid.E_centers
+    ΔE_grid = model.energy_grid.ΔE
+    μ_center = model.pitch_angle_grid.μ_center
+    Ω_beam = model.scattering.Ω_beam
+    z = model.altitude_grid.h
 
     ## ==================== Input validation ==================== ##
     if spectrum == :flat
@@ -317,7 +317,7 @@ end
 
 
 """
-    Ie_top_modulated(IeE_tot, state, Beams;
+    Ie_top_modulated(IeE_tot, model, Beams;
                      spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
 
 Steady-state version of `Ie_top_modulated` that does not include time-dependent behavior.
@@ -328,7 +328,7 @@ It internally calls the time-dependent version with minimal time grid (`1:1:1`) 
 
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
-- `state`: simulation state NamedTuple from `setup(...)`
+- `model`: `AuroraModel` describing the grids and atmosphere
 - `Beams`: indices of the electron beams with precipitating flux
 
 # Keyword Arguments
@@ -342,17 +342,17 @@ It internally calls the time-dependent version with minimal time grid (`1:1:1`) 
 
 # Examples
 ```jldoctest
-julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> Ie = Ie_top_modulated(1e-2, state, 1:2;
+julia> Ie = Ie_top_modulated(1e-2, model, 1:2;
                              spectrum=:flat, E_min=9000.0);
 ```
 """
-function Ie_top_modulated(IeE_tot, state, Beams;
+function Ie_top_modulated(IeE_tot, model::AuroraModel, Beams;
                           spectrum=:flat, E_min=0.0, E₀=nothing, ΔE=nothing)
-    z = state.altitude_grid.h
+    z = model.altitude_grid.h
     # Call time-dependent version with dummy time grid and default time-related parameters
-    return Ie_top_modulated(IeE_tot, state, Beams,
+    return Ie_top_modulated(IeE_tot, model, Beams,
                             1:1:1, 1;
                            spectrum=spectrum, E_min=E_min, E₀=E₀, ΔE=ΔE,
                            modulation=:none, f=0.0, amplitude=1.0,
@@ -365,7 +365,7 @@ end
 ## ====================================================================================== ##
 
 """
-    Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
+    Ie_with_LET(IeE_tot, E₀, model, Beams; low_energy_tail=true)
 
 Return an electron spectra following a Maxwellian distribution with a low
 energy tail (LET)
@@ -376,7 +376,7 @@ JGR 1989 (pages 13541-13552)
 # Arguments
 - `IeE_tot`: total energy flux (W/m²)
 - `E₀`: characteristic energy (eV)
-- `state`: simulation state NamedTuple from `setup(...)`
+- `model`: `AuroraModel` describing the grids and atmosphere
 - `Beams`: indices of the electron beams with a precipitating flux
 
 # Keyword Arguments
@@ -395,9 +395,9 @@ Changes were made to the factor `b`:
 Calling the function with flux only in the two first beams (0 to 20°) and an "isotropic"
 pitch-angle distribution.
 ```jldoctest
-julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, state, 1:2);
+julia> Ie = AURORA.Ie_with_LET(1e-2, 1e3, model, 1:2);
 
 ```
 
@@ -405,17 +405,17 @@ Calling the function with flux only in the three first beams (0 to 30°) and a
 custom pitch-angle distribution (1/2 of the total flux in the first beam,
 1/4 in the second beam and 1/4 in the third beam).
 ```jldoctest
-julia> state = setup((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
+julia> model = AuroraModel((100, 600), 180:-10:0, 10e3, find_msis_file(), find_iri_file());
 
-julia> Ie = Ie_with_LET(1e-2, 1e3, state, 1:3);
+julia> Ie = Ie_with_LET(1e-2, 1e3, model, 1:3);
 
 ```
 """
-function Ie_with_LET(IeE_tot, E₀, state, Beams; low_energy_tail=true)
-    E_centers = state.energy_grid.E_centers
-    ΔE = state.energy_grid.ΔE
-    μ_center = state.pitch_angle_grid.μ_center
-    Ω_beam = state.scattering.Ω_beam
+function Ie_with_LET(IeE_tot, E₀, model::AuroraModel, Beams; low_energy_tail=true)
+    E_centers = model.energy_grid.E_centers
+    ΔE = model.energy_grid.ΔE
+    μ_center = model.pitch_angle_grid.μ_center
+    Ω_beam = model.scattering.Ω_beam
 
     Ie_top = zeros(length(μ_center), 1, length(E_centers))
 

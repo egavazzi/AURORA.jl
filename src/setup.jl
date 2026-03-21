@@ -1,10 +1,28 @@
 """
-    setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+    AuroraModel{AG, EG, PAG, SD, IO, CS, FT, V}
 
-Load the atmosphere, the energy grid, and the collision data.
+Container for the grids, atmosphere, and collision data used by an AURORA simulation.
+"""
+struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
+                   SD<:ScatteringData, IO<:Ionosphere, CS<:CrossSectionData,
+                   FT, V<:AbstractVector{FT}}
+    altitude_grid::AG
+    energy_grid::EG
+    pitch_angle_grid::PAG
+    scattering::SD
+    ionosphere::IO
+    cross_sections::CS
+    B_angle_to_zenith::FT
+    s_field::V
+end
+
+"""
+    AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+
+Load the atmosphere, the energy grid, and the collision data into an `AuroraModel`.
 
 ## Calling
-`state = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)`
+`model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)`
 
 ## Inputs
 - `altitude_lims`: the altitude limits, in km, for the bottom and top of the ionosphere in our simulation
@@ -16,7 +34,7 @@ Load the atmosphere, the energy grid, and the collision data.
 - `B_angle_to_zenith`: angle between magnetic field and zenith (degrees)
 
 ## Returns
-A NamedTuple with fields:
+An `AuroraModel` with fields:
 - `altitude_grid::AltitudeGrid`
 - `energy_grid::EnergyGrid`
 - `pitch_angle_grid::PitchAngleGrid`
@@ -26,7 +44,7 @@ A NamedTuple with fields:
 - `B_angle_to_zenith::Real`
 - `s_field::Vector`
 """
-function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
     altitude_grid = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
@@ -35,7 +53,29 @@ function setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_ze
     cross_sections = CrossSectionData(energy_grid)
     s_field = altitude_grid.h ./ cosd(B_angle_to_zenith)
 
-    return (; altitude_grid, energy_grid, pitch_angle_grid,
-              scattering, ionosphere, cross_sections,
-              B_angle_to_zenith, s_field)
+    FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
+
+    return AuroraModel{typeof(altitude_grid), typeof(energy_grid), typeof(pitch_angle_grid),
+                       typeof(scattering), typeof(ionosphere), typeof(cross_sections),
+                       FT, typeof(s_field)}(
+        altitude_grid, energy_grid, pitch_angle_grid,
+        scattering, ionosphere, cross_sections,
+        FT(B_angle_to_zenith), s_field
+    )
+end
+
+function Base.show(io::IO, model::AuroraModel)
+    print(io, "AuroraModel($(model.altitude_grid), $(model.energy_grid))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
+    println(io, "AuroraModel:")
+    println(io, "├── ", model.altitude_grid)
+    println(io, "├── ", model.energy_grid)
+    println(io, "├── ", model.pitch_angle_grid)
+    println(io, "├── ", model.scattering)
+    println(io, "├── ", model.ionosphere)
+    println(io, "├── ", model.cross_sections)
+    println(io, "├── B angle to zenith: $(model.B_angle_to_zenith)°")
+    print(io, "└── s_field: $(length(model.s_field)) points")
 end

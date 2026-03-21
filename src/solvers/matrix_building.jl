@@ -82,10 +82,10 @@ end
 
 ## ----------------------------------------------------- ##
 
-function update_A!(A, state, iE)
-    ionosphere = state.ionosphere
-    cross_sections = state.cross_sections
-    energy_grid = state.energy_grid
+function update_A!(A, model::AuroraModel, iE)
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+    energy_grid = model.energy_grid
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
     E_centers = energy_grid.E_centers
@@ -112,11 +112,11 @@ function update_A!(A, state, iE)
     return nothing
 end
 
-function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
-    ionosphere = state.ionosphere
-    cross_sections = state.cross_sections
-    energy_grid = state.energy_grid
-    scattering = state.scattering
+function update_B!(B, model::AuroraModel, phase_fcn_neutrals, iE, B2B_fragment)
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+    energy_grid = model.energy_grid
+    scattering = model.scattering
     n_neutrals_data = n_neutrals(ionosphere)
     σ_neutrals = cross_sections.σ_neutrals
     collision_levels = cross_sections.collision_levels
@@ -179,9 +179,9 @@ function update_B!(B, state, phase_fcn_neutrals, iE, B2B_fragment)
     return B2B_inelastic_neutrals
 end
 
-function update_D!(D, state)
-    energy_grid = state.energy_grid
-    pitch_angle_grid = state.pitch_angle_grid
+function update_D!(D, model::AuroraModel)
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
     E_edges = energy_grid.E_edges
     ΔE = energy_grid.ΔE
     θ_lims = pitch_angle_grid.θ_lims
@@ -215,8 +215,8 @@ function update_D!(D, state)
     return nothing
 end
 
-function update_Ddiffusion!(Ddiffusion, state)
-    z = state.s_field
+function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
+    z = model.s_field
     dzd = z[2:end-1] - z[1:end-2]
     dzu = z[3:end]   - z[2:end-1]
 
@@ -237,13 +237,13 @@ function update_Ddiffusion!(Ddiffusion, state)
 end
 
 """
-    update_matrices!(matrices, state, phase_fcn_neutrals, iE, B2B_fragment)
+    update_matrices!(matrices, model, phase_fcn_neutrals, iE, B2B_fragment)
 
 Update the A and B matrices in place for a given energy level iE.
 
 # Arguments
 - `matrices::TransportMatrices`: Container to update
-- `state`: Setup state NamedTuple (grids + atmosphere + physics)
+- `model`: `AuroraModel` (grids + atmosphere + physics)
 - `phase_fcn_neutrals`: Phase functions for all species
 - `iE`: Current energy index
 - `B2B_fragment`: Pre-computed beam-to-beam fragments
@@ -251,23 +251,23 @@ Update the A and B matrices in place for a given energy level iE.
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, state, phase_fcn_neutrals,
+function update_matrices!(matrices::TransportMatrices, model::AuroraModel, phase_fcn_neutrals,
                           iE, B2B_fragment)
-    update_A!(matrices.A, state, iE)
-    return update_B!(matrices.B, state, phase_fcn_neutrals, iE, B2B_fragment)
+    update_A!(matrices.A, model, iE)
+    return update_B!(matrices.B, model, phase_fcn_neutrals, iE, B2B_fragment)
 end
 
 
 """
-    initialize_transport_matrices(state, t)
+    initialize_transport_matrices(model, t)
 
 Create a `TransportMatrices` container initialized with zeros for A, B, D, Q and Ddiffusion.
 """
-function initialize_transport_matrices(state, t)
-    n_altitude = length(state.altitude_grid.h)
-    n_angle = length(state.pitch_angle_grid.μ_center)
+function initialize_transport_matrices(model::AuroraModel, t)
+    n_altitude = length(model.altitude_grid.h)
+    n_angle = length(model.pitch_angle_grid.μ_center)
     n_time = length(t)
-    n_energy = state.energy_grid.n
+    n_energy = model.energy_grid.n
 
     matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
 

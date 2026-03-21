@@ -151,14 +151,14 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
     n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
 
-    ## Build simulation state from typed setup
-    state = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-    altitude_grid = state.altitude_grid
-    energy_grid = state.energy_grid
-    pitch_angle_grid = state.pitch_angle_grid
-    scattering = state.scattering
-    ionosphere = state.ionosphere
-    cross_sections = state.cross_sections
+    ## Build simulation model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+    altitude_grid = model.altitude_grid
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
+    scattering = model.scattering
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
 
     z = altitude_grid.h
     E_centers = energy_grid.E_centers
@@ -188,14 +188,14 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     if INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(t, E_centers, μ_center, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, state, INPUT_OPTIONS.Beams,
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
                                   t, n_loop;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
                                   modulation=Symbol(INPUT_OPTIONS.modulation),
                                   f=INPUT_OPTIONS.f, amplitude=1.0,
                                   z_source=INPUT_OPTIONS.z₀)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, state, INPUT_OPTIONS.Beams,
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
                                   t, n_loop;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
                                   modulation=:none,
@@ -237,10 +237,10 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
     ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(state, t_per_loop)
+    matrices = initialize_transport_matrices(model, t_per_loop)
     # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, state)
-    update_Ddiffusion!(matrices.Ddiffusion, state)
+    update_D!(matrices.D, model)
+    update_Ddiffusion!(matrices.Ddiffusion, model)
     matrices.Ddiffusion[1, 1] = 0
 
     ## Precalculate the B2B fragment
@@ -260,24 +260,24 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         # Looping over energy
         for iE in n_E:-1:1
             # Update matrices A and B for current energy
-            B2B_inelastic_neutrals = update_matrices!(matrices, state,
+            B2B_inelastic_neutrals = update_matrices!(matrices, model,
                                                       phase_fcn_neutrals, iE,
                                                       B2B_fragment)
 
             # Compute the flux of e-
             if iE == n_E
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, state,
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
                                                  v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache,
                                                  first_iteration = true)
             else
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, state,
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
                                                  v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
-            update_Q!(matrices, Ie, state, t_per_loop,
+            update_Q!(matrices, Ie, model, t_per_loop,
                       B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
 
             next!(p)
@@ -320,14 +320,14 @@ Run a steady-state electron transport simulation and save the results to `savedi
 """
 function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
-    ## Build simulation state from typed setup
-    state = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-    altitude_grid = state.altitude_grid
-    energy_grid = state.energy_grid
-    pitch_angle_grid = state.pitch_angle_grid
-    scattering = state.scattering
-    ionosphere = state.ionosphere
-    cross_sections = state.cross_sections
+    ## Build simulation model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+    altitude_grid = model.altitude_grid
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
+    scattering = model.scattering
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
 
     z = altitude_grid.h
     E_centers = energy_grid.E_centers
@@ -346,10 +346,10 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     if INPUT_OPTIONS.input_type == "from_file"
         Ie_top = Ie_top_from_file(1:1:1, E_centers, μ_center, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, state, INPUT_OPTIONS.Beams;
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min)
     elseif INPUT_OPTIONS.input_type == "LET"
-        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, state,
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, model,
                              INPUT_OPTIONS.Beams;
                              low_energy_tail = INPUT_OPTIONS.low_energy_tail)
     end
@@ -381,10 +381,10 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
 
     ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(state, 1:1:1)
+    matrices = initialize_transport_matrices(model, 1:1:1)
     # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, state)
-    update_Ddiffusion!(matrices.Ddiffusion, state)
+    update_D!(matrices.D, model)
+    update_Ddiffusion!(matrices.Ddiffusion, model)
     matrices.Ddiffusion[1, 1] = 0
 
     ## Initialize the ionospheric flux
@@ -397,26 +397,26 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     # Looping over energy
     for iE in n_E:-1:1
         # Update matrices A and B for current energy
-        B2B_inelastic_neutrals = update_matrices!(matrices, state,
+        B2B_inelastic_neutrals = update_matrices!(matrices, model,
                               phase_fcn_neutrals, iE,
                               B2B_fragment)
 
         # Compute the flux of e-
         if iE == n_E
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  state,
+                                                  model,
                                                   matrices, iE,
                                                   Ie_top_local[:, iE], cache,
                                                   first_iteration = true)
         else
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  state,
+                                                  model,
                                                   matrices, iE,
                                                   Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-
-        update_Q!(matrices, Ie, state, 1:1:1,
+        update_Q!(matrices, Ie, model, 1:1:1,
                   B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
 
         next!(p)
