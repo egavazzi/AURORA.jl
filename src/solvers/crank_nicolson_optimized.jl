@@ -276,14 +276,14 @@ end
 
 """
     update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
-                                    A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
+                                    A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
 
 Update both Mlhs and Mrhs using pre-computed mappings.
 This is the fast path with zero allocations.
 """
 function update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
-                                         A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
-    n_z = length(h_atm)
+                                         A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
+    n_z = length(z)
     n_angle = length(μ)
     nzval_lhs = Mlhs.nzval
     nzval_rhs = Mrhs.nzval
@@ -445,7 +445,7 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, mapping_lhs, mapping_rhs,
 end
 
 """
-    Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson_optimized!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
 
 Optimized Crank-Nicolson time-stepping scheme using direct nzval modification.
 This is an in-place version that modifies `Ie` directly to avoid allocations.
@@ -495,8 +495,7 @@ Both matrices have the same block structure as in steady-state:
 # Arguments
 - `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle × n_t) to store results
 - `t`: time grid [s]
-- `h_atm`: altitude grid [km]
-- `μ`: cosine of pitch angle grid
+- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `v`: electron velocity [km/s]
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
@@ -511,8 +510,10 @@ Both matrices have the same block structure as in steady-state:
 - `first_iteration`: whether this is the first call
 
 """
-function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
-    n_z = length(h_atm)
+function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    z = model.s_field
+    μ = model.pitch_angle_grid.μ_center
+    n_z = length(z)
     n_angle = length(μ)
 
     # Extract matrices from container
@@ -524,12 +525,12 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0
 
     # Temporal differentiation matrix
     dt = t[2] - t[1]
-    Ddt = Diagonal([1 ./ (v * dt) for i in h_atm])
+    Ddt = Diagonal([1 ./ (v * dt) for i in z])
 
     if first_iteration
         # Spatial differentiation matrices
-        h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]); h_atm]
-        h4diffd = [h_atm; h_atm[end] + (h_atm[end] - h_atm[end - 1])]
+        h4diffu = [z[1] - (z[2] - z[1]); z]
+        h4diffd = [z; z[end] + (z[end] - z[end - 1])]
         Ddz_Up = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
                          0 => 1 ./ (2 .* diff(h4diffu[1:end])))
         Ddz_Down = spdiagm(0 => -1 ./ (2 .* diff(h4diffd[1:end])),
@@ -548,7 +549,7 @@ function Crank_Nicolson_optimized!(Ie, t, h_atm, μ, v, matrices, iE, Ie_top, I0
 
     # Update matrix values (fast, no allocations)
     update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs, cache.mapping_lhs, cache.mapping_rhs,
-                                     A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
+                                     A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
 
     # Boundary indices
     index_top_bottom = sort(vcat(1:n_z:(n_angle*n_z),

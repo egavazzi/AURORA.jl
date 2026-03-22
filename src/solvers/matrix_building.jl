@@ -2,48 +2,6 @@ using SparseArrays: SparseArrays, spdiagm
 using LoopVectorization: @tturbo
 
 """
-    TransportMatrices
-
-Container for the matrices used in the electron transport equations.
-
-# Fields
-- `A::Vector{Float64}`: Loss term matrix (altitude dimension)
-- `B::Array{Float64, 3}`: Scattering term matrix (altitude x angle x angle)
-- `D::Array{Float64, 2}`: Diffusion coefficient matrix (energy x angle)
-- `Q::Array{Float64, 3}`: Source term array (altitude*angle x time x energy)
-- `Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}`: Diffusion operator (altitude x altitude)
-
-The struct is mutable to allow efficient in-place updates of Q during the energy cascade.
-"""
-mutable struct TransportMatrices
-    A::Vector{Float64}
-    B::Array{Float64, 3}
-    D::Array{Float64, 2}
-    Q::Array{Float64, 3}
-    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
-end
-
-"""
-    TransportMatrices(n_altitude, n_angle, n_time, n_energy)
-
-Construct an empty TransportMatrices container with zeros.
-
-# Arguments
-- `n_altitude::Int`: Number of altitude grid points
-- `n_angle::Int`: Number of angle bins
-- `n_time::Int`: Number of time steps
-- `n_energy::Int`: Number of energy bins
-"""
-function TransportMatrices(n_altitude::Int, n_angle::Int, n_time::Int, n_energy::Int)
-    A = zeros(Float64, n_altitude)
-    B = zeros(Float64, n_altitude, n_angle, n_angle)
-    D = zeros(Float64, n_energy, n_angle)
-    Q = zeros(Float64, n_altitude * n_angle, n_time, n_energy)
-    Ddiffusion = SparseArrays.spzeros(Float64, n_altitude, n_altitude)
-    return TransportMatrices(A, B, D, Q, Ddiffusion)
-end
-
-"""
     loss_to_thermal_electrons(E, ne, Te)
 
 Suprathermal electron energy loss function due to electron-electron collisions.
@@ -97,19 +55,19 @@ function loss_to_thermal_electrons(E::Real, nₑ, Tₑ)
 end
 
 # Depreciated function, for demo
-function beams2beams_demo(phase_fcn, Pmu2mup, BeamWeight_relative)
-    B2B = zeros(size(Pmu2mup, 3),size(Pmu2mup, 3));
-    for i = size(Pmu2mup, 3):-1:1
-        B2B[i, :] = BeamWeight_relative * (@view(Pmu2mup[:, :, i]) * phase_fcn);
+function beams2beams_demo(phase_fcn, P_scatter, Ω_subbeam_relative)
+    B2B = zeros(size(P_scatter, 3),size(P_scatter, 3));
+    for i = size(P_scatter, 3):-1:1
+        B2B[i, :] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
     end
     return B2B
 end
 
 # The new functions, for faster calculations
-function prepare_beams2beams(BeamWeight_relative, Pmu2mup)
-    B2B_fragment = zeros(size(BeamWeight_relative, 1), size(Pmu2mup, 2), size(Pmu2mup, 3))
-    for i = size(Pmu2mup, 3):-1:1
-        B2B_fragment[:, :, i] = BeamWeight_relative * (@view(Pmu2mup[:, :, i]));
+function prepare_beams2beams(Ω_subbeam_relative, P_scatter)
+    B2B_fragment = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
+    for i = size(P_scatter, 3):-1:1
+        B2B_fragment[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
     end
     return B2B_fragment
 end
@@ -124,11 +82,19 @@ end
 
 ## ----------------------------------------------------- ##
 
-function update_A!(A, n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
+function update_A!(A, model::AuroraModel, iE)
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+    energy_grid = model.energy_grid
+    n_neutrals_data = n_neutrals(ionosphere)
+    σ_neutrals = cross_sections.σ_neutrals
+    E_centers = energy_grid.E_centers
+    ΔE = energy_grid.ΔE
+
     fill!(A, 0.0)
     # Loop over the neutral species
-    for i1 in 1:length(n_neutrals)
-        n = n_neutrals[i1];  # Neutral density
+    for i1 in 1:length(n_neutrals_data)
+        n = n_neutrals_data[i1];  # Neutral density
         σ = σ_neutrals[i1];  # Array with collision cross sections
 
         # add elastic collisions
@@ -141,20 +107,30 @@ function update_A!(A, n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
     end
 
     # add losses due to electron-electron collisions
-    A .+= loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) ./ dE[iE];
+    A .+= loss_to_thermal_electrons(E_centers[iE], ionosphere.ne, ionosphere.Te) ./ ΔE[iE];
 
     return nothing
 end
 
-function update_B!(B, n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neutrals, dE, iE, B2B_fragment, finer_θ)
+function update_B!(B, model::AuroraModel, phase_fcn_neutrals, iE, B2B_fragment)
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+    energy_grid = model.energy_grid
+    scattering = model.scattering
+    n_neutrals_data = n_neutrals(ionosphere)
+    σ_neutrals = cross_sections.σ_neutrals
+    collision_levels = cross_sections.collision_levels
+    ΔE = energy_grid.ΔE
+    finer_θ = scattering.θ_scatter
+
     # Zero out B in place
     fill!(B, 0.0)
-    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(n_neutrals));
+    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(n_neutrals_data));
     # Loop over the neutral species
-    for i in 1:length(n_neutrals)
-        n = n_neutrals[i];                  # Neutral density
+    for i in 1:length(n_neutrals_data)
+        n = n_neutrals_data[i];                  # Neutral density
         σ = σ_neutrals[i];                  # Array with collision cross sections
-        E_levels = E_levels_neutrals[i];    # Array with collision enery levels and number of secondary e-
+        E_levels = collision_levels[i];    # Array with collision enery levels and number of secondary e-
         phase_fcn = phase_fcn_neutrals[i];   # Tuple with two phase function arrays, the first for elastic collisions
                                                     # and the second for inelastic collisions
 
@@ -186,7 +162,7 @@ function update_B!(B, n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neut
             # E_levels[i_coll, 1] is smaller than the width in energy of the energy bin.
             # That is, when dE[iE] > E_levels[i_coll,1], only the fraction
             # E_levels[i_coll,1] / dE is lost from the energy bin [E[iE], E[iE] + dE[iE]].
-            correction_factor = max(0.0, 1.0 - E_loss / dE[iE])
+            correction_factor = max(0.0, 1.0 - E_loss / ΔE[iE])
 
             @tturbo for i3 in 1:n_angle
                 for i2 in 1:n_angle
@@ -203,14 +179,19 @@ function update_B!(B, n_neutrals, σ_neutrals, E_levels_neutrals, phase_fcn_neut
     return B2B_inelastic_neutrals
 end
 
-function update_D!(D, E, dE, θ_lims)
+function update_D!(D, model::AuroraModel)
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
+    θ_lims = pitch_angle_grid.θ_lims
     θ_lims_rad = deg2rad.(θ_lims)
     nE = 3
     nθ = 3
     # n_ti = 701
     # n_thi = 401
-    for iE in length(E):-1:1
-        v = range(v_of_E(E[iE]), v_of_E(E[iE] + dE[iE]), length=nE)
+    for iE in energy_grid.n:-1:1
+        v = range(v_of_E(E_edges[iE]), v_of_E(E_edges[iE+1]), length=nE)
         for iθ in 1:(length(θ_lims_rad) - 1)
             θa = θ_lims_rad[iθ]
             θb = θ_lims_rad[iθ + 1]
@@ -234,7 +215,8 @@ function update_D!(D, E, dE, θ_lims)
     return nothing
 end
 
-function update_Ddiffusion!(Ddiffusion, z)
+function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
+    z = model.s_field
     dzd = z[2:end-1] - z[1:end-2]
     dzu = z[3:end]   - z[2:end-1]
 
@@ -255,53 +237,37 @@ function update_Ddiffusion!(Ddiffusion, z)
 end
 
 """
-    update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te, E_levels_neutrals,
-                     phase_fcn_neutrals, E, dE, iE, B2B_fragment, finer_θ)
+    update_matrices!(matrices, model, phase_fcn_neutrals, iE, B2B_fragment)
 
 Update the A and B matrices in place for a given energy level iE.
 
 # Arguments
 - `matrices::TransportMatrices`: Container to update
-- `n_neutrals, σ_neutrals, ne, Te, E_levels_neutrals, phase_fcn_neutrals`: Atmosphere and cross section data
-- `E, dE, iE`: Energy grid and current energy index
-- `B2B_fragment, finer_θ`: Pre-computed beam-to-beam fragments and angle grid
+- `model`: `AuroraModel` (grids + atmosphere + physics)
+- `phase_fcn_neutrals`: Phase functions for all species
+- `iE`: Current energy index
+- `B2B_fragment`: Pre-computed beam-to-beam fragments
 
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, n_neutrals, σ_neutrals, ne, Te,
-                         E_levels_neutrals, phase_fcn_neutrals, E, dE, iE, B2B_fragment, finer_θ)
-    # Update A matrix
-    update_A!(matrices.A, n_neutrals, σ_neutrals, ne, Te, E, dE, iE)
-
-    # Update B matrix and get B2B_inelastic
-    B2B_inelastic_neutrals = update_B!(matrices.B, n_neutrals, σ_neutrals, E_levels_neutrals,
-                                                 phase_fcn_neutrals, dE, iE, B2B_fragment, finer_θ)
-
-    return B2B_inelastic_neutrals
+function update_matrices!(matrices::TransportMatrices, model::AuroraModel, phase_fcn_neutrals,
+                          iE, B2B_fragment)
+    update_A!(matrices.A, model, iE)
+    return update_B!(matrices.B, model, phase_fcn_neutrals, iE, B2B_fragment)
 end
 
 
 """
-    initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
+    initialize_transport_matrices(model, t)
 
-Create a TransportMatrices container initialized with zeros for A, B, D, Q and Ddiffusion.
-
-# Arguments
-- `h_atm`: Altitude grid
-- `μ_center`: Cosine of angle centers
-- `t`: Time grid
-- `E, dE`: Energy grid and bin widths
-- `θ_lims`: Angle bin limits
-
-# Returns
-- `matrices::TransportMatrices`: Initialized container for the transport matrices
+Create a `TransportMatrices` container initialized with zeros for A, B, D, Q and Ddiffusion.
 """
-function initialize_transport_matrices(h_atm, μ_center, t, E, dE, θ_lims)
-    n_altitude = length(h_atm)
-    n_angle = length(μ_center)
+function initialize_transport_matrices(model::AuroraModel, t)
+    n_altitude = length(model.altitude_grid.h)
+    n_angle = length(model.pitch_angle_grid.μ_center)
     n_time = length(t)
-    n_energy = length(E)
+    n_energy = model.energy_grid.n
 
     matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
 

@@ -11,8 +11,19 @@ msis_file = find_msis_file(year = 2005, month = 10, day = 8, hour = 22, minute =
 iri_file = find_iri_file(year = 2005, month = 10, day = 8, hour = 22, minute = 0, lat = 70,
                          lon = 19, height = 85:1:700);
 
-h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+h_atm = model.altitude_grid.h
+ne = model.ionosphere.ne
+Te = model.ionosphere.Te
+Tn = model.ionosphere.Tn
+E = model.energy_grid.E_centers
+dE = model.energy_grid.ΔE
+n_neutrals = AURORA.n_neutrals(model.ionosphere)
+E_levels_neutrals = model.cross_sections.collision_levels
+σ_neutrals = model.cross_sections.σ_neutrals
+μ_lims = model.pitch_angle_grid.μ_lims
+μ_center = model.pitch_angle_grid.μ_center
+μ_scatterings = model.scattering
 
 ## Plot densities
 f1 = Figure()

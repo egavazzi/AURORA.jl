@@ -4,13 +4,13 @@ using LoopVectorization: @tturbo
 #                                   Update Q                                    #
 #################################################################################
 
-function demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                   B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
+function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_levels,
+                   B2B_inelastic_neutrals, cascading_neutrals, E_edges, E_centers, ΔE, iE, Ω_beam,
                    μ_center, cache)
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E_centers[iE], ne, Te) / ΔE[iE],
                                 outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
     end
 
@@ -18,26 +18,37 @@ function demo_update_Q!(Q, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_leve
     for i in 1:length(n_neutrals)
         n = n_neutrals[i];                          # Neutral density
         σ = σ_neutrals[i];                          # Array with collision cross sections
-        E_levels = E_levels_neutrals[i];            # Array with collision enery levels and number of secondary e-
+        E_levels = collision_levels[i];            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
-        add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE, BeamWeight, μ_center)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+        add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, cascading, E_edges, E_centers, ΔE, iE, Ω_beam, μ_center)
     end
 end
 
 
 
-function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                      B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, BeamWeight,
-                      μ_center, cache)
+function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
+                   B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
+
+    z = model.altitude_grid.h
+    ne = model.ionosphere.ne
+    Te = model.ionosphere.Te
+    n_neutrals_data = n_neutrals(model.ionosphere)
+    σ_neutrals = model.cross_sections.σ_neutrals
+    collision_levels = model.cross_sections.collision_levels
+    E_edges = model.energy_grid.E_edges
+    E_centers = model.energy_grid.E_centers
+    ΔE = model.energy_grid.ΔE
+    Ω_beam = model.scattering.Ω_beam
+    μ_center = model.pitch_angle_grid.μ_center
 
     Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
     @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E[iE] + dE[iE] / 2, ne, Te) / dE[iE],
+        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E_centers[iE], ne, Te) / ΔE[iE],
                                    outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
     end
 
@@ -48,14 +59,14 @@ function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals
     Ionizing_fragment_2 = cache.Ionizing_fragment_2
 
     # Loop over the neutral species
-    for i in 1:length(n_neutrals)
-        n = n_neutrals[i]                          # Neutral density
+    for i in 1:length(n_neutrals_data)
+        n = n_neutrals_data[i]                          # Neutral density
         σ = σ_neutrals[i]                          # Array with collision cross sections
-        E_levels = E_levels_neutrals[i]            # Array with collision enery levels and number of secondary e-
+        E_levels = collision_levels[i]            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
         cascading = cascading_neutrals[i]          # Cascading function for the current i-th species
 
-        add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
 
         # Zero out the ionization fragment arrays for this species
         fill!(Ionization_fragment_1[i], 0)
@@ -65,11 +76,11 @@ function update_Q!(matrices::TransportMatrices, Ie, h_atm, t, ne, Te, n_neutrals
 
         # If the energy is too low, skip the ionization calculation (use zeros)
         idx_ionization = (E_levels[:, 2] .> 0)
-        if minimum(E_levels[idx_ionization, 1]) < E[iE]
+        if minimum(E_levels[idx_ionization, 1]) < E_edges[iE]
             prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                    n, Ie, t, h_atm, μ_center, BeamWeight, iE, cache, i)
+                                    n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
             prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
-                                    σ, E_levels, cascading, E, dE, iE)
+                                    σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
@@ -140,7 +151,7 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic, E, dE, iE, cache)
+function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
     # Use cached matrices to avoid allocations
     Ie_scatter = cache.Ie_scatter
 
@@ -153,29 +164,29 @@ function add_inelastic_collisions!(Q, Ie, h_atm, n, σ, E_levels, B2B_inelastic,
         if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
             # Calculate the degradation factor combining:
             # 1) Cross-section σ[i_level, iE] - collision probability
-            # 2) Energy loss correction min(1, E_loss/dE[iE]) - accounts for when the energy
+            # 2) Energy loss correction min(1, E_loss/ΔE[iE]) - accounts for when the energy
             #    loss is smaller than the bin width (prevents over-depleting the current bin)
-            factor = σ[i_level, iE] * min(1, E_levels[i_level, 1] / dE[iE])
+            factor = σ[i_level, iE] * min(1, E_levels[i_level, 1] / ΔE[iE])
 
             # Find the energy bins where electrons will end up after losing E_levels[i_level, 1] eV
             E_loss = E_levels[i_level, 1]
-            E_min = E[iE] - E_loss           # Minimum energy after collision
-            E_max = E[iE] + dE[iE] - E_loss  # Maximum energy after collision
+            E_min = E_edges[iE] - E_loss           # Minimum energy after collision
+            E_max = E_edges[iE+1] - E_loss         # Maximum energy after collision
             # Find indices where degraded electrons end up
-            i_min = searchsortedfirst(E .+ dE, E_min)  # First bin with E+dE > E_min
-            i_max = searchsortedlast(E, E_max)         # Last bin with E < E_max
+            i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)  # First bin with upper edge > E_min
+            i_max = searchsortedlast(@view(E_edges[1:end-1]), E_max) # Last bin with lower edge < E_max
             i_degrade = i_min:i_max
             partition_fraction = zeros(length(i_degrade)) # initialise
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Distribute the degrading e- between those bins
-                partition_fraction[1] = min(1, (E[i_degrade[1]] .+ dE[i_degrade[1]] .-
-                                                E[iE] .+ E_levels[i_level, 1]) / dE[iE])
+                partition_fraction[1] = min(1, (E_edges[i_degrade[1]+1] -
+                                                E_edges[iE] + E_levels[i_level, 1]) / ΔE[iE])
                 if length(i_degrade) > 2
-                    partition_fraction[2:end-1] = min.(1, dE[i_degrade[2:end-1]] / dE[iE])
+                    partition_fraction[2:end-1] = min.(1, ΔE[i_degrade[2:end-1]] / ΔE[iE])
                 end
-                partition_fraction[end] = min(1, (E[iE] .+ dE[iE] .- E[i_degrade[end]] .-
-                                                    E_levels[i_level, 1]) / dE[iE])
+                partition_fraction[end] = min(1, (E_edges[iE+1] - E_edges[i_degrade[end]] -
+                                                    E_levels[i_level, 1]) / ΔE[iE])
                 if i_degrade[end] == iE
                     partition_fraction[end] = 0
                 end
@@ -256,8 +267,8 @@ for iI in 1:(iE - 1)
 end
 ```
 =#
-function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading, E, dE, iE,
-                                    BeamWeight, μ_center)
+function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, cascading, E_edges, E_centers, ΔE, iE,
+                                    Ω_beam, μ_center)
 
     Ionization = zeros(size(Ie, 1), size(Ie, 2))
     Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
@@ -268,8 +279,8 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
         if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
-            i_degrade = intersect(findall(x -> x > E[iE] - E_levels[i_level, 1], E + dE),     # find lowest bin
-                                  findall(x -> x < E[iE] + dE[iE] - E_levels[i_level,1], E))  # find highest bin
+            i_degrade = intersect(findall(x -> x > E_edges[iE] - E_levels[i_level, 1], @view(E_edges[2:end])),     # find lowest bin
+                                  findall(x -> x < E_edges[iE+1] - E_levels[i_level,1], @view(E_edges[1:end-1])))  # find highest bin
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # ISOTROPIC SECONDARY ELECTRONS
@@ -278,22 +289,22 @@ function add_ionization_collisions!(Q, Ie, h_atm, t, n, σ, E_levels, cascading,
                 fill!(Ionization, 0)
                 @views for i_μ1 in eachindex(μ_center)
                     for i_μ2 in eachindex(μ_center)
-                        Ionization[(i_μ1 - 1) * length(h_atm) .+ (1:length(h_atm)), :] .+=
+                        Ionization[(i_μ1 - 1) * length(z) .+ (1:length(z)), :] .+=
                             max.(0, n_repeated_over_t .*
                                 (σ[i_level, iE] .*
-                                Ie[(i_μ2 - 1) * length(h_atm) .+ (1:length(h_atm)), :, iE]) .*
-                                BeamWeight[i_μ1] ./ sum(BeamWeight))
+                                Ie[(i_μ2 - 1) * length(z) .+ (1:length(z)), :, iE]) .*
+                                Ω_beam[i_μ1] ./ sum(Ω_beam))
                     end
                 end
 
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "s");
                 # We use the average energy of the e- in the current energy bin
-                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* dE / 2
+                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "c");
 
                 if sum(secondary_e_spectra) > 0
                     # normalise
@@ -370,7 +381,7 @@ end
 ```
 =#
 function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                            n, Ie, t, h_atm, μ_center, BeamWeight, iE,
+                                            n, Ie, t, z, μ_center, Ω_beam, iE,
                                             cache, i_species)
     # Use pre-filled cached matrices (filled at cache creation)
     n_repeated_over_μt = cache.n_repeated_over_μt[i_species]
@@ -381,10 +392,10 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
 
     # SECONDARY ELECTRONS (ISOTROPIC)
     # Precompute constants
-    n_z = length(h_atm)
+    n_z = length(z)
     n_μ = length(μ_center)
     n_t = size(Ie, 2)
-    sum_BeamWeight = sum(BeamWeight)
+    sum_Ω_beam = sum(Ω_beam)
 
     # Use @tturbo for vectorized computation
     @tturbo for it in 1:n_t
@@ -395,7 +406,7 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
                     row_μ2 = (i_μ2 - 1) * n_z + iz
                     Ionization_fragment_1[row_μ1, it] += n_repeated_over_t[iz, it] *
                                                           Ie[row_μ2, it, iE] *
-                                                          BeamWeight[i_μ1] / sum_BeamWeight
+                                                          Ω_beam[i_μ1] / sum_Ω_beam
                 end
             end
         end
@@ -403,7 +414,7 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
 end
 
 function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
-                                             σ, E_levels, cascading, E, dE, iE)
+                                             σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
     # Loop through the different collisions for the current neutral species
     for i_level in axes(E_levels, 1)[2:end]
         # Continue with the ionizing collisions (will produce secondary e-)
@@ -411,22 +422,22 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
             # Find the energy bins where the e- in the current energy bin will degrade when
             # losing E_levels[i_level, 1] eV
             E_loss = E_levels[i_level, 1]
-            E_min = E[iE] - E_loss           # Minimum energy after collision
-            E_max = E[iE] + dE[iE] - E_loss  # Maximum energy after collision
+            E_min = E_edges[iE] - E_loss           # Minimum energy after collision
+            E_max = E_edges[iE+1] - E_loss         # Maximum energy after collision
             # Find indices where degraded electrons end up
-            i_min = searchsortedfirst(E .+ dE, E_min)  # First bin with E+dE > E_min
-            i_max = searchsortedlast(E, E_max)         # Last bin with E < E_max
+            i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)  # First bin with upper edge > E_min
+            i_max = searchsortedlast(@view(E_edges[1:end-1]), E_max) # Last bin with lower edge < E_max
             i_degrade = i_min:i_max
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "s");
                 # We use the average energy of the e- in the current energy bin
-                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* dE / 2
+                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(E, dE, E[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "c");
 
                 if sum(secondary_e_spectra) > 0
                     # normalise
