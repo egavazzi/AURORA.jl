@@ -158,7 +158,8 @@ function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
         verbose && println("Could not find file with matching pitch-angle grid.")
         verbose && println("Starting to calculate the requested scattering-matrices.")
 
-        P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction)
+        P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction;
+                                           verbose)
 
         # Save the results for future use using the current internal naming scheme.
         filename = pkgdir(AURORA, "internal_data", "e_scattering",
@@ -185,7 +186,7 @@ end
 # Another 100x factor (0.2s vs 20s for the legacy version, still with θ_lims = 180:-10:0 and
 # n_direction = 720
 """
-    calculate_scattering_matrices(θ_lims, n_direction = 720)
+    calculate_scattering_matrices(θ_lims, n_direction = 720; verbose = true)
 
 Calculate the scattering matrices for given pitch-angle limits `θ_lims` of the electron
 beams. Uses 720 directions by default for the start angle and the scattering angles,
@@ -206,7 +207,7 @@ equivalent to (1/4)° steps.
     summing along the sub-beams gives 1 for each beam. Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n\\_direction]
 """
-function calculate_scattering_matrices(θ_lims, n_direction = 720)
+function calculate_scattering_matrices(θ_lims, n_direction = 720; verbose = true)
     μ_lims = cosd.(θ_lims)
 
     θ₀ = Vector(0:(180/n_direction):180); θ₀ = deg2rad.((θ₀[1:end - 1] .+ θ₀[2:end]) / 2)
@@ -228,7 +229,7 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
         projection on the z-axis of the scattering "circle". This is much faster (and more
         accurate?)
     =#
-    p = Progress(length(θ₀); desc=string("Calculating scattering matrices "), color=:blue);
+    p = verbose ? Progress(length(θ₀); desc="Calculating scattering matrices ", color=:blue) : nothing
     for i0 in length(θ₀):-1:1
         for i1 in length(θ₁):-1:1
             for iμ in (length(μ_lims) - 1):-1:1
@@ -242,7 +243,7 @@ function calculate_scattering_matrices(θ_lims, n_direction = 720)
 
             end
         end
-        next!(p)
+        verbose && next!(p)
     end
 
     # Normalize so that all sum(P_scatter[i, j, :], dims=3) = 1
@@ -283,7 +284,7 @@ end
 # 144x faster than the Matlab code (24s instead of 1h for θ_lims = 180:-10:0 and
 # n_direction = 720)
 """
-    calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
+    calculate_scattering_matrices_legacy(θ_lims, n_direction=720; verbose = true)
 
 Calculate the scattering matrices for given pitch-angle limits `θ_lims` of the electron
 beams.
@@ -307,7 +308,7 @@ beams.
     Matrix [n\\_beam x n\\_direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
-function calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
+function calculate_scattering_matrices_legacy(θ_lims, n_direction=720; verbose = true)
     μ_lims = cosd.(θ_lims)
 
     θ₀ = Vector(0:(180/n_direction):180); θ₀ = deg2rad.((θ₀[1:end - 1] .+ θ₀[2:end]) / 2)
@@ -321,7 +322,7 @@ function calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
     ct = cos.(ϕ)
     cache = Vector{Float64}(undef, length(ϕ))
 
-    p = Progress(length(θ₀); desc=string("Calculating scattering matrices "), color=:blue);
+    p = verbose ? Progress(length(θ₀); desc="Calculating scattering matrices ", color=:blue) : nothing
 
     rotation_axis1 = [0, 1, 0]
     #=
@@ -353,7 +354,7 @@ function calculate_scattering_matrices_legacy(θ_lims, n_direction=720)
                 B[i0, i1, iμ] = sum(cache)
             end
         end
-        next!(p)
+        verbose && next!(p)
     end
 
     Pmu2mup = B ./ repeat(sum(B, dims=3), outer = (1, 1, size(B, 3)))
