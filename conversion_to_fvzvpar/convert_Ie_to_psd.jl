@@ -144,16 +144,19 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    default_vpar_edges(v, μ_lims) -> vpar_edges
+    default_vpar_edges(v) -> vpar_edges
 
-Construct a signed `v_parallel` grid from all source-bin endpoints `μ_lims * v`.
-This guarantees that the reduction grid spans the populated phase-space region
-without truncating the outermost bins.
+Construct a symmetric, uniformly spaced `v_parallel` grid spanning
+`[-maximum(v), maximum(v)]` with an exact edge at `v_parallel = 0`.
+
+The default uses the maximum source speed to cover the populated phase-space
+region while keeping a simple equidistant grid for the 1D reduction.
 """
-function default_vpar_edges(v::AbstractVector, μ_lims::AbstractVector)
-    vpar_edges = sort!(vec([μ * vi for μ in μ_lims, vi in v]))
-    unique!(vpar_edges)
-    return vpar_edges
+function default_vpar_edges(v::AbstractVector; n_edges::Int=75)
+    vmax = maximum(v)
+    positive_edges = collect(range(0.0, vmax; length=n_edges))
+
+    return vcat(-reverse(positive_edges[2:end]), positive_edges)
 end
 
 """
@@ -175,7 +178,7 @@ function compute_F(Ie::AbstractArray{<:Real,4}, μ_lims::AbstractVector,
     @assert length(v) == nE "v length must match energy dimension of Ie"
 
     if isnothing(vpar_edges)
-        vpar_edges = default_vpar_edges(v, μ_lims)
+        vpar_edges = default_vpar_edges(v)
     else
         vpar_edges = collect(Float64, vpar_edges)
     end
@@ -216,7 +219,7 @@ function compute_F(Ie::AbstractArray{<:Real,4}, μ_lims::AbstractVector,
                 end
 
                 weight = overlap / src_width / Δvpar[k]
-                @inbounds for it in 1:Nt, iz in 1:Nz
+                @tturbo for it in 1:Nt, iz in 1:Nz
                     F[k, iz, it] += Ie[iz, j, it, i] * inv_v * weight
                 end
             end
