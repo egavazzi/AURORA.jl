@@ -1,5 +1,6 @@
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using Term: @bold
+using LoopVectorization: @tturbo
 
 
 
@@ -362,23 +363,19 @@ end
 
 ## ====================================================================================== ##
 
-# Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [n_mu, nz, nt, nE]
+# Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [nz, n_mu, nt, nE]
 function restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
     n_μ = length(μ_lims) - 1
     n_z = length(h_atm)
     n_t = length(t_run)
     n_E = length(E)
-    Ie_restructured = zeros(n_μ, n_z, n_t, n_E);
-    for i_E in 1:n_E
-        for i_t in 1:n_t
-            for i_z in 1:n_z
-                for i_μ in 1:n_μ
-                    Ie_restructured[i_μ, i_z, i_t, i_E] = Ie_raw[i_z + (i_μ - 1) * n_z, i_t, i_E]
-                end
-            end
-        end
+
+    if size(Ie_raw, 1) != n_μ * n_z
+        error("Inconsistent dimensions between Ie_raw and (μ_lims, h_atm).")
     end
-    return Ie_restructured # size [n_mu, nz, nt, nE]
+
+    # Ie_raw is stacked as [z + (μ-1)*n_z, t, E]. Reshape to [nz, n_μ, nt, nE].
+    return reshape(Ie_raw, n_z, n_μ, n_t, n_E)
 end
 
 
@@ -403,7 +400,7 @@ Entries in `new_θ_lims` can be `nothing` to leave a panel empty.
 `Ie_plot = restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)`
 
 # Arguments
-- `Ie`: array of electron flux with pitch-angle limits `θ_lims`. Of shape [n\\_μ, n\\_z, n\\_t, n\\_E].
+- `Ie`: array of electron flux with pitch-angle limits `θ_lims`. Of shape [n\\_z, n\\_μ, n\\_t, n\\_E].
 - `θ_lims`: pitch-angle limits. Usually a vector or range.
 - `new_θ_lims`: new pitch-angle limits. Given as an array of tuples with angles in the range
                 0-180° (where 180° is field-aligned down, 0° is field-aligned up). Use `nothing`
@@ -415,46 +412,58 @@ julia> new_θ_lims = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);
 
 # Returns
 - `Ie_plot`: array of electron flux with the new pitch-angle limits `new_θ_lims`. Of shape
-             [n\\_μ\\_new, n\\_z, n\\_t, n\\_E], where n\\_μ\\_new is the number of streams
-             in `new_θ_lims`. The first dimension of `Ie_plot` is sorted such that the
+             [n\\_z, n\\_μ\\_new, n\\_t, n\\_E], where n\\_μ\\_new is the number of streams
+             in `new_θ_lims`. The second dimension of `Ie_plot` is sorted such that the
              indices go along the first row of `new_θ_lims`, and then the second row.
              In our example with `new_θ_lims` from above, that would be ``[1 2 3 4 5; 6 7 8 9 10]``.
 
 """
 function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
+    # Input Ie has shape [n_z, n_μ, n_t, n_E]
     # Initialize the new Ie_plot that will contain the restructured streams
     n_μ_new = length(new_θ_lims)
-    n_z = size(Ie, 2)
+    n_z = size(Ie, 1)
     n_t = size(Ie, 3)
     n_E = size(Ie, 4)
-    Ie_plot = zeros(n_μ_new, n_z, n_t, n_E)
+    Ie_plot = zeros(n_z, n_μ_new, n_t, n_E)
 
     # Flatten new_θ_lims from a 2D array to a 1D vector (row by row)
     new_θ_lims_flat = vec(permutedims(new_θ_lims))
+    θ_centers = acosd.(mu_avg(θ_lims))
 
     # Check if all the limits in new_θ_lims match some limits in θ_lims (skip nothing entries)
     θ_lims_sorted = sort(collect(θ_lims))
     for i in eachindex(new_θ_lims_flat)
-        isnothing(new_θ_lims_flat[i]) && continue  # skip empty panels
-        θ1, θ2 = new_θ_lims_flat[i]
-        if θ1 ∉ θ_lims
-            error("The limit $(θ1)° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+        θ_bin = new_θ_lims_flat[i]
+        isnothing(θ_bin) && continue  # skip empty panels
+        if θ_bin[1] ∉ θ_lims
+            error("The limit $(θ_bin[1])° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
                   "Available limits: $(θ_lims_sorted)")
-        elseif θ2 ∉ θ_lims
-            error("The limit $(θ2)° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
+        elseif θ_bin[2] ∉ θ_lims
+            error("The limit $(θ_bin[2])° in `angles_to_plot` does not match any limit in the simulation's θ_lims.\n" *
                   "Available limits: $(θ_lims_sorted)")
         end
     end
 
-    # Restructure to [n_μ_new, n_z, n_t, n_E]
-    # Loop over the new_θ_lims streams
-    @views for i in eachindex(new_θ_lims_flat)
-        isnothing(new_θ_lims_flat[i]) && continue  # skip empty panels
-        # Find the indices of the streams from the simulation that should be merged in the stream new_θ_lims[i].
-        idx_θ = axes(Ie, 1)[minimum(new_θ_lims_flat[i]) .<= acosd.(mu_avg(θ_lims)) .<= maximum(new_θ_lims_flat[i])]
-        # Loop over these streams and add them into the right stream of Ie_plot.
-        for j in idx_θ
-            Ie_plot[i, :, :, :] .+= Ie[j, :, :, :]
+    # Precompute which original streams contribute to each requested output stream.
+    idx_streams = Vector{Vector{Int}}(undef, n_μ_new)
+    for i in eachindex(new_θ_lims_flat)
+        θ_bin = new_θ_lims_flat[i]
+        if isnothing(θ_bin)
+            idx_streams[i] = Int[]
+            continue
+        end
+
+        θ_min = minimum(θ_bin)
+        θ_max = maximum(θ_bin)
+        idx_streams[i] = findall(θ -> θ_min <= θ <= θ_max, θ_centers)
+    end
+
+    # Restructure to [n_z, n_μ_new, n_t, n_E]
+    @views for i in eachindex(idx_streams)
+        isempty(idx_streams[i]) && continue
+        for j in idx_streams[i]
+            Ie_plot[:, i, :, :] .+= Ie[:, j, :, :]
         end
     end
 

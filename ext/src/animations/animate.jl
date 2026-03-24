@@ -11,6 +11,7 @@ using MAT: matread
 using Printf: @sprintf
 using Term: @bold
 using Dates
+using LoopVectorization: @tturbo
 
 
 """
@@ -103,6 +104,15 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     # Restructure `angles_to_plot` from a 2D array to a 1D vector
     angles_to_plot_vert = vec(permutedims(angles_to_plot))
 
+    # Precompute solid-angle normalization for non-empty panels.
+    scale_μ = zeros(Float64, length(angles_to_plot_vert))
+    for i_μ in eachindex(angles_to_plot_vert)
+        θ_bin = angles_to_plot_vert[i_μ]
+        isnothing(θ_bin) && continue
+        θ1, θ2 = θ_bin
+        scale_μ[i_μ] = 1 ./ beam_weight([θ1, θ2])[1]
+    end
+
     # Helper function to process Ie data
     function process_Ie(Ie_raw, t_run)
         Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
@@ -110,8 +120,9 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         # Convert from #e-/m²/s to #e-/m²/s/eV/ster
         for i_μ in eachindex(angles_to_plot_vert)
             isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
-            θ1, θ2 = angles_to_plot_vert[i_μ]
-            Ie_plot[i_μ, :, :, :] ./= beam_weight([θ1, θ2]) .* reshape(dE, (1, 1, :))
+            @tturbo for i_E in eachindex(E), i_t in eachindex(t_run), i_z in eachindex(h_atm)
+                Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / dE[i_E]
+            end
         end
         return Ie_plot
     end
