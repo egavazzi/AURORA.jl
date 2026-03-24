@@ -18,8 +18,8 @@ using LoopVectorization: @tturbo
     generate_default_angles(θ_lims)
 
 Generate a default `angles_to_plot` matrix from the simulation's θ_lims.
-Returns a 2-row matrix where row 1 is down-flux (angles >= 90°) and row 2 is up-flux
-(angles <= 90°). Beams that cross 90° are included in the down-flux row.
+Returns a 2-row matrix where row 1 is down-flux (negative average μ) and row 2 is
+up-flux (positive average μ).
 Angles are in the range 0-180° where 180° is field-aligned down and 0° is field-aligned up.
 """
 function generate_default_angles(θ_lims)
@@ -28,10 +28,16 @@ function generate_default_angles(θ_lims)
 
     # Build all beams as consecutive pairs
     all_beams = [(θ_sorted[i], θ_sorted[i+1]) for i in 1:(length(θ_sorted)-1)]
+    all_beams_μ = mu_avg(θ_sorted)
 
-    # Separate into down (includes beams that touch or cross 90°) and up (fully below 90°)
-    angles_down = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] >= 90]  # beam starts at or above 90°
-    angles_up = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] < 90]     # beam starts below 90°
+    # Separate into down and up using the sign of the average pitch-angle cosine.
+    # Row 1: most field-aligned down-going (μ ≈ -1) to near-perpendicular (μ ≈ 0).
+    # Row 2: most field-aligned up-going (μ ≈ 1) to near-perpendicular (μ ≈ 0).
+    idx_down = sort([i for i in eachindex(all_beams_μ) if all_beams_μ[i] < 0]; by = i -> all_beams_μ[i])
+    idx_up = sort([i for i in eachindex(all_beams_μ) if all_beams_μ[i] > 0]; by = i -> all_beams_μ[i], rev = true)
+
+    angles_down = Union{Tuple{Float64, Float64}, Nothing}[all_beams[i] for i in idx_down]
+    angles_up = Union{Tuple{Float64, Float64}, Nothing}[(all_beams[i][2], all_beams[i][1]) for i in idx_up]
 
     # Pad shorter row with nothing to match dimensions
     n_cols = max(length(angles_down), length(angles_up))
