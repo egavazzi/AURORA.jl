@@ -65,11 +65,15 @@ function AURORA.animate_Ie_in_time(directory_to_process;
                                      colorrange = nothing,
                                      save_to_file = true,
                                      plot_Ietop = false,
-                                     Ietop_angle_cone = [170, 180])
+                                     Ietop_angle_cone = [170, 180],
+                                     dt_steps = 1)
     ## Resolve the directory path
     full_path_to_directory = abspath(directory_to_process)
     if !isdir(full_path_to_directory)
         error("Directory not found: '$directory_to_process'")
+    end
+    if dt_steps < 1
+        error("`dt_steps` must be an integer greater than or equal to 1.")
     end
 
     ## Find the files to process
@@ -182,7 +186,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         # previous file's last frame)
         i_t_start = i_file == 1 ? 1 : 2
         println("animate.")
-        for i_t in i_t_start:length(t_run)
+        for i_t in i_t_start:dt_steps:length(t_run)
             Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
             time[] = @sprintf("%.3f s", t_run[i_t])
             if save_to_file
