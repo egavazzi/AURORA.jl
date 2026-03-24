@@ -418,20 +418,24 @@ julia> new_θ_lims = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);
              In our example with `new_θ_lims` from above, that would be ``[1 2 3 4 5; 6 7 8 9 10]``.
 
 """
-function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
+function restructure_streams_of_Ie!(Ie_plot, Ie, θ_lims, new_θ_lims)
     # Input Ie has shape [n_z, n_μ, n_t, n_E]
-    # Initialize the new Ie_plot that will contain the restructured streams
     n_μ_new = length(new_θ_lims)
     n_z = size(Ie, 1)
     n_t = size(Ie, 3)
     n_E = size(Ie, 4)
-    Ie_plot = zeros(n_z, n_μ_new, n_t, n_E)
+
+    if size(Ie_plot) != (n_z, n_μ_new, n_t, n_E)
+        error("`Ie_plot` has incompatible size. Expected $((n_z, n_μ_new, n_t, n_E)), got $(size(Ie_plot)).")
+    end
+
+    fill!(Ie_plot, zero(eltype(Ie_plot)))
 
     # Flatten new_θ_lims from a 2D array to a 1D vector (row by row)
     new_θ_lims_flat = vec(permutedims(new_θ_lims))
     θ_centers = acosd.(mu_avg(θ_lims))
 
-    # Check if all the limits in new_θ_lims match some limits in θ_lims (skip nothing entries)
+    # Check if all the limits in new_θ_lims match some existing limits in θ_lims.
     θ_lims_sorted = sort(collect(θ_lims))
     for i in eachindex(new_θ_lims_flat)
         θ_bin = new_θ_lims_flat[i]
@@ -468,6 +472,17 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     end
 
     return Ie_plot
+end
+
+
+function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
+    # Input Ie has shape [n_z, n_μ, n_t, n_E]
+    n_μ_new = length(new_θ_lims)
+    n_z = size(Ie, 1)
+    n_t = size(Ie, 3)
+    n_E = size(Ie, 4)
+    Ie_plot = Array{eltype(Ie)}(undef, n_z, n_μ_new, n_t, n_E)
+    return restructure_streams_of_Ie!(Ie_plot, Ie, θ_lims, new_θ_lims)
 end
 
 
