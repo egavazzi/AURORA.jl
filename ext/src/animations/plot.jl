@@ -17,7 +17,7 @@ To plot something, you need to give a `Ietop_struct` with
 `Ie_top_struct.bool = true` as well as some values for `Ie_top_struct.t_top` and
 `Ie_top_struct.data_Ietop`.
 =#
-function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
+function make_Ie_in_time_plot(Ie_timeslice::Observable,
                                 time::Observable{String}, h_atm, E, angles_to_plot, colorrange,
                                 Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing,
                                 Ietop_angle_cone = nothing))
@@ -25,7 +25,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable{Array{Float64, 3}},
     # Slice the input Ie into its different pitch-angle components
     Ie_streams = Array{Observable}(nothing, length(angles_to_plot))
     for i in eachindex(angles_to_plot)
-        Ie_streams[i] = @lift($Ie_timeslice[i, :, :]')
+        Ie_streams[i] = @lift($Ie_timeslice[:, i, :]')
     end
 
     fig = Figure(size = (1500, 1000), fontsize=20)
