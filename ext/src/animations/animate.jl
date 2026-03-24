@@ -113,10 +113,17 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         scale_μ[i_μ] = 1 ./ beam_weight([θ1, θ2])[1]
     end
 
+    Ie_plot_buffer = Ref{Union{Nothing, Array{Float64, 4}}}(nothing)
+
     # Helper function to process Ie data
     function process_Ie(Ie_raw, t_run)
         Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
-        Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
+        buffer_size = (size(Ie, 1), length(angles_to_plot), size(Ie, 3), size(Ie, 4))
+        if isnothing(Ie_plot_buffer[]) || size(Ie_plot_buffer[]) != buffer_size
+            Ie_plot_buffer[] = Array{Float64, 4}(undef, buffer_size...)
+        end
+
+        Ie_plot = AURORA.restructure_streams_of_Ie!(Ie_plot_buffer[], Ie, θ_lims, angles_to_plot)
         # Convert from #e-/m²/s to #e-/m²/s/eV/ster
         for i_μ in eachindex(angles_to_plot_vert)
             isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
@@ -150,7 +157,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
 
     # Create the figure
     print("create figure... ")
-    Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
+    Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
     fig = make_Ie_in_time_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, colorrange, Ietop_struct)
     display(fig)
@@ -176,13 +183,12 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         i_t_start = i_file == 1 ? 1 : 2
         println("animate.")
         for i_t in i_t_start:length(t_run)
-            Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+            Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
             time[] = @sprintf("%.3f s", t_run[i_t])
-            notify(Ie_timeslice)
             if save_to_file
                 recordframe!(io)
             end
-            sleep(0.005)
+            sleep(0.01)
         end
     end
 
