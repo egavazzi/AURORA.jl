@@ -148,7 +148,10 @@ function compute_F(
 
     Nvpar = length(Δvpar)
     vpar_centers = @. 0.5 * (vpar_edges[1:(end - 1)] + vpar_edges[2:end])
-    F = zeros(Float64, Nvpar, Nz, Nt)
+    # Use a [Nz, Nvpar, Nt] intermediate layout for the computation.
+    # This ensures iz is the innermost dimension for both arrays, which enables much more
+    # efficient SIMD optimizations from @tturbo compared to the original [Nvpar, Nz, Nt] layout.
+    F_local = zeros(Float64, Nz, Nvpar, Nt)
 
     for i in 1:nE
         inv_v = 1 / v[i]
@@ -177,11 +180,14 @@ function compute_F(
 
                 weight = overlap / src_width / Δvpar[k]
                 @tturbo for it in 1:Nt, iz in 1:Nz
-                    F[k, iz, it] += Ie[iz, j, it, i] * inv_v * weight
+                    F_local[iz, k, it] += Ie[iz, j, it, i] * inv_v * weight
                 end
             end
         end
     end
+
+    # Permute [Nz, Nvpar, Nt] → [Nvpar, Nz, Nt]
+    F = permutedims(F_local, (2, 1, 3))
 
     return (F = F, vpar_edges = vpar_edges, vpar_centers = vpar_centers, Δvpar = Δvpar)
 end
