@@ -9,7 +9,7 @@ So far we have
 using Makie
 using MAT: matread
 using Printf: @sprintf
-using Term: @bold
+using StyledStrings: @styled_str
 using Dates
 
 
@@ -80,7 +80,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     if save_to_file
         video_filename = plot_Ietop ? "animation_with_precipitation.mp4" : "animation.mp4"
         full_video_filename = rename_if_exists(joinpath(full_path_to_directory, video_filename))
-        println(@bold "The animation will be saved at $video_filename.")
+        println(styled"{bold:The animation will be saved at $video_filename.}")
     end
 
     ## Load data from the first file
