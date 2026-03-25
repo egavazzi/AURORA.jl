@@ -1,7 +1,6 @@
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
-using Term: @bold
 using LoopVectorization: @tturbo
-
+using StyledStrings: @styled_str
 
 
 ## ====================================================================================== ##
@@ -308,7 +307,7 @@ function make_savedir(root_savedir, name_savedir; behavior = "default")
 
     # And finally create the directory
     mkpath(savedir)
-    print("\n", @bold "Results will be saved at $savedir \n")
+    print("\n", styled"{bold:Results will be saved at $savedir}\n")
 
     return savedir
 end

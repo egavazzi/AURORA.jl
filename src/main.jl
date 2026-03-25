@@ -1,6 +1,5 @@
 using Dates: Dates, now
 using ProgressMeter: Progress, next!
-using Term: @bold
 
 using SparseArrays: SparseArrays, spzeros, spdiagm
 using KLU: KLU, klu
