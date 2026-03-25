@@ -1,5 +1,7 @@
 # Changelog
 
+
+## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
   - Comes with a few nice improvements to the function, see PR description
 - Throw an error when invalid pitch-angle limits are used as input [#90](https://github.com/egavazzi/AURORA.jl/pull/90)
