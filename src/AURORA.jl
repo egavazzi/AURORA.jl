@@ -40,8 +40,10 @@ include("steady_state_optimized.jl")
 export calculate_e_transport_steady_state
 
 include("analysis.jl")
+include("analysis_psd.jl")
 export make_density_file, downsampling_fluxes, make_volume_excitation_file,
-    make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file
+    make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file,
+    make_psd_file
 
 # Define and export functions to be extented by the AURORA_viz module
 """
@@ -85,7 +87,7 @@ exist as a limit.
 # Keyword Arguments
 - `angles_to_plot = nothing`: limits of the angles to plot as a matrix of tuples with angles
                               in range 0-180°. Use `nothing` for empty panels. If the whole
-                              argument is `nothing`, uses the θ_lims grid from the simulation
+                              argument is `nothing`, uses the simulation grid
                               with down-flux on the first row and up-flux on the second row.
 - `colorrange = nothing`: limits for the colormap/colorbar as a tuple (min, max). If `nothing`,
                           automatically computed as (max_value / 1e4, max_value) spanning
@@ -93,8 +95,8 @@ exist as a limit.
 - `save_to_file = true`: if true, saves the animation to a .mp4 file in the data directory.
 - `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
                         ionosphere by loading it from the file `Ie_top.mat`.
-- `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie
-                        to plot.
+- `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie plot.
+- `dt_steps`: plot one frame every `dt_steps` timesteps.
 """
 function animate_Ie_in_time end
 export animate_Ie_in_time

@@ -36,8 +36,8 @@ Ie2_4D = AURORA.restructure_Ie_from_3D_to_4D(Ie2, μ_lims, h_atm, t, E);
 i_μ = 1
 i_t = length(t)
 
-data_plot1 = Ie1_4D[i_μ, :, i_t, :];
-data_plot2 = Ie2_4D[i_μ, :, i_t, :];
+data_plot1 = Ie1_4D[:, i_μ, i_t, :];
+data_plot2 = Ie2_4D[:, i_μ, i_t, :];
 
 ##
 Theme(Axis = (xticksmirrored = true, yticksmirrored = true, xminorticksvisible = true,
@@ -101,8 +101,8 @@ display(fig)
 # Plot Ie data + difference (fixed energy, in height and time)
 i_μ = 1
 iE = 10
-data_plot1 = Ie1_4D[i_μ, :, :, iE];
-data_plot2 = Ie2_4D[i_μ, :, :, iE];
+data_plot1 = Ie1_4D[:, i_μ, :, iE];
+data_plot2 = Ie2_4D[:, i_μ, :, iE];
 
 #
 Theme(Axis = (xticksmirrored = true, yticksmirrored = true, xminorticksvisible = true,

@@ -13,6 +13,8 @@
   - **Breaking** `make_altitude_grid()` now ensures the last grid point is strictly below the requested top altitude (the grid can be one step smaller than before)
 - Add possibility to save the input flux to the output directory [#103](https://github.com/egavazzi/AURORA.jl/pull/103)
   - `calculate_e_transport()` and `calculate_e_transport_steady_state()` now accept a `save_input_flux` keyword argument (default: `true`) that saves the top-boundary flux to `Ie_incoming.mat` in the output directory
+- Performance improvement of animating the flux [#107](https://github.com/egavazzi/AURORA.jl/pull/107)
+- Add new analysis functions to calculate phase-space density and field-aligned distribution [#108](https://github.com/egavazzi/AURORA.jl/pull/108)
 
 ## v0.6.0 - 2025-11-04
 - Fix Python package installation issue with Conda [#77](https://github.com/egavazzi/AURORA.jl/pull/77)
