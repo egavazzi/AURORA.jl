@@ -19,6 +19,7 @@ simulation time grid `t`.
   onto the simulation time grid. Either:
   - `:constant` (default): each file value is held constant until the next sample.
   - `:linear`: linear interpolation between consecutive file samples.
+  - `:pchip`: piecewise cubic Hermite interpolation.
 
 # Returns
 - `Ie_top`: electron number flux (#e⁻/m²/s). Array [n_μ, n_t, n_E]
@@ -99,8 +100,8 @@ function Ie_top_from_file(t, E_centers, μ_center, filename; interpolation=:cons
         end
 
         # Validate interpolation keyword
-        if !(interpolation in (:constant, :linear))
-            error("Unknown interpolation type: $interpolation. Must be :constant or :linear.")
+        if !(interpolation in (:constant, :linear, :pchip))
+            error("Unknown interpolation type: $interpolation. Must be :constant, :linear, or :pchip.")
         end
 
         # Resample each (beam, energy) time series onto the simulation grid.
@@ -110,8 +111,10 @@ function Ie_top_from_file(t, E_centers, μ_center, filename; interpolation=:cons
             flux_series = Float64.(Ie_top_file[i_μ, :, iE])
             if interpolation == :constant
                 itp = ConstantInterpolation(flux_series, t_top)
-            else  # :linear
+            elseif interpolation == :linear
                 itp = LinearInterpolation(flux_series, t_top)
+            elseif interpolation == :pchip
+                itp = PCHIPInterpolation(flux_series, t_top)
             end
             for (k, tk) in enumerate(t)
                 Ie_top[i_μ, k, iE] = (tk < t_lo || tk > t_hi) ? 0.0 : itp(tk)

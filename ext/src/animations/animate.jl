@@ -9,16 +9,17 @@ So far we have
 using Makie
 using MAT: matread
 using Printf: @sprintf
-using Term: @bold
+using StyledStrings: @styled_str
 using Dates
+using LoopVectorization: @tturbo
 
 
 """
     generate_default_angles(θ_lims)
 
 Generate a default `angles_to_plot` matrix from the simulation's θ_lims.
-Returns a 2-row matrix where row 1 is down-flux (angles >= 90°) and row 2 is up-flux
-(angles <= 90°). Beams that cross 90° are included in the down-flux row.
+Returns a 2-row matrix where row 1 is down-flux (negative average μ) and row 2 is
+up-flux (positive average μ).
 Angles are in the range 0-180° where 180° is field-aligned down and 0° is field-aligned up.
 """
 function generate_default_angles(θ_lims)
@@ -27,10 +28,16 @@ function generate_default_angles(θ_lims)
 
     # Build all beams as consecutive pairs
     all_beams = [(θ_sorted[i], θ_sorted[i+1]) for i in 1:(length(θ_sorted)-1)]
+    all_beams_μ = mu_avg(θ_sorted)
 
-    # Separate into down (includes beams that touch or cross 90°) and up (fully below 90°)
-    angles_down = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] >= 90]  # beam starts at or above 90°
-    angles_up = Union{Tuple{Float64, Float64}, Nothing}[b for b in all_beams if b[1] < 90]     # beam starts below 90°
+    # Separate into down and up using the sign of the average pitch-angle cosine.
+    # Row 1: most field-aligned down-going (μ ≈ -1) to near-perpendicular (μ ≈ 0).
+    # Row 2: most field-aligned up-going (μ ≈ 1) to near-perpendicular (μ ≈ 0).
+    idx_down = sort([i for i in eachindex(all_beams_μ) if all_beams_μ[i] < 0]; by = i -> all_beams_μ[i])
+    idx_up = sort([i for i in eachindex(all_beams_μ) if all_beams_μ[i] > 0]; by = i -> all_beams_μ[i], rev = true)
+
+    angles_down = Union{Tuple{Float64, Float64}, Nothing}[all_beams[i] for i in idx_down]
+    angles_up = Union{Tuple{Float64, Float64}, Nothing}[(all_beams[i][2], all_beams[i][1]) for i in idx_up]
 
     # Pad shorter row with nothing to match dimensions
     n_cols = max(length(angles_down), length(angles_up))
@@ -64,11 +71,15 @@ function AURORA.animate_Ie_in_time(directory_to_process;
                                      colorrange = nothing,
                                      save_to_file = true,
                                      plot_Ietop = false,
-                                     Ietop_angle_cone = [170, 180])
+                                     Ietop_angle_cone = [170, 180],
+                                     dt_steps = 1)
     ## Resolve the directory path
     full_path_to_directory = abspath(directory_to_process)
     if !isdir(full_path_to_directory)
         error("Directory not found: '$directory_to_process'")
+    end
+    if dt_steps < 1
+        error("`dt_steps` must be an integer greater than or equal to 1.")
     end
 
     ## Find the files to process
@@ -80,7 +91,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     if save_to_file
         video_filename = plot_Ietop ? "animation_with_precipitation.mp4" : "animation.mp4"
         full_video_filename = rename_if_exists(joinpath(full_path_to_directory, video_filename))
-        println(@bold "The animation will be saved at $video_filename.")
+        println(styled"{bold:The animation will be saved at $video_filename.}")
     end
 
     ## Load data from the first file
@@ -103,15 +114,32 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     # Restructure `angles_to_plot` from a 2D array to a 1D vector
     angles_to_plot_vert = vec(permutedims(angles_to_plot))
 
+    # Precompute solid-angle normalization for non-empty panels.
+    scale_μ = zeros(Float64, length(angles_to_plot_vert))
+    for i_μ in eachindex(angles_to_plot_vert)
+        θ_bin = angles_to_plot_vert[i_μ]
+        isnothing(θ_bin) && continue
+        θ1, θ2 = θ_bin
+        scale_μ[i_μ] = 1 ./ beam_weight([θ1, θ2])[1]
+    end
+
+    Ie_plot_buffer = Ref{Union{Nothing, Array{Float64, 4}}}(nothing)
+
     # Helper function to process Ie data
     function process_Ie(Ie_raw, t_run)
         Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, z, t_run, E_centers)
-        Ie_plot = AURORA.restructure_streams_of_Ie(Ie, θ_lims, angles_to_plot)
+        buffer_size = (size(Ie, 1), length(angles_to_plot), size(Ie, 3), size(Ie, 4))
+        if isnothing(Ie_plot_buffer[]) || size(Ie_plot_buffer[]) != buffer_size
+            Ie_plot_buffer[] = Array{Float64, 4}(undef, buffer_size...)
+        end
+
+        Ie_plot = AURORA.restructure_streams_of_Ie!(Ie_plot_buffer[], Ie, θ_lims, angles_to_plot)
         # Convert from #e-/m²/s to #e-/m²/s/eV/ster
         for i_μ in eachindex(angles_to_plot_vert)
             isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
-            θ1, θ2 = angles_to_plot_vert[i_μ]
-            Ie_plot[i_μ, :, :, :] ./= beam_weight([θ1, θ2]) .* reshape(ΔE, (1, 1, :))
+            @tturbo for i_E in eachindex(E_centers), i_t in eachindex(t_run), i_z in eachindex(z)
+                Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
+            end
         end
         return Ie_plot
     end
@@ -139,7 +167,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
 
     # Create the figure
     print("create figure... ")
-    Ie_timeslice = Observable(Ie_plot[:, :, 1, :])
+    Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
     fig = make_Ie_in_time_plot(Ie_timeslice, time, z, E_centers, angles_to_plot, colorrange, Ietop_struct)
     display(fig)
@@ -164,14 +192,13 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         # previous file's last frame)
         i_t_start = i_file == 1 ? 1 : 2
         println("animate.")
-        for i_t in i_t_start:length(t_run)
-            Ie_timeslice[] .= Ie_plot[:, :, i_t, :]
+        for i_t in i_t_start:dt_steps:length(t_run)
+            Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
             time[] = @sprintf("%.3f s", t_run[i_t])
-            notify(Ie_timeslice)
             if save_to_file
                 recordframe!(io)
             end
-            sleep(0.005)
+            sleep(0.01)
         end
     end
 

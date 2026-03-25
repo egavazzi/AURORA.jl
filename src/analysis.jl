@@ -117,6 +117,94 @@ function calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)
     end
 end
 
+"""
+    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, output_prefix="psd")
+
+Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
+loads particle flux files `IeFlickering-NN.mat`, converts them into phase-space density, and
+writes one output file per input as `psd/psd-NN.mat`.
+
+# Calling
+`make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, output_prefix="psd")`
+
+# Inputs
+- `directory_to_process`: absolute or relative path to the simulation directory to process.
+
+# Keyword Arguments
+- `compute`: one of `:f_only`, `:F_only`, or `:both`.
+- `vpar_edges`: custom `v_parallel` bin edges [m/s] used when computing `F`.
+    If `nothing`, an automatic symmetric uniform interval grid is used, spanning
+    `[-maximum(v), maximum(v)]` with an edge at `v_parallel = 0`.
+- `output_prefix`: output filename prefix used as `<output_prefix>-NN.mat`.
+"""
+function make_psd_file(
+    directory_to_process;
+    compute::Symbol = :both,
+    vpar_edges::Union{Nothing, AbstractVector} = nothing,
+    output_prefix::AbstractString = "psd",
+)
+    println("Converting Ie to PSD.")
+    files = readdir(directory_to_process, join = true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    sort!(
+        files_to_process,
+        by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]),
+    )
+
+    if isempty(files_to_process)
+        @warn "No IeFlickering files found in $directory_to_process."
+        return nothing
+    end
+
+    n_files = length(files_to_process)
+    psd_dir = joinpath(directory_to_process, "psd")
+    mkpath(psd_dir)
+
+    for (i_file, file) in enumerate(files_to_process)
+        match_result = match(r"IeFlickering-(\d+)\.mat", basename(file))
+        @assert !isnothing(match_result) "Unexpected input filename: $file"
+        file_id = match_result[1]
+
+        print("\rProcessing PSD: $(i_file)/$(n_files)")
+        flush(stdout)
+
+        result = make_psd_from_AURORA(file; compute = compute, vpar_edges = vpar_edges)
+        outfile = joinpath(psd_dir, "$(output_prefix)-$(file_id).mat")
+        write_psd_result(outfile, result)
+    end
+
+    println()
+
+    return nothing
+end
+
+
+function write_psd_result(outfile::AbstractString, res)
+    matopen(outfile, "w") do io
+        if hasproperty(res, :f)
+            write(io, "f", res.f)
+        end
+
+        if hasproperty(res, :F)
+            write(io, "F", res.F)
+            write(io, "vpar_edges", res.vpar_edges)
+            write(io, "vpar_centers", res.vpar_centers)
+            write(io, "dvpar", res.Δvpar)
+        end
+
+        write(io, "v", res.v)
+        write(io, "v_par", res.v_par)
+        write(io, "v_perp", res.v_perp)
+        write(io, "dE_J", res.ΔE_J)
+        write(io, "BeamWeight", res.BeamWeight)
+        write(io, "mu_center", res.μ_center)
+        write(io, "E", res.E)
+        write(io, "t_run", res.t_run)
+        write(io, "h_atm", res.h_atm)
+        write(io, "mu_lims", res.μ_lims)
+    end
+end
+
 
 
 

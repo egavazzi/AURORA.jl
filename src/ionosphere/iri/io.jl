@@ -1,6 +1,6 @@
 using DelimitedFiles: readdlm, writedlm
 using Printf: @sprintf
-using Term: @bold, @underline
+using StyledStrings: @styled_str
 
 ############################################################################################
 # Looking for files
@@ -274,8 +274,7 @@ function save_iri_data(iri_data, parameters; verbose=true)
         write(f, "\n")
         writedlm(f, iri_data)
     end
-    verbose && println("File " * @bold("$filename") * " created under " * @underline("$directory") *
-                       ".")
+    verbose && println(styled"File {bold:$filename} created under {underline:$directory}.")
 
     return fullpath
 end

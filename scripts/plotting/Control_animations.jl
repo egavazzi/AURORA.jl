@@ -23,7 +23,7 @@ GLMakie.activate!()
 
 
 ## Calling the animate function
-directory_to_process = "pitch-angle-tests/180:-45:0"
+directory_to_process = ""
 
-# animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange = (1e5, 1e9), plot_Ietop = true)
-animate_Ie_in_time(directory_to_process; save_to_file = true)
+
+animate_Ie_in_time(directory_to_process; save_to_file = false, dt_steps = 1)
