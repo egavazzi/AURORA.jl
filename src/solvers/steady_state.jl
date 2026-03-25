@@ -2,8 +2,8 @@ using KLU: klu, klu!
 using LinearAlgebra: Diagonal
 using SparseArrays: spdiagm, sparse!, dropzeros!, findnz
 
-function steady_state_scheme(h_atm, μ, matrices, iE, Ie_top, cache; first_iteration = false)
-    Ie = Array{Float64}(undef, length(h_atm) * length(μ))
+function steady_state_scheme(z, μ, matrices, iE, Ie_top, cache; first_iteration = false)
+    Ie = Array{Float64}(undef, length(z) * length(μ))
 
     # Extract matrices from container
     A = matrices.A
@@ -15,8 +15,8 @@ function steady_state_scheme(h_atm, μ, matrices, iE, Ie_top, cache; first_itera
     # Spatial differentiation matrices, for up and down streams
     # Here we tuck on a fictious height one tick below lowest height and on tick above highest
     # height just to make it possible to use the diff function.
-    h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
-    h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
+    h4diffu = [z[1] - (z[2] - z[1]) ; z]
+    h4diffd = [z ; z[end] + (z[end] - z[end-1])]
     Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
                         0 =>  1 ./ diff(h4diffu[1:end]))
     Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
@@ -25,7 +25,7 @@ function steady_state_scheme(h_atm, μ, matrices, iE, Ie_top, cache; first_itera
 
 
     # Building the CN matrices
-    Nz = length(h_atm)
+    Nz = length(z)
     row_l = Vector{Int64}() # maybe using sizehint could help?
     col_l = Vector{Int64}()
     val_l = Vector{Float64}()
@@ -65,8 +65,8 @@ function steady_state_scheme(h_atm, μ, matrices, iE, Ie_top, cache; first_itera
     Mlhs = sparse!(row_l, col_l, val_l)
     dropzeros!(Mlhs)    # for performance
 
-    index_top_bottom = sort(vcat(1:length(h_atm):(length(μ)*length(h_atm)),
-                            length(h_atm):length(h_atm):(length(μ)*length(h_atm))))
+    index_top_bottom = sort(vcat(1:length(z):(length(μ)*length(z)),
+                            length(z):length(z):(length(μ)*length(z))))
 
     if first_iteration
         cache.KLU = klu(Mlhs)

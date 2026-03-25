@@ -100,10 +100,10 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     Ie_raw = data["Ie_ztE"]  # size of [n_mu x nz, nt, nE]
     μ_lims = vec(data["mu_lims"])
     t_run = data["t_run"]
-    E = data["E"]
-    h_atm = data["h_atm"]
+    E_centers = data["E_centers"]
+    z = data["h_atm"]
 
-    dE = diff(E); dE = [dE; dE[end]]
+    ΔE = data["dE"]
     θ_lims = round.(acosd.(μ_lims))
 
     # Use default angles_to_plot if not provided
@@ -127,7 +127,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
 
     # Helper function to process Ie data
     function process_Ie(Ie_raw, t_run)
-        Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, h_atm, t_run, E)
+        Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, z, t_run, E_centers)
         buffer_size = (size(Ie, 1), length(angles_to_plot), size(Ie, 3), size(Ie, 4))
         if isnothing(Ie_plot_buffer[]) || size(Ie_plot_buffer[]) != buffer_size
             Ie_plot_buffer[] = Array{Float64, 4}(undef, buffer_size...)
@@ -137,8 +137,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         # Convert from #e-/m²/s to #e-/m²/s/eV/ster
         for i_μ in eachindex(angles_to_plot_vert)
             isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
-            @tturbo for i_E in eachindex(E), i_t in eachindex(t_run), i_z in eachindex(h_atm)
-                Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / dE[i_E]
+            @tturbo for i_E in eachindex(E_centers), i_t in eachindex(t_run), i_z in eachindex(z)
+                Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
             end
         end
         return Ie_plot
@@ -158,8 +158,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         Ietop = data["Ie_total"]
         t_top = data["t_top"]; t_top = [t_top; t_top[end] + diff(t_top)[end]] .- t_top[1]
         idx_θ = vec(Ietop_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= Ietop_angle_cone[2])
-        BeamW = beam_weight([Ietop_angle_cone[1], Ietop_angle_cone[2]])
-        data_Ietop = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ BeamW ./ dE' .* E' # in eV/m²/s/eV/ster
+        Ω_beam = beam_weight([Ietop_angle_cone[1], Ietop_angle_cone[2]])
+        data_Ietop = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ Ω_beam ./ ΔE' .* E_centers' # in eV/m²/s/eV/ster
         Ietop_struct = (; bool = plot_Ietop, t_top, data_Ietop, Ietop_angle_cone)
     else
         Ietop_struct = (; bool = false, t_top = nothing, data_Ietop = nothing, Ietop_angle_cone = nothing)
@@ -169,7 +169,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     print("create figure... ")
     Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
-    fig = make_Ie_in_time_plot(Ie_timeslice, time, h_atm, E, angles_to_plot, colorrange, Ietop_struct)
+    fig = make_Ie_in_time_plot(Ie_timeslice, time, z, E_centers, angles_to_plot, colorrange, Ietop_struct)
     display(fig)
 
     # Animate

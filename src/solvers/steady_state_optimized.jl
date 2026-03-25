@@ -205,13 +205,13 @@ function create_steady_state_nzval_mapping(Mlhs, n_z, n_angle)
 end
 
 """
-    update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
+    update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
 
 Update the sparse matrix values using pre-computed mapping.
 This avoids all allocations by directly modifying nzval.
 """
-function update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
-    n_z = length(h_atm)
+function update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
+    n_z = length(z)
     n_angle = length(μ)
     nzval = Mlhs.nzval
 
@@ -321,7 +321,7 @@ function update_steady_state_matrix!(Mlhs, mapping, A, B, D, Ddiffusion, Ddz_Up,
 end
 
 """
-    steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cache; first_iteration = false)
+    steady_state_scheme_optimized!(Ie, model, matrices, iE, Ie_top, cache; first_iteration = false)
 
 Optimized steady-state scheme using direct nzval modification.
 This is an in-place version that modifies `Ie` directly to avoid allocations.
@@ -373,8 +373,7 @@ Jacobian = ∂f/∂Ie = Mlhs
 
 # Arguments
 - `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle) to store results
-- `h_atm`: altitude grid [km]
-- `μ`: cosine of pitch angle grid
+- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
     - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
@@ -386,8 +385,10 @@ Jacobian = ∂f/∂Ie = Mlhs
 - `cache`: Cache object storing Mlhs, mapping, KLU, and differentiation matrices
 - `first_iteration`: whether this is the first call (creates structure) or subsequent (reuses structure)
 """
-function steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cache; first_iteration = false)
-    n_z = length(h_atm)
+function steady_state_scheme_optimized!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache; first_iteration = false)
+    z = model.s_field
+    μ = model.pitch_angle_grid.μ_center
+    n_z = length(z)
     n_angle = length(μ)
 
     # Extract matrices from container
@@ -400,8 +401,8 @@ function steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cac
     # Compute or retrieve differentiation matrices
     if first_iteration
         # Spatial differentiation matrices
-        h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
-        h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
+        h4diffu = [z[1] - (z[2] - z[1]) ; z]
+        h4diffd = [z ; z[end] + (z[end] - z[end-1])]
         Ddz_Up   = spdiagm(-1 => -1 ./ diff(h4diffu[2:end]),
                             0 =>  1 ./ diff(h4diffu[1:end]))
         Ddz_Down = spdiagm( 0 => -1 ./ diff(h4diffd[1:end]),
@@ -413,13 +414,13 @@ function steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cac
         cache.Ddz_Up = Ddz_Up
         cache.Ddz_Down = Ddz_Down
     else
-        # Reuse stored differentiation matrices (they don't change if h_atm doesn't change)
+        # Reuse stored differentiation matrices (they don't change if z doesn't change)
         Ddz_Up = cache.Ddz_Up
         Ddz_Down = cache.Ddz_Down
     end
 
     # Update matrix values (fast, no allocations)
-    update_steady_state_matrix!(cache.Mlhs, cache.mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, h_atm)
+    update_steady_state_matrix!(cache.Mlhs, cache.mapping, A, B, D, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
 
     # Update or create KLU factorization
     if first_iteration
@@ -429,8 +430,8 @@ function steady_state_scheme_optimized!(Ie, h_atm, μ, matrices, iE, Ie_top, cac
     end
 
     # Set boundary conditions
-    index_top_bottom = sort(vcat(1:length(h_atm):(length(μ)*length(h_atm)),
-                            length(h_atm):length(h_atm):(length(μ)*length(h_atm))))
+    index_top_bottom = sort(vcat(1:length(z):(length(μ)*length(z)),
+                            length(z):length(z):(length(μ)*length(z))))
 
     I_top_bottom = (Ie_top * [0, 1]')'
     Q_local = copy(Q_slice)

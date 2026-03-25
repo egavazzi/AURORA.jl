@@ -49,8 +49,8 @@ The returned matrix contains the following columns:
 - The geomagnetic activity parameter is set to -1 (use observational data)
 """
 function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                              lat = 76, lon = 5, height = 85:1:700)
-    print("Calculating msis data...")
+                lat = 76, lon = 5, height = 85:1:700, verbose=true)
+  verbose && print("Calculating msis data...")
 
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
@@ -67,7 +67,7 @@ function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minu
     path_to_pymsis = pyconvert(String, path_to_pymsis)
     SW_file = joinpath(path_to_pymsis, "SW-All.csv")
     if isfile(SW_file) == false
-        print(" downloading ap and F10.7 data from (https://celestrak.org/SpaceData/SW-All.csv)...")
+      verbose && print(" downloading ap and F10.7 data from (https://celestrak.org/SpaceData/SW-All.csv)...")
         Downloads.download("https://celestrak.org/SpaceData/SW-All.csv", SW_file)
     end
 
@@ -81,7 +81,7 @@ function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minu
     # add a header with the name of columns
     nrlmsis_data = vcat(["height(km)" "air(kg/m3)" "N2(m-3)" "O2(m-3)" "O(m-3)" "He(m-3)" "H(m-3)" "Ar(m-3)" "N(m-3)" "anomalousO(m-3)" "NO(m-3)" "T(K)"], nrlmsis_data)
 
-    println(" done.")
+    verbose && println(" done.")
 
     parameters = (; year, month, day, hour, minute, lat, lon, height)
     return nrlmsis_data, parameters

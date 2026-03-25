@@ -150,39 +150,52 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
     n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
 
-    ## Get atmosphere
-    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+    ## Build simulation model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+    altitude_grid = model.altitude_grid
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
+    scattering = model.scattering
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+
+    z = altitude_grid.h
+    E_centers = energy_grid.E_centers
+    n_E = energy_grid.n
+    μ_lims = pitch_angle_grid.μ_lims
+    μ_center = pitch_angle_grid.μ_center
+    neutral_densities = n_neutrals(ionosphere)
+    ne = ionosphere.ne
+    Te = ionosphere.Te
+    Tn = ionosphere.Tn
 
     ## CFL criteria
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
-    t, CFL_factor = CFL_criteria(t_total, dt, h_atm, v_of_E(E_max), CFL_number)
+    t, CFL_factor = CFL_criteria(t_total, dt, z, v_of_E(E_max), CFL_number)
 
     ## Calculate n_loop if not provided
     if isnothing(n_loop)
-        n_loop = calculate_n_loop(t, length(h_atm), length(μ_center), length(E);
+        n_loop = calculate_n_loop(t, length(z), length(μ_center), n_E;
                                   max_memory_gb = max_memory_gb)
     end
     ## Check that n_loop won't cause memory issues
-    check_n_loop(n_loop, length(h_atm), length(μ_center), length(t), length(E))
+    check_n_loop(n_loop, length(z), length(μ_center), length(t), n_E)
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(t, E, μ_center, INPUT_OPTIONS.input_file; interpolation = INPUT_OPTIONS.interpolation)
+        Ie_top = Ie_top_from_file(t, E_centers, μ_center, INPUT_OPTIONS.input_file; interpolation = INPUT_OPTIONS.interpolation)
     elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
-                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                  t, n_loop, h_atm;
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
+                                  t, n_loop;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
                                   modulation=Symbol(INPUT_OPTIONS.modulation),
                                   f=INPUT_OPTIONS.f, amplitude=1.0,
                                   z_source=INPUT_OPTIONS.z₀)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
-                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                  t, n_loop, h_atm;
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
+                                  t, n_loop;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
                                   modulation=:none,
                                   z_source=INPUT_OPTIONS.z₀,
@@ -191,14 +204,14 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
-        save_Ie_top(Ie_top, E, collect(μ_lims), t, savedir)
+        save_Ie_top(Ie_top, energy_grid, collect(μ_lims), t, savedir)
     end
 
     ## Calculate the phase functions and put them in a Tuple
     print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
-    phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
-    phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
+    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
     println(" done ✅")
@@ -206,7 +219,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     ## And save the simulation parameters in it
     save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t, n_loop,
                     CFL_number, INPUT_OPTIONS, savedir)
-    save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
+    save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
 
     ## Calculate the number of time steps per loop
     # Each loop processes (length(t) - 1) / n_loop + 1 time steps, with overlapping endpoints
@@ -214,23 +227,23 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     t_per_loop = range(0, step = t[2] - t[1], length = n_t_per_loop)
 
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), n_t_per_loop, length(h_atm), length(E))
+    cache = Cache(neutral_densities, length(μ_center), n_t_per_loop, length(z), n_E)
 
     ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E));    # starting e- flux profile
-    Ie = zeros(length(h_atm) * length(μ_center), n_t_per_loop, length(E))
+    I0 = zeros(length(z) * length(μ_center), n_E);    # starting e- flux profile
+    Ie = zeros(length(z) * length(μ_center), n_t_per_loop, n_E)
     n_t_save = length(0:dt:t_per_loop[end])
-    Ie_save = zeros(length(h_atm) * length(μ_center), n_t_save, length(E))
+    Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
     ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(h_atm, μ_center, t_per_loop, E, dE, θ_lims)
+    matrices = initialize_transport_matrices(model, t_per_loop)
     # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, E, dE, θ_lims)
-    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
+    update_D!(matrices.D, model)
+    update_Ddiffusion!(matrices.Ddiffusion, model)
     matrices.Ddiffusion[1, 1] = 0
 
     ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
+    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
 
     ## Looping over n_loop
     for i_loop in 1:n_loop
@@ -242,32 +255,29 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         # Extract the top flux for the current loop
         Ie_top_local = Ie_top[:, (1 + (i_loop - 1) * (n_t_per_loop - 1)) : (n_t_per_loop + (i_loop - 1) * (n_t_per_loop - 1)), :]
 
-        p = Progress(length(E); desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
+        p = Progress(n_E; desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
         # Looping over energy
-        for iE in length(E):-1:1
+        for iE in n_E:-1:1
             # Update matrices A and B for current energy
-            B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
-                                                      E_levels_neutrals, phase_fcn_neutrals,
-                                                      E, dE, iE, B2B_fragment, μ_scatterings.theta1)
+            B2B_inelastic_neutrals = update_matrices!(matrices, model,
+                                                      phase_fcn_neutrals, iE,
+                                                      B2B_fragment)
 
             # Compute the flux of e-
-            if iE == length(E)
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop,
-                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                                 v_of_E(E[iE]), matrices, iE,
+            if iE == n_E
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
+                                                 v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache,
                                                  first_iteration = true)
             else
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop,
-                                                 h_atm ./ cosd(B_angle_to_zenith), μ_center,
-                                                 v_of_E(E[iE]), matrices, iE,
+                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
+                                                 v_of_E(E_centers[iE]), matrices, iE,
                                                  Ie_top_local[:, :, iE], I0[:, iE], cache)
             end
 
             # Update the cascading of e-
-            update_Q!(matrices, Ie, h_atm, t_per_loop, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                        B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
-                        μ_center, cache)
+            update_Q!(matrices, Ie, model, t_per_loop,
+                      B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
 
             next!(p)
         end
@@ -278,7 +288,8 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
         # Subsample Ie into Ie_save buffer
         Ie_save .= @view Ie[:, 1:CFL_factor:end, :]
         # Save results for the n_loop
-        save_results(Ie_save, E, t_per_loop, μ_lims, h_atm, I0, μ_scatterings, i_loop, CFL_factor, savedir)
+        save_results(Ie_save, energy_grid, t_per_loop, μ_lims, z, I0, scattering, i_loop,
+                     CFL_factor, savedir)
     end
 end
 
@@ -308,37 +319,50 @@ Run a steady-state electron transport simulation and save the results to `savedi
 """
 function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
-    ## Get atmosphere
-    h_atm, ne, Te, Tn, E, dE, n_neutrals, E_levels_neutrals, σ_neutrals, μ_lims, μ_center,
-    μ_scatterings = setup(altitude_lims, θ_lims, E_max, msis_file, iri_file);
+    ## Build simulation model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+    altitude_grid = model.altitude_grid
+    energy_grid = model.energy_grid
+    pitch_angle_grid = model.pitch_angle_grid
+    scattering = model.scattering
+    ionosphere = model.ionosphere
+    cross_sections = model.cross_sections
+
+    z = altitude_grid.h
+    E_centers = energy_grid.E_centers
+    n_E = energy_grid.n
+    μ_lims = pitch_angle_grid.μ_lims
+    μ_center = pitch_angle_grid.μ_center
+    neutral_densities = n_neutrals(ionosphere)
+    ne = ionosphere.ne
+    Te = ionosphere.Te
+    Tn = ionosphere.Tn
 
     ## Initialise
-    I0 = zeros(length(h_atm) * length(μ_center), length(E)); # starting e- flux profile
+    I0 = zeros(length(z) * length(μ_center), n_E); # starting e- flux profile
 
     ## Load incoming flux
     if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(1:1:1, E, μ_center, INPUT_OPTIONS.input_file)
+        Ie_top = Ie_top_from_file(1:1:1, E_centers, μ_center, INPUT_OPTIONS.input_file)
     elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, E, dE, μ_center,
-                                  INPUT_OPTIONS.Beams, μ_scatterings.BeamWeight,
-                                  h_atm;
+        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams;
                                   spectrum=:flat, E_min=INPUT_OPTIONS.E_min)
     elseif INPUT_OPTIONS.input_type == "LET"
-        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, E, dE, μ_center,
-                             μ_scatterings.BeamWeight, INPUT_OPTIONS.Beams;
+        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, model,
+                             INPUT_OPTIONS.Beams;
                              low_energy_tail = INPUT_OPTIONS.low_energy_tail)
     end
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
-        save_Ie_top(Ie_top, E, collect(μ_lims), 1:1:1, savedir)
+        save_Ie_top(Ie_top, energy_grid, collect(μ_lims), 1:1:1, savedir)
     end
 
     ## Calculate the phase functions and put them in a Tuple
     print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(μ_scatterings.theta1, E);
-    phaseO2e, phaseO2i = phase_fcn_O2(μ_scatterings.theta1, E);
-    phaseOe, phaseOi = phase_fcn_O(μ_scatterings.theta1, E);
+    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
     println(" done ✅")
@@ -347,57 +371,56 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     ## And save the simulation parameters in it
     save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 0, 0, 1:1:1, 1,
         0, INPUT_OPTIONS, savedir)
-    save_neutrals(h_atm, n_neutrals, ne, Te, Tn, savedir)
+    save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
 
     ## Initialize cache with pre-filled density matrices
-    cache = Cache(n_neutrals, length(μ_center), 1, length(h_atm), length(E))
+    cache = Cache(neutral_densities, length(μ_center), 1, length(z), n_E)
 
     ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(μ_scatterings.BeamWeight_relative, μ_scatterings.Pmu2mup);
+    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
 
     ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(h_atm, μ_center, 1:1:1, E, dE, θ_lims)
+    matrices = initialize_transport_matrices(model, 1:1:1)
     # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, E, dE, θ_lims)
-    update_Ddiffusion!(matrices.Ddiffusion, h_atm ./ cosd(B_angle_to_zenith))
+    update_D!(matrices.D, model)
+    update_Ddiffusion!(matrices.Ddiffusion, model)
     matrices.Ddiffusion[1, 1] = 0
 
     ## Initialize the ionospheric flux
-    Ie = zeros(length(h_atm) * length(μ_center), 1, length(E));
+    Ie = zeros(length(z) * length(μ_center), 1, n_E);
 
     # Extract the top flux for the current loop
     Ie_top_local = Ie_top[:, 1, :];
 
-    p = Progress(length(E), desc=string("Calculating flux"))
+    p = Progress(n_E, desc=string("Calculating flux"))
     # Looping over energy
-    for iE in length(E):-1:1
+    for iE in n_E:-1:1
         # Update matrices A and B for current energy
-        B2B_inelastic_neutrals = update_matrices!(matrices, n_neutrals, σ_neutrals, ne, Te,
-                                                  E_levels_neutrals, phase_fcn_neutrals,
-                                                  E, dE, iE, B2B_fragment, μ_scatterings.theta1)
+        B2B_inelastic_neutrals = update_matrices!(matrices, model,
+                              phase_fcn_neutrals, iE,
+                              B2B_fragment)
 
         # Compute the flux of e-
-        if iE == length(E)
+        if iE == n_E
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  h_atm ./ cosd(B_angle_to_zenith),
-                                                  μ_center, matrices, iE,
+                                                  model,
+                                                  matrices, iE,
                                                   Ie_top_local[:, iE], cache,
                                                   first_iteration = true)
         else
             @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  h_atm ./ cosd(B_angle_to_zenith),
-                                                  μ_center, matrices, iE,
+                                                  model,
+                                                  matrices, iE,
                                                   Ie_top_local[:, iE], cache)
         end
 
         # Update the cascading of e-
-        update_Q!(matrices, Ie, h_atm, 1:1:1, ne, Te, n_neutrals, σ_neutrals, E_levels_neutrals,
-                  B2B_inelastic_neutrals, cascading_neutrals, E, dE, iE, μ_scatterings.BeamWeight,
-                  μ_center, cache)
+        update_Q!(matrices, Ie, model, 1:1:1,
+                  B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
 
         next!(p)
     end
 
-    save_results(Ie, E, 1:1:1, μ_lims, h_atm, I0, μ_scatterings, 1, 1, savedir)
+    save_results(Ie, energy_grid, 1:1:1, μ_lims, z, I0, scattering, 1, 1, savedir)
 
 end

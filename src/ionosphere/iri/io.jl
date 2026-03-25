@@ -27,12 +27,13 @@ pre-check on filenames before loading and comparing full parameters.
 # Returns
 - `Union{String, Nothing}`: Full path to matching file, or `nothing` if not found
 """
-function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height)
+function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height,
+                                   verbose=true)
     data_electron_directory = pkgdir(AURORA, "internal_data", "data_electron")
     data_electron_files = readdir(data_electron_directory)
     iri_files = data_electron_files[contains.(data_electron_files, "iri")]
     iri_files_fullpath = joinpath.(data_electron_directory, iri_files)
-    print("Looking for an iri file that matches the parameters...")
+    verbose && print("Looking for an iri file that matches the parameters...")
 
     for (i, file) in enumerate(iri_files_fullpath)
         if iri_files[i][4] == '_' # Check that the file is not an old iri file
@@ -49,15 +50,15 @@ function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, he
                 # Now we check if all the parameters are the same
                 if parameters == parameters_file
                     # If it is the case, that will be the file to load
-                    println(" found one!")
-                    println("   ∟ at $file")
+                    verbose && println(" found one!")
+                    verbose && println("   ∟ at $file")
                     return file
                 end
             end
         end
     end
 
-    println(" no file was found.")
+    verbose && println(" no file was found.")
     return nothing
 end
 
@@ -234,7 +235,7 @@ The file contains:
 - Files are saved to `internal_data/data_electron/` directory
 - Existing files are not overwritten; a suffix is added to the filename
 """
-function save_iri_data(iri_data, parameters)
+function save_iri_data(iri_data, parameters; verbose=true)
     # Unpack the parameters
     year = parameters.year
     month = parameters.month
@@ -273,7 +274,7 @@ function save_iri_data(iri_data, parameters)
         write(f, "\n")
         writedlm(f, iri_data)
     end
-    println(styled"File {bold:$filename} created under {underline:$directory}.")
+    verbose && println(styled"File {bold:$filename} created under {underline:$directory}.")
 
     return fullpath
 end

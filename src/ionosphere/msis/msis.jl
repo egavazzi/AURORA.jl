@@ -38,17 +38,20 @@ function find_msis_file(;
                         minute = 15,
                         lat = 76,
                         lon = 5,
-                        height = 85:1:700)
+                        height = 85:1:700,
+                        verbose = true)
 
     # First check if we have a msis file with these parameters
-    file_to_load = search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height)
+    file_to_load = search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height,
+                                             verbose)
     if !isnothing(file_to_load)
         return file_to_load
     end
 
     # Otherwise, calculate and save new MSIS data
-    msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon, height)
-    file_to_load = save_msis_data(msis_data, parameters)
+    msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon,
+                                                height, verbose)
+    file_to_load = save_msis_data(msis_data, parameters; verbose)
 
     return file_to_load
 end
@@ -62,7 +65,8 @@ function find_nrlmsis_file(;
                            minute = 15,
                            lat = 76,
                            lon = 5,
-                           height = 85:1:700)
+                           height = 85:1:700,
+                           verbose = true)
     @warn "find_nrlmsis_file() is deprecated, use find_msis_file() instead" maxlog = 1
-    return find_msis_file(; year, month, day, hour, minute, lat, lon, height)
+    return find_msis_file(; year, month, day, hour, minute, lat, lon, height, verbose)
 end

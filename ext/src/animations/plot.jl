@@ -18,7 +18,7 @@ To plot something, you need to give a `Ietop_struct` with
 `Ie_top_struct.data_Ietop`.
 =#
 function make_Ie_in_time_plot(Ie_timeslice::Observable,
-                                time::Observable{String}, h_atm, E, angles_to_plot, colorrange,
+                                time::Observable{String}, z, E_centers, angles_to_plot, colorrange,
                                 Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing,
                                 Ietop_angle_cone = nothing))
 
@@ -47,7 +47,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
 
             ax = Axis(ga[i, j], xscale = log10, xminorticks = IntervalsBetween(9),
                       xminorticksvisible = true, yticks = 100:100:600)
-            heatmap!(E, h_atm / 1e3, Ie_streams[idx]; colorrange, colorscale = log10, colormap = :inferno)
+            heatmap!(E_centers, z / 1e3, Ie_streams[idx]; colorrange, colorscale = log10, colormap = :inferno)
 
             # Generate title based on angle values (>90° = DOWN, <90° = UP)
             θ1, θ2 = angles_to_plot[i, j]
@@ -87,7 +87,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
                         xticklabelsvisible = true, xminorticksvisible = true,
                         xticksmirrored = true, yticksmirrored = true,
                         limits = ((0, 1), nothing))
-        hm = heatmap!(Ietop_struct.t_top, E, Ietop_struct.data_Ietop; colormap = :inferno,
+        hm = heatmap!(Ietop_struct.t_top, E_centers, Ietop_struct.data_Ietop; colormap = :inferno,
                       colorscale = log10,
                       colorrange = (1e6, maximum(Ietop_struct.data_Ietop)))
         time_float64 = @lift(parse(Float64, $time[1:end-1]))
