@@ -100,7 +100,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     Ie_raw = data["Ie_ztE"]  # size of [n_mu x nz, nt, nE]
     μ_lims = vec(data["mu_lims"])
     t_run = data["t_run"]
-    E_centers = data["E"]
+    E_centers = data["E_centers"]
     z = data["h_atm"]
 
     ΔE = data["dE"]
