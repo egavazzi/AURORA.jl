@@ -22,37 +22,24 @@ iri_file = find_iri_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
     );
 
+## Build the model
+model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
 ## Define where to save the results
 root_savedir = ""   # name of the root folder
 name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
-## Define input parameters
-# input_type = "from_file"
-# input_file = "/mnt/data/etienne/Julia/AURORA/data/MI_coupling/1.27e7-1/Ie_precipitating.mat"
-# INPUT_OPTIONS = (;input_type, input_file);
+## Define input flux
+# Flickering with flat spectrum and sinusoidal modulation at 5 Hz,
+# with a source set at 3000 km altitude
+flux = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
+                 beams=1, z_source=3000.0)
 
-input_type = "flickering";
-IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = 3000;                  # (km) altitude of the source
-E_min = 100;                # (eV) bottom energy of the FAB
-f = 5;                      # (Hz) frequence of the modulation
-Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
-modulation = "sinus";       # type of the modulation ("square" or "sinus")
-INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
 
-# input_type = "constant_onset"
-# IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-# z₀ = altitude_lims[2];      # (km) altitude of the source
-# E_min = E_max - 100;        # (eV) bottom energy of the FAB
-# Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
-# t0 = 0;                     # (s) time of start for smooth transition
-# t1 = 0;                     # (s) time of end for smooth transition
-# INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
 
 ## Run the simulation
-calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-                      msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number)
+calculate_e_transport(model, flux, t_total, dt, savedir, CFL_number)
 
 ## Run the analysis
 make_Ie_top_file(savedir)

@@ -28,8 +28,13 @@ export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 include("setup.jl")
 export AuroraModel, make_altitude_grid, make_energy_grid
 
+include("input/spectra.jl")
+include("input/modulations.jl")
 include("input/input_flux.jl")
-export Ie_top_from_file, Ie_top_modulated, Ie_with_LET
+export AbstractSpectrum, FlatSpectrum, GaussianSpectrum, MaxwellianSpectrum, FileSpectrum
+export AbstractModulation, ConstantModulation, SinusoidalFlickering, SquareFlickering, SmoothOnset
+export InputFlux, evaluate_spectrum, apply_modulation, compute_flux
+export Ie_top_from_file
 
 
 include("solvers/transport_matrices.jl")

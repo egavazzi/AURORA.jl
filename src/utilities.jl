@@ -101,8 +101,8 @@ end
 
 import LibGit2
 import Pkg
-function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t,
-    n_loop, CFL_number, INPUT_OPTIONS, savedir)
+function save_parameters(model::AuroraModel, flux::InputFlux, t_total, dt, t, n_loop,
+    CFL_number, savedir)
 	savefile = joinpath(savedir, "parameters.txt")
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
         LibGit2.head(pkgdir(AURORA))
@@ -111,10 +111,10 @@ function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_tot
     end
     version_AURORA = pkgversion(AURORA)
     open(savefile, "w") do f
-        write(f, "altitude_lims = $altitude_lims \n")
-        write(f, "θ_lims = $θ_lims \n")
-        write(f, "E_max = $E_max \n")
-        write(f, "B_angle_to_zenith = $B_angle_to_zenith \n")
+        write(f, "altitude_lims = [$(model.altitude_grid.h[1]/1e3), $(model.altitude_grid.h[end]/1e3)] \n")
+        write(f, "θ_lims = $(model.pitch_angle_grid.θ_lims) \n")
+        write(f, "E_max = $(model.energy_grid.E_max) \n")
+        write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
         write(f, "\n")
         write(f, "t_total = $t_total \n")
         write(f, "dt = $dt \n")
@@ -123,7 +123,7 @@ function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_tot
         write(f, "\n")
         write(f, "CFL_number = $CFL_number")
         write(f, "\n")
-        write(f, "input_options = $INPUT_OPTIONS \n")
+        write(f, "flux = $flux \n")
         write(f, "\n")
         write(f, "commit_hash = $commit_hash \n")
         write(f, "version_AURORA = $version_AURORA")

@@ -120,23 +120,17 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
 end
 
 """
-    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-        msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
-        n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
+    calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt, savedir,
+        CFL_number = 64; n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
 
 Run a time-dependent electron transport simulation and save the results to `savedir`.
 
 # Arguments
-- `altitude_lims`: altitude range of the simulation (km). Tuple or Vector
-- `θ_lims`: pitch-angle beam limits (degrees). Range or Vector `[n_beams + 1]`
-- `E_max`: maximum energy of the simulation (eV)
-- `B_angle_to_zenith`: angle between the magnetic field and the zenith (degrees)
+- `model`: [`AuroraModel`](@ref) describing the grids and atmosphere/ionosphere
+- `flux`: [`InputFlux`](@ref) describing the incoming electron precipitation
 - `t_total`: total simulation time (s)
 - `dt`: output time step (s)
-- `msis_file`: path to the MSIS neutral atmosphere file
-- `iri_file`: path to the IRI ionosphere file
 - `savedir`: path to the directory where results will be saved
-- `INPUT_OPTIONS`: NamedTuple describing the incoming electron flux source
 - `CFL_number`: CFL multiplier used to sub-sample the time grid (default: `64`)
 
 # Keyword Arguments
@@ -146,12 +140,9 @@ Run a time-dependent electron transport simulation and save the results to `save
 - `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
   `Ie_incoming.mat` in `savedir` before the simulation starts
 """
-function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-    msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number = 64;
-    n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
+function calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt, savedir,
+    CFL_number = 64; n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
 
-    ## Build simulation model
-    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
     altitude_grid = model.altitude_grid
     energy_grid = model.energy_grid
     pitch_angle_grid = model.pitch_angle_grid
@@ -173,7 +164,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     # The time grid over which the simulation is run needs to be fine enough to ensure that
     # the results are correct. Here we check the CFL criteria and reduce the time grid
     # accordingly
-    t, CFL_factor = CFL_criteria(t_total, dt, z, v_of_E(E_max), CFL_number)
+    t, CFL_factor = CFL_criteria(t_total, dt, z, v_of_E(maximum(E_centers)), CFL_number)
 
     ## Calculate n_loop if not provided
     if isnothing(n_loop)
@@ -184,23 +175,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     check_n_loop(n_loop, length(z), length(μ_center), length(t), n_E)
 
     ## Load incoming flux
-    if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(t, E_centers, μ_center, INPUT_OPTIONS.input_file; interpolation = INPUT_OPTIONS.interpolation)
-    elseif INPUT_OPTIONS.input_type == "flickering"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
-                                  t, n_loop;
-                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
-                                  modulation=Symbol(INPUT_OPTIONS.modulation),
-                                  f=INPUT_OPTIONS.f, amplitude=1.0,
-                                  z_source=INPUT_OPTIONS.z₀)
-    elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams,
-                                  t, n_loop;
-                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min,
-                                  modulation=:none,
-                                  z_source=INPUT_OPTIONS.z₀,
-                                  t_start=INPUT_OPTIONS.t0, t_end=INPUT_OPTIONS.t1)
-    end
+    Ie_top = compute_flux(flux, model, t)
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
@@ -217,8 +192,7 @@ function calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t, n_loop,
-                    CFL_number, INPUT_OPTIONS, savedir)
+    save_parameters(model, flux, t_total, dt, t, n_loop, CFL_number, savedir)
     save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
 
     ## Calculate the number of time steps per loop
@@ -298,29 +272,22 @@ end
 
 
 """
-    calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-        msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
+    calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux, savedir;
+        save_input_flux = true)
 
 Run a steady-state electron transport simulation and save the results to `savedir`.
 
 # Arguments
-- `altitude_lims`: altitude range of the simulation (km). Tuple or Vector
-- `θ_lims`: pitch-angle beam limits (degrees). Range or Vector `[n_beams + 1]`
-- `E_max`: maximum energy of the simulation (eV)
-- `B_angle_to_zenith`: angle between the magnetic field and the zenith (degrees)
-- `msis_file`: path to the MSIS neutral atmosphere file
-- `iri_file`: path to the IRI ionosphere file
+- `model`: [`AuroraModel`](@ref) describing the grids and atmosphere/ionosphere
+- `flux`: [`InputFlux`](@ref) describing the incoming electron precipitation
 - `savedir`: path to the directory where results will be saved
-- `INPUT_OPTIONS`: NamedTuple describing the incoming electron flux source
 
 # Keyword Arguments
 - `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
   `Ie_incoming.mat` in `savedir` before the simulation starts
 """
-function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, savedir, INPUT_OPTIONS; save_input_flux = true)
-    ## Build simulation model
-    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+function calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux, savedir;
+    save_input_flux = true)
     altitude_grid = model.altitude_grid
     energy_grid = model.energy_grid
     pitch_angle_grid = model.pitch_angle_grid
@@ -342,16 +309,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     I0 = zeros(length(z) * length(μ_center), n_E); # starting e- flux profile
 
     ## Load incoming flux
-    if INPUT_OPTIONS.input_type == "from_file"
-        Ie_top = Ie_top_from_file(1:1:1, E_centers, μ_center, INPUT_OPTIONS.input_file)
-    elseif INPUT_OPTIONS.input_type == "constant_onset"
-        Ie_top = Ie_top_modulated(INPUT_OPTIONS.IeE_tot, model, INPUT_OPTIONS.Beams;
-                                  spectrum=:flat, E_min=INPUT_OPTIONS.E_min)
-    elseif INPUT_OPTIONS.input_type == "LET"
-        Ie_top = Ie_with_LET(INPUT_OPTIONS.IeE_tot, INPUT_OPTIONS.E0, model,
-                             INPUT_OPTIONS.Beams;
-                             low_energy_tail = INPUT_OPTIONS.low_energy_tail)
-    end
+    Ie_top = compute_flux(flux, model)
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
@@ -368,9 +326,7 @@ function calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_ang
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    ## And save the simulation parameters in it
-    save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, 0, 0, 1:1:1, 1,
-        0, INPUT_OPTIONS, savedir)
+    save_parameters(model, flux, 0, 0, 1:1:1, 1, 0, savedir)
     save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
 
     ## Initialize cache with pre-filled density matrices
