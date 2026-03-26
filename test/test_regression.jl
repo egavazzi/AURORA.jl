@@ -20,7 +20,8 @@
     flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
     ## Run the simulation
-    calculate_e_transport_steady_state(model, flux, savedir)
+    sim = AuroraSimulation(model, flux, savedir)
+    run!(sim)
 
     ## Analyze the results
     make_Ie_top_file(savedir)
@@ -70,7 +71,8 @@ end
                      beams=1, z_source=1000.0)
 
     ## Run the simulation
-    calculate_e_transport(model, flux, t_total, dt, savedir, CFL_number; n_loop = 2)
+    sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop = 2)
+    run!(sim)
 
     ## Analyze the results
     make_Ie_top_file(savedir)

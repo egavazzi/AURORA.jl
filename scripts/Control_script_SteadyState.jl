@@ -24,8 +24,9 @@ savedir = make_savedir(root_savedir, name_savedir)
 ## Define input flux
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
-## Run the simulation
-calculate_e_transport_steady_state(model, flux, savedir)
+## Create and run the simulation
+sim = AuroraSimulation(model, flux, savedir)
+run!(sim)
 
 ## Analyze the results
 make_Ie_top_file(savedir)

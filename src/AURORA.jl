@@ -48,9 +48,10 @@ include("solvers/crank_nicolson_optimized.jl")
 include("solvers/steady_state.jl")
 include("solvers/steady_state_optimized.jl")
 
+include("simulation.jl")
+export AuroraSimulation, run!
+
 include("main.jl")
-export calculate_e_transport
-export calculate_e_transport_steady_state
 
 include("utilities.jl")
 export v_of_E, CFL_criteria, mu_avg, beam_weight,

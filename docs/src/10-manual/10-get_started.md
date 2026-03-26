@@ -1,6 +1,6 @@
 # Get started
 
-Simulations are started using the function `calculate_e_transport(...)`. The function takes in many parameters, so it can be easier to use the script named `Control_script.jl` situated in the `scripts/` folder.
+Simulations are set up by creating an [`AuroraSimulation`](@ref) and then calling `run!(sim)`. See the script named `Control_script.jl` situated in the `scripts/` folder for a ready-to-use template.
 The script is pre-filled and you just need to modify the values of the parameters.
 You can also use the script as a template to make your own control scripts.
 

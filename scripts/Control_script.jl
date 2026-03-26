@@ -36,10 +36,11 @@ savedir = make_savedir(root_savedir, name_savedir)
 flux = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
                  beams=1, z_source=3000.0)
 
-
+## Create the simulation
+sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number)
 
 ## Run the simulation
-calculate_e_transport(model, flux, t_total, dt, savedir, CFL_number)
+run!(sim)
 
 ## Run the analysis
 make_Ie_top_file(savedir)

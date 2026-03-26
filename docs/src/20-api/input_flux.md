@@ -8,10 +8,10 @@ specified by an [`InputFlux`](@ref) object, which combines:
   number flux as a function of energy, and
 - a **temporal modulation** ([`AbstractModulation`](@ref)) — how that flux varies in time.
 
-Once an `InputFlux` is built, it is passed to either
-`calculate_e_transport` (time-dependent) or `calculate_e_transport_steady_state`
-(steady-state), which internally calls [`compute_flux`](@ref) to produce the full 3-D flux
-array `Ie_top` of shape `[n_beams, n_t, n_E]` (units: #e⁻/m²/s).
+Once an `InputFlux` is built, it is bundled with an [`AuroraModel`](@ref) into an
+[`AuroraSimulation`](@ref) and executed with [`run!`](@ref). Internally, `run!` calls
+[`compute_flux`](@ref) to produce the full 3-D flux array `Ie_top` of shape
+`[n_beams, n_t, n_E]` (units: #e⁻/m²/s).
 
 !!! note "Units"
     Energy flux (`IeE_tot`) is always given in **W/m²**. Energies and characteristic

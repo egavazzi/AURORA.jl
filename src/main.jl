@@ -120,28 +120,23 @@ function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
 end
 
 """
-    calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt, savedir,
-        CFL_number = 64; n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
+    calculate_e_transport(sim::AuroraSimulation)
 
-Run a time-dependent electron transport simulation and save the results to `savedir`.
+Run a time-dependent electron transport simulation and save the results to `sim.savedir`.
 
-# Arguments
-- `model`: [`AuroraModel`](@ref) describing the grids and atmosphere/ionosphere
-- `flux`: [`InputFlux`](@ref) describing the incoming electron precipitation
-- `t_total`: total simulation time (s)
-- `dt`: output time step (s)
-- `savedir`: path to the directory where results will be saved
-- `CFL_number`: CFL multiplier used to sub-sample the time grid (default: `64`)
-
-# Keyword Arguments
-- `n_loop`: number of loops to split the time grid into. Computed automatically from
-  `max_memory_gb` if not provided
-- `max_memory_gb`: memory budget used to compute `n_loop` automatically
-- `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
-  `Ie_incoming.mat` in `savedir` before the simulation starts
+Called internally by [`run!`](@ref). Users should prefer `run!(sim)`.
 """
-function calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt, savedir,
-    CFL_number = 64; n_loop = nothing, max_memory_gb = 8, save_input_flux = true)
+function calculate_e_transport(sim::AuroraSimulation)
+
+    model = sim.model
+    flux = sim.flux
+    t_total = sim.t_total
+    dt = sim.dt
+    savedir = sim.savedir
+    CFL_number = sim.CFL_number
+    n_loop = sim.n_loop
+    max_memory_gb = sim.max_memory_gb
+    save_input_flux = sim.save_input_flux
 
     altitude_grid = model.altitude_grid
     energy_grid = model.energy_grid
@@ -179,7 +174,7 @@ function calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt,
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
-        save_Ie_top(Ie_top, energy_grid, collect(μ_lims), t, savedir)
+        save_Ie_top(sim, Ie_top, t)
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -192,8 +187,8 @@ function calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt,
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    save_parameters(model, flux, t_total, dt, t, n_loop, CFL_number, savedir)
-    save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
+    save_parameters(sim, t, n_loop)
+    save_neutrals(sim)
 
     ## Calculate the number of time steps per loop
     # Each loop processes (length(t) - 1) / n_loop + 1 time steps, with overlapping endpoints
@@ -262,8 +257,7 @@ function calculate_e_transport(model::AuroraModel, flux::InputFlux, t_total, dt,
         # Subsample Ie into Ie_save buffer
         Ie_save .= @view Ie[:, 1:CFL_factor:end, :]
         # Save results for the n_loop
-        save_results(Ie_save, energy_grid, t_per_loop, μ_lims, z, I0, scattering, i_loop,
-                     CFL_factor, savedir)
+        save_results(sim, Ie_save, t_per_loop, I0, i_loop, CFL_factor)
     end
 end
 
@@ -272,22 +266,19 @@ end
 
 
 """
-    calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux, savedir;
-        save_input_flux = true)
+    calculate_e_transport_steady_state(sim::AuroraSimulation)
 
-Run a steady-state electron transport simulation and save the results to `savedir`.
+Run a steady-state electron transport simulation and save the results to `sim.savedir`.
 
-# Arguments
-- `model`: [`AuroraModel`](@ref) describing the grids and atmosphere/ionosphere
-- `flux`: [`InputFlux`](@ref) describing the incoming electron precipitation
-- `savedir`: path to the directory where results will be saved
-
-# Keyword Arguments
-- `save_input_flux`: if `true`, save the computed top-boundary flux `Ie_top` to
-  `Ie_incoming.mat` in `savedir` before the simulation starts
+Called internally by [`run!`](@ref). Users should prefer `run!(sim)`.
 """
-function calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux, savedir;
-    save_input_flux = true)
+function calculate_e_transport_steady_state(sim::AuroraSimulation)
+
+    model = sim.model
+    flux = sim.flux
+    savedir = sim.savedir
+    save_input_flux = sim.save_input_flux
+
     altitude_grid = model.altitude_grid
     energy_grid = model.energy_grid
     pitch_angle_grid = model.pitch_angle_grid
@@ -313,7 +304,7 @@ function calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux,
 
     ## Optionally save the input flux to the output folder
     if save_input_flux
-        save_Ie_top(Ie_top, energy_grid, collect(μ_lims), 1:1:1, savedir)
+        save_Ie_top(sim, Ie_top, 1:1:1)
     end
 
     ## Calculate the phase functions and put them in a Tuple
@@ -326,8 +317,8 @@ function calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux,
     println(" done ✅")
 
     ## And save the simulation parameters in it
-    save_parameters(model, flux, 0, 0, 1:1:1, 1, 0, savedir)
-    save_neutrals(z, neutral_densities, ne, Te, Tn, savedir)
+    save_parameters(sim, 1:1:1, 1)
+    save_neutrals(sim)
 
     ## Initialize cache with pre-filled density matrices
     cache = Cache(neutral_densities, length(μ_center), 1, length(z), n_E)
@@ -377,6 +368,6 @@ function calculate_e_transport_steady_state(model::AuroraModel, flux::InputFlux,
         next!(p)
     end
 
-    save_results(Ie, energy_grid, 1:1:1, μ_lims, z, I0, scattering, 1, 1, savedir)
+    save_results(sim, Ie, 1:1:1, I0, 1, 1)
 
 end
