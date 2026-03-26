@@ -48,8 +48,11 @@ include("solvers/crank_nicolson_optimized.jl")
 include("solvers/steady_state.jl")
 include("solvers/steady_state_optimized.jl")
 
+include("cache.jl")
+export SolverCache, DegradationCache, TransportCache
 include("simulation.jl")
-export AuroraSimulation, run!
+export AuroraSimulation, ResolvedTimeGrid
+export initialize!, run!
 
 include("main.jl")
 

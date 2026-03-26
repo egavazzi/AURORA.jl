@@ -101,8 +101,23 @@ end
 
 import LibGit2
 import Pkg
-function save_parameters(sim::AuroraSimulation, t, n_loop)
+function save_parameters(sim::AuroraSimulation)
     model = sim.model
+    if isnothing(sim.time)
+        t_total = nothing
+        dt = nothing
+        dt_resolved = nothing
+        t = 1:1:1
+        n_loop = 1
+        CFL_number = 0.0
+    else
+        t_total = sim.time.t_total
+        dt = sim.time.dt_requested
+        dt_resolved = sim.time.dt_resolved
+        t = sim.time.t
+        n_loop = sim.time.n_loop
+        CFL_number = sim.time.CFL_number
+    end
 	savefile = joinpath(sim.savedir, "parameters.txt")
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
         LibGit2.head(pkgdir(AURORA))
@@ -116,12 +131,13 @@ function save_parameters(sim::AuroraSimulation, t, n_loop)
         write(f, "E_max = $(model.energy_grid.E_max) \n")
         write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
         write(f, "\n")
-        write(f, "t_total = $(sim.t_total) \n")
-        write(f, "dt = $(sim.dt) \n")
+        write(f, "t_total = $t_total \n")
+        write(f, "dt = $dt \n")
+        write(f, "dt_resolved = $dt_resolved \n")
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
-        write(f, "CFL_number = $(sim.CFL_number)")
+        write(f, "CFL_number = $CFL_number")
         write(f, "\n")
         write(f, "flux = $(sim.flux) \n")
         write(f, "\n")

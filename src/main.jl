@@ -1,373 +1,164 @@
-using Dates: Dates, now
 using ProgressMeter: Progress, next!
 
-using SparseArrays: SparseArrays, spzeros, spdiagm
-using KLU: KLU, klu
-
-# Practical cache storage
-mutable struct Cache
-    # Fields for steady-state scheme
-    KLU::KLU.KLUFactorization{Float64, Int64}
-    Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    mapping::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    Ddz_Up::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    Ddz_Down::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    # Additional fields for Crank-Nicolson scheme
-    Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    mapping_lhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    mapping_rhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    # Cached repeated density matrices for ionization calculations (one per species)
-    n_repeated_over_μt::Vector{Matrix{Float64}}
-    n_repeated_over_t::Vector{Matrix{Float64}}
-    # Cached temporary matrix for scattered flux calculation (inelastic collisions)
-    Ie_scatter::Matrix{Float64}
-    # Cached ionization fragment arrays (one per species)
-    Ionization_fragment_1::Vector{Matrix{Float64}}
-    Ionizing_fragment_1::Vector{Matrix{Float64}}
-    Ionization_fragment_2::Vector{Vector{Float64}}
-    Ionizing_fragment_2::Vector{Vector{Float64}}
+function require_cache(sim::AuroraSimulation)
+    cache = sim.cache
+    cache === nothing && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
+    return cache
 end
 
-function Cache()
-    KLU = klu(spdiagm(0 => ones(1)))
-    Mlhs = spdiagm(0 => ones(1))
-    Mrhs = spdiagm(0 => ones(1))
-    Ddz_Up = spdiagm(0 => ones(1))
-    Ddz_Down = spdiagm(0 => ones(1))
-    Ddiffusion = spdiagm(0 => ones(1))
-    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+function phase_function_cache(model::AuroraModel)
+    E_centers = model.energy_grid.E_centers
+    θ_scatter = model.scattering.θ_scatter
 
-    n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]  # 3 species (N2, O2, O)
-    n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
-    Ie_scatter = zeros(1, 1)
-    Ionization_fragment_1 = [zeros(1, 1) for _ in 1:3]
-    Ionizing_fragment_1 = [zeros(1, 1) for _ in 1:3]
-    Ionization_fragment_2 = [zeros(1) for _ in 1:3]
-    Ionizing_fragment_2 = [zeros(1) for _ in 1:3]
-    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
-                 Ionization_fragment_1, Ionizing_fragment_1,
-                 Ionization_fragment_2, Ionizing_fragment_2)
-end
-
-# Constructor that pre-fills the density matrices
-function Cache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
-    KLU = klu(spdiagm(0 => ones(1)))
-
-    number_species = length(n_neutrals)
-
-    # Pre-allocate and fill the density matrices for all species
-    n_repeated_over_μt = Vector{Matrix{Float64}}(undef, number_species)
-    n_repeated_over_t = Vector{Matrix{Float64}}(undef, number_species)
-
-    for i_species in 1:number_species
-        n = n_neutrals[i_species]
-
-        # Allocate and fill n_repeated_over_μt (size: n_z × n_μ, n_t)
-        n_repeated_over_μt[i_species] = Matrix{Float64}(undef, n_z * n_μ, n_t)
-        for i_t in 1:n_t
-            for i_μ in 1:n_μ
-                @views n_repeated_over_μt[i_species][(i_μ - 1) * n_z .+ (1:n_z), i_t] .= n
-            end
-        end
-
-        # Allocate and fill n_repeated_over_t (size: n_z, n_t)
-        n_repeated_over_t[i_species] = Matrix{Float64}(undef, n_z, n_t)
-        for i_t in 1:n_t
-            @views n_repeated_over_t[i_species][:, i_t] .= n
-        end
-    end
-
-    # Pre-allocate Ie_scatter matrix with correct size (n_z × n_μ, n_t)
-    Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
-
-    # Pre-allocate ionization fragment arrays for all species
-    Ionization_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
-    Ionizing_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
-    Ionization_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
-    Ionizing_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
-
-    for i_species in 1:number_species
-        Ionization_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
-        Ionizing_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
-        Ionization_fragment_2[i_species] = zeros(n_E)
-        Ionizing_fragment_2[i_species] = zeros(n_E)
-    end
-
-    # Create minimal placeholder matrices with concrete types
-    Mlhs = spdiagm(0 => ones(1))
-    Mrhs = spdiagm(0 => ones(1))
-    Ddz_Up = spdiagm(0 => ones(1))
-    Ddz_Down = spdiagm(0 => ones(1))
-    Ddiffusion = spdiagm(0 => ones(1))
-    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-
-    return Cache(KLU, Mlhs, mapping, Ddz_Up, Ddz_Down, Ddiffusion, Mrhs, mapping_lhs, mapping_rhs,
-                 n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
-                 Ionization_fragment_1, Ionizing_fragment_1,
-                 Ionization_fragment_2, Ionizing_fragment_2)
-end
-
-"""
-    calculate_e_transport(sim::AuroraSimulation)
-
-Run a time-dependent electron transport simulation and save the results to `sim.savedir`.
-
-Called internally by [`run!`](@ref). Users should prefer `run!(sim)`.
-"""
-function calculate_e_transport(sim::AuroraSimulation)
-
-    model = sim.model
-    flux = sim.flux
-    t_total = sim.t_total
-    dt = sim.dt
-    savedir = sim.savedir
-    CFL_number = sim.CFL_number
-    n_loop = sim.n_loop
-    max_memory_gb = sim.max_memory_gb
-    save_input_flux = sim.save_input_flux
-
-    altitude_grid = model.altitude_grid
-    energy_grid = model.energy_grid
-    pitch_angle_grid = model.pitch_angle_grid
-    scattering = model.scattering
-    ionosphere = model.ionosphere
-    cross_sections = model.cross_sections
-
-    z = altitude_grid.h
-    E_centers = energy_grid.E_centers
-    n_E = energy_grid.n
-    μ_lims = pitch_angle_grid.μ_lims
-    μ_center = pitch_angle_grid.μ_center
-    neutral_densities = n_neutrals(ionosphere)
-    ne = ionosphere.ne
-    Te = ionosphere.Te
-    Tn = ionosphere.Tn
-
-    ## CFL criteria
-    # The time grid over which the simulation is run needs to be fine enough to ensure that
-    # the results are correct. Here we check the CFL criteria and reduce the time grid
-    # accordingly
-    t, CFL_factor = CFL_criteria(t_total, dt, z, v_of_E(maximum(E_centers)), CFL_number)
-
-    ## Calculate n_loop if not provided
-    if isnothing(n_loop)
-        n_loop = calculate_n_loop(t, length(z), length(μ_center), n_E;
-                                  max_memory_gb = max_memory_gb)
-    end
-    ## Check that n_loop won't cause memory issues
-    check_n_loop(n_loop, length(z), length(μ_center), length(t), n_E)
-
-    ## Load incoming flux
-    Ie_top = compute_flux(flux, model, t)
-
-    ## Optionally save the input flux to the output folder
-    if save_input_flux
-        save_Ie_top(sim, Ie_top, t)
-    end
-
-    ## Calculate the phase functions and put them in a Tuple
     print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
-    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
-    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
-    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
-    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
+    phaseN2e, phaseN2i = phase_fcn_N2(θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(θ_scatter, E_centers)
     println(" done ✅")
 
-    ## And save the simulation parameters in it
-    save_parameters(sim, t, n_loop)
-    save_neutrals(sim)
+    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi))
+    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
+    return phase_fcn_neutrals, cascading_neutrals
+end
 
-    ## Calculate the number of time steps per loop
-    # Each loop processes (length(t) - 1) / n_loop + 1 time steps, with overlapping endpoints
-    n_t_per_loop = (length(t) - 1) ÷ n_loop + 1
-    t_per_loop = range(0, step = t[2] - t[1], length = n_t_per_loop)
+function build_transport_cache(sim::AuroraSimulation)
+    model = sim.model
+    z = model.altitude_grid.h
+    μ_center = model.pitch_angle_grid.μ_center
+    neutral_densities = n_neutrals(model.ionosphere)
+    n_E = model.energy_grid.n
 
-    ## Initialize cache with pre-filled density matrices
-    cache = Cache(neutral_densities, length(μ_center), n_t_per_loop, length(z), n_E)
+    n_t = isnothing(sim.time) ? 1 : sim.time.n_t_per_loop
+    t_loop = isnothing(sim.time) ? (1:1:1) : range(0.0, step=sim.time.dt_resolved, length=sim.time.n_t_per_loop)
 
-    ## Initialise
-    I0 = zeros(length(z) * length(μ_center), n_E);    # starting e- flux profile
-    Ie = zeros(length(z) * length(μ_center), n_t_per_loop, n_E)
-    n_t_save = length(0:dt:t_per_loop[end])
+    solver = SolverCache()
+    degradation = DegradationCache(neutral_densities, length(μ_center), n_t, length(z), n_E)
+    matrices = initialize_transport_matrices(model, t_loop)
+    update_D!(matrices.D, model)
+    update_Ddiffusion!(matrices.Ddiffusion, model)
+
+    phase_fcn_neutrals, cascading_neutrals = phase_function_cache(model)
+    B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
+    Ie_top = isnothing(sim.time) ? compute_flux(sim.flux, model) : compute_flux(sim.flux, model, sim.time.t)
+
+    I0 = zeros(length(z) * length(μ_center), n_E)
+    Ie = zeros(length(z) * length(μ_center), n_t, n_E)
+    n_t_save = isnothing(sim.time) ? 1 : length(0:sim.time.dt_requested:t_loop[end])
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
-    ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(model, t_per_loop)
-    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, model)
-    update_Ddiffusion!(matrices.Ddiffusion, model)
-    matrices.Ddiffusion[1, 1] = 0
-
-    ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
-
-    ## Looping over n_loop
-    for i_loop in 1:n_loop
-
-        # Reset Ie and Q for each new loop
-        fill!(Ie, 0.0)
-        fill!(matrices.Q, 0.0)
-
-        # Extract the top flux for the current loop
-        Ie_top_local = Ie_top[:, (1 + (i_loop - 1) * (n_t_per_loop - 1)) : (n_t_per_loop + (i_loop - 1) * (n_t_per_loop - 1)), :]
-
-        p = Progress(n_E; desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
-        # Looping over energy
-        for iE in n_E:-1:1
-            # Update matrices A and B for current energy
-            B2B_inelastic_neutrals = update_matrices!(matrices, model,
-                                                      phase_fcn_neutrals, iE,
-                                                      B2B_fragment)
-
-            # Compute the flux of e-
-            if iE == n_E
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
-                                                 v_of_E(E_centers[iE]), matrices, iE,
-                                                 Ie_top_local[:, :, iE], I0[:, iE], cache,
-                                                 first_iteration = true)
-            else
-                @views Crank_Nicolson_optimized!(Ie[:, :, iE], t_per_loop, model,
-                                                 v_of_E(E_centers[iE]), matrices, iE,
-                                                 Ie_top_local[:, :, iE], I0[:, iE], cache)
-            end
-
-            # Update the cascading of e-
-            update_Q!(matrices, Ie, model, t_per_loop,
-                      B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
-
-            next!(p)
-        end
-
-        # Update the starting e- flux profile
-        I0 .= Ie[:, end, :]
-
-        # Subsample Ie into Ie_save buffer
-        Ie_save .= @view Ie[:, 1:CFL_factor:end, :]
-        # Save results for the n_loop
-        save_results(sim, Ie_save, t_per_loop, I0, i_loop, CFL_factor)
-    end
+    return TransportCache(solver, degradation, matrices, Ie, Ie_save, I0, Ie_top,
+                          t_loop, phase_fcn_neutrals, B2B_fragment, cascading_neutrals)
 end
 
-
-
-
-
 """
-    calculate_e_transport_steady_state(sim::AuroraSimulation)
+    initialize!(sim::AuroraSimulation)
 
-Run a steady-state electron transport simulation and save the results to `sim.savedir`.
+Allocate or re-allocate the working cache for `sim`.
 
-Called internally by [`run!`](@ref). Users should prefer `run!(sim)`.
+This step performs the expensive setup that depends on the model geometry and the
+resolved time grid, but does not write any output files.
 """
-function calculate_e_transport_steady_state(sim::AuroraSimulation)
+function initialize!(sim::AuroraSimulation)
+    sim.cache = build_transport_cache(sim)
+    return sim
+end
 
+function step!(sim::AuroraSimulation)
+    if isnothing(sim.time)
+        step_steady_state!(sim)
+    else
+        step_time_dependent!(sim)
+    end
+    return sim
+end
+
+function step_time_dependent!(sim::AuroraSimulation)
+    cache = require_cache(sim)
+    time = sim.time
+
+    fill!(cache.I0, 0.0)
+    fill!(cache.Ie, 0.0)
+    fill!(cache.Ie_save, 0.0)
+
+    for i_loop in 1:time.n_loop
+        fill!(cache.Ie, 0.0)
+        fill!(cache.matrices.Q, 0.0)
+
+        i_start = 1 + (i_loop - 1) * (time.n_t_per_loop - 1)
+        i_stop = time.n_t_per_loop + (i_loop - 1) * (time.n_t_per_loop - 1)
+        Ie_top_local = @view cache.Ie_top[:, i_start:i_stop, :]
+
+        energy_loop!(sim, Ie_top_local, i_loop, time.n_loop)
+
+        cache.I0 .= cache.Ie[:, end, :]
+        cache.Ie_save .= @view cache.Ie[:, 1:time.CFL_factor:end, :]
+        save_results(sim, cache.Ie_save, cache.t_loop, cache.I0, i_loop, time.CFL_factor)
+    end
+
+    return sim
+end
+
+function step_steady_state!(sim::AuroraSimulation)
+    cache = require_cache(sim)
+
+    fill!(cache.I0, 0.0)
+    fill!(cache.Ie, 0.0)
+    fill!(cache.matrices.Q, 0.0)
+
+    Ie_top_local = @view cache.Ie_top[:, 1, :]
+    energy_loop!(sim, Ie_top_local, 1, 1)
+    save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1, 1)
+
+    return sim
+end
+
+function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::Int)
+    cache = require_cache(sim)
     model = sim.model
-    flux = sim.flux
-    savedir = sim.savedir
-    save_input_flux = sim.save_input_flux
+    E_centers = model.energy_grid.E_centers
+    n_E = model.energy_grid.n
 
-    altitude_grid = model.altitude_grid
-    energy_grid = model.energy_grid
-    pitch_angle_grid = model.pitch_angle_grid
-    scattering = model.scattering
-    ionosphere = model.ionosphere
-    cross_sections = model.cross_sections
+    progress = isnothing(sim.time) ?
+               Progress(n_E, desc="Calculating flux") :
+               Progress(n_E; desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
 
-    z = altitude_grid.h
-    E_centers = energy_grid.E_centers
-    n_E = energy_grid.n
-    μ_lims = pitch_angle_grid.μ_lims
-    μ_center = pitch_angle_grid.μ_center
-    neutral_densities = n_neutrals(ionosphere)
-    ne = ionosphere.ne
-    Te = ionosphere.Te
-    Tn = ionosphere.Tn
-
-    ## Initialise
-    I0 = zeros(length(z) * length(μ_center), n_E); # starting e- flux profile
-
-    ## Load incoming flux
-    Ie_top = compute_flux(flux, model)
-
-    ## Optionally save the input flux to the output folder
-    if save_input_flux
-        save_Ie_top(sim, Ie_top, 1:1:1)
-    end
-
-    ## Calculate the phase functions and put them in a Tuple
-    print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(scattering.θ_scatter, E_centers)
-    phaseO2e, phaseO2i = phase_fcn_O2(scattering.θ_scatter, E_centers)
-    phaseOe, phaseOi = phase_fcn_O(scattering.θ_scatter, E_centers)
-    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
-    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O) # tuple of functions
-    println(" done ✅")
-
-    ## And save the simulation parameters in it
-    save_parameters(sim, 1:1:1, 1)
-    save_neutrals(sim)
-
-    ## Initialize cache with pre-filled density matrices
-    cache = Cache(neutral_densities, length(μ_center), 1, length(z), n_E)
-
-    ## Precalculate the B2B fragment
-    B2B_fragment = prepare_beams2beams(scattering.Ω_subbeam_relative, scattering.P_scatter)
-
-    ## Initialize transport matrices container
-    matrices = initialize_transport_matrices(model, 1:1:1)
-    # Pre-compute the D matrix (energy × angle) and the diffusion operator (altitude x altitude)
-    update_D!(matrices.D, model)
-    update_Ddiffusion!(matrices.Ddiffusion, model)
-    matrices.Ddiffusion[1, 1] = 0
-
-    ## Initialize the ionospheric flux
-    Ie = zeros(length(z) * length(μ_center), 1, n_E);
-
-    # Extract the top flux for the current loop
-    Ie_top_local = Ie_top[:, 1, :];
-
-    p = Progress(n_E, desc=string("Calculating flux"))
-    # Looping over energy
     for iE in n_E:-1:1
-        # Update matrices A and B for current energy
-        B2B_inelastic_neutrals = update_matrices!(matrices, model,
-                              phase_fcn_neutrals, iE,
-                              B2B_fragment)
+        B2B_inelastic_neutrals = update_matrices!(cache.matrices, model,
+                                                  cache.phase_fcn_neutrals, iE,
+                                                  cache.B2B_fragment)
 
-        # Compute the flux of e-
-        if iE == n_E
-            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  model,
-                                                  matrices, iE,
-                                                  Ie_top_local[:, iE], cache,
-                                                  first_iteration = true)
-        else
-            @views steady_state_scheme_optimized!(Ie[:, 1, iE],
-                                                  model,
-                                                  matrices, iE,
-                                                  Ie_top_local[:, iE], cache)
-        end
+        solve_energy_step!(sim, iE, Ie_top_local; first_iteration=(iE == n_E))
 
-        # Update the cascading of e-
-        update_Q!(matrices, Ie, model, 1:1:1,
-                  B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
+        update_Q!(cache.matrices, cache.Ie, model, cache.t_loop,
+                  B2B_inelastic_neutrals, cache.cascading_neutrals,
+                  iE, cache.degradation)
 
-        next!(p)
+        next!(progress)
     end
 
-    save_results(sim, Ie, 1:1:1, I0, 1, 1)
+    return sim
+end
 
+function solve_energy_step!(sim::AuroraSimulation, iE::Int, Ie_top_local; first_iteration=false)
+    cache = require_cache(sim)
+    model = sim.model
+
+    if isnothing(sim.time)
+        @views steady_state_scheme_optimized!(cache.Ie[:, 1, iE], model,
+                                              cache.matrices, iE,
+                                              Ie_top_local[:, iE], cache.solver;
+                                              first_iteration)
+    else
+        @views Crank_Nicolson_optimized!(cache.Ie[:, :, iE], cache.t_loop, model,
+                                         v_of_E(model.energy_grid.E_centers[iE]),
+                                         cache.matrices, iE,
+                                         Ie_top_local[:, :, iE], cache.I0[:, iE],
+                                         cache.solver; first_iteration)
+    end
+
+    return sim
+end
+
+function finalize!(sim::AuroraSimulation)
+    return sim
 end
