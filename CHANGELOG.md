@@ -4,8 +4,7 @@
 ## v0.8.0 - 2026-03-27
 - **Breaking** New simulation interface [#114](https://github.com/egavazzi/AURORA.jl/pull/114)
   - Simulations are now set up by building an `AuroraModel`, creating an `InputFlux`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The old `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
-  - `AuroraSimulation` bundles the model, input flux, save directory, and resolved time grid.
-  - See the [Input Flux documentation](https://egavazzi.github.io/AURORA.jl/dev/20-api/input-flux/) for full details and examples.
+  - See the [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
 
 
 ## v0.7.0 - 2026-03-25
