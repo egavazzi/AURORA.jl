@@ -64,11 +64,31 @@ export v_of_E, CFL_criteria, mu_avg, beam_weight,
 
 include("analysis.jl")
 include("analysis_psd.jl")
-export make_density_file, downsampling_fluxes, make_volume_excitation_file,
+export downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file,
     make_psd_file
 
-# Define and export functions to be extented by the AURORA_viz module
+# Define and export functions to be extended by the AURORA_viz module
+"""
+    plot_input(sim::AuroraSimulation)
+
+Plot the input electron flux for a simulation.
+
+For **time-dependent** simulations, produces a heatmap of flux vs energy and time for each
+active beam.  For **steady-state** simulations, produces a line plot of flux vs energy.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Examples
+```julia
+using CairoMakie
+sim = AuroraSimulation(model, flux, 0.5, 0.001, savedir)
+fig = plot_input(sim)
+```
+"""
+function plot_input end
+export plot_input
+
 """
     animate_Ie_in_time(directory_to_process; angles_to_plot=nothing, colorrange=nothing, ...)
 

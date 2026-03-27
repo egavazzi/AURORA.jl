@@ -10,32 +10,28 @@ altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
 E_max = 500;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-msis_file = "test/reference_results/msis_20051008-2200_70N-19E.txt"
-iri_file = "test/reference_results/iri_20051008-2200_70N-19E.txt"
+msis_file = "test/regression/reference_results/msis_20051008-2200_70N-19E.txt"
+iri_file = "test/regression/reference_results/iri_20051008-2200_70N-19E.txt"
 
-# Define where to save the results
+## Build the model
+model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
+## Define where to save the results
 root_savedir = "temp_results/"   # name of the root folder
 name_savedir = "SS/"   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 
-# Define input parameters
-input_type = "constant_onset"
-IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = altitude_lims[2];      # (km) altitude of the source
-E_min = E_max - 100;        # (eV) bottom energy of the FAB
-Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
-t0 = 0;                     # (s) time of start for smooth transition
-t1 = 0;                     # (s) time of end for smooth transition
-INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+## Define input flux
+flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
-# Run the simulation
-calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, savedir, INPUT_OPTIONS);
+## Run the simulation
+sim = AuroraSimulation(model, flux, savedir)
+run!(sim)
 
-# Analyze the results
-# make_Ie_top_file(savedir)
-make_volume_excitation_file(savedir)
-# make_current_file(savedir)
+## Analyze the results
+make_volume_excitation_file(sim)
+make_column_excitation_file(sim)
+make_current_file(sim)
 
 
 
@@ -56,34 +52,30 @@ altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
 E_max = 500;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-t_sampling = 0:0.01:0.1;       # (s) time-array over which data will be saved
-n_loop = 2;                    # number of loops to run
+t_total = 0.2;                  # (s) total simulation time
+dt = 0.01;                      # (s) time step for saving data
 CFL_number = 128;
 
-msis_file = "test/reference_results/msis_20051008-2200_70N-19E.txt"
-iri_file = "test/reference_results/iri_20051008-2200_70N-19E.txt"
+msis_file = "test/regression/reference_results/msis_20051008-2200_70N-19E.txt"
+iri_file = "test/regression/reference_results/iri_20051008-2200_70N-19E.txt"
 
-# Define where to save the results
+## Build the model
+model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
+## Define where to save the results
 root_savedir = "temp_results/"   # name of the root folder
 name_savedir = "TD/"   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 
-# Define input parameters
-input_type = "flickering";
-IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = 1000;                  # (km) altitude of the source
-E_min = 100;                # (eV) bottom energy of the FAB
-f = 5;                      # (Hz) frequence of the modulation
-Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
-modulation = "sinus";       # type of the modulation ("square" or "sinus")
-INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+## Define input flux
+flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
+                 beams=1, z_source=1000.0)
 
-# Run the simulation
-calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_sampling, n_loop,
-msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number);
+## Run the simulation
+sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop=2)
+run!(sim)
 
-# Analyze the results
-# make_Ie_top_file(savedir)
-make_volume_excitation_file(savedir)
-# make_column_excitation_file(savedir)
-# make_current_file(savedir)
+## Analyze the results
+make_volume_excitation_file(sim)
+make_column_excitation_file(sim)
+make_current_file(sim)

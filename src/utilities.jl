@@ -620,6 +620,7 @@ function calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
         println("  Max memory limit:            $(round(max_memory_gb, digits=2)) GB")
         println("  ─────────────────────────────────────────")
         println("  Calculated n_loop:           $n_loop")
+        println()
     end
 
     return n_loop

@@ -43,7 +43,7 @@ sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number)
 run!(sim)
 
 ## Run the analysis
-make_Ie_top_file(savedir)
-make_volume_excitation_file(savedir)
-make_current_file(savedir)
-make_column_excitation_file(savedir)
+make_Ie_top_file(sim)
+make_volume_excitation_file(sim)
+make_current_file(sim)
+make_column_excitation_file(sim)

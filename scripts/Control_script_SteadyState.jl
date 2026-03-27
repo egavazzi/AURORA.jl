@@ -29,7 +29,7 @@ sim = AuroraSimulation(model, flux, savedir)
 run!(sim)
 
 ## Analyze the results
-make_Ie_top_file(savedir)
-make_volume_excitation_file(savedir)
-make_current_file(savedir)
-# make_column_excitation_file(savedir) -- does not make sense for steady-state
+make_Ie_top_file(sim)
+make_volume_excitation_file(sim)
+make_current_file(sim)
+# make_column_excitation_file(sim) -- does not make sense for steady-state
