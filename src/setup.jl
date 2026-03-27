@@ -79,6 +79,5 @@ function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
     println(io, "├── ", model.scattering)
     println(io, "├── ", model.ionosphere)
     println(io, "├── ", model.cross_sections)
-    println(io, "├── B angle to zenith: $(model.B_angle_to_zenith)°")
-    print(io, "└── s_field: $(length(model.s_field)) points")
+    print(io, "└── B angle to zenith: $(model.B_angle_to_zenith)°")
 end

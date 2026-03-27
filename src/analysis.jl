@@ -1,121 +1,6 @@
 using MAT: matopen, matread
 using ProgressMeter: Progress, next!
 
-# ======================================================================================== #
-#                                  DENSITY FUNCTIONS                                     #
-# ======================================================================================== #
-
-"""
-    make_density_file(directory_to_process)
-
-This function reads into a folder `directory_to_process` containing results from an AURORA.jl
-simulation. It loads the particle flux `Ie` (#e⁻/m²/s), calculates the superthermal e-
-density `n_e` (#e⁻/m³) from it, and saves `n_e` into a new file "superthermal\\_e\\_density.mat".
-
-The particle flux `Ie` is defined along a magnetic field line and over an (Energy, pitch\\_angle)-grid.
-The number density `n_e` calculated is given along a magnetic field line and over an energy
-grid. That way, we have the density of electrons with a certain energy at a specific
-altitude and time.
-
-# Calling
-`make_density_file(directory_to_process)`
-
-# Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process
-"""
-function make_density_file(directory_to_process)
-    println("Calculating the densities from integrating Ie.")
-    ## Find the files to process
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
-
-    ## Extract simulation grid
-    f = matopen(files_to_process[1])
-        E_centers = read(f, "E_centers")
-        μ_lims = vec(read(f, "mu_lims"))
-        t_run = read(f, "t_run")
-        z = read(f, "h_atm")
-    close(f)
-    ## Calculate the velocities
-    v = v_of_E.(E_centers)
-
-    # Initiate variables
-    n_e_local = zeros(length(z), length(t_run), length(E_centers));
-    n_e = zeros(length(z), length(t_run), length(E_centers));
-    t = t_run
-    ## Calculate the densities
-    for (i_file, file) in enumerate(files_to_process)
-        if i_file > 1
-            fill!(n_e_local, 0.0)
-        end
-
-        f = matopen(file)
-            Ie = read(f, "Ie_ztE") # [n_μ * nz, nt, nE]
-            t_run = read(f, "t_run")
-        close(f)
-
-        # calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e_local) # when Ie is in #e-/m²/s
-        calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie .* 1e4, n_e_local) # when Ie is in #e-/cm²/s
-
-        if i_file == 1
-            n_e .= n_e_local
-            t .= t_run
-        elseif i_file > 1
-            n_e = hcat(n_e, n_e_local[:, 2:end, :])
-            t = vcat(t, t_run[2:end])
-        end
-        println("File $i_file/", length(files_to_process), " done.")
-    end
-
-    ## And save the densities into a file
-    savefile = joinpath(directory_to_process, "superthermal_e_density.mat")
-    f = matopen(savefile, "w")
-        write(f, "n_e", n_e)
-        write(f, "E_centers", E_centers)
-        write(f, "t", t)
-        write(f, "h_atm", z)
-    close(f)
-end
-
-
-"""
-    calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)
-
-This function converts a particle flux `Ie` (#e⁻/m²/s) into a number density `n_e` (#e⁻/m³).
-
-The particle flux `Ie` is defined along a magnetic field line and over an (Energy, pitch\\_angle)-grid.
-The number density `n_e` calculated is given along a magnetic field line and over an energy
-grid. That way, we have the density of electrons with a certain energy at a specific
-altitude and time.
-
-# Calling
-`calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)`
-
-# Inputs
-- `z`: altitude (m), vector [nz]
-- `t_run`: time (s), vector [nt]
-- `μ_lims`: cosine of the pitch angle limits of the e- beams, vector [n_beam + 1]
-- `E_centers`: center energy of the energy bins (eV), vector [nE]
-- `v`: velocity corresponding to the `E_centers` (m/s), vector [nE]
-- `Ie`: electron flux (#e⁻/m²/s), 3D array [n_beam * nz, nt, nE]
-- `n_e`: electron density (#e⁻/m³), **empty** 3D array [nz, nt, nE]
-"""
-function calculate_density_from_Ie!(z, t_run, μ_lims, E_centers, v, Ie, n_e)
-    Threads.@threads for i_t in eachindex(t_run)
-        for i_μ in 1:(length(μ_lims) - 1)
-            for i_z in eachindex(z)
-                for i_E in eachindex(E_centers)
-                    n_e[i_z, i_t, i_E] += 1 / v[i_E] *
-                                            Ie[(i_μ - 1) * length(z) + i_z, i_t, i_E]
-                end
-            end
-        end
-    end
-end
 
 """
     make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, output_prefix="psd")
@@ -1080,3 +965,58 @@ function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
 
     return heating_rate
 end
+
+
+
+# ======================================================================================== #
+#                         AuroraSimulation convenience wrappers                          #
+# ======================================================================================== #
+
+"""
+    make_volume_excitation_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_volume_excitation_file`](@ref) on `sim.savedir`.
+"""
+make_volume_excitation_file(sim::AuroraSimulation) = make_volume_excitation_file(sim.savedir)
+
+"""
+    make_column_excitation_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_column_excitation_file`](@ref) on `sim.savedir`.
+"""
+make_column_excitation_file(sim::AuroraSimulation) = make_column_excitation_file(sim.savedir)
+
+"""
+    make_Ie_top_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.savedir`.
+"""
+make_Ie_top_file(sim::AuroraSimulation) = make_Ie_top_file(sim.savedir)
+
+"""
+    make_current_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_current_file`](@ref) on `sim.savedir`.
+"""
+make_current_file(sim::AuroraSimulation) = make_current_file(sim.savedir)
+
+"""
+    make_heating_rate_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.savedir`.
+"""
+make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.savedir)
+
+"""
+    downsampling_fluxes(sim::AuroraSimulation, downsampling_factor)
+
+Convenience wrapper that calls [`downsampling_fluxes`](@ref) on `sim.savedir`.
+"""
+downsampling_fluxes(sim::AuroraSimulation, downsampling_factor) = downsampling_fluxes(sim.savedir, downsampling_factor)
+
+"""
+    make_psd_file(sim::AuroraSimulation; kwargs...)
+
+Convenience wrapper that calls [`make_psd_file`](@ref) on `sim.savedir`.
+"""
+make_psd_file(sim::AuroraSimulation; kwargs...) = make_psd_file(sim.savedir; kwargs...)

@@ -8,24 +8,20 @@
     msis_file = "reference_results/msis_20051008-2200_70N-19E.txt"
     iri_file = "reference_results/iri_20051008-2200_70N-19E.txt"
 
+    ## Build the model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
     ## Define where to save the results
     root_savedir = "temp_results/"   # name of the root folder
     name_savedir = "temp/"   # name of the experiment folder
     savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 
-    ## Define input parameters
-    input_type = "constant_onset"
-    IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-    z₀ = altitude_lims[2];      # (km) altitude of the source
-    E_min = E_max - 100;        # (eV) bottom energy of the FAB
-    Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
-    t0 = 0;                     # (s) time of start for smooth transition
-    t1 = 0;                     # (s) time of end for smooth transition
-    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+    ## Define input flux
+    flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
     ## Run the simulation
-    calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-                                       msis_file, iri_file, savedir, INPUT_OPTIONS)
+    sim = AuroraSimulation(model, flux, savedir)
+    run!(sim)
 
     ## Analyze the results
     make_Ie_top_file(savedir)
@@ -62,24 +58,21 @@ end
     msis_file = "reference_results/msis_20051008-2200_70N-19E.txt"
     iri_file = "reference_results/iri_20051008-2200_70N-19E.txt"
 
+    ## Build the model
+    model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
     ## Define where to save the results
     root_savedir = "temp_results/"   # name of the root folder
     name_savedir = "temp/"   # name of the experiment folder
     savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 
-    ## Define input parameters
-    input_type = "flickering";
-    IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-    z₀ = 1000;                  # (km) altitude of the source
-    E_min = 100;                # (eV) bottom energy of the FAB
-    f = 5;                      # (Hz) frequence of the modulation
-    Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
-    modulation = "sinus";       # type of the modulation ("square" or "sinus")
-    INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+    ## Define input flux
+    flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
+                     beams=1, z_source=1000.0)
 
     ## Run the simulation
-    calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-                          msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop = 2)
+    sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop = 2)
+    run!(sim)
 
     ## Analyze the results
     make_Ie_top_file(savedir)

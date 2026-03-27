@@ -66,7 +66,7 @@ function make_altitude_grid(bottom_altitude, top_altitude; dz_max = 25)
 end
 
 function Base.show(io::IO, grid::AltitudeGrid)
-    print(io, "AltitudeGrid($(grid.bottom)-$(grid.top) km, $(grid.n) points)")
+    print(io, "AltitudeGrid($(grid.bottom) - $(grid.top) km, $(grid.n) points)")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::AltitudeGrid)

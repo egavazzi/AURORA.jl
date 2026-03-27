@@ -101,9 +101,24 @@ end
 
 import LibGit2
 import Pkg
-function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt, t,
-    n_loop, CFL_number, INPUT_OPTIONS, savedir)
-	savefile = joinpath(savedir, "parameters.txt")
+function save_parameters(sim::AuroraSimulation)
+    model = sim.model
+    if isnothing(sim.time)
+        t_total = nothing
+        dt = nothing
+        dt_resolved = nothing
+        t = 1:1:1
+        n_loop = 1
+        CFL_number = 0.0
+    else
+        t_total = sim.time.t_total
+        dt = sim.time.dt_requested
+        dt_resolved = sim.time.dt_resolved
+        t = sim.time.t
+        n_loop = sim.time.n_loop
+        CFL_number = sim.time.CFL_number
+    end
+	savefile = joinpath(sim.savedir, "parameters.txt")
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
         LibGit2.head(pkgdir(AURORA))
     else
@@ -111,19 +126,20 @@ function save_parameters(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_tot
     end
     version_AURORA = pkgversion(AURORA)
     open(savefile, "w") do f
-        write(f, "altitude_lims = $altitude_lims \n")
-        write(f, "θ_lims = $θ_lims \n")
-        write(f, "E_max = $E_max \n")
-        write(f, "B_angle_to_zenith = $B_angle_to_zenith \n")
+        write(f, "altitude_lims = [$(model.altitude_grid.h[1]/1e3), $(model.altitude_grid.h[end]/1e3)] \n")
+        write(f, "θ_lims = $(model.pitch_angle_grid.θ_lims) \n")
+        write(f, "E_max = $(model.energy_grid.E_max) \n")
+        write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
         write(f, "\n")
         write(f, "t_total = $t_total \n")
         write(f, "dt = $dt \n")
+        write(f, "dt_resolved = $dt_resolved \n")
         write(f, "t = $t \n")
         write(f, "n_loop = $n_loop \n")
         write(f, "\n")
         write(f, "CFL_number = $CFL_number")
         write(f, "\n")
-        write(f, "input_options = $INPUT_OPTIONS \n")
+        write(f, "flux = $(sim.flux) \n")
         write(f, "\n")
         write(f, "commit_hash = $commit_hash \n")
         write(f, "version_AURORA = $version_AURORA")
@@ -132,29 +148,32 @@ end
 
 
 using MAT: matopen
-function save_neutrals(z, n_neutrals, ne, Te, Tn, savedir)
-    savefile = joinpath(savedir, "neutral_atm.mat")
+function save_neutrals(sim::AuroraSimulation)
+    ionosphere = sim.model.ionosphere
+    savefile = joinpath(sim.savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
-        write(file, "h_atm", z)
-        write(file, "nN2", n_neutrals.nN2)
-        write(file, "nO2", n_neutrals.nO2)
-        write(file, "nO", n_neutrals.nO)
-        write(file, "ne", ne)
-        write(file, "Te", Te)
-        write(file, "Tn", Tn)
+        write(file, "h_atm", sim.model.altitude_grid.h)
+        write(file, "nN2", n_neutrals(ionosphere).nN2)
+        write(file, "nO2", n_neutrals(ionosphere).nO2)
+        write(file, "nO", n_neutrals(ionosphere).nO)
+        write(file, "ne", ionosphere.ne)
+        write(file, "Te", ionosphere.Te)
+        write(file, "Tn", ionosphere.Tn)
     close(file)
 end
 
 
 using MAT: matopen
-function save_Ie_top(Ie_top, energy_grid, μ_lims, t, savedir)
-    savefile = joinpath(savedir, "Ie_incoming.mat")
+function save_Ie_top(sim::AuroraSimulation, Ie_top, t)
+    energy_grid = sim.model.energy_grid
+    μ_lims = sim.model.pitch_angle_grid.μ_lims
+    savefile = joinpath(sim.savedir, "Ie_incoming.mat")
     file = matopen(savefile, "w")
         write(file, "Ie_total", Ie_top)
         write(file, "E_centers", energy_grid.E_centers)
         write(file, "E_edges", energy_grid.E_edges)
         write(file, "dE", energy_grid.ΔE)
-        write(file, "mu_lims", μ_lims)
+        write(file, "mu_lims", collect(μ_lims))
         write(file, "t_top", collect(Float64, t))
     close(file)
 end
@@ -162,20 +181,25 @@ end
 
 using MAT: matopen
 using Printf: @sprintf
-function save_results(Ie_save, energy_grid, t, μ_lims, z, I0, scattering, i, CFL_factor, savedir)
+function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
+    energy_grid = sim.model.energy_grid
+    μ_lims = sim.model.pitch_angle_grid.μ_lims
+    z = sim.model.altitude_grid.h
+    scattering = sim.model.scattering
+
     # Extract the time array for the current loop
 	t_run = collect(t .+ t[end] * (i - 1))
     # Reduce t_run to match the t_sampling
     t_run = t_run[1:CFL_factor:end]
 
-    savefile = joinpath(savedir, (@sprintf "IeFlickering-%02d.mat" i))
+    savefile = joinpath(sim.savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
 		write(file, "Ie_ztE", Ie_save)
 		write(file, "E_centers", energy_grid.E_centers)
 		write(file, "E_edges", energy_grid.E_edges)
 		write(file, "dE", energy_grid.ΔE)
 		write(file, "t_run", t_run)
-		write(file, "mu_lims", μ_lims)
+		write(file, "mu_lims", collect(μ_lims))
 		write(file, "h_atm", z)
 		write(file, "I0", I0)
 		write(file, "mu_scatterings", Dict(
@@ -596,6 +620,7 @@ function calculate_n_loop(t, n_z, n_μ, n_E; max_memory_gb=8, verbose=true)
         println("  Max memory limit:            $(round(max_memory_gb, digits=2)) GB")
         println("  ─────────────────────────────────────────")
         println("  Calculated n_loop:           $n_loop")
+        println()
     end
 
     return n_loop
