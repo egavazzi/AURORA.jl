@@ -135,6 +135,5 @@ function run!(sim::AuroraSimulation)
     save_parameters(sim)
     save_neutrals(sim)
     step!(sim)
-    finalize!(sim)
     return sim
 end

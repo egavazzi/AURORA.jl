@@ -158,7 +158,3 @@ function solve_energy_step!(sim::AuroraSimulation, iE::Int, Ie_top_local; first_
 
     return sim
 end
-
-function finalize!(sim::AuroraSimulation)
-    return sim
-end
