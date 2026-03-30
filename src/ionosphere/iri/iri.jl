@@ -9,8 +9,8 @@ include("interpolation.jl")
 Find or create an IRI model data file for the specified conditions.
 
 It first searches for an existing IRI file matching the given parameters.
-If no matching file is found, it calculates new IRI data using the Python iri2016 package
-and saves it to a file. The iri2016 package will compile and run some fortran code under
+If no matching file is found, it calculates new IRI data using the Python iri2020 package
+and saves it to a file. The iri2020 package will compile and run some fortran code under
 the hood.
 
 # Keyword Arguments
