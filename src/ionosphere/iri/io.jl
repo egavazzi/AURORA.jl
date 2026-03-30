@@ -197,6 +197,13 @@ function load_iri_data(iri_file)
                 EqVertIonDrift = data_matrix[:, 20],  # Equatorial vertical ion drift
                 foF2 = data_matrix[:, 21])
 
+    # Validate: check that the loaded data doesn't contain only -1 sentinel values
+    if all(iri_data.ne .== -1) && all(iri_data.Te .== -1)
+        error("The IRI file at\n  $(iri_file)\n" *
+              "contains only -1 sentinel values (no valid ionospheric profiles).\n" *
+              "You might want to use another file or regenerate it.")
+    end
+
     return iri_data
 end
 

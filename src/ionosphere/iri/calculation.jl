@@ -60,6 +60,17 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     iri_data = iri_data[:, :, 1]'
     # add a column with the altitude
     iri_data = hcat(Vector(height), iri_data)
+
+    # Validate: check that IRI didn't return all -1 sentinel values
+    # (this happens when iri2016's solar index data files don't cover the requested date)
+    if all(iri_data[:, 2:5] .== -1)  # ne, Tn, Ti, Te
+        error("IRI-2016 returned all -1 sentinel values for $(year)-$(lpad(month,2,'0'))-" *
+              "$(lpad(day,2,'0')) $(lpad(hour,2,'0')):$(lpad(minute,2,'0')) UT at " *
+              "($(lat)°N, $(lon)°E).\n" *
+              "This can mean the iri2016 package's solar index data files " *
+              "(apf107.dat, ig_rz.dat) do not cover the requested date.\n")
+    end
+
     # add a header with the name of columns
     iri_data = vcat(["height(km)" "ne(m-3)" "Tn(K)" "Ti(K)" "Te(K)" "nO+(m-3)" "nH+(m-3)" "nHe+(m-3)" "nO2+(m-3)" "nNO+(m-3)" "nCI(m-3)" "nN+(m-3)" "NmF2" "hmF2" "NmF1" "hmF1" "NmE" "hmE" "TEC" "EqVertIonDrift" "foF2"], iri_data)
     parameters = (; year, month, day, hour, minute, lat, lon, height)
