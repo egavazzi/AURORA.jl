@@ -1,6 +1,6 @@
 # Changelog
 
-- Add error message if iri calculations return invalid data or if loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
+- Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
