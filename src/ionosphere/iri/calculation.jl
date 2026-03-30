@@ -44,8 +44,8 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
-    # Suppress verbose output from iri2020 build
-    iri_data = redirect_stdio(stdout=devnull) do
+    # Suppress verbose output and Fortran compiler warnings from iri2020 build
+    iri_data = redirect_stdio(stdout=devnull, stderr=devnull) do
         # import iri2020 model from the Python package 'iri2020'
         iri2020 = pyimport("iri2020")
         # run the model and return result
