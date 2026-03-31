@@ -141,6 +141,6 @@ function run!(sim::AuroraSimulation)
     end
     save_parameters(sim)
     save_neutrals(sim)
-    step!(sim)
+    solve!(sim)
     return sim
 end
