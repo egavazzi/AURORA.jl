@@ -12,6 +12,7 @@ end
 
 function ResolvedTimeGrid(model::AuroraModel, t_total, dt;
                           CFL_number=64, n_loop=nothing, max_memory_gb=8.0)
+    # Validate all input parameters
     t_total > 0 || error("t_total must be positive, got $t_total")
     dt > 0 || error("dt must be positive, got $dt")
     dt <= t_total || error("dt ($dt) must be ≤ t_total ($t_total)")
@@ -21,19 +22,25 @@ function ResolvedTimeGrid(model::AuroraModel, t_total, dt;
         n_loop > 0 || error("n_loop must be positive, got $n_loop")
     end
 
+    # Extract grid dimensions from the model
     z = model.altitude_grid.h
     n_μ = length(model.pitch_angle_grid.μ_center)
     n_E = model.energy_grid.n
     v_max = v_of_E(maximum(model.energy_grid.E_centers))
 
+    # Apply CFL criteria to resolve the time grid and calculate CFL factor
     t_resolved, CFL_factor = CFL_criteria(t_total, dt, z, v_max, CFL_number)
+    # Determine number of loops based on memory constraints, or use provided value
     n_loop_resolved = isnothing(n_loop) ? calculate_n_loop(t_resolved, length(z), n_μ, n_E;
                                                            max_memory_gb=max_memory_gb) : Int(n_loop)
+    # Check if it actually fits in RAM
     check_n_loop(n_loop_resolved, length(z), n_μ, length(t_resolved), n_E)
 
+    # Calculate timesteps per loop and actual resolved timestep (can be different from the saving dt)
     n_t_per_loop = (length(t_resolved) - 1) ÷ n_loop_resolved + 1
     dt_resolved = length(t_resolved) > 1 ? Float64(t_resolved[2] - t_resolved[1]) : Float64(dt)
 
+    # Return fully configured time grid
     return ResolvedTimeGrid(Float64(t_total), Float64(dt), dt_resolved, Float64(CFL_number),
                             CFL_factor, t_resolved, n_loop_resolved,
                             Float64(max_memory_gb), n_t_per_loop)
