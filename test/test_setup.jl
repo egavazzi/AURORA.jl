@@ -30,3 +30,22 @@ end
     @test !any(isinf.(Te))
     @test !any(Te .< 0)
 end
+
+
+@testitem "Recent electron densities from IRI" begin
+    using Dates
+    # Use a rolling date (1 year ago) to test the IRI coefficient files coverage
+    past = today() - Year(1)
+    z = make_altitude_grid(50, 800)
+    iri_file = find_iri_file(; year = year(past), month = month(past), day = day(past),
+                              hour = 12, minute = 0)
+    ne, Te = AURORA.load_electron_densities(iri_file, z)
+
+    @test !any(isnan.(ne))
+    @test !any(isinf.(ne))
+    @test !any(ne .< 0)
+
+    @test !any(isnan.(Te))
+    @test !any(isinf.(Te))
+    @test !any(Te .< 0)
+end

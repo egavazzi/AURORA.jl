@@ -4,9 +4,9 @@ using PythonCall: pyimport, pyconvert, Py
     calculate_iri_data(; year=2018, month=12, day=7, hour=11, minute=15,
                         lat=76, lon=5, height=85:1:700)
 
-Calculate IRI-2016 ionospheric model data using Python interface.
+Calculate IRI-2020 ionospheric model data using Python interface.
 
-This function calls the Python `iri2016` package to compute ionospheric parameters
+This function calls the Python `iri2020` package to compute ionospheric parameters
 including electron density, temperatures, and ion composition profiles. The data
 is returned as a matrix with a header row containing column names.
 
@@ -44,12 +44,12 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
-    # Suppress verbose output from iri2016 build
-    iri_data = redirect_stdio(stdout=devnull) do
-        # import iri2016 model from the Python package 'iri2016'
-        iri2016 = pyimport("iri2016.profile")
+    # Suppress verbose output and Fortran compiler warnings from iri2020 build
+    iri_data = redirect_stdio(stdout=devnull, stderr=devnull) do
+        # import iri2020 model from the Python package 'iri2020'
+        iri2020 = pyimport("iri2020")
         # run the model and return result
-        iri2016.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
+        iri2020.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
     end
 
     # convert the Python Dataset to a DataArray
@@ -62,12 +62,12 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     iri_data = hcat(Vector(height), iri_data)
 
     # Validate: check that IRI didn't return all -1 sentinel values
-    # (this happens when iri2016's solar index data files don't cover the requested date)
+    # (this happens when iri2020's solar index data files don't cover the requested date)
     if all(iri_data[:, 2:5] .== -1)  # ne, Tn, Ti, Te
-        error("IRI-2016 returned all -1 sentinel values for $(year)-$(lpad(month,2,'0'))-" *
+        error("IRI-2020 returned all -1 sentinel values for $(year)-$(lpad(month,2,'0'))-" *
               "$(lpad(day,2,'0')) $(lpad(hour,2,'0')):$(lpad(minute,2,'0')) UT at " *
               "($(lat)°N, $(lon)°E).\n" *
-              "This can mean the iri2016 package's solar index data files " *
+              "This can mean the iri2020 package's bundled solar index data files " *
               "(apf107.dat, ig_rz.dat) do not cover the requested date.\n")
     end
 

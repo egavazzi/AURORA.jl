@@ -5,5 +5,5 @@ ninja = ""
 gfortran = ""
 
 [pip.deps]
-iri2016 = ""
-pymsis = ""
+iri2020 = "@https://github.com/space-physics/iri2020/archive/refs/heads/main.zip"
+pymsis = ">=0.12,<0.13"
