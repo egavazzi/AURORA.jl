@@ -751,8 +751,8 @@ and field-aligned energy-flux for each height and through time.
 The following variables are saved to a file named *J.mat*:
 - `J_up`: Field-aligned current-density in the upward direction. 2D array [n\\_z, n\\_t]
 - `J_down`: Field-aligned current-density in the downward direction. 2D array [n\\_z, n\\_t]
-- `E_up`: Field-aligned energy-flux (eV/m²/s) in the upward direction. 2D array [n\\_z, n\\_t]
-- `E_down`: Field-aligned energy-flux (eV/m²/s) in the downward direction. 2D array [n\\_z, n\\_t]
+- `IeE_up`: Field-aligned energy-flux (eV/m²/s) in the upward direction. 2D array [n\\_z, n\\_t]
+- `IeE_down`: Field-aligned energy-flux (eV/m²/s) in the downward direction. 2D array [n\\_z, n\\_t]
 
 # Calling
 `make_current_file(directory_to_process)`

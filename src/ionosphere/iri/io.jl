@@ -204,6 +204,39 @@ function load_iri_data(iri_file)
               "You might want to use another file or regenerate it.")
     end
 
+    # Check for sentinel -1 values at the lowest and highest altitudes.
+    # If found, emit a warning, drop those and let the interpolator fill them.
+    sentinel_mask = (iri_data.ne .== -1) .| (iri_data.Te .== -1)
+    if any(sentinel_mask)
+        first_valid = findfirst(!, sentinel_mask)
+        last_valid  = findlast(!, sentinel_mask)
+        n_bottom = first_valid - 1
+        n_top    = length(sentinel_mask) - last_valid
+
+        if n_bottom > 0 || n_top > 0
+            h = iri_data.height_km
+            if n_bottom > 0 && n_top > 0
+                location_str = "the $(n_bottom) lowest altitude levels " *
+                               "($(h[1]) – $(h[n_bottom]) km) and " *
+                               "$(n_top) highest altitude levels " *
+                               "($(h[last_valid + 1]) – $(h[end]) km)"
+            elseif n_bottom > 0
+                location_str = "the $(n_bottom) lowest altitude level(s) " *
+                               "($(h[1]) – $(h[n_bottom]) km)"
+            else
+                location_str = "the $(n_top) highest altitude level(s) " *
+                               "($(h[last_valid + 1]) – $(h[end]) km)"
+            end
+            @warn "IRI file at\n  $(iri_file)\n" *
+                  "has sentinel -1 values in ne or Te at $(location_str).\n" *
+                  "These levels will be dropped and the interpolator will fill them " *
+                  "through extrapolation."
+
+            valid_range = first_valid:last_valid
+            iri_data = map(v -> v isa AbstractVector ? v[valid_range] : v, iri_data)
+        end
+    end
+
     return iri_data
 end
 
