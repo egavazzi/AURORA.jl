@@ -1,24 +1,15 @@
-function get_cache(sim::AuroraSimulation)
-    cache = sim.cache
-    cache === nothing && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
-    return cache
-end
 
+"""
+    initialize!(sim::AuroraSimulation)
 
-# Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
-# These phase functions describe the angular distribution of particles after collisions.
-function compute_phase_functions(model::AuroraModel)
-    E_centers = model.energy_grid.E_centers
-    θ_scatter = model.scattering.θ_scatter
+Allocate or re-allocate the working cache for `sim`.
 
-    print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(θ_scatter, E_centers)
-    phaseO2e, phaseO2i = phase_fcn_O2(θ_scatter, E_centers)
-    phaseOe, phaseOi = phase_fcn_O(θ_scatter, E_centers)
-    println(" done ✅")
-
-    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi))
-    return phase_fcn_neutrals
+This step performs the expensive setup that depends on the model geometry and the
+resolved time grid, but does not write any output files.
+"""
+function initialize!(sim::AuroraSimulation)
+    sim.cache = build_simulation_cache(sim)
+    return nothing
 end
 
 function build_simulation_cache(sim::AuroraSimulation)
@@ -58,19 +49,22 @@ function build_simulation_cache(sim::AuroraSimulation)
     n_t_save = isnothing(sim.time) ? 1 : length(0:sim.time.dt_requested:t_loop[end])
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
-    return TransportCache(solver, degradation, matrices, Ie, Ie_save, I0, Ie_top,
-                          t_loop, phase_fcn_neutrals, B2B_fragment, cascading_neutrals)
+    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0, Ie_top,
+                           t_loop, phase_fcn_neutrals, B2B_fragment, cascading_neutrals)
 end
 
-"""
-    initialize!(sim::AuroraSimulation)
+# Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
+# These phase functions describe the angular distribution of particles after collisions.
+function compute_phase_functions(model::AuroraModel)
+    E_centers = model.energy_grid.E_centers
+    θ_scatter = model.scattering.θ_scatter
 
-Allocate or re-allocate the working cache for `sim`.
+    print("Calculating the phase functions...")
+    phaseN2e, phaseN2i = phase_fcn_N2(θ_scatter, E_centers)
+    phaseO2e, phaseO2i = phase_fcn_O2(θ_scatter, E_centers)
+    phaseOe, phaseOi = phase_fcn_O(θ_scatter, E_centers)
+    println(" done ✅")
 
-This step performs the expensive setup that depends on the model geometry and the
-resolved time grid, but does not write any output files.
-"""
-function initialize!(sim::AuroraSimulation)
-    sim.cache = build_simulation_cache(sim)
-    return nothing
+    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi))
+    return phase_fcn_neutrals
 end

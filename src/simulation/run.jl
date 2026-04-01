@@ -138,3 +138,9 @@ function solve_energy_step!(sim::AuroraSimulation, iE::Int, Ie_top_local; first_
 
     return sim
 end
+
+function get_cache(sim::AuroraSimulation)
+    cache = sim.cache
+    cache === nothing && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
+    return cache
+end

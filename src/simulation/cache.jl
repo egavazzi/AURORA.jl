@@ -95,7 +95,7 @@ function DegradationCache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
                             Ionization_fragment_2, Ionizing_fragment_2)
 end
 
-struct TransportCache
+struct SimulationCache
     solver::SolverCache
     degradation::DegradationCache
     matrices::TransportMatrices

@@ -49,7 +49,7 @@ include("solvers/steady_state.jl")
 include("solvers/steady_state_optimized.jl")
 
 include("simulation/cache.jl")
-export SolverCache, DegradationCache, TransportCache
+export SolverCache, DegradationCache, SimulationCache
 include("simulation/types.jl")
 export AuroraSimulation, ResolvedTimeGrid
 include("simulation/initialize.jl")

@@ -77,7 +77,7 @@ mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux}
     const savedir::String
     const time::Union{ResolvedTimeGrid, Nothing}
     const save_input_flux::Bool
-    cache::Union{Nothing, TransportCache}
+    cache::Union{Nothing, SimulationCache}
 end
 
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, t_total, dt, savedir;
