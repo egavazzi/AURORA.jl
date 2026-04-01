@@ -3,7 +3,8 @@
 - **Breaking** New simulation interface [#114](https://github.com/egavazzi/AURORA.jl/pull/114)
   - Simulations are now set up by building an `AuroraModel`, creating an `InputFlux`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The old `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - See the [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
-
+- Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
+- Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)

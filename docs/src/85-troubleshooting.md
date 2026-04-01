@@ -2,7 +2,7 @@
 
 ## IRI and MSIS data
 You might run into some issues when trying to load/generate some msis or iri 
-data for the first time. This is because AURORA uses the `pymsis` and `iri2016` 
+data for the first time. This is because AURORA uses the `pymsis` and `iri2020` 
 python packages as dependencies. These packages use in turn some fortran
 dependencies. This should be normally handled by CondaPkg which is used 
 internally in AURORA, but if your system is complaining about missing fortran 
