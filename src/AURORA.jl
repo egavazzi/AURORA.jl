@@ -25,7 +25,7 @@ export ScatteringData
 include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 
-include("setup.jl")
+include("model.jl")
 export AuroraModel, make_altitude_grid, make_energy_grid
 
 include("input/spectra.jl")
@@ -48,13 +48,14 @@ include("solvers/crank_nicolson_optimized.jl")
 include("solvers/steady_state.jl")
 include("solvers/steady_state_optimized.jl")
 
-include("cache.jl")
+include("simulation/cache.jl")
 export SolverCache, DegradationCache, TransportCache
-include("simulation.jl")
+include("simulation/types.jl")
 export AuroraSimulation, ResolvedTimeGrid
-export initialize!, run!
-
-include("main.jl")
+include("simulation/initialize.jl")
+export initialize!
+include("simulation/run.jl")
+export run!
 
 include("utilities.jl")
 export v_of_E, CFL_criteria, mu_avg, beam_weight,
