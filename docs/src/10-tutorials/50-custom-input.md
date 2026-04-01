@@ -1,4 +1,4 @@
-# Input Flux
+# [Custom Input Flux](@id Custom-Input-Flux)
 
 The input flux describes the precipitating electron flux injected at the top of the
 simulated ionosphere. It is the primary "forcing" of an AURORA simulation and is fully
@@ -36,13 +36,19 @@ energy flux equals `IeE_tot` (W/m²).
 time dependence) directly from a file, so it must be used with
 [`ConstantModulation`](@ref) and cannot be combined with other modulation types.
 
-```@docs; canonical=false
-AbstractSpectrum
-FlatSpectrum
-GaussianSpectrum
-MaxwellianSpectrum
-FileSpectrum
-evaluate_spectrum
+### Examples
+
+```@example custom_input
+using AURORA
+
+# Flat spectrum: 10 mW/m² above 100 eV
+flat = FlatSpectrum(1e-2; E_min=100)
+
+# Gaussian: 10 mW/m², peaked at 5 keV with 500 eV width
+gauss = GaussianSpectrum(1e-2, 5000.0, 500.0)
+
+# Maxwellian: 10 mW/m², characteristic energy 1 keV
+maxw = MaxwellianSpectrum(1e-2, 1000.0)
 ```
 
 ---
@@ -60,13 +66,17 @@ is multiplied by the base spectrum at every time step.
 | [`SquareFlickering`](@ref) | On/off square-wave at frequency `f` Hz |
 | [`SmoothOnset`](@ref) | C∞-smooth ramp from 0 to 1 over `[t_start, t_end]` |
 
-```@docs; canonical=false
-AbstractModulation
-ConstantModulation
-SinusoidalFlickering
-SquareFlickering
-SmoothOnset
-apply_modulation
+### Examples
+
+```@example custom_input
+# 5 Hz sinusoidal flickering
+sin_mod = SinusoidalFlickering(5.0)
+
+# 10 Hz square wave with 50% modulation depth
+sq_mod = SquareFlickering(10.0; amplitude=0.5)
+
+# Smooth onset from 0 to 1 over the first 0.1 s
+onset = SmoothOnset(0.0, 0.1)
 ```
 
 ---
@@ -92,7 +102,7 @@ simultaneously with no delay.
 
 ### Steady-state example
 
-```julia
+```@example custom_input
 # Flat spectrum from 2900 eV to E_max.
 # No modulation is needed; ConstantModulation is the default.
 flux = InputFlux(FlatSpectrum(1e-2; E_min=2900); beams=1:2)
@@ -100,43 +110,33 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=2900); beams=1:2)
 
 ### Time-dependent examples
 
-```julia
+```@example custom_input
 # Sinusoidal flickering at 5 Hz, electrons sourced 3000 km above the ionosphere top.
 # The travel-time delay is applied automatically for each energy and pitch angle.
-flux = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
-                 beams=1, z_source=3000.0)
+flux_td1 = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
+                     beams=1, z_source=3000.0)
+```
 
+```@example custom_input
 # Maxwellian spectrum with a smooth onset over the first 0.1 s.
-flux = InputFlux(MaxwellianSpectrum(1e-2, 1000.0), SmoothOnset(0.0, 0.1);
-                 beams=1:2)
-
-# Square-wave flickering at 10 Hz with 50 % modulation depth.
-flux = InputFlux(GaussianSpectrum(1e-2, 5000.0, 500.0), SquareFlickering(10.0; amplitude=0.5);
-                 beams=1)
+flux_td2 = InputFlux(MaxwellianSpectrum(1e-2, 1000.0), SmoothOnset(0.0, 0.1);
+                     beams=1:2)
 ```
 
-### File-based example
-
-```julia
-# Load a time-dependent flux directly from a .mat file.
-# The file already contains the full temporal behaviour, so no modulation is used.
-flux = InputFlux(FileSpectrum("path/to/flux.mat"; interpolation=:linear))
-```
-
-```@docs; canonical=false
-InputFlux
-compute_flux
+```@example custom_input
+# Square-wave flickering at 10 Hz with 50% modulation depth.
+flux_td3 = InputFlux(GaussianSpectrum(1e-2, 5000.0, 500.0), SquareFlickering(10.0; amplitude=0.5);
+                     beams=1)
 ```
 
 ---
 
-## Load from file
+## Loading flux from a file
 
-[`Ie_top_from_file`](@ref) is the lower-level function called internally when a
-[`FileSpectrum`](@ref) is used. It handles mapping the file's time grid onto the
-simulation time grid via the chosen interpolation scheme.
+[`FileSpectrum`](@ref) loads a time-dependent flux distribution directly from a `.mat`
+file. This is useful when you have measured or externally computed input fluxes.
 
-### File format requirements
+### File format
 
 The `.mat` file must contain the variable `Ie_total` with shape **`[n_μ, n_t_file, n_E]`**
 (units: #e⁻/m²/s), and optionally `t_top` (a vector of length `n_t_file`, in seconds).
@@ -144,8 +144,8 @@ The `.mat` file must contain the variable `Ie_total` with shape **`[n_μ, n_t_fi
 | Dimension | Meaning | Constraint |
 |-----------|---------|------------|
 | dim 1 — `n_μ` | pitch-angle beams | must **exactly** match the model's beam count |
-| dim 2 — `n_t_file` | time steps in the file | flexible (see time-grid notes below) |
-| dim 3 — `n_E` | energy bins | must be **≥** the model's `n_E`; only the first `n_E` bins are used |
+| dim 2 — `n_t_file` | time steps in the file | flexible (see interpolation) |
+| dim 3 — `n_E` | energy bins | must be **≥** the model's `n_E`; only first `n_E` bins used |
 
 !!! warning "Strict beam/energy alignment"
     AURORA does **not** interpolate in the pitch-angle or energy dimensions when loading
@@ -153,10 +153,10 @@ The `.mat` file must contain the variable `Ie_total` with shape **`[n_μ, n_t_fi
     model must correspond exactly. If they do not, the results will be silently wrong or an
     error will be raised.
 
-### Preparing the file — matching the grids
+### Matching the grids
 
 Before writing a file, build an `AuroraModel` with the same settings you intend to use
-for the simulation, then read the grids off it:
+for the simulation, then read the grids from it:
 
 ```julia
 using AURORA, MAT
@@ -172,15 +172,6 @@ E_centers = model.energy_grid.E_centers     # length n_E
 n_μ = length(μ_center)
 n_E = length(E_centers)
 ```
-
-Now build your flux array following the `[n_μ, n_t_file, n_E]` layout.
-Downward-going beams correspond to **negative** `μ_center` values; upward-going beams
-(positive `μ_center`) will be forced to zero by `Ie_top_from_file` regardless of what
-the file contains.
-
-With the standard `θ_lims = 180:-10:0` convention, `μ_center` starts at −1 (straight
-down, θ = 180°) and increases toward +1 (straight up, θ = 0°), so **downward-going
-beams are the first indices** of the array.
 
 ### Writing the file
 
@@ -198,40 +189,11 @@ matwrite("my_flux.mat", Dict(
 ))
 ```
 
-For a steady-state (no time dependence), simply use a single time slice and omit `t_top`:
+### Using the file
 
 ```julia
-Ie_total = zeros(n_μ, 1, n_E)
-# ... fill steady-state values ...
-matwrite("my_flux_steady.mat", Dict("Ie_total" => Ie_total))
+flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))
 ```
 
-### Time-grid handling
-
-If `t_top` is present, the file's time axis does **not** need to match the simulation
-time grid in length or step size. The file is always re-sampled:
-
-- The file time is treated as **relative** — `t_top[1]` is always aligned with the
-  simulation's `t[1]`, regardless of what the absolute values in `t_top` are. Only
-  durations and spacings matter.
-- If the file is **shorter** than the simulation, the flux is set to zero for any
-  simulation time beyond the file's duration (a warning is emitted).
-- If the file is **finer** than the simulation (smaller `dt`), the flux is
-  point-sampled, which may miss rapid variations — choose a denser simulation grid
-  or a smoother file if this matters.
-- The `:constant`, `:linear`, and `:pchip` interpolation options control how the
-  file values are mapped onto the simulation grid.
-
-### Using the file in a simulation
-
-```julia
-flux = InputFlux(FileSpectrum("my_flux.mat"))               # constant (step) interpolation
-flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))   # linear interpolation
-```
-
-No modulation type should be specified — `ConstantModulation` is both the default and
-the only permitted choice for `FileSpectrum`.
-
-```@docs; canonical=false
-Ie_top_from_file
-```
+Available interpolation schemes: `:constant` (default, nearest), `:linear`, `:pchip`
+(piecewise cubic Hermite).
