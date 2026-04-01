@@ -34,11 +34,12 @@ model = AuroraModel(
 ```
 
 The constructor performs several steps automatically:
-- Builds an [`AltitudeGrid`](@ref) with fine spacing (~150 m) below 100 km and coarser
-  spacing above.
-- Builds an [`EnergyGrid`](@ref) with adaptive bin widths (finer at low energies).
+- Builds an [`AltitudeGrid`](@ref) with fine spacing (~150 m) at the lowest altitudes and 
+  coarser spacing above.
+- Builds an [`EnergyGrid`](@ref) with adaptive bin widths (finer at low energies 
+  where numerous elastic and inelastic collisions need to be properly resolved).
 - Builds a [`PitchAngleGrid`](@ref) from the given angle edges.
-- Loads the neutral atmosphere (N₂, O₂, O densities and temperature) from the MSIS file.
+- Loads the neutrals (N₂, O₂, O) densities and temperature from the MSIS file.
 - Loads electron densities and temperature from the IRI file.
 - Precomputes electron collision cross sections and scattering data.
 
@@ -105,7 +106,9 @@ electron flux and save them alongside the simulation output:
 make_Ie_top_file(sim)              # boundary condition (input flux applied at top)
 make_volume_excitation_file(sim)   # volumetric excitation rates for optical emissions
 make_column_excitation_file(sim)   # column-integrated excitation rates
-make_current_file(sim)             # precipitated electron current
+make_current_file(sim)             # field-aligned electron currents and energy fluxes
+make_heating_rate_file(sim)        # electron heating rates
+make_psd_file(sim)                 # electron phase-space density f(E, θ) and F(v∥)
 ```
 
 The output files are saved in `data/my_first_simulation/`:
