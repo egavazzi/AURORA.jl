@@ -7,7 +7,7 @@
 # should load cleanly without warnings.
 
 @testitem "load_iri_data: sentinel at bottom levels triggers warning and trims" begin
-    iri_file = joinpath(@__DIR__, "reference_results", "iri_20221102-1700_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "test_data/", "iri_20221102-1700_70N-19E.txt")
 
     # A warning must be emitted
     @test_warn r"sentinel -1" AURORA.load_iri_data(iri_file)
@@ -25,7 +25,7 @@
 end
 
 @testitem "load_iri_data: clean file loads without warning" begin
-    iri_file = joinpath(@__DIR__, "reference_results", "iri_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "test_data", "iri_20051008-2200_70N-19E.txt")
 
     # No warning expected for a file without boundary sentinels
     @test_nowarn AURORA.load_iri_data(iri_file)

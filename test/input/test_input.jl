@@ -177,25 +177,25 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    z = model.altitude_grid.h
     E_centers = model.energy_grid.E_centers
-    ΔE = model.energy_grid.ΔE
-    μ_center = model.pitch_angle_grid.μ_center
-    scattering = model.scattering
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
     # Check that IeE_top is respected for a Maxwellian without LET (with a tolerance of 0.1%)
     IeE_tot = 1e-2  # W/m²
-    Ie_top = Ie_with_LET(IeE_tot, 100, model, 1; low_energy_tail = false)
+    flux = InputFlux(MaxwellianSpectrum(IeE_tot, 100; low_energy_tail=false); beams=1)
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # Check that varying the beams does not change IeE_top
-    Ie_top_LET_1 = Ie_with_LET(IeE_tot, 100, model, 1; low_energy_tail = true)
-    Ie_top_LET_2 = Ie_with_LET(IeE_tot, 100, model, 1:2; low_energy_tail = true)
-    Ie_top_LET_3 = Ie_with_LET(IeE_tot, 100, model, [2, 5]; low_energy_tail = true)
+    flux1 = InputFlux(MaxwellianSpectrum(IeE_tot, 100); beams=1)
+    flux2 = InputFlux(MaxwellianSpectrum(IeE_tot, 100); beams=1:2)
+    flux3 = InputFlux(MaxwellianSpectrum(IeE_tot, 100); beams=[2, 5])
+    Ie_top_LET_1 = compute_flux(flux1, model)
+    Ie_top_LET_2 = compute_flux(flux2, model)
+    Ie_top_LET_3 = compute_flux(flux3, model)
     IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E_centers, (1, 1, :))) * qₑ
     IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E_centers, (1, 1, :))) * qₑ
     IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E_centers, (1, 1, :))) * qₑ
@@ -203,7 +203,7 @@ end
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
-@testitem "Ie_top_modulated - flat spectrum" begin
+@testitem "FlatSpectrum - energy conservation" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
@@ -211,64 +211,61 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    z = model.altitude_grid.h
     E_centers = model.energy_grid.E_centers
-    ΔE = model.energy_grid.ΔE
-    μ_center = model.pitch_angle_grid.μ_center
-    scattering = model.scattering
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
-    # Check that IeE_top is respected for different cases
     IeE_tot = 1e-2  # W/m²
     E_min = E_max - 100
     Beams = [1, 2]
+
     # SS
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:flat, E_min=E_min)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min); beams=Beams)
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different Beams
-    Ie_top = Ie_top_modulated(IeE_tot, model, [1, 3, 4], 1:1:1, 1;
-                              spectrum=:flat, E_min=E_min)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min); beams=[1, 3, 4])
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:flat, E_min=E_max - 1000)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_max - 1000); beams=Beams)
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:flat, E_min=E_max - 10)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_max - 10); beams=Beams)
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:flat, E_min=E_max)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=Float64(E_max)); beams=Beams)
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.01:1, 1;
-                              spectrum=:flat, E_min=E_min)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), ConstantModulation(); beams=Beams)
+    Ie_top = compute_flux(flux, model, 0:0.01:1)
     IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, high source altitude
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.01:1, 1;
-                              spectrum=:flat, E_min=E_min, z_source=1000.0)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), ConstantModulation();
+                     beams=Beams, z_source=1000.0)
+    Ie_top = compute_flux(flux, model, 0:0.01:1)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, delayed smooth onset
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.01:1, 1;
-                              spectrum=:flat, E_min=E_min, z_source=altitude_lims[2],
-                              t_start=0.4, t_end=0.8)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SmoothOnset(0.4, 0.8);
+                     beams=Beams, z_source=altitude_lims[2])
+    Ie_top = compute_flux(flux, model, 0:0.01:1)
     IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end
 
 
-@testitem "Ie_top_modulated - gaussian spectrum" begin
+@testitem "GaussianSpectrum - energy conservation" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
@@ -276,10 +273,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    z = model.altitude_grid.h
     E_centers = model.energy_grid.E_centers
-    μ_center = model.pitch_angle_grid.μ_center
-    scattering = model.scattering
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
@@ -287,35 +281,34 @@ end
     IeE_tot = 1e-2  # W/m²
     E₀ = 5000.0     # center energy (eV)
     ΔE = 500.0      # energy width (eV)
-    Beams = [1, 2]
 
     # SS - check energy flux is conserved
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE); beams=[1, 2])
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # SS, different Beams
-    Ie_top = Ie_top_modulated(IeE_tot, model, [1, 3, 4], 1:1:1, 1;
-                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE); beams=[1, 3, 4])
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # SS, different E₀ and ΔE
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 1:1:1, 1;
-                              spectrum=:gaussian, E₀=3000.0, ΔE=1000.0)
+    flux = InputFlux(GaussianSpectrum(IeE_tot, 3000.0, 1000.0); beams=[1, 2])
+    Ie_top = compute_flux(flux, model)
     IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # TD
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.01:1, 1;
-                              spectrum=:gaussian, E₀=E₀, ΔE=ΔE)
+    flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE), ConstantModulation(); beams=[1, 2])
+    Ie_top = compute_flux(flux, model, 0:0.01:1)
     IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :))) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end
 
 
-@testitem "Ie_top_modulated - modulation types" begin
+@testitem "Modulation types" begin
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
@@ -323,23 +316,19 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    z = model.altitude_grid.h
     E_centers = model.energy_grid.E_centers
-    ΔE = model.energy_grid.ΔE
-    μ_center = model.pitch_angle_grid.μ_center
-    scattering = model.scattering
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
 
     IeE_tot = 1e-2  # W/m²
     E_min = 4000.0
-    Beams = [1, 2]
     f = 10.0  # Hz
 
     # Sinus modulation
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.001:0.5, 1;
-                              spectrum=:flat, E_min=E_min, modulation=:sinus, f=f, amplitude=0.8)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SinusoidalFlickering(f; amplitude=0.8);
+                     beams=[1, 2])
+    Ie_top = compute_flux(flux, model, 0:0.001:0.5)
     # At t where modulation is at peak (sin²(πft) = 1), flux should be IeE_tot
     # This happens when πft = π/2, i.e., t = 0.05s for f=10Hz
     t_peak_idx = round(Int, 0.05 / 0.001) + 1  # index for t=0.05s
@@ -352,8 +341,9 @@ end
     @test isapprox(IeE_at_min, 0.2 * IeE_tot, rtol = 0.001)
 
     # Square modulation
-    Ie_top = Ie_top_modulated(IeE_tot, model, Beams, 0:0.001:0.5, 1;
-                              spectrum=:flat, E_min=E_min, modulation=:square, f=f, amplitude=0.2)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SquareFlickering(f; amplitude=0.2);
+                     beams=[1, 2])
+    Ie_top = compute_flux(flux, model, 0:0.001:0.5)
     IeE_in_time = sum(Ie_top .* reshape(E_centers, (1, 1, :)) * qₑ, dims = (1, 3))
     # The maximum value should be equal to IeE_tot
     @test isapprox(maximum(IeE_in_time), IeE_tot, rtol=0.001)
@@ -361,16 +351,17 @@ end
     @test isapprox(minimum(IeE_in_time), 0.8 * IeE_tot, rtol=0.001)
 
     # Partial amplitude modulation (amplitude=0.5)
-    Ie_top_partial = Ie_top_modulated(IeE_tot, model, Beams, 0:0.001:0.5, 1;
-                                      spectrum=:flat, E_min=E_min, modulation=:sinus, f=f, amplitude=0.5)
+    flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SinusoidalFlickering(f; amplitude=0.5);
+                     beams=[1, 2])
+    Ie_top = compute_flux(flux, model, 0:0.001:0.5)
     # At minimum of sinus (where sin²(πft)=0), flux should be 0.5*IeE_tot
     t_min_idx = 1 # at t=0, sin²(0)=0 (modulation minimum)
-    IeE_at_min = sum(Ie_top_partial[:, t_min_idx, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E_centers, (1, :))) * qₑ
     @test isapprox(IeE_at_min, 0.5 * IeE_tot, rtol=0.001)
 end
 
 
-@testitem "(SS) Does LET run?" begin
+@testitem "(SS) Does MaxwellianSpectrum run?" begin
     mktempdir() do savedir
         # Setting parameters
         altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
@@ -379,21 +370,17 @@ end
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
         msis_file = find_msis_file();
         iri_file = find_iri_file();
-        # Define input parameters
-        input_type = "LET"
-        IeE_tot = 1e-3              # total energy flux (W/m²)
-        E0 = 50                     # characteristic energy (eV)
-        Beams = 1                   # indices of the beams with precipitation
-        low_energy_tail = true      # with or without a low energy tail
-        INPUT_OPTIONS = (;input_type, IeE_tot, E0, Beams, low_energy_tail);
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        # Define input flux
+        flux = InputFlux(MaxwellianSpectrum(1e-3, 50); beams=1)
         # Run simulation
-        calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-                                        msis_file, iri_file, savedir, INPUT_OPTIONS)
+        sim = AuroraSimulation(model, flux, savedir)
+        run!(sim)
         @test true
     end
 end
 
-@testitem "(SS) Does constant onset run?" begin
+@testitem "(SS) Does FlatSpectrum run?" begin
     mktempdir() do savedir
         # Setting parameters
         altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
@@ -402,23 +389,17 @@ end
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
         msis_file = find_msis_file();
         iri_file = find_iri_file();
-        # Define input parameters
-        input_type = "constant_onset"
-        IeE_tot = 1.0           # total energy flux (W/m²)
-        z₀ = 500.0              # altitude of the source (km)
-        E_min = 50.0            # minimum energy (eV)
-        Beams = 1:2             # indices of the beams with precipitation
-        t0 = 0.0                # onset start time (s)
-        t1 = 0.0                # onset end time (s)
-        INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        # Define input flux
+        flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         # Run simulation
-        calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-                                           msis_file, iri_file, savedir, INPUT_OPTIONS)
+        sim = AuroraSimulation(model, flux, savedir)
+        run!(sim)
         @test true
     end
 end
 
-@testitem "(TD) Does constant onset run?" begin
+@testitem "(TD) Does SmoothOnset run?" begin
     mktempdir() do savedir
         # Setting parameters
         altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
@@ -431,23 +412,18 @@ end
         CFL_number = 128;
         msis_file = find_msis_file();
         iri_file = find_iri_file();
-        # Define input parameters
-        input_type = "constant_onset"
-        IeE_tot = 1.0           # total energy flux (W/m²)
-        z₀ = 500.0              # altitude of the source (km)
-        E_min = 50.0            # minimum energy (eV)
-        Beams = 1:2             # indices of the beams with precipitation
-        t0 = 0.0                # onset start time (s)
-        t1 = 0.05               # onset end time (s)
-        INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        # Define input flux
+        flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
+                         beams=1:2, z_source=500.0)
         # Run simulation
-        calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-                              msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop)
+        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        run!(sim)
         @test true
     end
 end
 
-@testitem "(TD) Does flickering run?" begin
+@testitem "(TD) Does SinusoidalFlickering run?" begin
     mktempdir() do savedir
         # Setting parameters
         altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
@@ -460,18 +436,13 @@ end
         CFL_number = 128;
         msis_file = find_msis_file();
         iri_file = find_iri_file();
-        # Define input parameters
-        input_type = "flickering";
-        IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-        z₀ = 1000;                  # (km) altitude of the source
-        E_min = 50;                # (eV) bottom energy of the FAB
-        f = 5;                      # (Hz) frequence of the modulation
-        Beams = 1;                  # beam numbers for the precipitation, starting with field aligned down
-        modulation = "sinus";       # type of the modulation ("square" or "sinus")
-        INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, f, Beams, modulation);
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        # Define input flux
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SinusoidalFlickering(5.0);
+                         beams=1, z_source=1000.0)
         # Run simulation
-        calculate_e_transport(altitude_lims, θ_lims, E_max, B_angle_to_zenith, t_total, dt,
-                              msis_file, iri_file, savedir, INPUT_OPTIONS, CFL_number; n_loop)
+        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        run!(sim)
         @test true
     end
 end

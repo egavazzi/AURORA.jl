@@ -21,8 +21,10 @@ DocMeta.setdocmeta!(AURORA, :DocTestSetup, :(using AURORA); recursive = true)
 
 # Add titles of sections and overrides page titles
 const titles = Dict(
-    "10-manual" => "Manual",
-    "20-api" => "API Reference",
+    "10-tutorials" => "Tutorials",
+    "20-physics" => "Physics",
+    "30-developer" => "Implementation",
+    "40-api" => "API Reference",
 )
 
 function recursively_list_pages(folder; path_prefix="")
@@ -81,6 +83,11 @@ makedocs(;
     sitename = "AURORA.jl",
     format = Documenter.HTML(; canonical = "https://egavazzi.github.io/AURORA.jl"),
     pages = list_pages(),
+    warnonly = [:cross_references],
+    # Uncomment the two following lines in order to skip running @example and jldoctest
+    # blocks when building the documentation
+    # doctest = false,
+    # draft = true,
 )
 
 deploydocs(; repo = "github.com/egavazzi/AURORA.jl")

@@ -13,27 +13,23 @@ iri_file = find_iri_file(
     year=2005, month=10, day=8, hour=22, minute=0, lat=70, lon=19, height=85:1:700
     );
 
+## Build the model
+model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+
 ## Define where to save the results
 root_savedir = ""   # name of the root folder
 name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
-## Define input parameters
-input_type = "constant_onset"
-IeE_tot = 1e-2;             # (W/m²) total energy flux of the FAB
-z₀ = altitude_lims[2];      # (km) altitude of the source
-E_min = E_max - 100;        # (eV) bottom energy of the FAB
-Beams = 1:2;                # beam numbers for the precipitation, starting with field aligned down
-t0 = 0;                     # (s) time of start for smooth transition
-t1 = 0;                     # (s) time of end for smooth transition
-INPUT_OPTIONS = (;input_type, IeE_tot, z₀, E_min, Beams, t0, t1);
+## Define input flux
+flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
-## Run the simulation
-calculate_e_transport_steady_state(altitude_lims, θ_lims, E_max, B_angle_to_zenith,
-    msis_file, iri_file, savedir, INPUT_OPTIONS);
+## Create and run the simulation
+sim = AuroraSimulation(model, flux, savedir)
+run!(sim)
 
 ## Analyze the results
-make_Ie_top_file(savedir)
-make_volume_excitation_file(savedir)
-make_current_file(savedir)
-# make_column_excitation_file(savedir) -- does not make sense for steady-state
+make_Ie_top_file(sim)
+make_volume_excitation_file(sim)
+make_current_file(sim)
+# make_column_excitation_file(sim) -- does not make sense for steady-state

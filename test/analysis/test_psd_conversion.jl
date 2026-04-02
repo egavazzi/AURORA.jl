@@ -56,7 +56,9 @@ end
     tmpdir = mktempdir()
     filepath = joinpath(tmpdir, "IeFlickering-01.mat")
 
-    E = [10.0, 20.0, 40.0]
+    E_edges = [10.0, 20.0, 40.0, 80.0]
+    E_centers = [15.0, 30.0, 60.0]
+    ΔE = diff(E_edges)  # [10.0, 20.0, 40.0]
     μ_lims = [-1.0, 0.0, 1.0]
     t_run = [0.0, 1.0]
     h_atm = [100e3, 110e3]
@@ -64,7 +66,7 @@ end
     Nz = length(h_atm)
     nμ = length(μ_lims) - 1
     Nt = length(t_run)
-    nE = length(E)
+    nE = length(E_centers)
 
     Ie = zeros(Float64, nμ * Nz, Nt, nE)
     for i_E in 1:nE, i_t in 1:Nt, i_μ in 1:nμ, i_z in 1:Nz
@@ -73,7 +75,9 @@ end
 
     matopen(filepath, "w") do io
         write(io, "Ie_ztE", Ie)
-        write(io, "E", E)
+        write(io, "E_edges", E_edges)
+        write(io, "E_centers", E_centers)
+        write(io, "dE", ΔE)
         write(io, "mu_lims", μ_lims)
         write(io, "t_run", t_run)
         write(io, "h_atm", h_atm)
