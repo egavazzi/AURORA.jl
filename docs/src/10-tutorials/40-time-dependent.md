@@ -13,7 +13,7 @@ iri_file  = find_iri_file()
 
 model = AuroraModel(
     [100, 600],    # altitude limits [km]
-    180:-10:0,     # pitch-angle bin edges [°]
+    180:-30:0,     # pitch-angle bin edges [°]
     1000,          # maximum energy [eV]
     msis_file,
     iri_file,

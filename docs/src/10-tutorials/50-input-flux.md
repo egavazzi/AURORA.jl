@@ -1,4 +1,4 @@
-# [Custom Input Flux](@id Custom-Input-Flux)
+# [Input Flux](@id Input-Flux)
 
 The input flux describes the precipitating electron flux injected at the top of the
 simulated ionosphere. It is the primary "forcing" of an AURORA simulation and is fully

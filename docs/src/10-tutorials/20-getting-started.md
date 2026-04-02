@@ -25,7 +25,7 @@ iri_file  = find_iri_file()
 
 model = AuroraModel(
     [100, 600],    # altitude limits [km]
-    180:-10:0,     # pitch-angle bin edges [°] → 18 beams
+    180:-45:0,     # pitch-angle bin edges [°] → 4 beams
     1000,          # maximum energy [eV]
     msis_file,
     iri_file,
@@ -62,20 +62,21 @@ flux = InputFlux(
 
 **Energy flux and modulation:**
 
-- [`FlatSpectrum`](@ref)`(1e-3)` specifies a **total energy flux of 1 mW/m²** (uniform in energy above 100 eV). The first argument is always the energy flux in W/m² (per square meter, per second).
+- [`FlatSpectrum`](@ref)`(1e-3; E_min=100)` specifies a **total energy flux of 1 mW/m²**, uniform in energy above 100 eV. 
+  The first argument is always the energy flux in W/m² (per square meter, per second).
 - [`SinusoidalFlickering`](@ref)`(5.0)` applies a 5 Hz sinusoidal modulation with default
-  amplitude 1.0, so the flux oscillates between **0 and 1 mW/m²**. For example, if you want
+  amplitude 1.0, so the flux oscillates between **0 and 1 mW/m²**. If you want
   only 50% modulation depth (between 0.5 and 1 mW/m²), use `SinusoidalFlickering(5.0; amplitude=0.5)`.
 
 **Beam and launch arguments:**
 
 - The `beams=1` argument means that only the most field-aligned downward-going beam carries
-the precipitating flux.
+  the precipitating flux.
 - The `z_source` argument sets the altitude from which the electrons are launched. This
-introduces an energy-dependent travel-time delay, so higher-energy electrons reach the top
-of the ionosphere before lower-energy ones. 
-- See the [Custom input flux](@ref "Custom Input Flux")
-tutorial for other spectrum types, modulation types, and more details.
+  introduces an energy-dependent travel-time delay, so higher-energy electrons reach the top
+  of the ionosphere before lower-energy ones. 
+- See the [Input flux](@ref "Input Flux")
+  tutorial for other spectrum types, modulation types, and more details.
 
 ## Step 3: Create and run the simulation
 
@@ -84,18 +85,21 @@ simulation you specify the total duration and the output cadence:
 
 ```@example getting_started
 savedir = mkpath(joinpath("data", "my_first_simulation"))
-sim = AuroraSimulation(model, flux, 0.2, 0.01, savedir)
+t = 0.2     # total simulation time [s]
+dt = 0.01   # output time step [s] (saves every 10 ms)
+sim = AuroraSimulation(model, flux, t, dt, savedir; CFL_number=128)
 ```
 
 Now run it:
 
 ```@example getting_started
 run!(sim)
-nothing # hide
+# nothing # hide
 ```
 
-Internally, AURORA refines the time grid as needed to satisfy its CFL criterion and then
-sweeps through energies from high to low, advancing the Crank-Nicolson scheme for each energy.
+Internally, AURORA refines the time grid as needed to satisfy the CFL criterion as given by
+`CFL_number` (default `= 64`) and then sweeps through energies from high to low, advancing 
+the Crank-Nicolson scheme for each energy.
 
 ## Step 4: Post-process
 

@@ -17,18 +17,15 @@
 
 
 !!! note
-- "Instantiating" the environment will download and install dependencies in their correct version. This needs to be done only the first time you use AURORA.
-- The `--project=.` flag **activates** the local environment. This has to be done every time you start a new Julia session and want to use AURORA.
+    - "Instantiating" the environment will download and install dependencies in their correct version. This needs to be done only the first time you use AURORA.
+    - The `--project=.` flag **activates** the local environment. This has to be done every time you start a new Julia session and want to use AURORA.
 
 !!! tip "Using VS Code"
-If you are using VS Code with the Julia extension, the local environment should
-be automatically activated when you open the `AURORA.jl/` folder.
+    If you are using VS Code with the Julia extension, the local environment should be automatically activated when you open the `AURORA.jl/` folder.
 
 !!! warning "Supported OS"
-AURORA is developed on Linux but should also work on macOS and Windows platforms. If you encounter problems, open an issue on the [GitHub repository](https://github.com/egavazzi/AURORA.jl/issues) or contact [etienne.gavazzi@uit.no](mailto:etienne.gavazzi@uit.no).
+	AURORA is developed on Linux but should also work on macOS and Windows platforms. If you encounter problems, open an issue on the [GitHub repository](https://github.com/egavazzi/AURORA.jl/issues) or contact [etienne.gavazzi@uit.no](mailto:etienne.gavazzi@uit.no).
 
 !!! info "Python dependencies (MSIS & IRI)"
-AURORA uses `pymsis` and `iri2020` Python packages (via CondaPkg) for atmospheric
-background models. These packages depend on external libraries, so on some
-systems they can occasionally run into build or compilation issues. 
-If that happens, see the [Troubleshooting](@ref) page.
+	AURORA uses `pymsis` and `iri2020` Python packages (via CondaPkg) for atmospheric background models. These packages depend on external libraries, so on some systems they can occasionally run into build or compilation issues. 
+	If that happens, see the [Troubleshooting](@ref) page.

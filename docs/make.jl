@@ -84,6 +84,10 @@ makedocs(;
     format = Documenter.HTML(; canonical = "https://egavazzi.github.io/AURORA.jl"),
     pages = list_pages(),
     warnonly = [:cross_references],
+    # Uncomment the two following lines in order to skip running @example and jldoctest
+    # blocks when building the documentation
+    # doctest = false,
+    # draft = true,
 )
 
 deploydocs(; repo = "github.com/egavazzi/AURORA.jl")

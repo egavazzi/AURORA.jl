@@ -1,9 +1,9 @@
 # [Steady-State Simulation](@id Steady-State-Simulation)
 
-AURORA can also run steady-state simulations. In this mode, it computes the equilibrium
-electron distribution and ionization rates for a constant (time-independent) precipitating
-input. This is useful when you only care about the long-term response and want to skip the
-time-stepping overhead.
+AURORA can also run steady-state simulations. In this mode, it computes the final 
+equilibrium electron distribution for a constant (time-independent) precipitating
+input. This is useful when you only care about the long-term response and don't 
+need to resolve the precise temporal dynamics.
 
 ## Setup
 
