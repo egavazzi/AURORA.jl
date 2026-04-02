@@ -5,8 +5,8 @@
     E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-    msis_file = "reference_results/msis_20051008-2200_70N-19E.txt"
-    iri_file = "reference_results/iri_20051008-2200_70N-19E.txt"
+    msis_file = joinpath(@__DIR__, "reference_results", "msis_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__,  "reference_results", "iri_20051008-2200_70N-19E.txt")
 
     ## Build the model
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -30,7 +30,7 @@
     make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = "reference_results/SS/Qzt_all_L.mat"
+    reference_file = joinpath(@__DIR__, "reference_results", "SS", "Qzt_all_L.mat")
     data_ref = matread(reference_file)
     data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
     @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
@@ -55,8 +55,8 @@ end
     dt = 0.01
     CFL_number = 128;
 
-    msis_file = "reference_results/msis_20051008-2200_70N-19E.txt"
-    iri_file = "reference_results/iri_20051008-2200_70N-19E.txt"
+    msis_file = joinpath(@__DIR__, "reference_results", "msis_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "reference_results", "iri_20051008-2200_70N-19E.txt")
 
     ## Build the model
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -81,7 +81,7 @@ end
     make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = "reference_results/TD/Qzt_all_L.mat"
+    reference_file = joinpath(@__DIR__, "reference_results", "TD", "Qzt_all_L.mat")
     data_ref = matread(reference_file)
     data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
     @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
