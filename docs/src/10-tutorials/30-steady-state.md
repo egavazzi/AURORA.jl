@@ -79,7 +79,7 @@ flux_maxw = InputFlux(
 )
 ```
 
-See the [Input flux](50-input-flux.md) tutorial for the full list of
+See the [Input flux](@ref "Input Flux") tutorial for the full list of
 spectrum and modulation types.
 
 For the general time-dependent case, including flickering input fluxes, see
