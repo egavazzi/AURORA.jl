@@ -29,7 +29,7 @@ where:
 - ``A(z, E)`` contains the total loss frequency from collisions with neutrals and thermal
   electrons
 - ``B(z, E, \mu \to \mu')`` is the pitch-angle scattering matrix
-- ``D(z, E, \mu)`` is the spatial diffusion coefficient
+- ``D(z, E, \mu)`` is the spatial diffusion coefficient (due to finite pitch-angle widths)
 - ``Q(z, \mu, t, E)`` is the source term from energy cascading (ionization secondaries and
   degraded primaries from higher energies)
 
@@ -74,22 +74,28 @@ as diffusion spreads information symmetrically in both directions.
 ## Crank-Nicolson discretization
 
 AURORA uses the Crank-Nicolson scheme — a second-order, unconditionally stable
-semi-implicit time integrator:
+semi-implicit time integrator. It descretizes the time derivative as:
 
 ```math
-\left(I + \frac{\Delta t}{2} \mathcal{L}\right) \vec{I_e}^{n+1}
-= \left(I - \frac{\Delta t}{2} \mathcal{L}\right) \vec{I_e}^{n}
-+ \Delta t \, \vec{Q}
+\frac{1}{v}\frac{\vec{I_e}^{n+1} - \vec{I_e}^{n}}{\Delta t}
+= \frac{1}{2}\left(-\mathcal{L}\,\vec{I_e}^{n+1} + \vec{Q}^{n+1}\right)
++ \frac{1}{2}\left(-\mathcal{L}\,\vec{I_e}^{n} + \vec{Q}^{n}\right)
 ```
 
-This is rewritten as:
+i.e., the right-hand side is the average at the current and next time steps.
+Rearranging leads to the linear system solved at each time step:
 
 ```math
-M_{\text{lhs}} \, \vec{I_e}^{n+1} = M_{\text{rhs}} \, \vec{I_e}^{n} + \Delta t \, \vec{Q}
+M_{\text{lhs}} \, \vec{I_e}^{n+1} = M_{\text{rhs}} \, \vec{I_e}^{n} + \frac{\vec{Q}^{n+1} + \vec{Q}^{n}}{2}
 ```
 
-At each energy level, the matrices ``M_{\text{lhs}}`` and ``M_{\text{rhs}}`` are assembled
-once and the system is solved using a sparse LU factorization (KLU from SuiteSparse).
+where:
+- ``M_{\text{lhs}} = D_{\Delta t} + \mathcal{L}/2``
+- ``M_{\text{rhs}} = D_{\Delta t} - \mathcal{L}/2``
+- ``D_{\Delta t} = \mathrm{diag}(1 / (v\,\Delta t))`` is the time-step diagonal (with units 1/m)
+
+At each energy level, these matrices are assembled once and the system is solved using a
+sparse LU factorization (KLU from SuiteSparse).
 
 For the **steady-state** case, the time derivative vanishes and we solve:
 
@@ -128,8 +134,17 @@ where ``P_k`` is the scattering probability for collision process ``k``.
 
 ### Diffusion coefficient D
 
-The diffusion coefficient accounts for pitch-angle mixing due to small-angle scattering.
-It is computed from the elastic scattering cross sections.
+`update_D!(D, model)` computes the spatial diffusion coefficient for each energy and
+pitch-angle bin. Within a discrete bin, electrons span a range of parallel velocities
+``v\cos\theta``. This spread causes electrons in the same beam to arrive at different
+altitudes at different times. The diffusion coefficient D models this spread of travel times:
+
+```math
+D[iE, i\mu] = \frac{(\Delta t_{\text{arrival}} / 4)^2}{\bar{t}_{\text{arrival}}}
+```
+
+where ``\Delta t_{\text{arrival}}`` is the range of arrival times across the bin and
+``\bar{t}_{\text{arrival}}`` is the mean. ``D`` vanishes for infinitely narrow bins.
 
 ### Source term Q
 
@@ -167,15 +182,6 @@ At each energy step:
 3. **Update Q** — compute the cascading/degradation contributions from this energy to all
    lower energies.
 
-## Implementation notes
-
-- **Sparse factorizations**: The block-structured transport matrices are solved with KLU
-  factorizations from SuiteSparse.
-- **Loop partitioning**: Long time-dependent simulations may be split into `n_loop` chunks
-  so that the working arrays fit within the requested memory budget.
-- **Cached data**: Scattering and cascading data are saved to disk and reused when the 
-  relevant grids match, avoiding repeated setup work.
-
 ## Boundary conditions
 
 - **Top boundary** (``z = z_{\max}``):
@@ -187,3 +193,12 @@ At each energy step:
 
 - **Bottom boundary** (``z = z_{\min}``): Dirichlet condition — the flux is held at its
   initial value.
+
+## Implementation notes
+
+- **Sparse factorizations**: The block-structured transport matrices are solved with KLU
+  factorizations from SuiteSparse.
+- **Loop partitioning**: Long time-dependent simulations may be split into `n_loop` chunks
+  so that the working arrays fit within the requested memory budget.
+- **Cached data**: Scattering and cascading data are saved to disk and reused when the 
+  relevant grids match, avoiding repeated setup work.
