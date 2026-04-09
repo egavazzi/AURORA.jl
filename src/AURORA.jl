@@ -62,8 +62,10 @@ export v_of_E, CFL_criteria, mu_avg, beam_weight,
         rename_if_exists,
         find_Ietop_file
 
-include("analysis.jl")
-include("analysis_psd.jl")
+include("analysis/psd.jl")
+include("analysis/emissions.jl")
+include("analysis/fluxes.jl")
+include("analysis/heating.jl")
 export downsampling_fluxes, make_volume_excitation_file,
     make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file,
     make_psd_file
