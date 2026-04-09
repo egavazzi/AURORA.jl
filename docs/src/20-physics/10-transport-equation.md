@@ -1,8 +1,7 @@
 # Transport Equation
 
-!!! info "Under construction"
-    This section is a placeholder. A detailed derivation and discussion of the multi-stream
-    transport equation will be added in a future update.
+!!! info "WIP"
+    This section is under construction.
 
 AURORA solves the time-dependent, multi-stream electron transport equation in the
 Earth's ionosphere. The equation describes how precipitating auroral electrons propagate

@@ -1,6 +1,12 @@
 using DataInterpolations: LinearInterpolation, PCHIPInterpolation
 using Statistics: mean
 
+
+# TODO:
+# - Take into account energy transfer from N₂ for O(1S) production?
+# - Take into account dissociative recombination for O(1S) production?
+# - Check PhD thesis from Grenoble that looked in details at cross-sections (used in TRANSCAR I believe)
+
 """
     excitation_4278(E)
 

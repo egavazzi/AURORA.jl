@@ -33,9 +33,10 @@ where:
 - ``Q(z, \mu, t, E)`` is the source term from energy cascading (ionization secondaries and
   degraded primaries from higher energies)
 
-The equation is solved on a staggered grid: the flux ``I_e`` is defined at cell centers in
-altitude, while the diffusion operator uses a standard second-order finite difference
-stencil.
+The spatial domain is discretized on a non-uniform altitude grid with ``I_e`` defined at
+cell centers. Different finite difference schemes are used depending on the nature of each
+term: the streaming term uses directional (upwind) differences, while the diffusion term
+uses central differences.
 
 ## Matrix representation
 
@@ -55,6 +56,20 @@ This gives the system:
 ```
 
 where ``\mathcal{L}`` is the combined spatial/loss/scattering operator.
+
+## Spatial discretization
+
+The altitude grid in AURORA is non-uniform, with finer spacing at lower altitudes where
+collision rates are highest.
+
+The **streaming term** ``-\mu v \, \partial I_e / \partial z`` uses directional
+(upwind) finite differences: a backward difference for upward-going beams (``\mu > 0``)
+and a forward difference for downward-going beams (``\mu < 0``). This choice is dictated
+by the physics — the derivative should be evaluated using information from the direction
+the beam is coming from.
+
+The **diffusion term** ``\partial_z(D \, \partial_z I_e)`` uses central differences,
+as diffusion spreads information symmetrically in both directions.
 
 ## Crank-Nicolson discretization
 
@@ -125,13 +140,13 @@ vector for the current energy ``iE``:
    in bin ``iE``.
 2. **Inelastic scattering**: Electrons losing discrete amounts of energy to excitation of
    neutral states.
-3. **Ionization fragments**:
-   - *Secondary electrons*: produced when a neutral is ionized, with a Lorentzian-like
-     energy distribution (width ~11.4 eV per Itikawa 1986). The pre-computed *cascading
-     transfer matrices* (one per species) map the ionization rate at energy ``E'`` to the
-     secondary electron production at energy ``E < E'``.
-   - *Degraded primaries*: the ionizing electron loses its ionization energy and continues
-     at lower energy.
+3. **Ionization**:
+   - *Secondary electrons*: produced when a neutral is ionized and emitted isotropically
+     over all pitch angles. The energy distribution of secondaries is species-dependent.
+     Pre-computed *cascading transfer matrices* (one per species) map the ionization rate
+     at energy ``E'`` to the secondary electron production at energy ``E < E'``.
+   - *Degraded primaries*: the ionizing electron continues in the same beam at reduced
+     energy (ionization potential + energy given to the secondary).
 
 These cascading transfer matrices are computed once (by `cascading_N2()`, `cascading_O2()`,
 `cascading_O()`) and cached in `internal_data/e_cascading/` for reuse.
@@ -161,45 +176,14 @@ At each energy step:
 - **Cached data**: Scattering and cascading data are saved to disk and reused when the 
   relevant grids match, avoiding repeated setup work.
 
-## SimulationCache data flow
-
-The `SimulationCache` is the central workspace allocated by `initialize!`. Here is how
-data flows through it during a time-dependent simulation:
-
-```
-initialize!(sim)
-│
-├── Compute Ie_top[n_μ, n_t, n_E]     # Full input flux boundary condition
-├── Allocate Ie[n_z·n_μ, n_t_chunk, n_E]   # Solution array for one time chunk
-├── Allocate I0[n_z·n_μ, n_E]         # Initial condition (carried between loops)
-├── Build TransportMatrices (A, B, D, Q, Ddiffusion)
-└── Build SolverCache (KLU factorizations)
-
-solve! loop:
-│
-├── Loop i_loop = 1:n_loop
-│   ├── Extract Ie_top_chunk from Ie_top for this time window
-│   ├── Reset Ie to zero (or carry I0 from previous loop)
-│   │
-│   ├── energy_loop!(descending in E)
-│   │   └── For each energy:
-│   │       ├── Update A, B, D, Ddiffusion ← cross_sections[iE]
-│   │       ├── Assemble Mlhs, Mrhs using TransportMatrices
-│   │       ├── Solve → writes into Ie[:, :, iE]
-│   │       └── Update Q[:, :, iE-1:1] ← cascading from Ie[:, :, iE]
-│   │
-│   ├── Downsample Ie → Ie_save (keep every CFL_factor-th time step)
-│   ├── Save Ie_save to disk
-│   └── Store I0 ← Ie[:, end, :] for next loop
-│
-└── Done
-```
-
 ## Boundary conditions
 
-- **Top boundary** (``z = z_{\max}``): The incoming (downward) flux is prescribed by the
-  `Ie_top` array from the [`InputFlux`](@ref). Upward-going beams at the top boundary are
-  free (outflow).
+- **Top boundary** (``z = z_{\max}``):
+  - *Downward-going beams* (``\mu < 0``): Dirichlet condition — the flux is prescribed by
+    the `Ie_top` array from the [`InputFlux`](@ref).
+  - *Upward-going beams* (``\mu > 0``): Zero-gradient condition
+    (``\partial I_e / \partial z = 0``), allowing electrons to exit freely at the top of
+    the simulation domain.
 
-- **Bottom boundary** (``z = z_{\min}``): Upward-going flux is determined by reflection
-  of the downward flux (backscatter from the dense atmosphere below).
+- **Bottom boundary** (``z = z_{\min}``): Dirichlet condition — the flux is held at its
+  initial value.

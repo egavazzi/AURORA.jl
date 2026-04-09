@@ -197,3 +197,20 @@ flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))
 
 Available interpolation schemes: `:constant` (default, nearest), `:linear`, `:pchip`
 (piecewise cubic Hermite).
+
+---
+
+## Visualizing the input flux
+
+AURORA provides plotting functions via a Makie extension. Load a Makie backend to
+visualize the input flux applied at the top boundary:
+
+```julia
+using CairoMakie   # or GLMakie for interactive plots
+
+# Plot the input flux (requires a simulation object)
+fig = plot_input(sim)
+```
+
+See the [Visualization](../40-api/visualization.md) API page for more plotting and
+animation functions.

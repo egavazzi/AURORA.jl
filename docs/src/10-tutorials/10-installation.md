@@ -26,6 +26,6 @@
 !!! warning "Supported OS"
 	AURORA is developed on Linux but should also work on macOS and Windows platforms. If you encounter problems, open an issue on the [GitHub repository](https://github.com/egavazzi/AURORA.jl/issues) or contact [etienne.gavazzi@uit.no](mailto:etienne.gavazzi@uit.no).
 
-!!! info "Python dependencies (MSIS & IRI)"
+!!! warning "Python dependencies (MSIS & IRI)"
 	AURORA uses `pymsis` and `iri2020` Python packages (via CondaPkg) for atmospheric background models. These packages depend on external libraries, so on some systems they can occasionally run into build or compilation issues. 
 	If that happens, see the [Troubleshooting](@ref) page.

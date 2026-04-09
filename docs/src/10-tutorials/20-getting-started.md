@@ -48,8 +48,7 @@ The constructor performs several steps automatically:
 The precipitating electrons are specified by an [`InputFlux`](@ref), which combines an
 *energy spectrum* with a *temporal modulation*.
 
-For this first example we use a simple 5 Hz flickering input. This is the main use case
-for AURORA: studying how the ionosphere responds to rapidly varying precipitation.
+For this first example we use a simple, 5 Hz flickering input.
 
 ```@example getting_started
 flux = InputFlux(
@@ -86,7 +85,7 @@ simulation you specify the total duration and the output cadence:
 ```@example getting_started
 savedir = mkpath(joinpath("data", "my_first_simulation"))
 t = 0.2     # total simulation time [s]
-dt = 0.01   # output time step [s] (saves every 10 ms)
+dt = 0.01   # output time step [s] (save every 10 ms)
 sim = AuroraSimulation(model, flux, t, dt, savedir; CFL_number=128)
 ```
 
@@ -94,7 +93,7 @@ Now run it:
 
 ```@example getting_started
 run!(sim)
-# nothing # hide
+nothing # hide
 ```
 
 Internally, AURORA refines the time grid as needed to satisfy the CFL criterion as given by

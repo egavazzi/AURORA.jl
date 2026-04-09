@@ -91,30 +91,4 @@ energy to propagate the solution in time.
 
 ## Post-processing
 
-```@example time_dep
-make_Ie_top_file(sim)
-make_volume_excitation_file(sim)
-make_column_excitation_file(sim)   # column-integrated excitation (time-dependent only)
-make_current_file(sim)
-```
-
-```@example time_dep
-readdir(savedir)
-```
-
-## Visualization
-
-AURORA provides plotting and animation functions via a Makie extension. Load a Makie
-backend to access them:
-
-```julia
-using CairoMakie   # or GLMakie for interactive plots
-
-# Plot the input flux
-fig = plot_input(sim)
-
-# Animate the electron flux over time
-animate_Ie_in_time("data/time_dep_example"; angles_to_plot=[1, 10])
-```
-
-See the [Visualization](../40-api/visualization.md) API page for details.
+Post-process the results as shown in [Getting started](@ref) Step 4.

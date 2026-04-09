@@ -1,17 +1,14 @@
 # Cross Sections
 
-!!! info "Under construction"
-    This section is a placeholder. Detailed tables and plots of the cross-section data
-    will be added in a future update.
+!!! info "WIP"
+    This section is under construction.
 
-AURORA includes electron-impact cross sections for three neutral species in the
-upper atmosphere:
+AURORA includes electron-impact cross sections for the three main neutral species
+in the upper atmosphere: **N₂**, **O₂**, and **atomic O**. For each species, elastic and
+inelastic (excitation of rotational, vibrational, electronic states and ionization) 
+cross-sections are included. 
 
-| Species | Elastic | Inelastic (excitation) | Ionization |
-|---------|---------|----------------------|------------|
-| N₂ | ✓ | Multiple rotational, vibrational, and electronic states | ✓ |
-| O₂ | ✓ | Multiple states | ✓ |
-| O  | ✓ | Multiple states | ✓ |
+These data are loaded internally when an [`AuroraModel`](@ref) is constructed.
 
 ## Data sources
 
@@ -24,23 +21,20 @@ The cross-section data are primarily based on:
 - **Itikawa, Y. & Ichimura, A.** (1990). Cross sections for collisions of electrons and
   photons with atomic oxygen. *J. Phys. Chem. Ref. Data*, 19(3), 637–651.
 
-## Current scope in AURORA
-
-The current model includes cross sections for N₂, O₂, and O, together with selected
-optical-emission cross sections used to compute excitation rates. These data are loaded
-internally when an [`AuroraModel`](@ref) is constructed.
-
 ## Emission cross sections
 
-AURORA also includes cross sections for specific auroral optical emissions, used by
-[`make_volume_excitation_file`](@ref) to compute volume excitation rates. These include
-transitions such as:
+In addition to the collision cross sections used by the transport solver, AURORA includes
+cross sections for specific auroral optical emissions. These are used by
+[`make_volume_excitation_file`](@ref) to compute volume excitation rates. The following
+emission lines are currently implemented:
 
-- N₂⁺ first negative band (1NG, 3914 Å)
-- (4278 Å)
-- O(¹S) green line (5577 Å)
-- O(¹D) red line (6300 Å)
-- 7774 Å
-- 8446 Å
-- N₂ first positive band (1PG)
-- N₂ second positive band (2PG)
+| Emission | Source | Wavelength | Function |
+|----------|--------|------------|----------|
+| N₂⁺ 1NG (0-1) | e + N₂ | 4278 Å | `excitation_4278` |
+| O(¹S) green line | e + O | 5577 Å | `excitation_O1S` |
+| O(¹D) red line | e + O | 6300 Å | `excitation_O1D` |
+| N₂ 1PG (4–1, 5–2) | e + N₂ | 6730 Å | `excitation_6730_N2` |
+| OI 7774 Å | e + O | 7774 Å | `excitation_7774_O` |
+| OI 7774 Å | e + O₂ | 7774 Å | `excitation_7774_O2` |
+| OI 8446 Å | e + O | 8446 Å | `excitation_8446_O` |
+| OI 8446 Å | e + O₂ | 8446 Å | `excitation_8446_O2` |
