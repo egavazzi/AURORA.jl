@@ -70,8 +70,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
                                      angles_to_plot = nothing,
                                      colorrange = nothing,
                                      save_to_file = true,
-                                     plot_Ietop = false,
-                                     Ietop_angle_cone = [170, 180],
+                                     plot_input = false,
+                                     input_angle_cone = [170, 180],
                                      dt_steps = 1)
     ## Resolve the directory path
     full_path_to_directory = abspath(directory_to_process)
@@ -89,7 +89,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
 
     ## Create file name
     if save_to_file
-        video_filename = plot_Ietop ? "animation_with_precipitation.mp4" : "animation.mp4"
+        video_filename = plot_input ? "animation_with_precipitation.mp4" : "animation.mp4"
         full_video_filename = rename_if_exists(joinpath(full_path_to_directory, video_filename))
         println(styled"{bold:The animation will be saved at $video_filename.}")
     end
@@ -151,25 +151,25 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         colorrange = compute_default_colorrange(Ie_plot)
     end
 
-    # Load Ietop if requested
-    if plot_Ietop
-        Ietop_file = find_Ietop_file(full_path_to_directory)
-        data = matread(Ietop_file)
+    # Load input flux if requested
+    if plot_input
+        input_file = find_input_file(full_path_to_directory)
+        data = matread(input_file)
         Ietop = data["Ie_total"]
         t_top = data["t_top"]; t_top = [t_top; t_top[end] + diff(t_top)[end]] .- t_top[1]
-        idx_θ = vec(Ietop_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= Ietop_angle_cone[2])
-        Ω_beam = beam_weight([Ietop_angle_cone[1], Ietop_angle_cone[2]])
-        data_Ietop = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ Ω_beam ./ ΔE' .* E_centers' # in eV/m²/s/eV/ster
-        Ietop_struct = (; bool = plot_Ietop, t_top, data_Ietop, Ietop_angle_cone)
+        idx_θ = vec(input_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= input_angle_cone[2])
+        Ω_beam = beam_weight([input_angle_cone[1], input_angle_cone[2]])
+        data_input = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ Ω_beam ./ ΔE' .* E_centers' # in eV/m²/s/eV/ster
+        input_struct = (; bool = plot_input, t_top, data_input, input_angle_cone)
     else
-        Ietop_struct = (; bool = false, t_top = nothing, data_Ietop = nothing, Ietop_angle_cone = nothing)
+        input_struct = (; bool = false, t_top = nothing, data_input = nothing, input_angle_cone = nothing)
     end
 
     # Create the figure
     print("create figure... ")
     Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
     time = Observable("$(t_run[1]) s")
-    fig = make_Ie_in_time_plot(Ie_timeslice, time, z, E_centers, angles_to_plot, colorrange, Ietop_struct)
+    fig = make_Ie_in_time_plot(Ie_timeslice, time, z, E_centers, angles_to_plot, colorrange, input_struct)
     display(fig)
 
     # Animate

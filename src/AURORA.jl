@@ -60,7 +60,7 @@ include("utilities.jl")
 export v_of_E, CFL_criteria, mu_avg, beam_weight,
         make_savedir,
         rename_if_exists,
-        find_Ietop_file
+        find_input_file
 
 include("analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult,
@@ -110,7 +110,7 @@ julia> animate_Ie_in_time(directory_to_process)
 # Or with custom angles and colorrange:
 julia> angles_to_plot = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);   # DOWN
                          (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)];   # UP
-julia> animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange=(1e5, 1e9), plot_Ietop=true)
+julia> animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange=(1e5, 1e9), plot_input=true)
 
 # Using nothing for empty panels:
 julia> angles_to_plot = [(180, 90)  nothing;
@@ -140,9 +140,9 @@ exist as a limit.
                           automatically computed as (max_value / 1e4, max_value) spanning
                           4 orders of magnitude.
 - `save_to_file = true`: if true, saves the animation to a .mp4 file in the data directory.
-- `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
+- `plot_input = false`: if true, also plots the precipitating Ie at the top of the
                         ionosphere by loading it from the file `Ie_top.mat`.
-- `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie plot.
+- `input_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie plot.
 - `dt_steps`: plot one frame every `dt_steps` timesteps.
 """
 function animate_Ie_in_time end
@@ -188,7 +188,7 @@ function plot_column_emission! end
 export plot_column_emission, plot_column_emission!
 
 """
-    plot_ionization(data::VolumeExcitationResult; Ietop_directory=nothing, kwargs...)
+    plot_ionization(data::VolumeExcitationResult; plot_input=false, kwargs...)
 
 Plot ionization rate heatmap, optionally with a top-panel showing the precipitating
 electron flux loaded from the given directory.

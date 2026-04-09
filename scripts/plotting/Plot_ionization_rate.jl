@@ -22,7 +22,7 @@ full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20
 
 ## Plot ionization rate
 data = load_volume_excitation(full_path_to_directory)
-fig = plot_ionization(data; plot_Ietop = true)
+fig = plot_ionization(data; plot_input = true)
 display(fig)
 
 ## Save the figure

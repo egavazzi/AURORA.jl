@@ -47,31 +47,31 @@ end
 # ======================================================================================== #
 
 function AURORA.plot_ionization(data::AURORA.VolumeExcitationResult;
-                                plot_Ietop::Bool = false,
+                                plot_input::Bool = false,
                                 angle_cone = [170, 180],
                                 size = (850, 950), kwargs...)
-    if plot_Ietop && data.savedir === nothing
-        error("plot_Ietop=true requires data to have a known savedir. " *
+    if plot_input && data.savedir === nothing
+        error("plot_input=true requires data to have a known savedir. " *
               "Load data with load_volume_excitation(directory) to populate it.")
     end
 
-    fig_height = plot_Ietop ? size[2] : 500
+    fig_height = plot_input ? size[2] : 500
     fig = Makie.Figure(; size = (size[1], fig_height), fontsize = 20)
 
     row = 1
     ax_Ietop = nothing
 
-    if plot_Ietop
-        has_Ietop = any(startswith(f, "Ie_incoming_") for f in readdir(data.savedir))
-        if !has_Ietop
+    if plot_input
+        has_ietop = any(startswith(f, "Ie_incoming_") for f in readdir(data.savedir))
+        if !has_ietop
             @warn "No Ie_incoming file found in $(data.savedir), skipping top-flux panel."
-            plot_Ietop = false
+            plot_input = false
         end
     end
 
-    if plot_Ietop
-        Ietop_file = AURORA.find_Ietop_file(data.savedir)
-        ie_data = matread(Ietop_file)
+    if plot_input
+        input_file = AURORA.find_input_file(data.savedir)
+        ie_data = matread(input_file)
         Ietop = ie_data["Ie_total"]
         μ_lims = ie_data["mu_lims"]
         t_top = ie_data["t_top"]
@@ -104,7 +104,7 @@ function AURORA.plot_ionization(data::AURORA.VolumeExcitationResult;
     Makie.Colorbar(fig[row, 2], hm_Q; label = "Ionization rate (/m³/s)")
 
     Makie.colsize!(fig.layout, 1, Makie.Auto())
-    if plot_Ietop
+    if plot_input
         Makie.rowsize!(fig.layout, 1, Makie.Relative(1/5))
         Makie.linkxaxes!(ax_Ietop, ax_Q)
         Makie.xlims!(ax_Q, 0, min(t_top[end], t[end]))
