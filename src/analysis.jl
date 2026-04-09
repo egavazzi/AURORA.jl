@@ -293,7 +293,13 @@ function make_volume_excitation_file(directory_to_process)
 
     println("Volume excitation rates saved in $savefile")
 
-    return nothing
+    return VolumeExcitationResult(
+        Q4278, Q6730, Q7774, Q7774_O, Q7774_O2,
+        Q8446, Q8446_O, Q8446_O2,
+        QO1D, QO1S, QOi, QO2i, QN2i,
+        Vector{Float64}(vec(z)), Vector{Float64}([t;]),
+        directory_to_process,
+    )
 end
 
 
@@ -400,7 +406,11 @@ function make_column_excitation_file(directory_to_process)
 
     println("Column excitation rates saved in $savefile")
 
-    return nothing
+    return ColumnExcitationResult(
+        vec(I_4278), vec(I_6730), vec(I_7774), vec(I_7774_O), vec(I_7774_O2),
+        vec(I_8446), vec(I_8446_O), vec(I_8446_O2),
+        vec(I_O1D), vec(I_O1S), Vector{Float64}([t;]),
+    )
 end
 
 using Integrals: SampledIntegralProblem, TrapezoidalRule, solve

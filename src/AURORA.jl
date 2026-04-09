@@ -62,6 +62,10 @@ export v_of_E, CFL_criteria, mu_avg, beam_weight,
         rename_if_exists,
         find_Ietop_file
 
+include("analysis_types.jl")
+export VolumeExcitationResult, ColumnExcitationResult,
+    load_volume_excitation, load_column_excitation
+
 include("analysis.jl")
 include("analysis_psd.jl")
 export downsampling_fluxes, make_volume_excitation_file,
@@ -143,6 +147,66 @@ exist as a limit.
 """
 function animate_Ie_in_time end
 export animate_Ie_in_time
+
+"""
+    plot_emission(data::VolumeExcitationResult; kwargs...)
+
+Plot a 2x2 grid of volume emission rate heatmaps (4278, 6730, 7774, 8446 Å).
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_emission end
+
+"""
+    plot_emission!(ax, data::VolumeExcitationResult, wavelength::Symbol; kwargs...)
+
+Plot a single volume emission rate onto an existing `Axis`. `wavelength` can be
+`:Q4278`, `:Q6730`, `:Q7774`, `:Q8446`, `:QO1D`, or `:QO1S`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_emission! end
+export plot_emission, plot_emission!
+
+"""
+    plot_column_emission(data::ColumnExcitationResult; kwargs...)
+
+Plot column-integrated emission intensities as line plots vs time.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_column_emission end
+
+"""
+    plot_column_emission!(ax, data::ColumnExcitationResult; kwargs...)
+
+Plot column-integrated emission intensities onto an existing `Axis`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_column_emission! end
+export plot_column_emission, plot_column_emission!
+
+"""
+    plot_ionization(data::VolumeExcitationResult; Ietop_directory=nothing, kwargs...)
+
+Plot ionization rate heatmap, optionally with a top-panel showing the precipitating
+electron flux loaded from the given directory.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_ionization end
+
+"""
+    plot_ionization!(ax, data::VolumeExcitationResult; species=:total, kwargs...)
+
+Plot ionization rate onto an existing `Axis`. `species` can be `:total`, `:QN2i`,
+`:QO2i`, or `:QOi`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_ionization! end
+export plot_ionization, plot_ionization!
 
 # Precompile selected functions
 include("precompiles.jl")
