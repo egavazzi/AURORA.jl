@@ -1,7 +1,7 @@
 # Input Flux
 
 Types and functions for specifying the precipitating electron flux. See the
-[Custom input flux](@ref "Custom Input Flux") tutorial for usage examples.
+[Input flux](@ref "Input Flux") tutorial for usage examples.
 
 ## Spectrum types
 

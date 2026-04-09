@@ -13,7 +13,7 @@
    julia> Pkg.instantiate() # this might take a while the first time...
    ```
 
-4. AURORA is now ready to use! See the [Getting started](@ref) tutorial.
+4. AURORA is now ready to use! See the [Time-Dependent Simulation](@ref) tutorial.
 
 
 !!! note

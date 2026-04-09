@@ -158,10 +158,12 @@ The `.mat` file must contain the variable `Ie_total` with shape **`[n_μ, n_t_fi
 Before writing a file, build an `AuroraModel` with the same settings you intend to use
 for the simulation, then read the grids from it:
 
-```julia
-using AURORA, MAT
+```@example custom_input
+using MAT
 
 # Build the model (same settings as the simulation that will use the file)
+msis_file = find_msis_file()
+iri_file  = find_iri_file()
 θ_lims = 180:-10:0
 E_max  = 1000.0
 model  = AuroraModel([100, 600], θ_lims, E_max, msis_file, iri_file, 13)
@@ -175,7 +177,7 @@ n_E = length(E_centers)
 
 ### Writing the file
 
-```julia
+```@example custom_input
 # Example: time-dependent flux, 100 time steps
 t_file = collect(0.0:0.01:0.99)   # 100 steps, dt = 10 ms
 n_t_file = length(t_file)
@@ -191,8 +193,9 @@ matwrite("my_flux.mat", Dict(
 
 ### Using the file
 
-```julia
+```@example custom_input
 flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))
+rm("my_flux.mat") # hide
 ```
 
 Available interpolation schemes: `:constant` (default, nearest), `:linear`, `:pchip`

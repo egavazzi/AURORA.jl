@@ -33,7 +33,7 @@ sim = AuroraSimulation(model, flux, 0.2, 0.01, savedir; CFL_number=128)
 run!(sim)
 ```
 
-See the [Getting started](@ref) tutorial for a full walkthrough.
+See the [Time-Dependent Simulation](@ref) tutorial for a full walkthrough.
 
 ## Documentation outline
 
