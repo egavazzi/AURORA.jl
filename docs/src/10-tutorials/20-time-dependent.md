@@ -145,3 +145,4 @@ readdir(savedir)
 
 - [Steady-state simulation](@ref "Steady-State Simulation") — the steady-state special case.
 - [Input flux](@ref "Input Flux") — explore all spectrum and modulation types.
+- [Post-processing & analysis](@ref "Post-Processing") — detailed walkthrough of all analysis functions.

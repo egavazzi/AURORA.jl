@@ -1,4 +1,4 @@
-# Analysis
+# [Analysis](@id Analysis)
 
 Post-processing functions that compute derived quantities from raw simulation output.
 All functions write their results to the simulation's save directory.
