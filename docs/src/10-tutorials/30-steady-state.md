@@ -41,19 +41,17 @@ run!(sim)
 nothing # hide
 ```
 
-## Analysis
+## Post-process
 
-After the simulation completes, compute derived quantities:
+As for [time-dependent](@ref "Time-Dependent Simulation") simulations, it is possible to compute derived quantities from the raw
+electron flux and save them alongside the simulation output:
 
 ```@example steady_state
-# Volume excitation rates for optical emissions (e.g. N₂⁺ 1NG, O 557.7 nm, ...)
-make_volume_excitation_file(sim)
-
-# Precipitated current density
-make_current_file(sim)
-
-# Input flux boundary condition (for verification)
-make_Ie_top_file(sim)
+make_Ie_top_file(sim)              # boundary condition (input flux applied at top)
+make_volume_excitation_file(sim)   # volumetric excitation rates for optical emissions
+make_column_excitation_file(sim)   # column-integrated excitation rates (steady-state scalar)
+make_current_file(sim)             # field-aligned electron currents and energy fluxes
+make_heating_rate_file(sim)        # electron heating rates
 ```
 
 ```@example steady_state
@@ -81,7 +79,7 @@ flux_maxw = InputFlux(
 )
 ```
 
-See the [Input flux](@ref "Input Flux") tutorial for the full list of
+See the [Input flux](50-input-flux.md) tutorial for the full list of
 spectrum and modulation types.
 
 For the general time-dependent case, including flickering input fluxes, see

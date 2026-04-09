@@ -173,6 +173,7 @@ model  = AuroraModel([100, 600], θ_lims, E_max, msis_file, iri_file, 13)
 E_centers = model.energy_grid.E_centers     # length n_E
 n_μ = length(μ_center)
 n_E = length(E_centers)
+nothing # hide
 ```
 
 ### Writing the file
@@ -195,7 +196,6 @@ matwrite("my_flux.mat", Dict(
 
 ```@example custom_input
 flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))
-rm("my_flux.mat") # hide
 ```
 
 Available interpolation schemes: `:constant` (default, nearest), `:linear`, `:pchip`
