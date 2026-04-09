@@ -229,6 +229,7 @@ function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
     D2M = spdiagm( -1 => dsup,
                     0 => dMain,
                     1 => dsub)
+    D2M[1, 1] = 0.0
 
     # Copy the new matrix structure into the existing one
     copyto!(Ddiffusion, D2M)

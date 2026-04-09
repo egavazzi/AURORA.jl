@@ -10,15 +10,19 @@ Load a `IeFlickering-NN.mat` result file produced by AURORA.
 
 Returns a named tuple with fields:
 - `Ie`      : `[Nz, n_mu, Nt, nE]` number flux [m^-2 s^-1], integrated over ΔE and ΔΩ
-- `E`       : energy bin left edges [eV], length `nE`
-- `μ_lims` : cosine pitch-angle bin limits, length `n_mu + 1`
+- `E_edges` : energy bin edges [eV], length `nE + 1`
+- `E_centers`: energy bin centers [eV], length `nE`
+- `dE`      : energy bin widths [eV], length `nE`
+- `μ_lims`  : cosine pitch-angle bin limits, length `n_mu + 1`
 - `t_run`   : time vector [s], length `Nt`
 - `h_atm`   : altitude grid [m], length `Nz`
 """
 function load_Ie(path::AbstractString)
     file = matopen(path)
     Ie_raw = read(file, "Ie_ztE")
-    E = vec(read(file, "E"))
+    E_edges = vec(read(file, "E_edges"))
+    E_centers = vec(read(file, "E_centers"))
+    ΔE = vec(read(file, "dE"))
     μ_lims = vec(read(file, "mu_lims"))
     t_run = vec(read(file, "t_run"))
     h_atm = vec(read(file, "h_atm"))
@@ -30,23 +34,24 @@ function load_Ie(path::AbstractString)
 
     Ie = reshape(Ie_raw, Nz, nμ, length(t_run), nE)
 
-    return (Ie = Ie, E = E[1:nE], μ_lims = μ_lims, t_run = t_run, h_atm = h_atm)
+    return (Ie = Ie, E_edges = E_edges, E_centers = E_centers, ΔE = ΔE, μ_lims = μ_lims, t_run = t_run, h_atm = h_atm)
 end
 
 """
-    psd_grids(E_eV, μ_lims_cosine)
+    psd_grids(E_centers, ΔE, μ_lims_cosine)
 
-Compute energy, angle, and velocity grids needed by `compute_f`.
+Compute velocity and pitch-angle grids needed by `compute_f` and `compute_F`.
+
+- `E_centers` is the energy bin centers [eV] (length `nE`).
+- `ΔE` is the energy bin widths [eV] (length `nE`).
 """
-function psd_grids(E_eV::AbstractVector, μ_lims_cosine::AbstractVector)
-    nE = length(E_eV)
+function psd_grids(E_centers::AbstractVector, ΔE::AbstractVector, μ_lims_cosine::AbstractVector)
+    nE = length(E_centers)
     nμ = length(μ_lims_cosine) - 1
+    @assert length(ΔE) == nE "ΔE length must match E_centers length"
 
-    ΔE_eV = diff(E_eV)
-    ΔE_eV = vcat(ΔE_eV, ΔE_eV[end])
-    ΔE_J = ΔE_eV .* e_charge
-    E_center_eV = E_eV .+ 0.5 .* ΔE_eV
-    E_center_J = E_center_eV .* e_charge
+    ΔE_J = ΔE .* e_charge
+    E_center_J = E_centers .* e_charge
     v = sqrt.(2 .* E_center_J ./ m_e)
 
     ΔΩ = Vector{Float64}(undef, nμ)
@@ -207,7 +212,7 @@ function make_psd_from_AURORA(
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
 )
     data = load_Ie(path_to_file)
-    grids = psd_grids(data.E, data.μ_lims)
+    grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
 
     if compute ∉ (:f_only, :F_only, :both)
         throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
@@ -233,7 +238,8 @@ function make_psd_from_AURORA(
             ΔE_J = grids.ΔE_J,
             BeamWeight = grids.ΔΩ,
             μ_center = grids.μ_center,
-            E = data.E,
+            E_edges = data.E_edges,
+            E_centers = data.E_centers,
             t_run = data.t_run,
             h_atm = data.h_atm,
             μ_lims = data.μ_lims,
