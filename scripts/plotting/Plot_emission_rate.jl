@@ -88,8 +88,7 @@ for (wl, (r, c)) in zip(wavelengths, positions)
     ax = Axis(fig[r, c]; ax_kwargs_profile..., title = ax_labels[wl],
               xlabel = r == 2 ? "photons/m³/s" : "",
               ylabel = c == 1 ? "Altitude (km)" : "",
-              xticklabelsvisible = r == 2,
               yticklabelsvisible = c == 1)
-    plot_excitation!(ax, data_Q; field = wl, time_index = 1)
+    plot_excitation!(ax, data_Q; field = wl, time_index = 20)
 end
 display(fig)
