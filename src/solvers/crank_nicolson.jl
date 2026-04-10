@@ -101,7 +101,7 @@ function Crank_Nicolson(t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_
     end
 
     for i_t in 1:length(t) - 1
-        I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
+        I_top_bottom = (@view(Ie_top[:, i_t + 1]) * [0, 1]')'
         Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
         Q_local[index_top_bottom] = I_top_bottom[:]
 

@@ -569,7 +569,7 @@ function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, I
 
     # Time-stepping loop
     for i_t in 1:(length(t) - 1)
-        I_top_bottom = (@view(Ie_top[:, i_t]) * [0, 1]')'
+        I_top_bottom = (@view(Ie_top[:, i_t + 1]) * [0, 1]')'
         Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
         Q_local[index_top_bottom] = I_top_bottom[:]
 
