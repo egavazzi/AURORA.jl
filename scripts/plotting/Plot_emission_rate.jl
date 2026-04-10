@@ -13,48 +13,83 @@ using CairoMakie
 
 
 ## ====================================================================================== ##
-## Run
+## Load data
 ## ====================================================================================== ##
 
-## Set the path to the simulation results directory
-# full_path_to_directory = "path/to/simulation/results"
+full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260410-1015"
 full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260409-1812"
 
-## Plot volume emission rates
 data_Q = load_volume_excitation(full_path_to_directory)
-fig_Q = plot_emission(data_Q)
-display(fig_Q)
-
-## Save volume emission plot
-savefile = joinpath(full_path_to_directory, "Qtz.png")
-save(savefile, fig_Q; backend = CairoMakie)
-println("Saved $savefile")
-
-## Plot column-integrated emission intensities
 data_I = load_column_excitation(full_path_to_directory)
-fig_I = plot_column_emission(data_I)
-display(fig_I)
 
-## Save column emission plot
-savefile = joinpath(full_path_to_directory, "It.png")
-save(savefile, fig_I; backend = CairoMakie)
+
+## ====================================================================================== ##
+## Volume emission rates (2×2 heatmap grid)
+## ====================================================================================== ##
+
+wavelengths = [:Q4278, :Q6730, :Q7774, :Q8446]
+positions   = [(1, 1), (1, 2), (2, 1), (2, 2)]
+ax_labels   = Dict(:Q4278 => "4278 Å", :Q6730 => "6730 Å",
+                   :Q7774 => "7774 Å", :Q8446 => "8446 Å")
+
+fig = Figure(; fontsize = 20)
+ax_kwargs = (; xticksmirrored = true, yticksmirrored = true,
+               xminorticksvisible = true, yminorticksvisible = true,
+               limits = ((0, data_Q.t[end]), (100, 400)))
+
+for (wl, (r, c)) in zip(wavelengths, positions)
+    g = fig[r, c] = GridLayout()
+    ax = Axis(g[1, 1]; ax_kwargs..., title = ax_labels[wl],
+              xlabel = r == 2 ? "t (s)" : "",
+              ylabel = c == 1 ? "Altitude (km)" : "",
+              xticklabelsvisible = r == 2,
+              yticklabelsvisible = c == 1)
+    hm = plot_excitation!(ax, data_Q; field = wl)
+    Colorbar(g[1, 2], hm; label = "photons/m³/s")
+    colgap!(g, 10)
+end
+display(fig)
+
+savefile = joinpath(full_path_to_directory, "Qtz.png")
+save(savefile, fig; backend = CairoMakie)
 println("Saved $savefile")
 
 
 ## ====================================================================================== ##
-## Examples: plotting on a custom axis
+## Column-integrated emission intensities
 ## ====================================================================================== ##
 
-## Plot a single emission wavelength on a custom axis
-fig = Figure()
-ax = Axis(fig[1, 1]; xlabel = "t (s)", ylabel = "Altitude (km)")
-hm = plot_emission!(ax, data_Q, :Q4278)
-Colorbar(fig[1, 2], hm)
-fig
+fig = Figure(; fontsize = 20)
+ax = Axis(fig[1, 1]; xlabel = "t (s)", ylabel = "Intensity (R)",
+          yscale = log10,
+          xminorticksvisible = true, xminorgridvisible = true,
+          xminorticks = IntervalsBetween(10),
+          yminorticksvisible = true, yminorgridvisible = true,
+          yminorticks = IntervalsBetween(9), yticksmirrored = true)
+plot_column_excitation!(ax, data_I)
+Legend(fig[1, 2], ax; patchsize = [40, 20])
+display(fig)
 
-## Plot column emission on a custom axis
-fig = Figure()
-ax = Axis(fig[1, 1]; xlabel = "t (s)", ylabel = "Intensity (R)", yscale = log10)
-plot_column_emission!(ax, data_I; wavelengths = [:I_4278, :I_7774])
-axislegend(ax)
-fig
+savefile = joinpath(full_path_to_directory, "It.png")
+save(savefile, fig; backend = CairoMakie)
+println("Saved $savefile")
+
+
+## ====================================================================================== ##
+## Profile mode (single time step)
+## ====================================================================================== ##
+
+fig = Figure(; fontsize = 20)
+ax_kwargs_profile = (; xscale = log10, xticksmirrored = true, yticksmirrored = true,
+                       xminorticksvisible = true, yminorticksvisible = true,
+                       yminorticks = IntervalsBetween(9),
+                       limits = (nothing, (100, 400)))
+for (wl, (r, c)) in zip(wavelengths, positions)
+    ax = Axis(fig[r, c]; ax_kwargs_profile..., title = ax_labels[wl],
+              xlabel = r == 2 ? "photons/m³/s" : "",
+              ylabel = c == 1 ? "Altitude (km)" : "",
+              xticklabelsvisible = r == 2,
+              yticklabelsvisible = c == 1)
+    plot_excitation!(ax, data_Q; field = wl, time_index = 1)
+end
+display(fig)

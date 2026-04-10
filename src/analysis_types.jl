@@ -83,8 +83,8 @@ function load_volume_excitation(directory::String)
         data["QOi"],
         data["QO2i"],
         data["QN2i"],
-        vec(data["h_atm"]),
-        vec(data["t"]),
+        vec(collect(data["h_atm"])),
+        vec(collect(data["t"])),
         directory,
     )
 end
@@ -106,17 +106,17 @@ function load_column_excitation(directory::String)
     filepath = joinpath(directory, "I_lambda_of_t.mat")
     data = matread(filepath)
     return ColumnExcitationResult(
-        vec(data["I_4278"]),
-        vec(data["I_6730"]),
-        vec(data["I_7774"]),
-        vec(data["I_7774_O"]),
-        vec(data["I_7774_O2"]),
-        vec(data["I_8446"]),
-        vec(data["I_8446_O"]),
-        vec(data["I_8446_O2"]),
-        vec(data["I_O1D"]),
-        vec(data["I_O1S"]),
-        vec(data["t"]),
+        vec(collect(data["I_4278"])),
+        vec(collect(data["I_6730"])),
+        vec(collect(data["I_7774"])),
+        vec(collect(data["I_7774_O"])),
+        vec(collect(data["I_7774_O2"])),
+        vec(collect(data["I_8446"])),
+        vec(collect(data["I_8446_O"])),
+        vec(collect(data["I_8446_O2"])),
+        vec(collect(data["I_O1D"])),
+        vec(collect(data["I_O1S"])),
+        vec(collect(data["t"])),
     )
 end
 
@@ -126,3 +126,49 @@ end
 Load the column-integrated excitation intensities from the simulation's save directory.
 """
 load_column_excitation(sim::AuroraSimulation) = load_column_excitation(sim.savedir)
+
+"""
+    IeTopResult
+
+Incoming electron flux at the top of the ionosphere, as saved in `Ie_incoming_*.mat`.
+
+# Fields
+- `Ietop`: flux array of size (n_beams x n_t x n_E)
+- `t`: time grid (s), relative so always start at 0
+- `E_edges`: energy bin edges (eV), length n_E + 1
+- `E_centers`: energy bin centres (eV), length n_E
+- `ΔE`: energy bin widths (eV), length n_E
+- `mu_lims`: cosine-of-pitch-angle limits, length n_beams + 1
+"""
+struct IeTopResult
+    Ietop::Array{Float64, 3}
+    t::Vector{Float64}
+    E_edges::Vector{Float64}
+    E_centers::Vector{Float64}
+    ΔE::Vector{Float64}
+    mu_lims::Vector{Float64}
+end
+
+"""
+    load_input(directory::String)
+
+Load the incoming electron flux at the top of the ionosphere from `Ie_incoming_*.mat`
+in `directory`. Returns an [`IeTopResult`](@ref).
+"""
+function load_input(directory::String)
+    filepath = find_input_file(directory)
+    data = matread(filepath)
+    t = vec(collect(data["t_top"]))
+    t = [t; t[end] + diff(t)[end]] .- t[1]
+    E_edges =  vec(collect(data["E_edges"]))
+    E_centers = vec(collect(data["E_centers"]))
+    ΔE = vec(collect(data["dE"]))
+    return IeTopResult(
+        data["Ie_total"],
+        t,
+        E_edges,
+        E_centers,
+        ΔE,
+        vec(collect(data["mu_lims"])),
+    )
+end

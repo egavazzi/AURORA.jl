@@ -60,8 +60,8 @@ include("utilities.jl")
 export v_of_E, mu_avg, beam_weight, make_savedir
 
 include("analysis_types.jl")
-export VolumeExcitationResult, ColumnExcitationResult,
-    load_volume_excitation, load_column_excitation
+export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
+    load_volume_excitation, load_column_excitation, load_input
 
 include("analysis.jl")
 include("analysis_psd.jl")
@@ -88,7 +88,8 @@ fig = plot_input(sim)
 ```
 """
 function plot_input end
-export plot_input
+function plot_input! end
+export plot_input, plot_input!
 
 """
     animate_Ie_in_time(directory_to_process; angles_to_plot=nothing, colorrange=nothing, ...)
@@ -146,64 +147,32 @@ function animate_Ie_in_time end
 export animate_Ie_in_time
 
 """
-    plot_emission(data::VolumeExcitationResult; kwargs...)
+    plot_excitation!(ax, data::VolumeExcitationResult; field=:total, time_index=nothing, kwargs...)
 
-Plot a 2x2 grid of volume emission rate heatmaps (4278, 6730, 7774, 8446 Å).
+Plot a volume excitation or ionization rate onto an existing `Axis`.
 
-Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
-"""
-function plot_emission end
+`field` can be any field of [`VolumeExcitationResult`](@ref): `:Q4278`, `:Q6730`,
+`:Q7774`, `:Q8446`, `:QO1D`, `:QO1S`, `:QOi`, `:QO2i`, `:QN2i`, or the special
+value `:total` (default) which sums all three ionization rates.
 
-"""
-    plot_emission!(ax, data::VolumeExcitationResult, wavelength::Symbol; kwargs...)
-
-Plot a single volume emission rate onto an existing `Axis`. `wavelength` can be
-`:Q4278`, `:Q6730`, `:Q7774`, `:Q8446`, `:QO1D`, or `:QO1S`.
+- If `data` contains one time step, or if `time_index` is given, plots an altitude
+  profile (returns a `Lines` plot).
+- Otherwise, plots a time-altitude heatmap (returns a `Heatmap`).
 
 Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 """
-function plot_emission! end
-export plot_emission, plot_emission!
+function plot_excitation! end
+export plot_excitation!
 
 """
-    plot_column_emission(data::ColumnExcitationResult; kwargs...)
-
-Plot column-integrated emission intensities as line plots vs time.
-
-Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
-"""
-function plot_column_emission end
-
-"""
-    plot_column_emission!(ax, data::ColumnExcitationResult; kwargs...)
+    plot_column_excitation!(ax, data::ColumnExcitationResult; kwargs...)
 
 Plot column-integrated emission intensities onto an existing `Axis`.
 
 Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 """
-function plot_column_emission! end
-export plot_column_emission, plot_column_emission!
-
-"""
-    plot_ionization(data::VolumeExcitationResult; plot_input=false, kwargs...)
-
-Plot ionization rate heatmap, optionally with a top-panel showing the precipitating
-electron flux loaded from the given directory.
-
-Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
-"""
-function plot_ionization end
-
-"""
-    plot_ionization!(ax, data::VolumeExcitationResult; species=:total, kwargs...)
-
-Plot ionization rate onto an existing `Axis`. `species` can be `:total`, `:QN2i`,
-`:QO2i`, or `:QOi`.
-
-Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
-"""
-function plot_ionization! end
-export plot_ionization, plot_ionization!
+function plot_column_excitation! end
+export plot_column_excitation!
 
 # Precompile selected functions
 include("precompiles.jl")

@@ -270,10 +270,9 @@ return a string with the path to that file.
 - `input_file`: path to the Ie\\_incoming file, in the form "path_to_directory/Ie_incoming_*.mat"
 """
 function find_input_file(path_to_directory)
-    incoming_files = filter(file -> startswith(file, "Ie_incoming_"), readdir(path_to_directory))
+    incoming_files = filter(file -> startswith(file, "Ie_incoming"), readdir(path_to_directory))
     if isempty(incoming_files)
-        error("No Ie_incoming_*.mat file found in $path_to_directory.\n" *
-              "Such a file is required when using `plot_input = true`.")
+        error("No Ie_incoming*.mat file found in $path_to_directory.")
     elseif length(incoming_files) > 1
         error("More than one file contains incoming flux. This is not normal")
     else
