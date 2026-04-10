@@ -552,12 +552,16 @@ function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, I
                                      A, B, D, Ddt, Ddiffusion, Ddz_Up, Ddz_Down, μ, z)
 
     # Boundary indices
-    index_top_bottom = sort(vcat(1:n_z:(n_angle*n_z),
-                            n_z:n_z:(n_angle*n_z)))
+    index_bottom = 1:n_z:(n_angle*n_z)
+    index_top = n_z:n_z:(n_angle*n_z)
+    index_top_bottom = sort(vcat(index_bottom, index_top))
 
-    # Initialize
+    # Initialize with I0, then enforce boundary from Ie_top[:, 1]
+    # (important for file-based input where Ie_top[:, 1] may be nonzero)
     Ie[:, 1] = I0
-    Ie_finer = copy(I0)
+    Ie[index_bottom, 1] .= 0.0
+    Ie[index_top, 1] .= @view(Ie_top[:, 1])
+    Ie_finer = Ie[:, 1]
     b = similar(Ie_finer)
 
     # Create or update KLU factorization

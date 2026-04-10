@@ -86,12 +86,17 @@ function Crank_Nicolson(t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_
     dropzeros!(Mlhs)    # for performance
     dropzeros!(Mrhs)    # for performance
 
-    index_top_bottom = sort(vcat(1:length(h_atm):(length(μ)*length(h_atm)),
-                            length(h_atm):length(h_atm):(length(μ)*length(h_atm))))
+    # Boundary indices
+    index_bottom = 1:n_z:(n_angle*n_z)
+    index_top = n_z:n_z:(n_angle*n_z)
+    index_top_bottom = sort(vcat(index_bottom, index_top))
 
-    i_t = 1
+    # Initialize with I0, then enforce boundary from Ie_top[:, 1]
+    # (important for file-based input where Ie_top[:, 1] may be nonzero)
     Ie[:, 1] = I0
-    Ie_finer = I0
+    Ie[index_bottom, 1] .= 0.0
+    Ie[index_top, 1] .= @view(Ie_top[:, 1])
+    Ie_finer = Ie[:, 1]
     b = similar(Ie_finer)
 
     if first_iteration
