@@ -57,10 +57,7 @@ include("simulation/run.jl")
 export run!
 
 include("utilities.jl")
-export v_of_E, CFL_criteria, mu_avg, beam_weight,
-        make_savedir,
-        rename_if_exists,
-        find_input_file
+export v_of_E, mu_avg, beam_weight, make_savedir
 
 include("analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult,
