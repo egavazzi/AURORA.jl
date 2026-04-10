@@ -186,7 +186,9 @@ n_t_file = length(t_file)
 Ie_total = zeros(n_μ, n_t_file, n_E)
 # ... fill Ie_total with your flux values ...
 
-matwrite("my_flux.mat", Dict(
+flux_filepath = "my_flux.mat"
+flux_filepath = tempname() * ".mat"  # hide — redirect to OS temp so the file is not deployed to gh-pages
+matwrite(flux_filepath, Dict(
     "Ie_total" => Ie_total,
     "t_top"    => t_file,
 ))
@@ -195,7 +197,7 @@ matwrite("my_flux.mat", Dict(
 ### Using the file
 
 ```@example custom_input
-flux = InputFlux(FileSpectrum("my_flux.mat"; interpolation=:linear))
+flux = InputFlux(FileSpectrum(flux_filepath; interpolation=:linear))
 ```
 
 Available interpolation schemes: `:constant` (default, nearest), `:linear`, `:pchip`

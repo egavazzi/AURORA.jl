@@ -80,6 +80,7 @@ simulation you specify the total duration and the output cadence:
 
 ```@example time_dep
 savedir = mkpath(joinpath("data", "my_first_simulation"))
+savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 
 sim = AuroraSimulation(
     model,
