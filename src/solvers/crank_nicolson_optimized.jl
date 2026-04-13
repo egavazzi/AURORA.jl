@@ -554,7 +554,6 @@ function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, I
     # Boundary indices
     index_bottom = 1:n_z:(n_angle*n_z)
     index_top = n_z:n_z:(n_angle*n_z)
-    index_top_bottom = sort(vcat(index_bottom, index_top))
 
     # Initialize with I0, then enforce boundary from Ie_top[:, 1]
     # (important for file-based input where Ie_top[:, 1] may be nonzero)
@@ -573,9 +572,9 @@ function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, I
 
     # Time-stepping loop
     for i_t in 1:(length(t) - 1)
-        I_top_bottom = (@view(Ie_top[:, i_t + 1]) * [0, 1]')'
         Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
-        Q_local[index_top_bottom] = I_top_bottom[:]
+        Q_local[index_bottom] .= 0.0
+        Q_local[index_top] .= @view(Ie_top[:, i_t + 1])
 
         # Crank-Nicolson step: Mlhs * Ie^(n+1) = Mrhs * Ie^n + Q
         mul!(b, cache.Mrhs, Ie_finer)
