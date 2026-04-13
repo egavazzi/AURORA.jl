@@ -66,8 +66,8 @@ ax = Axis(fig[1, 1]; xlabel = "t (s)", ylabel = "Intensity (R)",
           xminorticks = IntervalsBetween(10),
           yminorticksvisible = true, yminorgridvisible = true,
           yminorticks = IntervalsBetween(9), yticksmirrored = true)
-plot_column_excitation!(ax, data_I)
-Legend(fig[1, 2], ax; patchsize = [40, 20])
+line_plots = plot_column_excitation!(ax, data_I)
+Legend(fig[1, 2], ax)
 display(fig)
 
 savefile = joinpath(full_path_to_directory, "It.png")

@@ -116,7 +116,9 @@
 
         fig_column = Figure()
         ax_column = Axis(fig_column[1, 1]; yscale = log10)
-        @test plot_column_excitation!(ax_column, col) === ax_column
+        col_plots = plot_column_excitation!(ax_column, col)
+        @test col_plots isa Vector{Makie.Lines}
+        @test length(col_plots) == 6
     end
 
     @testset "plot_input(sim) wrapper" begin

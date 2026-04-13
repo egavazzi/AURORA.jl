@@ -176,9 +176,15 @@ function plot_excitation! end
 export plot_excitation!
 
 """
-    plot_column_excitation!(ax, data::ColumnExcitationResult; kwargs...)
+    plot_column_excitation!(ax, data::ColumnExcitationResult; wavelengths=[:I_4278, :I_6730, :I_7774, :I_8446, :I_O1D, :I_O1S], kwargs...)
 
 Plot column-integrated emission intensities onto an existing `Axis`.
+
+`wavelengths` is a vector of symbols specifying which emission lines to plot. Available options are
+`:I_4278`, `:I_6730`, `:I_7774`, `:I_8446`, `:I_O1D`, `:I_O1S`.
+Defaults to all six wavelengths.
+
+Returns a vector of Makie `Lines` plot objects, one per wavelength that was plotted.
 
 Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 """
