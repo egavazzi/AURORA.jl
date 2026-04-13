@@ -36,6 +36,7 @@ flux = InputFlux(
 )
 
 savedir = mkpath(joinpath("data", "steady_state_example"))
+savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 sim = AuroraSimulation(model, flux, savedir)
 run!(sim)
 nothing # hide
