@@ -5,6 +5,8 @@ const _COLUMN_WAVELENGTHS = [
     (:I_6730, Makie.rich("I", Makie.subscript("6730")), :red),
     (:I_7774, Makie.rich("I", Makie.subscript("7774")), Makie.RGBf(0.5, 0, 0)),
     (:I_8446, Makie.rich("I", Makie.subscript("8446")), :black),
+    # Here we label O1S and O1D as excitation/production rates (q) to avoid confusion with
+    # the quasi-instantaneous emission rates (I) of the other wavelengths
     (:I_O1D,  Makie.rich("q", Makie.subscript("O(¹D)")), Makie.RGBf(1, 0.2, 0)),
     (:I_O1S,  Makie.rich("q", Makie.subscript("O(¹S)")), :green),
 ]
