@@ -1,7 +1,5 @@
 # Run one minimal TD simulation once and share the results across all three test items.
 # θ_lims = 180:-90:0 → beam 1: μ ∈ [-1, 0] (downward), beam 2: μ ∈ [0, 1] (upward).
-# Only beam 1 receives input flux (beams=1), so Ie_top_raw[1, :, :] must equal Ie_total[1, :, :]
-# from Ie_incoming.mat — a strong, physically-grounded assertion.
 @testmodule FluxTestSetup begin
     using AURORA
     using MAT: matread
@@ -39,6 +37,14 @@
     const n_μ = length(Ω_beam)
     const n_t = length(t_run)
     const n_E = length(ΔE)
+
+    # Read back the prescribed input flux (saved on the internal refined time grid)
+    incoming_file = matread(joinpath(savedir, "Ie_incoming.mat"))
+    const Ie_incoming  = incoming_file["Ie_total"]      # [n_μ, n_t_refined, n_E]
+    const t_top      = vec(incoming_file["t_top"])
+    # CFL_factor is the stride between the refined and the coarse output grids.
+    # From CFL_criteria: length(t_top) == CFL_factor * (n_t - 1) + 1
+    const CFL_factor = (length(t_top) - 1) ÷ (n_t - 1)
 
 end
 
@@ -89,10 +95,12 @@ end
     # Upward beam (beam 2) has no direct input — only backscatter, which is non-negative
     @test all(out["Ie_top_raw"][2, :, :] .>= 0)
 
-    # TODO: Can we somehow compare with what was actually used as input? The problem is that
-    # Ie_incoming.mat is saved over the internal refined grid, while Ie_top.mat is
-    # calculated from the simulation results that are typically) saved on a coarser grid.
-    # Maybe we could use the sim.CFL_number to manually jump??
+    # Beam 1 is a Dirichlet boundary condition: the solver enforces the prescribed input flux
+    # at the top altitude exactly. The CrankNicolson scheme fills Ie[:, i_t+1] using the BC
+    # from Ie_top[:, i_t], so there is a 1-step lag: Ie_top_raw[1, k, :] corresponds to
+    # Ie_total[1, (k-1)*CFL_factor, :]. We skip k=1 (which is the zero initial condition I0).
+    CF = FluxTestSetup.CFL_factor
+    @test out["Ie_top_raw"][1, 2:end, :] ≈ FluxTestSetup.Ie_incoming[1, CF:CF:end-1, :]
 end
 
 @testitem "make_current_file computes currents" setup=[FluxTestSetup] begin
