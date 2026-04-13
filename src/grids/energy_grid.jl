@@ -36,7 +36,7 @@ Create an energy grid based on the maximum energy `E_max` given as input.
 - `E_max`: upper limit for the energy grid (in eV)
 
 # Outputs
-- `E_edges`: energy bin edges (eV). Vector [nE + 1] (includes the last upper edge)
+- `E_edges`: energy bin edges (eV). Vector [nE + 1]
 - `E_centers`: energy bin centers (eV). Vector [nE]
 - `ΔE`: energy bin widths (eV). Vector [nE]
 """
