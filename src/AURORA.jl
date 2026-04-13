@@ -88,6 +88,17 @@ fig = plot_input(sim)
 ```
 """
 function plot_input end
+"""
+    plot_input!(ax, data::IeTopResult; beams=1, colorrange=nothing, colormap=:inferno, kwargs...)
+
+Plot the input electron flux stored in an [`IeTopResult`](@ref) onto an existing `Axis`.
+
+`beams` selects which pitch-angle beam or beams to include. It may be a single integer
+or a vector of integers. The selected beams are summed and converted to differential
+energy flux using their corresponding beam solid angles.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
 function plot_input! end
 export plot_input, plot_input!
 
