@@ -95,12 +95,10 @@ end
     # Upward beam (beam 2) has no direct input — only backscatter, which is non-negative
     @test all(out["Ie_top_raw"][2, :, :] .>= 0)
 
-    # Beam 1 is a Dirichlet boundary condition: the solver enforces the prescribed input flux
-    # at the top altitude exactly. The CrankNicolson scheme fills Ie[:, i_t+1] using the BC
-    # from Ie_top[:, i_t], so there is a 1-step lag: Ie_top_raw[1, k, :] corresponds to
-    # Ie_total[1, (k-1)*CFL_factor, :]. We skip k=1 (which is the zero initial condition I0).
+    # Beam 1 is a Dirichlet boundary condition: Ie_top_raw on the coarse output grid must
+    # match Ie_incoming subsampled from the refined grid using the stride CFL_factor.
     CF = FluxTestSetup.CFL_factor
-    @test out["Ie_top_raw"][1, 2:end, :] ≈ FluxTestSetup.Ie_incoming[1, CF:CF:end-1, :]
+    @test out["Ie_top_raw"][1, :, :] ≈ FluxTestSetup.Ie_incoming[1, 1:CF:end, :]
 end
 
 @testitem "make_current_file computes currents" setup=[FluxTestSetup] begin
