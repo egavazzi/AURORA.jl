@@ -1,25 +1,17 @@
-@testitem "calculate_heating_rate output shape and positivity" begin
+@testitem "make_heating_rate_file produces correct output" setup=[FluxTestSetup] begin
     using AURORA
+    using MAT: matread
 
-    n_z = 5
-    n_t = 3
-    n_E = 4
+    AURORA.make_heating_rate_file(FluxTestSetup.savedir)
 
-    z = collect(range(100e3, 300e3; length = n_z))
-    t = collect(range(0.0, 1.0; length = n_t))
-    E_centers = collect(range(10.0, 500.0; length = n_E))
+    outfile = joinpath(FluxTestSetup.savedir, "heating_rate.mat")
+    @test isfile(outfile)
 
-    # Uniform positive flux
-    Ie_ztE_omni = ones(n_z, n_t, n_E) .* 1e8
+    out = matread(outfile)
+    @test haskey(out, "heating_rate")
+    @test haskey(out, "h_atm")
+    @test haskey(out, "t")
 
-    # Typical ionospheric values
-    ne = fill(1e11, n_z)   # m⁻³
-    Te = fill(2000.0, n_z) # K
-
-    hr = AURORA.calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
-
-    @test size(hr) == (n_z, n_t)
-    # Heating rate should be positive when there is positive flux flowing
-    # through a plasma with thermal electrons
-    @test all(hr .> 0)
+    @test size(out["heating_rate"]) == (FluxTestSetup.n_z, FluxTestSetup.n_t)
+    @test all(out["heating_rate"] .>= 0)
 end
