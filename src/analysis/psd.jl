@@ -288,7 +288,7 @@ function make_psd_file(
     )
 
     if isempty(files_to_process)
-        @warn "No IeFlickering files found in $directory_to_process."
+        @warn "No simulation results found in $directory_to_process. Skipping phase-space density calculations."
         return nothing
     end
 

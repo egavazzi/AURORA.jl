@@ -28,6 +28,11 @@ function make_volume_excitation_file(directory_to_process)
     # the number in the filename.
     sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
+    if isempty(files_to_process)
+        @warn "No simulation results found in $directory_to_process. Skipping volume excitation calculations."
+        return nothing
+    end
+
     ## Load simulation grid
     f = matopen(files_to_process[1])
         z = read(f, "h_atm")
@@ -70,7 +75,7 @@ function make_volume_excitation_file(directory_to_process)
     QOi = Vector{Matrix{Float64}}()
     QO2i = Vector{Matrix{Float64}}()
     QN2i = Vector{Matrix{Float64}}()
-    t = Vector{}()
+    t = Vector{Vector{Float64}}()
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -210,7 +215,7 @@ Note that the neutral density `n` should match the excitation of interest (e.g. 
 calculating the volume-excitation-rate of the 4278Å optical emission).
 
 # Calling
-`Q = calculate_volume_excitation(z, t, Ie_ztE, σ, n)``
+`Q = calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)`
 
 # Inputs
 - `z`: altitude (m). Vector [n\\_z]
@@ -248,7 +253,7 @@ Note that the function `make_volume_excitation_file()` needs to be run before th
 we need the file `Qzt_all_L.mat` with the volume excitation rates.
 
 # Calling
-`make_current_file(directory_to_process)`
+`make_column_excitation_file(directory_to_process)`
 
 # Inputs
 - `directory_to_process`: absolute or relative path to the simulation directory to process.

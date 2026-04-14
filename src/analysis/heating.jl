@@ -31,6 +31,11 @@ function make_heating_rate_file(directory_to_process)
     # the number in the filename.
     sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
+    if isempty(files_to_process)
+        @warn "No simulation results found in $directory_to_process. Skipping heating rate calculations."
+        return nothing
+    end
+
     ## Load simulation grid
     f = matopen(files_to_process[1])
         z = read(f, "h_atm")
@@ -44,7 +49,7 @@ function make_heating_rate_file(directory_to_process)
 
     ## Initialize arrays to store the results for each time-slice
     heating_rate = Vector{Matrix{Float64}}()
-    t = Vector{}()
+    t = Vector{Vector{Float64}}()
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -139,7 +144,7 @@ function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
     # Calculate heating rate for each time step
     # The heating rate is the product of the flux and the energy loss rate, integrated over energy
     @views for i_t in eachindex(t)
-        heating_rate[:, i_t] .= sum(Ie_ztE_omni[:, i_t, :] .* L_th, dims=2)
+        heating_rate[:, i_t] .= dropdims(sum(Ie_ztE_omni[:, i_t, :] .* L_th, dims=2); dims=2)
     end
 
     return heating_rate

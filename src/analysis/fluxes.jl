@@ -28,6 +28,11 @@ function make_Ie_top_file(directory_to_process)
     # the number in the filename.
     sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
+    if isempty(files_to_process)
+        @warn "No simulation results found in $directory_to_process. Skipping top flux extraction."
+        return nothing
+    end
+
     ## Load simulation grid
     f = matopen(files_to_process[1])
         z = read(f, "h_atm")
@@ -40,7 +45,7 @@ function make_Ie_top_file(directory_to_process)
 
     ## Initialize arrays to store the results for each time-slice
     Ie_top = Vector{Array{Float64, 3}}()
-    t = Vector{}()
+    t = Vector{Vector{Float64}}()
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -201,6 +206,11 @@ function make_current_file(directory_to_process)
     # the number in the filename.
     sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
 
+    if isempty(files_to_process)
+        @warn "No simulation results found in $directory_to_process. Skipping current-density calculations."
+        return nothing
+    end
+
     ## Load simulation grid
     f = matopen(files_to_process[1])
         z = read(f, "h_atm")
@@ -214,7 +224,7 @@ function make_current_file(directory_to_process)
     J_down = Vector{Array{Float64, 2}}()
     IeE_up = Vector{Array{Float64, 2}}()
     IeE_down = Vector{Array{Float64, 2}}()
-    t = Vector{}()
+    t = Vector{Vector{Float64}}()
 
     ## Define constant
     q_e = 1.602176620898e-19 # elementary charge (C)
