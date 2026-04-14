@@ -67,12 +67,13 @@ end
 
 # Main function
 function AURORA.animate_Ie_in_time(directory_to_process;
-                                     angles_to_plot = nothing,
-                                     colorrange = nothing,
-                                     save_to_file = true,
-                                     plot_input = false,
-                                     input_angle_cone = [170, 180],
-                                     dt_steps = 1)
+                                   angles_to_plot = nothing,
+                                   colorrange = nothing,
+                                   save_to_file = true,
+                                   plot_input = false,
+                                   input_angle_cone = [170, 180],
+                                   dt_steps = 1,
+                                   framerate = 30)
     ## Resolve the directory path
     full_path_to_directory = abspath(directory_to_process)
     if !isdir(full_path_to_directory)
@@ -173,7 +174,6 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     display(fig)
 
     # Animate
-    framerate = 30
     if save_to_file
         io = VideoStream(fig; framerate=framerate, visible=true)
     end

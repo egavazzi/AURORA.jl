@@ -23,7 +23,7 @@ iri_file  = find_iri_file()
 
 model = AuroraModel(
     [100, 600],    # altitude limits [km]
-    180:-45:0,     # pitch-angle bin edges [°] → 4 beams
+    180:-30:0,     # pitch-angle bin edges [°] → 6 beams
     1000,          # maximum energy [eV]
     msis_file,
     iri_file,
@@ -140,6 +140,58 @@ The output files are saved in `data/my_first_simulation/`:
 ```@example time_dep
 readdir(savedir)
 ```
+
+## Step 5: Visualize
+
+AURORA.jl provides helper plotting functions to visualize results through a [Makie](https://github.com/MakieOrg/Makie.jl) extension. 
+Install and load a Makie backend to access them (more information about this in [`Visualization`](@ref "Visualization")).
+
+### Volume excitation rate
+
+```@example time_dep
+using CairoMakie
+CairoMakie.activate!() # hide
+vol = load_volume_excitation(savedir)
+
+fig = Figure()
+ax  = Axis(fig[1, 1]; xlabel = "Time (s)", ylabel = "Altitude (km)", title = "4278 Å")
+hm  = plot_excitation!(ax, vol; field = :Q4278)
+Colorbar(fig[1, 2], hm; label = "photons/m³/s")
+fig
+```
+
+### Column emission intensity
+
+```@example time_dep
+using CairoMakie
+CairoMakie.activate!() # hide
+col = load_column_excitation(savedir)
+
+fig = Figure()
+ax  = Axis(fig[1, 1]; xlabel = "Time (s)", ylabel = "Intensity (R)", yscale = log10)
+plot_column_excitation!(ax, col)
+Legend(fig[1, 2], ax)
+fig
+```
+
+### Animation
+
+[`animate_Ie_in_time`](@ref) produces an animation of the electron flux distribution
+plotted over altitude and energy, with different panels for different pitch-angle streams,
+stepping over time:
+
+```@example time_dep
+using CairoMakie
+CairoMakie.activate!() # hide
+animate_Ie_in_time(savedir; framerate = 15)
+nothing # hide
+```
+
+```@raw html
+<video autoplay loop muted playsinline controls src="../data/my_first_simulation/animation.mp4"/>
+```
+
+For the full API of all visualization functions, see [Visualization](@ref).
 
 ## Next steps
 

@@ -1,8 +1,6 @@
 # Visualization
 
-AURORA.jl provides functions to visualize and animate simulation results. 
-
-Currently, the only animation function available is `animate_Ie_in_time`.
+AURORA.jl provides functions to visualize and animate simulation results.
 
 ## Requirements
 
@@ -26,9 +24,11 @@ using GLMakie
 # Do some visualization
 ```
 
-
 ## Functions
 
 ```@docs; canonical=false
+plot_excitation!
+plot_column_excitation!
+plot_input!
 animate_Ie_in_time
 ```
