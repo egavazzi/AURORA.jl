@@ -45,7 +45,7 @@ function make_Ie_top_file(directory_to_process)
 
     ## Initialize arrays to store the results for each time-slice
     Ie_top = Vector{Array{Float64, 3}}()
-    t = Vector{Vector{Float64}}()
+    t = Float64[]
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -70,7 +70,7 @@ function make_Ie_top_file(directory_to_process)
         ## Push the Ie_top of the current time-slice into a vector
         # We get Ie_top = [[n_μ, n_t1, n_E], [n_μ, n_t2, n_E], ...]
         push!(Ie_top, Ie_top_local)
-        push!(t, t_local)
+        append!(t, t_local)
 
         next!(p)
     end
@@ -78,7 +78,6 @@ function make_Ie_top_file(directory_to_process)
     ## Concatenate along time
     # We get Ie_top = [n_μ, n_t, n_E]
     Ie_top = reduce(hcat, Ie_top)
-    t = reduce(vcat, t)
 
     ## Play with the units
     Ie_top_raw = copy(Ie_top) # in #e-/m²/s
@@ -224,7 +223,7 @@ function make_current_file(directory_to_process)
     J_down = Vector{Array{Float64, 2}}()
     IeE_up = Vector{Array{Float64, 2}}()
     IeE_down = Vector{Array{Float64, 2}}()
-    t = Vector{Vector{Float64}}()
+    t = Float64[]
 
     ## Define constant
     q_e = 1.602176620898e-19 # elementary charge (C)
@@ -270,7 +269,7 @@ function make_current_file(directory_to_process)
         push!(J_down, J_down_local)
         push!(IeE_up, IeE_up_local)
         push!(IeE_down, IeE_down_local)
-        push!(t, t_local)
+        append!(t, t_local)
 
         next!(p)
     end
@@ -281,7 +280,6 @@ function make_current_file(directory_to_process)
     J_down = reduce(hcat, J_down)
     IeE_up = reduce(hcat, IeE_up)
     IeE_down = reduce(hcat, IeE_down)
-    t = reduce(vcat, t)
 
     ## Save results
     savefile = joinpath(directory_to_process, "J.mat")

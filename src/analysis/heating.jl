@@ -49,7 +49,7 @@ function make_heating_rate_file(directory_to_process)
 
     ## Initialize arrays to store the results for each time-slice
     heating_rate = Vector{Matrix{Float64}}()
-    t = Vector{Vector{Float64}}()
+    t = Float64[]
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -83,14 +83,13 @@ function make_heating_rate_file(directory_to_process)
 
         ## Push the heating rate of the current time-slice into a vector
         push!(heating_rate, heating_rate_local)
-        push!(t, t_local)
+        append!(t, t_local)
 
         next!(p)
     end
 
     ## Concatenate along time
     heating_rate = reduce(hcat, heating_rate)
-    t = reduce(vcat, t)
 
     ## Save results
     savefile = joinpath(directory_to_process, "heating_rate.mat")

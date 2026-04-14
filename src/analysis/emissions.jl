@@ -75,7 +75,7 @@ function make_volume_excitation_file(directory_to_process)
     QOi = Vector{Matrix{Float64}}()
     QO2i = Vector{Matrix{Float64}}()
     QN2i = Vector{Matrix{Float64}}()
-    t = Vector{Vector{Float64}}()
+    t = Float64[]
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
@@ -156,7 +156,7 @@ function make_volume_excitation_file(directory_to_process)
         push!(QOi, QOi_local)
         push!(QO2i, QO2i_local)
         push!(QN2i, QN2i_local)
-        push!(t, t_local)
+        append!(t, t_local)
 
         next!(p)
     end
@@ -176,7 +176,6 @@ function make_volume_excitation_file(directory_to_process)
     QOi = reduce(hcat, QOi)
     QO2i = reduce(hcat, QO2i)
     QN2i = reduce(hcat, QN2i)
-    t = reduce(vcat, t)
 
     ## Save results
     savefile = joinpath(directory_to_process, "Qzt_all_L.mat")
