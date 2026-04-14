@@ -58,7 +58,7 @@ function Base.show(io::IO, ::MIME"text/plain", time::ResolvedTimeGrid)
     println(io, "├── CFL number:    ", time.CFL_number)
     println(io, "├── CFL factor:    ", time.CFL_factor)
     println(io, "├── n_loop:        ", time.n_loop)
-    println(io, "├── steps per loop:    ", time.n_t_per_loop)
+    println(io, "├── steps / loop:  ", time.n_t_per_loop)
     print(io,   "└── memory budget: ", time.max_memory_gb, " GB")
 end
 
