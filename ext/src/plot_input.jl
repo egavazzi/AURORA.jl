@@ -64,7 +64,7 @@ function _plot_input_steady_state(Ie_top, E_centers, ΔE, θ_lims, Ω_beam, flux
         lines!(ax, E_centers, Ie_differential)
     end
 
-    Label(fig[0, :], "Input flux — Steady state"; fontsize = 16, tellwidth = false)
+    Label(fig[0, :], "Input flux"; fontsize = 16, tellwidth = false)
 
     return fig
 end
@@ -108,7 +108,7 @@ function _plot_input_time_dependent(Ie_top, t, E_centers, ΔE, θ_lims, Ω_beam,
         Colorbar(fig[idx, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
     end
 
-    Label(fig[0, :], "Input flux — Time dependent"; fontsize = 16, tellwidth = false)
+    Label(fig[0, :], "Input flux"; fontsize = 16, tellwidth = false)
 
     return fig
 end
