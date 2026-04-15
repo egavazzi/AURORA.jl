@@ -79,24 +79,23 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
 
     # Plot Ie precipitating at the top (#TODO: this can probably be done in a better way than with a struct, or?)
     if input_struct.bool
-        plot_hposition = 1:floor(Int, n_col / 2)
-        gb = fig[0, plot_hposition] = GridLayout()
-        ax_Ietop = Axis(gb[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
+        # Top row always split in two: left = input flux panel, right = time label.
+        gb = fig[0, 1:n_col] = GridLayout() # span the full column range so the split is independent of n_col
+        gc = gb[1, 1] = GridLayout()   # holds axis + its colorbar
+        ax_Ietop = Axis(gc[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
                         title = "Incoming energy flux",
                         yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                         xticklabelsvisible = true, xminorticksvisible = true,
                         xticksmirrored = true, yticksmirrored = true,
                         limits = ((0, 1), nothing))
-        hm = heatmap!(input_struct.t_top, E_centers, input_struct.data_input; colormap = :inferno,
-                      colorscale = log10,
+        hm = heatmap!(ax_Ietop, input_struct.t_top, E_centers, input_struct.data_input;
+                      colormap = :inferno, colorscale = log10,
                       colorrange = (1e6, maximum(input_struct.data_input)))
         time_float64 = @lift(parse(Float64, $time[1:end-1]))
         vlines!(time_float64, linewidth = 3)
         angles = input_struct.input_angle_cone
-        Colorbar(gb[1, 2], hm; label = "IeE ($(180 - angles[2])°-$(180 - angles[1])°)\n(eV/m²/s/eV/ster)")
-
-        time_hposition = ceil(Int, n_col / 2):n_col
-        Label(fig[0, time_hposition], time; tellwidth = false, tellheight = false, fontsize=20)
+        Colorbar(gc[1, 2], hm; label = "IeE ($(180 - angles[2])°-$(180 - angles[1])°)\n(eV/m²/s/eV/ster)")
+        Label(gb[1, 2], time; tellwidth = false, tellheight = false, fontsize=20)
     else
         Label(fig[0, :], time; tellwidth = false, fontsize=20)
     end

@@ -159,7 +159,7 @@ function load_input(directory::String)
     filepath = find_input_file(directory)
     data = matread(filepath)
     t = vec(collect(data["t_top"]))
-    t = [t; t[end] + diff(t)[end]] .- t[1]
+    t = t .- t[1] # make sure it is relative (start at 0)
     E_edges =  vec(collect(data["E_edges"]))
     E_centers = vec(collect(data["E_centers"]))
     ΔE = vec(collect(data["dE"]))

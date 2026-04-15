@@ -1,127 +1,66 @@
-@testitem "Plotting extension smoke tests" begin
+@testitem "Plotting extension tests" setup=[SharedSimResults] begin
     using Test
     using AURORA
     using CairoMakie
-    using MAT: matwrite
 
     CairoMakie.activate!()
 
-    positive_matrix(n1, n2; scale = 1.0) = reshape(scale .* collect(1.0:(n1 * n2)), n1, n2)
-    positive_vector(n; offset = 1.0) = collect(offset:(offset + n - 1))
+    vol = load_volume_excitation(SharedSimResults.td_dir)
+    col = load_column_excitation(SharedSimResults.td_dir)
+    inp = load_input(SharedSimResults.td_dir)
 
-    function make_volume_result(; n_z = 8, n_t = 4)
-        h_atm = collect(range(100e3, 300e3; length = n_z))
-        t = collect(range(0.0, 0.3; length = n_t))
+    @testset "plot_excitation! smoke" begin
+        # default call → heatmap
+        fig1 = Figure()
+        ax1 = Axis(fig1[1, 1])
+        @test plot_excitation!(ax1, vol) isa Makie.Heatmap
 
-        return VolumeExcitationResult(
-            positive_matrix(n_z, n_t; scale = 1.0),
-            positive_matrix(n_z, n_t; scale = 1.1),
-            positive_matrix(n_z, n_t; scale = 1.2),
-            positive_matrix(n_z, n_t; scale = 1.3),
-            positive_matrix(n_z, n_t; scale = 1.4),
-            positive_matrix(n_z, n_t; scale = 1.5),
-            positive_matrix(n_z, n_t; scale = 1.6),
-            positive_matrix(n_z, n_t; scale = 1.7),
-            positive_matrix(n_z, n_t; scale = 1.8),
-            positive_matrix(n_z, n_t; scale = 1.9),
-            positive_matrix(n_z, n_t; scale = 2.0),
-            positive_matrix(n_z, n_t; scale = 2.1),
-            positive_matrix(n_z, n_t; scale = 2.2),
-            h_atm,
-            t,
-            nothing,
-        )
+        # show_contours = true branch
+        fig2 = Figure()
+        ax2 = Axis(fig2[1, 1])
+        @test plot_excitation!(ax2, vol; show_contours = true) isa Makie.Heatmap
+
+        # time_index selects a single profile → Lines
+        fig3 = Figure()
+        ax3 = Axis(fig3[1, 1]; xscale = log10)
+        mid_t = cld(length(vol.t), 2)  # avoid t=0 where Q can be all zeros
+        @test plot_excitation!(ax3, vol; time_index = mid_t) isa Makie.Lines
+
+        # out-of-range time_index → ArgumentError from _select_time_index
+        fig4 = Figure()
+        ax4 = Axis(fig4[1, 1]; xscale = log10)
+        @test_throws ArgumentError plot_excitation!(ax4, vol; time_index = 10000)
     end
 
-    function make_column_result(; n_t = 4)
-        t = collect(range(0.0, 0.3; length = n_t))
+    @testset "plot_input! smoke" begin
+        # scalar beam index
+        fig1 = Figure()
+        ax1 = Axis(fig1[1, 1]; yscale = log10)
+        @test plot_input!(ax1, inp; beams = 1) isa Makie.Heatmap
 
-        return ColumnExcitationResult(
-            positive_vector(n_t; offset = 1.0),
-            positive_vector(n_t; offset = 2.0),
-            positive_vector(n_t; offset = 3.0),
-            positive_vector(n_t; offset = 4.0),
-            positive_vector(n_t; offset = 5.0),
-            positive_vector(n_t; offset = 6.0),
-            positive_vector(n_t; offset = 7.0),
-            positive_vector(n_t; offset = 8.0),
-            positive_vector(n_t; offset = 9.0),
-            positive_vector(n_t; offset = 10.0),
-            t,
-        )
+        # vector beam index
+        fig2 = Figure()
+        ax2 = Axis(fig2[1, 1]; yscale = log10)
+        @test plot_input!(ax2, inp; beams = [1]) isa Makie.Heatmap
     end
 
-    function make_input_result(; n_beams = 2, n_t = 4, n_E = 6)
-        Ietop = Array{Float64}(undef, n_beams, n_t, n_E)
-        for i_beam in 1:n_beams, i_t in 1:n_t, i_E in 1:n_E
-            Ietop[i_beam, i_t, i_E] = i_beam + i_t + i_E
-        end
-
-        return IeTopResult(
-            Ietop,
-            collect(range(0.0, 0.3; length = n_t)),
-            [50.0, 100.0, 150.0, 250.0, 400.0, 700.0, 1000.0],
-            [75.0, 125.0, 200.0, 325.0, 550.0, 850.0],
-            [50.0, 50.0, 100.0, 150.0, 300.0, 300.0],
-            [-1.0, 0.0, 1.0],
-        )
-    end
-
-    function make_animation_data(tmpdir)
-        μ_lims = [-1.0, 0.0, 1.0]
-        z = [100e3, 150e3, 200e3]
-        t_run = collect(range(0.0, 0.1; length = 10))
-        E_centers = [100.0, 200.0, 400.0]
-        dE = [100.0, 100.0, 200.0]
-        n_μ = length(μ_lims) - 1
-        n_z = length(z)
-        n_t = length(t_run)
-        n_E = length(E_centers)
-
-        Ie_ztE = Array{Float64}(undef, n_μ * n_z, n_t, n_E)
-        for i in eachindex(Ie_ztE)
-            Ie_ztE[i] = 1.0 + i / 10
-        end
-
-        matwrite(joinpath(tmpdir, "IeFlickering-1.mat"), Dict(
-            "Ie_ztE" => Ie_ztE,
-            "mu_lims" => μ_lims,
-            "t_run" => t_run,
-            "E_centers" => E_centers,
-            "h_atm" => z,
-            "dE" => dE,
-        ))
-    end
-
-    @testset "building-block smoke and types" begin
-        vol = make_volume_result()
-        col = make_column_result()
-        input = make_input_result()
-
-        fig_heatmap = Figure()
-        ax_heatmap = Axis(fig_heatmap[1, 1])
-        @test plot_excitation!(ax_heatmap, vol) isa Makie.Heatmap
-
-        fig_profile = Figure()
-        ax_profile = Axis(fig_profile[1, 1]; xscale = log10)
-        @test plot_excitation!(ax_profile, vol; time_index = 1) isa Makie.Lines
-
-        fig_input_scalar = Figure()
-        ax_input_scalar = Axis(fig_input_scalar[1, 1]; yscale = log10)
-        @test plot_input!(ax_input_scalar, input; beams = 1) isa Makie.Heatmap
-
-        fig_input_vector = Figure()
-        ax_input_vector = Axis(fig_input_vector[1, 1]; yscale = log10)
-        @test plot_input!(ax_input_vector, input; beams = [1]) isa Makie.Heatmap
-
-        fig_column = Figure()
-        ax_column = Axis(fig_column[1, 1]; yscale = log10)
-        col_plots = plot_column_excitation!(ax_column, col)
+    @testset "plot_column_excitation! smoke" begin
+        # all wavelengths
+        fig1 = Figure()
+        ax1 = Axis(fig1[1, 1]; yscale = log10)
+        col_plots = plot_column_excitation!(ax1, col)
         @test col_plots isa Vector{Makie.Lines}
         @test length(col_plots) == 6
+
+        # wavelength subset
+        fig2 = Figure()
+        ax2 = Axis(fig2[1, 1]; yscale = log10)
+        result = plot_column_excitation!(ax2, col; wavelengths = [:I_4278])
+        @test result isa Vector{Makie.Lines}
+        @test length(result) == 1
     end
 
-    @testset "plot_input(sim) wrapper" begin
+    @testset "plot_input(sim) smoke" begin
         mktempdir() do savedir
             altitude_lims = [100, 200]
             θ_lims = 180:-45:0
@@ -138,14 +77,27 @@
         end
     end
 
-    # This tests will display a figure, which is to be expected as we have a `display(fig)`
-    # internally. We just have to live with it.
+    # This testset will display figures when run on a personal machine, which is to be
+    # expected as we have `display(fig)` internally. We just have to live with it.
     @testset "animation smoke" begin
-        mktempdir() do tmpdir
-            make_animation_data(tmpdir)
+        # test the plot_input=false branch
+        fig = animate_Ie_in_time(SharedSimResults.td_dir;
+                                 save_to_file = false,
+                                 plot_input = false,
+                                 dt_steps = 5)
+        @test fig isa Figure
 
-            fig = animate_Ie_in_time(tmpdir; save_to_file = false, plot_input = false, dt_steps = 2)
-            @test fig isa Figure
-        end
+        # test the plot_input=true branch
+        fig = animate_Ie_in_time(SharedSimResults.td_dir;
+                                 save_to_file = false,
+                                 plot_input = true,
+                                 input_angle_cone = [90, 180],
+                                 dt_steps = 5)
+        @test fig isa Figure
+
+        # dt_steps < 1 must throw
+        @test_throws Exception animate_Ie_in_time(SharedSimResults.td_dir;
+            save_to_file = false, dt_steps = 0)
     end
+
 end
