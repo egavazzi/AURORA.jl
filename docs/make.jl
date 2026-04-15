@@ -93,4 +93,17 @@ makedocs(;
     # draft = true,
 )
 
+# Remove heavy simulation output from the build before deployment.
+# Tutorial @example blocks write results into data/ subdirectories; those files are
+# not needed in the deployed site and can be several hundred MB.
+data_dirs = String[]
+for (root, dirs, _) in walkdir(joinpath(@__DIR__, "build"))
+    for d in dirs
+        d == "data" && push!(data_dirs, joinpath(root, d))
+    end
+end
+for d in data_dirs
+    rm(d; recursive=true)
+end
+
 deploydocs(; repo = "github.com/egavazzi/AURORA.jl")

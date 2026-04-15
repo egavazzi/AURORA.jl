@@ -188,7 +188,7 @@ Ie_total = zeros(n_μ, n_t_file, n_E)
 # ... fill Ie_total with your flux values ...
 
 flux_filepath = "my_flux.mat"
-flux_filepath = tempname() * ".mat"  # hide — redirect to OS temp so the file is not deployed to gh-pages
+flux_filepath = tempname() * ".mat"  # hide
 matwrite(flux_filepath, Dict(
     "Ie_total" => Ie_total,
     "t_top"    => t_file,

@@ -80,7 +80,6 @@ simulation you specify the total duration and the output cadence:
 
 ```@example time_dep
 savedir = mkpath(joinpath("data", "my_first_simulation"))
-savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 
 sim = AuroraSimulation(
     model,
@@ -112,6 +111,12 @@ sim.time
 
 ### Running
 
+```@setup time_dep
+# Initialize the simulation to suppress the verbose "Load/Calculate..." messages
+# from appearing in the example output.
+initialize!(sim)
+```
+
 ```@example time_dep
 run!(sim)
 nothing # hide
@@ -134,6 +139,7 @@ make_column_excitation_file(sim)   # column-integrated excitation rates
 make_current_file(sim)             # field-aligned electron currents and energy fluxes
 make_heating_rate_file(sim)        # electron heating rates
 make_psd_file(sim)                 # electron phase-space density f(E, θ) and F(v∥)
+nothing # hide
 ```
 
 The output files are saved in `data/my_first_simulation/`:
