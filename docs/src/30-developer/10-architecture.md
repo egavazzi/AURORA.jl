@@ -75,8 +75,13 @@ src/
 │   ├── initialize.jl            # initialize! — allocates cache
 │   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
 │
-├── analysis.jl                  # Post-processing (excitation, current, heating)
-├── analysis_psd.jl              # Phase space density analysis
+├── analysis/
+│   ├── analysis_types.jl        # Result types (VolumeExcitationResult, ColumnExcitationResult, IeTopResult)
+│   ├── emissions.jl             # Volume and column excitation rates
+│   ├── fluxes.jl                # Electron flux post-processing and downsampling
+│   ├── heating.jl               # Electron heating rate
+│   └── psd.jl                   # Phase space density analysis
+│
 ├── utilities.jl                 # Helpers (v_of_E, CFL_criteria, beam_weight, ...)
 └── precompiles.jl               # Precompilation workload
 ```

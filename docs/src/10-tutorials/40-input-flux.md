@@ -77,6 +77,7 @@ sq_mod = SquareFlickering(10.0; amplitude=0.5)
 
 # Smooth onset from 0 to 1 over the first 0.1 s
 onset = SmoothOnset(0.0, 0.1)
+nothing # hide
 ```
 
 ---
@@ -173,7 +174,7 @@ model  = AuroraModel([100, 600], θ_lims, E_max, msis_file, iri_file, 13)
 E_centers = model.energy_grid.E_centers     # length n_E
 n_μ = length(μ_center)
 n_E = length(E_centers)
-nothing # hide
+println("") # hide
 ```
 
 ### Writing the file

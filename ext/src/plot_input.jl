@@ -1,5 +1,25 @@
 using Makie
 
+function AURORA.plot_input!(ax, data::AURORA.IeTopResult;
+                            beams = 1,
+                            colorrange = nothing,
+                            colormap = :inferno,
+                            kwargs...)
+    all_weights = AURORA.beam_weight(acosd.(data.mu_lims))
+    beams = beams isa Int ? [beams] : beams # always treat as array for indexing
+    BeamW = sum(all_weights[beams])
+    data_heatmap = dropdims(sum(data.Ietop[beams, :, :]; dims=1); dims=1) ./ BeamW ./ data.ΔE' .* data.E_centers'
+
+    if colorrange === nothing
+        dmax = maximum(data_heatmap)
+        colorrange = (dmax / 1e4, dmax)
+    end
+
+    return heatmap!(ax, data.t, data.E_centers, data_heatmap;
+                    colorscale = log10, colorrange, colormap,
+                    rasterize = true, kwargs...)
+end
+
 function AURORA.plot_input(sim::AURORA.AuroraSimulation)
     model = sim.model
     E_centers = model.energy_grid.E_centers
@@ -29,7 +49,7 @@ function _plot_input_steady_state(Ie_top, E_centers, ΔE, θ_lims, Ω_beam, flux
 
     for (idx, i_μ) in enumerate(active_beams)
         # Differential number flux: #e⁻/m²/s/eV/ster
-        Ie_diff = Ie_top[i_μ, 1, :] ./ ΔE ./ Ω_beam[i_μ]
+        Ie_differential = Ie_top[i_μ, 1, :] ./ ΔE ./ Ω_beam[i_μ]
 
         θ_lo = round(min(θ_lims[i_μ], θ_lims[i_μ+1]); digits=1)
         θ_hi = round(max(θ_lims[i_μ], θ_lims[i_μ+1]); digits=1)
@@ -41,11 +61,10 @@ function _plot_input_steady_state(Ie_top, E_centers, ΔE, θ_lims, Ω_beam, flux
                   yscale = log10,
                   xminorticks = IntervalsBetween(9),
                   xminorticksvisible = true)
-        Ie_diff_plot = replace(x -> x <= 0 ? NaN : x, Ie_diff)
-        lines!(ax, E_centers, Ie_diff_plot)
+        lines!(ax, E_centers, Ie_differential)
     end
 
-    Label(fig[0, :], "Input flux — Steady state"; fontsize = 16, tellwidth = false)
+    Label(fig[0, :], "Input flux"; fontsize = 16, tellwidth = false)
 
     return fig
 end
@@ -89,7 +108,7 @@ function _plot_input_time_dependent(Ie_top, t, E_centers, ΔE, θ_lims, Ω_beam,
         Colorbar(fig[idx, 2], hm; label = "IeE (eV/m²/s/eV/ster)")
     end
 
-    Label(fig[0, :], "Input flux — Time dependent"; fontsize = 16, tellwidth = false)
+    Label(fig[0, :], "Input flux"; fontsize = 16, tellwidth = false)
 
     return fig
 end

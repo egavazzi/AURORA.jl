@@ -43,8 +43,8 @@ end
 
 Compute velocity and pitch-angle grids needed by `compute_f` and `compute_F`.
 
-- `E_centers` is the energy bin centers [eV] (length `nE`).
-- `ΔE` is the energy bin widths [eV] (length `nE`).
+- `E_centers` is the energy bin centers (eV). Vector [nE]
+- `ΔE` is the energy bin widths (eV). Vector [nE]
 """
 function psd_grids(E_centers::AbstractVector, ΔE::AbstractVector, μ_lims_cosine::AbstractVector)
     nE = length(E_centers)

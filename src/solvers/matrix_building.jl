@@ -179,6 +179,10 @@ function update_B!(B, model::AuroraModel, phase_fcn_neutrals, iE, B2B_fragment)
     return B2B_inelastic_neutrals
 end
 
+# `D` and `Ddiffusion` are used together in the solvers as `D[iE, iμ] * Ddiffusion`,
+# forming the full spatial diffusion term of the transport equation.
+# `D` provides the scalar coefficient for each (energy, pitch-angle) bin,
+# while `Ddiffusion` provides the ∂²/∂z² operator along the field line.
 function update_D!(D, model::AuroraModel)
     energy_grid = model.energy_grid
     pitch_angle_grid = model.pitch_angle_grid
@@ -215,6 +219,8 @@ function update_D!(D, model::AuroraModel)
     return nothing
 end
 
+# See comment above `update_D!`: `Ddiffusion` is the ∂²/∂z² finite-difference operator
+# and is always multiplied by the scalar `D[iE, iμ]` in the solvers.
 function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
     z = model.s_field
     dzd = z[2:end-1] - z[1:end-2]

@@ -92,7 +92,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::
     n_E = model.energy_grid.n
 
     progress = isnothing(sim.time) ?
-               Progress(n_E, desc="Calculating flux") :
+               Progress(n_E, desc="Calculating flux",  dt=1.0) :
                Progress(n_E; desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
 
     # Energy loop: solve transport in descending energy order.

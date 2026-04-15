@@ -16,7 +16,7 @@ iri_file  = find_iri_file()
 
 model = AuroraModel(
     [100, 600],    # altitude limits [km]
-    180:-10:0,     # pitch-angle bin edges [°]
+    180:-15:0,     # pitch-angle bin edges [°]
     3000,          # maximum energy [eV]
     msis_file,
     iri_file,
@@ -24,19 +24,24 @@ model = AuroraModel(
 )
 ```
 
-## Flat spectrum with energy cutoff
+## Maxwellian input spectrum
 
-A [`FlatSpectrum`](@ref) produces a uniform differential number flux above a given minimum
-energy. This is useful for studying the transport of quasi-monoenergetic beams:
+A [`MaxwellianSpectrum`](@ref) provides a smooth, physically motivated energy distribution
+set by a characteristic energy (formula from the Meier et al. 1989 paper):
 
 ```@example steady_state
 flux = InputFlux(
-    FlatSpectrum(1e-3; E_min=2900);    # 1 mW/m², only above 2900 eV
+    MaxwellianSpectrum(1e-3, 1000.0);  # 1 mW/m², characteristic energy 1 keV
     beams=1:2                          # two most field-aligned downward beams
 )
+```
 
+## Create and run the simulation
+
+```@example steady_state
 savedir = mkpath(joinpath("data", "steady_state_example"))
 savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
+
 sim = AuroraSimulation(model, flux, savedir)
 run!(sim)
 nothing # hide
@@ -59,32 +64,41 @@ make_heating_rate_file(sim)        # electron heating rates
 readdir(savedir)
 ```
 
-## Gaussian and Maxwellian spectra
+## Visualize
 
-For more realistic energy distributions, use [`GaussianSpectrum`](@ref) or
-[`MaxwellianSpectrum`](@ref):
+AURORA.jl provides helper plotting functions through a [Makie](https://github.com/MakieOrg/Makie.jl) extension.
+Install and load a Makie backend to access them (more information in [`Visualization`](@ref "Visualization")).
 
-```@example steady_state
-# Gaussian: 10 mW/m², peaked at 2 keV with 300 eV width
-flux_gauss = InputFlux(
-    GaussianSpectrum(1e-2, 2000.0, 300.0);
-    beams=1:2
-)
-```
+### Input flux
+
+[`plot_input`](@ref) can be used to inspect the prescribed input spectrum directly from the simulation object:
 
 ```@example steady_state
-# Maxwellian: 10 mW/m², characteristic energy 1 keV
-flux_maxw = InputFlux(
-    MaxwellianSpectrum(1e-2, 1000.0);
-    beams=1:2
-)
+using CairoMakie
+
+fig = plot_input(sim)
 ```
 
-See the [Input flux](@ref "Input Flux") tutorial for the full list of
-spectrum and modulation types.
+### Volume excitation profile
 
-For the general time-dependent case, including flickering input fluxes, see
-[Time-Dependent Simulation](@ref "Time-Dependent Simulation").
+[`plot_excitation!`](@ref) can be used to visualize the altitude profile of the volume excitation rate for a given emission line. 
 
-For a detailed walkthrough of post-processing functions (excitation rates, currents,
-heating, phase-space density), see [Post-Processing & Analysis](@ref "Post-Processing").
+```@example steady_state
+using CairoMakie
+vol = load_volume_excitation(savedir)
+
+fig = Figure()
+ax  = Axis(fig[1, 1];
+           xlabel = "Volume emission rate (photons/m³/s)",
+           ylabel = "Altitude (km)",
+           xscale = log10,
+           title = "4278 Å")
+plot_excitation!(ax, vol; field = :Q4278)
+fig
+```
+
+## Next steps
+
+- [Time-Dependent Simulation](@ref "Time-Dependent Simulation") — run the general time-dependent case.
+- [Input flux](@ref "Input Flux") — explore all spectrum and modulation types.
+- [Post-processing & analysis](@ref "Post-Processing") — detailed walkthrough of all analysis functions.

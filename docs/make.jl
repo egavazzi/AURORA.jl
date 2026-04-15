@@ -81,7 +81,10 @@ makedocs(;
     authors = "Etienne <etienne.gavazzi@uit.no>",
     repo =  Documenter.Remotes.GitHub("egavazzi", "AURORA.jl"),
     sitename = "AURORA.jl",
-    format = Documenter.HTML(; canonical = "https://egavazzi.github.io/AURORA.jl"),
+    format = Documenter.HTML(;
+        canonical = "https://egavazzi.github.io/AURORA.jl",
+        size_threshold = 1000 * 2^10, # 1000 KiB (default is 200 which is too small for our API reference page)
+    ),
     pages = list_pages(),
     warnonly = [:cross_references],
     # Uncomment the two following lines in order to skip running @example and jldoctest

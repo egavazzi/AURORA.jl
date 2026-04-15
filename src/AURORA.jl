@@ -57,18 +57,18 @@ include("simulation/run.jl")
 export run!
 
 include("utilities.jl")
-export v_of_E, CFL_criteria, mu_avg, beam_weight,
-        make_savedir,
-        rename_if_exists,
-        find_Ietop_file
+export v_of_E, mu_avg, beam_weight, make_savedir
 
+include("analysis/analysis_types.jl")
+export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
+       load_volume_excitation, load_column_excitation, load_input
 include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")
 include("analysis/heating.jl")
-export downsampling_fluxes, make_volume_excitation_file,
-    make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file,
-    make_psd_file
+export make_volume_excitation_file, make_column_excitation_file,
+       downsampling_fluxes, make_Ie_top_file, make_current_file,
+       make_heating_rate_file, make_psd_file
 
 # Define and export functions to be extended by the AURORA_viz module
 """
@@ -89,42 +89,37 @@ fig = plot_input(sim)
 ```
 """
 function plot_input end
-export plot_input
+"""
+    plot_input!(ax, data::IeTopResult;
+                beams=1, colorrange=nothing, colormap=:inferno, kwargs...)
+
+Plot the input electron flux stored in an [`IeTopResult`](@ref) onto an existing `Axis`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Keyword Arguments
+- `beams = 1`: pitch-angle beam index, or vector of indices, to include. Selected beams are
+  summed and normalised by their combined solid angle, then converted to differential energy
+  flux (#e⁻/m²/s/eV/ster).
+- `colorrange = nothing`: `(min, max)` limits for the colorscale. Defaults to
+  `(max_value / 1e4, max_value)` spanning 4 orders of magnitude.
+- `colormap = :inferno`: Makie colormap for the heatmap.
+- `kwargs...`: additional keyword arguments are forwarded to the underlying `heatmap!` call.
 
 """
-    animate_Ie_in_time(directory_to_process; angles_to_plot=nothing, colorrange=nothing, ...)
+function plot_input! end
+export plot_input, plot_input!
 
-Plot a heatmap of Ie over height and energy, and animate it in time. It will load the
-result files one by one. The animation will be saved as a .mp4 file under the
-`directory_to_process`.
+"""
+    animate_Ie_in_time(directory_to_process;
+                       angles_to_plot=nothing, colorrange=nothing, save_to_file=true,
+                       plot_input=false, input_angle_cone=[170, 180], dt_steps=1,
+                       framerate=30)
 
-# Example
-```julia-repl
-julia> directory_to_process = "Visions2/Alfven_475s";
+Plot a heatmap of Ie over height and energy, and animate it in time. The animation is saved
+as a .mp4 file under the `directory_to_process` if `save_to_file = true`.
 
-# Using defaults for angles and colorrange:
-julia> animate_Ie_in_time(directory_to_process)
-
-# Or with custom angles and colorrange:
-julia> angles_to_plot = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);   # DOWN
-                         (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)];   # UP
-julia> animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange=(1e5, 1e9), plot_Ietop=true)
-
-# Using nothing for empty panels:
-julia> angles_to_plot = [(180, 90)  nothing;
-                         (0, 45)    (45, 90)];
-julia> animate_Ie_in_time(directory_to_process; angles_to_plot)
-```
-
-The `angles_to_plot` is a matrix of tuples, where each tuple defines a pitch-angle range
-from 0° to 180° (where 180° is field-aligned down and 0° is field-aligned up). A panel
-will be created for each matrix element at the corresponding row/column position.
-Angles > 90° are labeled as "DOWN", angles < 90° as "UP". Use `nothing` for empty panels.
-
-The limits of `angles_to_plot` need to match existing limits of the beams
-used in the simulation. E.g. if `θ_lims = 180:-10:0` was used in the simulation, `(150, 120)`
-will be fine as 150° and 120° exist as limits, but `(155, 120)` will not as 155° does not
-exist as a limit.
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 
 # Arguments
 - `directory_to_process`: directory containing the simulation results (absolute or relative path).
@@ -137,14 +132,95 @@ exist as a limit.
 - `colorrange = nothing`: limits for the colormap/colorbar as a tuple (min, max). If `nothing`,
                           automatically computed as (max_value / 1e4, max_value) spanning
                           4 orders of magnitude.
-- `save_to_file = true`: if true, saves the animation to a .mp4 file in the data directory.
-- `plot_Ietop = false`: if true, also plots the precipitating Ie at the top of the
-                        ionosphere by loading it from the file `Ie_top.mat`.
-- `Ietop_angle_cone = [170, 180]`: angle cone (in degrees) for the precipitating Ie plot.
-- `dt_steps`: plot one frame every `dt_steps` timesteps.
+- `save_to_file = true`: if `true`, saves the animation to an `animation.mp4` file (or
+                         `animation_with_precipitation.mp4` when `plot_input = true`) inside
+                         `directory_to_process`.
+- `plot_input = false`: if `true`, also plots the precipitating electron flux at the top of
+                        the ionosphere by loading it from the `Ie_incoming_*.mat` file.
+- `input_angle_cone = [170, 180]`: pitch-angle cone (degrees) used to select and sum beams
+                                   for the precipitation overlay. Only used when `plot_input = true`.
+- `dt_steps = 1`: plot one frame every `dt_steps` timesteps. Increase to speed up rendering.
+- `framerate = 30`: framerate of the animation in frames per second.
+
+# Example
+```julia-repl
+# Use default angles and colorrange:
+julia> animate_Ie_in_time(directory_to_process)
+
+# Use custom angles and colorrange:
+julia> angles_to_plot = [(180, 170)  (170, 150)  (150, 120)  (120, 100)  (100, 90);   # DOWN
+                         (0, 10)     (10, 30)    (30, 60)    (60, 80)    (80, 90)];   # UP
+julia> animate_Ie_in_time(directory_to_process; angles_to_plot, colorrange=(1e5, 1e9), plot_input=true)
+
+# Use `nothing` for an empty panels:
+julia> angles_to_plot = [(180, 90)  nothing;
+                         (0, 45)    (45, 90)];
+julia> animate_Ie_in_time(directory_to_process; angles_to_plot)
+```
+
+# Notes
+The `angles_to_plot` is a matrix of tuples, where each tuple defines a pitch-angle range
+from 0° to 180° (where 180° is field-aligned down and 0° is field-aligned up). A panel
+will be created for each matrix element at the corresponding row/column position.
+Angles > 90° are labeled as "DOWN", angles < 90° as "UP". Use `nothing` for empty panels.
+
+The limits of `angles_to_plot` need to match existing limits of the beams
+used in the simulation. E.g. if `θ_lims = 180:-10:0` was used in the simulation, `(150, 120)`
+will be fine as 150° and 120° exist as limits, but `(155, 120)` will not as 155° does not
+exist as a limit.
 """
 function animate_Ie_in_time end
 export animate_Ie_in_time
+
+"""
+    plot_excitation!(ax, data::VolumeExcitationResult;
+                     field=:total, time_index=nothing, colorrange=nothing,
+                     colormap=:viridis, show_contours=false, show_height_of_max=true,
+                     kwargs...)
+
+Plot a volume excitation or ionization rate onto an existing `Axis`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+
+- If `data` contains one time step, or if `time_index` is given, plots an altitude
+  profile (returns a `Lines` plot).
+- Otherwise, plots a time-altitude heatmap (returns a `Heatmap`).
+
+# Keyword Arguments
+- `field = :total`: which rate to plot. Can be any field of [`VolumeExcitationResult`](@ref):
+  `:Q4278`, `:Q6730`, `:Q7774`, `:Q8446`, `:QO1D`, `:QO1S`, `:QOi`, `:QO2i`, `:QN2i`,
+  or `:total` which sums the three ionization rates (`:QN2i + :QO2i + :QOi`).
+- `time_index = nothing`: if given, plot a single altitude profile at that time index.
+  If `nothing` and the data has more than one time step, a heatmap is plotted.
+- `colorrange = nothing`: `(min, max)` limits for the colorscale. Defaults to
+  `(max_value / 1e4, max_value)` spanning 4 orders of magnitude.
+- `colormap = :viridis`: Makie colormap for the heatmap.
+- `show_contours = false`: if `true`, overlays black contour lines on the heatmap (heatmap mode only).
+- `show_height_of_max = true`: if `true`, overlays a dashed red line at the altitude of peak
+  rate at each time step (heatmap mode only).
+- `kwargs`: additional keyword arguments are forwarded to the underlying `heatmap!` or `lines!` call.
+"""
+function plot_excitation! end
+export plot_excitation!
+
+"""
+    plot_column_excitation!(ax, data::ColumnExcitationResult;
+                            wavelengths=[:I_4278, :I_6730, :I_7774, :I_8446, :I_O1D, :I_O1S],
+                            kwargs...)
+
+Plot column-integrated emission intensities onto an existing `Axis`.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Keyword Arguments
+- `wavelengths`: vector of symbols selecting which emission lines to plot. Available values
+  are `:I_4278`, `:I_6730`, `:I_7774`, `:I_8446`, `:I_O1D`, `:I_O1S`. Defaults to all six.
+  O(¹D) and O(¹S) lines are plotted with a dashed linestyle.
+- `kwargs`: additional keyword arguments are forwarded to each underlying `lines!` call.
+"""
+function plot_column_excitation! end
+export plot_column_excitation!
 
 # Precompile selected functions
 include("precompiles.jl")

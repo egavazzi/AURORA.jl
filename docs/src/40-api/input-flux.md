@@ -1,4 +1,4 @@
-# Input Flux
+# Input Flux API
 
 Types and functions for specifying the precipitating electron flux. See the
 [Input flux](@ref "Input Flux") tutorial for usage examples.

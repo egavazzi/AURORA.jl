@@ -49,7 +49,7 @@ jobs:
             DocMeta.setdocmeta!(AURORA, :DocTestSetup, :(using AURORA); recursive=true)
             doctest(AURORA)'
       - name: Generate and deploy documentation
-        run: julia --project=docs docs/make.jl
+        run: julia --color=yes --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

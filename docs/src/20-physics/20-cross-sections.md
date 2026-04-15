@@ -31,10 +31,10 @@ emission lines are currently implemented:
 | Emission | Source | Wavelength | Function |
 |----------|--------|------------|----------|
 | N₂⁺ 1NG (0-1) | e + N₂ | 4278 Å | `excitation_4278` |
-| O(¹S) green line | e + O | 5577 Å | `excitation_O1S` |
-| O(¹D) red line | e + O | 6300 Å | `excitation_O1D` |
 | N₂ 1PG (4–1, 5–2) | e + N₂ | 6730 Å | `excitation_6730_N2` |
 | OI 7774 Å | e + O | 7774 Å | `excitation_7774_O` |
 | OI 7774 Å | e + O₂ | 7774 Å | `excitation_7774_O2` |
 | OI 8446 Å | e + O | 8446 Å | `excitation_8446_O` |
 | OI 8446 Å | e + O₂ | 8446 Å | `excitation_8446_O2` |
+| O(¹S) green line | e + O | 5577 Å | `excitation_O1S` |
+| O(¹D) red line | e + O | 6300 Å | `excitation_O1D` |

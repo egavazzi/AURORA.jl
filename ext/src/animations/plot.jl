@@ -8,19 +8,19 @@ It should take Ie as a function of pitch-angle, height and energy as input. But 
 function of time. This because we want to update the time OUTSIDE of the function.
 
 It is also possible to plot the precipitating Ie at the top of the ionosphere by giving an
-optional NamedTuple `Ietop_struct` as input. By default it is set to
+optional NamedTuple `input_struct` as input. By default it is set to
 ```
-Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing)
+input_struct = (bool = false, t_top = nothing, data_input = nothing)
 ```
 which won't plot anything.
-To plot something, you need to give a `Ietop_struct` with
-`Ie_top_struct.bool = true` as well as some values for `Ie_top_struct.t_top` and
-`Ie_top_struct.data_Ietop`.
+To plot something, you need to give a `input_struct` with
+`input_struct.bool = true` as well as some values for `input_struct.t_top` and
+`input_struct.data_input`.
 =#
 function make_Ie_in_time_plot(Ie_timeslice::Observable,
                                 time::Observable{String}, z, E_centers, angles_to_plot, colorrange,
-                                Ietop_struct = (bool = false, t_top = nothing, data_Ietop = nothing,
-                                Ietop_angle_cone = nothing))
+                                input_struct = (bool = false, t_top = nothing, data_input = nothing,
+                                input_angle_cone = nothing))
 
     # Slice the input Ie into its different pitch-angle components
     Ie_streams = Array{Observable}(nothing, length(angles_to_plot))
@@ -78,25 +78,24 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
     Colorbar(fig[:, end + 1]; limits = colorrange, scale = log10, label = "Ie (#e⁻/m²/s/eV/ster)", colormap = :inferno)
 
     # Plot Ie precipitating at the top (#TODO: this can probably be done in a better way than with a struct, or?)
-    if Ietop_struct.bool
-        plot_hposition = 1:floor(Int, n_col / 2)
-        gb = fig[0, plot_hposition] = GridLayout()
-        ax_Ietop = Axis(gb[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
+    if input_struct.bool
+        # Top row always split in two: left = input flux panel, right = time label.
+        gb = fig[0, 1:n_col] = GridLayout() # span the full column range so the split is independent of n_col
+        gc = gb[1, 1] = GridLayout()   # holds axis + its colorbar
+        ax_Ietop = Axis(gc[1, 1], yscale = log10, ylabel = " Energy (eV)", xlabel = "t (s)",
                         title = "Incoming energy flux",
                         yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                         xticklabelsvisible = true, xminorticksvisible = true,
                         xticksmirrored = true, yticksmirrored = true,
                         limits = ((0, 1), nothing))
-        hm = heatmap!(Ietop_struct.t_top, E_centers, Ietop_struct.data_Ietop; colormap = :inferno,
-                      colorscale = log10,
-                      colorrange = (1e6, maximum(Ietop_struct.data_Ietop)))
+        hm = heatmap!(ax_Ietop, input_struct.t_top, E_centers, input_struct.data_input;
+                      colormap = :inferno, colorscale = log10,
+                      colorrange = (1e6, maximum(input_struct.data_input)))
         time_float64 = @lift(parse(Float64, $time[1:end-1]))
         vlines!(time_float64, linewidth = 3)
-        angles = Ietop_struct.Ietop_angle_cone
-        Colorbar(gb[1, 2], hm; label = "IeE ($(180 - angles[2])°-$(180 - angles[1])°)\n(eV/m²/s/eV/ster)")
-
-        time_hposition = ceil(Int, n_col / 2):n_col
-        Label(fig[0, time_hposition], time; tellwidth = false, tellheight = false, fontsize=20)
+        angles = input_struct.input_angle_cone
+        Colorbar(gc[1, 2], hm; label = "IeE ($(180 - angles[2])°-$(180 - angles[1])°)\n(eV/m²/s/eV/ster)")
+        Label(gb[1, 2], time; tellwidth = false, tellheight = false, fontsize=20)
     else
         Label(fig[0, :], time; tellwidth = false, fontsize=20)
     end
