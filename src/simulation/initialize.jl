@@ -8,6 +8,7 @@ This step performs the expensive setup that depends on the model geometry and th
 resolved time grid, but does not write any output files.
 """
 function initialize!(sim::AuroraSimulation)
+    @info "Initializing simulation..."
     sim.cache = build_simulation_cache(sim)
     return nothing
 end
@@ -42,6 +43,8 @@ function build_simulation_cache(sim::AuroraSimulation)
     # TODO: can we do this in a more elegant way? Maybe we should have a dedicated struct?
     # Or maybe we should simply put them in DegradationCache?
     cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
+    # Pre-load/calculate the cascading transfer matrices.
+    preload_cascading_matrices!(model, cascading_neutrals)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
@@ -67,4 +70,21 @@ function compute_phase_functions(model::AuroraModel)
 
     phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi))
     return phase_fcn_neutrals
+end
+
+# Trigger the first (potentially expensive) load-or-compute step for all three species
+# cascading functions. The closures store their transfer matrices in module-level `let`
+# blocks indexed by E_grid; once loaded they stay warm for the session.
+function preload_cascading_matrices!(model::AuroraModel, cascading_functions::Tuple)
+    E_grid = model.energy_grid.E_edges[1:end-1]
+    dE = model.energy_grid.ΔE
+    # Random ionization threshold (non-physical)
+    E_threshold = 15.0
+    # Any primary energy above the ionization threshold works
+    E_primary = 40.0
+    # We just use some random numbers for the ionization thresholds
+    for cascading_func in cascading_functions
+        cascading_func(E_grid, dE, E_primary, E_threshold, "s")
+    end
+    return nothing
 end

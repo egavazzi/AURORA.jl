@@ -16,7 +16,6 @@ run!(sim)
 """
 function run!(sim::AuroraSimulation)
     if sim.cache === nothing
-        @info "Simulation not initialized, calling initialize!(sim)..."
         initialize!(sim)
     end
     if sim.save_input_flux
@@ -29,6 +28,7 @@ function run!(sim::AuroraSimulation)
 end
 
 function solve!(sim::AuroraSimulation)
+    @info "Starting simulation..."
     if isnothing(sim.time)
         solve_steady_state!(sim)
     else

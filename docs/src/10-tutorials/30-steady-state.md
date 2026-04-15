@@ -40,9 +40,17 @@ flux = InputFlux(
 
 ```@example steady_state
 savedir = mkpath(joinpath("data", "steady_state_example"))
-savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 
 sim = AuroraSimulation(model, flux, savedir)
+```
+
+```@setup steady_state
+# Initialize the simulation to suppress the verbose "Load/Calculate..." messages
+# from appearing in the example output.
+initialize!(sim)
+```
+
+```@example steady_state
 run!(sim)
 nothing # hide
 ```
@@ -58,6 +66,7 @@ make_volume_excitation_file(sim)   # volumetric excitation rates for optical emi
 make_column_excitation_file(sim)   # column-integrated excitation rates (steady-state scalar)
 make_current_file(sim)             # field-aligned electron currents and energy fluxes
 make_heating_rate_file(sim)        # electron heating rates
+nothing # hide
 ```
 
 ```@example steady_state
