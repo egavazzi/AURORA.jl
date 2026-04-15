@@ -29,6 +29,7 @@ flux = InputFlux(
 
 # Create and run a short time-dependent simulation
 savedir = mkpath(joinpath("data", "my_first_simulation"))
+savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 sim = AuroraSimulation(model, flux, 0.2, 0.01, savedir; CFL_number=128)
 run!(sim)
 ```

@@ -80,6 +80,7 @@ simulation you specify the total duration and the output cadence:
 
 ```@example time_dep
 savedir = mkpath(joinpath("data", "my_first_simulation"))
+savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 
 sim = AuroraSimulation(
     model,
@@ -197,3 +198,4 @@ For the full API of all visualization functions, see [Visualization](@ref).
 
 - [Steady-state simulation](@ref "Steady-State Simulation") — the steady-state special case.
 - [Input flux](@ref "Input Flux") — explore all spectrum and modulation types.
+- [Post-processing & analysis](@ref "Post-Processing") — detailed walkthrough of all analysis functions.

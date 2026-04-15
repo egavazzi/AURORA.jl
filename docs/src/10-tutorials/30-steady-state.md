@@ -36,6 +36,7 @@ flux = InputFlux(
 )
 
 savedir = mkpath(joinpath("data", "steady_state_example"))
+savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
 sim = AuroraSimulation(model, flux, savedir)
 run!(sim)
 nothing # hide
@@ -84,3 +85,6 @@ spectrum and modulation types.
 
 For the general time-dependent case, including flickering input fluxes, see
 [Time-Dependent Simulation](@ref "Time-Dependent Simulation").
+
+For a detailed walkthrough of post-processing functions (excitation rates, currents,
+heating, phase-space density), see [Post-Processing & Analysis](@ref "Post-Processing").

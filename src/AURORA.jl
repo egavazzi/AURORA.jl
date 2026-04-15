@@ -59,15 +59,16 @@ export run!
 include("utilities.jl")
 export v_of_E, mu_avg, beam_weight, make_savedir
 
-include("analysis_types.jl")
+include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
-    load_volume_excitation, load_column_excitation, load_input
-
-include("analysis.jl")
-include("analysis_psd.jl")
-export downsampling_fluxes, make_volume_excitation_file,
-    make_column_excitation_file, make_Ie_top_file, make_current_file, make_heating_rate_file,
-    make_psd_file
+       load_volume_excitation, load_column_excitation, load_input
+include("analysis/psd.jl")
+include("analysis/emissions.jl")
+include("analysis/fluxes.jl")
+include("analysis/heating.jl")
+export make_volume_excitation_file, make_column_excitation_file,
+       downsampling_fluxes, make_Ie_top_file, make_current_file,
+       make_heating_rate_file, make_psd_file
 
 # Define and export functions to be extended by the AURORA_viz module
 """
