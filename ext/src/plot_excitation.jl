@@ -22,9 +22,11 @@ function AURORA.plot_excitation!(ax, data::AURORA.VolumeExcitationResult;
         p = lines!(ax, q, h_km; kwargs...)
         xmin, xmax = _profile_xlims_from_top(q)
         xlims!(ax, xmin, xmax)
-        ax.xticks = LogTicks(ceil(Int, log10(xmin)):floor(Int, log10(xmax)))
-        ax.xminorticks = IntervalsBetween(9)
-        ax.xminorticksvisible = true
+        if ax.xscale[] === log10
+            ax.xticks = LogTicks(ceil(Int, log10(xmin)):floor(Int, log10(xmax)))
+            ax.xminorticks = IntervalsBetween(9)
+            ax.xminorticksvisible = true
+        end
         return p
     end
 
