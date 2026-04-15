@@ -4,51 +4,12 @@ After running a simulation, AURORA provides several post-processing functions th
 derived physical quantities from the raw electron flux output and save them alongside the
 simulation data.
 
-This tutorial walks through each analysis function in detail. We first run a short
-simulation to produce output files, then demonstrate each post-processing step.
+This page provides a small description of each analysis function.
 
 !!! tip
     All analysis functions accept either a directory path or an
     [`AuroraSimulation`](@ref) object directly. See the [API reference](@ref Analysis) for
     full docstrings.
-
-## Setup: run a short simulation
-
-```@example post_proc
-using AURORA
-
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
-
-model = AuroraModel(
-    [100, 600],    # altitude limits [km]
-    180:-45:0,     # pitch-angle bin edges [°]
-    1000,          # maximum energy [eV]
-    msis_file,
-    iri_file,
-    13             # magnetic field angle to zenith [°]
-)
-
-flux = InputFlux(
-    FlatSpectrum(1e-3; E_min=100),
-    SinusoidalFlickering(5.0);
-    beams=1,
-    z_source=3000.0,
-)
-
-savedir = mkpath(joinpath("data", "post_proc_tutorial"))
-savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not deployed to gh-pages
-
-sim = AuroraSimulation(
-    model, flux,
-    0.2, 0.01, savedir;
-    CFL_number=128,
-    max_memory_gb=4.0,
-)
-
-run!(sim)
-nothing # hide
-```
 
 ## Excitation rates
 
@@ -60,9 +21,8 @@ and computes the volume excitation rate $Q = I_e \times \sigma \times n$ for sev
 optical emissions (4278 Å, 6730 Å, 7774 Å, 8446 Å, O¹D, O¹S) and ionizations (O⁺, O₂⁺,
 N₂⁺). Results are saved as `Qzt_all_L.mat`.
 
-```@example post_proc
+```julia
 make_volume_excitation_file(sim)
-nothing # hide
 ```
 
 ### Column-integrated excitation rates
@@ -72,9 +32,8 @@ taking into account the finite speed of light (photon travel time from emission 
 the bottom of the column). This must be run **after** `make_volume_excitation_file`.
 Results are saved as `I_lambda_of_t.mat`.
 
-```@example post_proc
+```julia
 make_column_excitation_file(sim)
-nothing # hide
 ```
 
 ## Boundary condition (top flux)
@@ -84,9 +43,8 @@ nothing # hide
 applied boundary condition and for comparing with satellite or rocket observations.
 Results are saved as `Ie_top.mat`.
 
-```@example post_proc
+```julia
 make_Ie_top_file(sim)
-nothing # hide
 ```
 
 ## Field-aligned currents
@@ -95,9 +53,8 @@ nothing # hide
 electron energy flux (eV/m²/s), separated into upward and downward components. Results are saved
 as `J.mat`.
 
-```@example post_proc
+```julia
 make_current_file(sim)
-nothing # hide
 ```
 
 ## Heating rates
@@ -106,9 +63,8 @@ nothing # hide
 superthermal (energetic) electrons to thermal electrons through Coulomb collisions.
 Results are saved as `heating_rate.mat`.
 
-```@example post_proc
+```julia
 make_heating_rate_file(sim)
-nothing # hide
 ```
 
 ## Phase-space density
@@ -119,9 +75,8 @@ compute:
 - the reduced parallel distribution `F(z, t, v∥)` (`:F_only`), or
 - both (`:both`).
 
-```@example post_proc
+```julia
 make_psd_file(sim; compute = :both)
-nothing # hide
 ```
 
 You can also pass custom `v_parallel` bin edges:
@@ -137,17 +92,6 @@ This is useful when transferring data between machines or when finer time resolu
 needed for a given analysis. The downsampled files are saved in a subdirectory named
 `downsampled_Xx` (where `X` is the downsampling factor).
 
-```@example post_proc
+```julia
 downsampling_fluxes(sim, 2)
-nothing # hide
 ```
-
-## Output summary
-
-After running all post-processing steps, the output directory contains:
-
-```@example post_proc
-readdir(savedir)
-```
-
-See the [Analysis API reference](@ref Analysis) for complete function documentation.

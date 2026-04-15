@@ -22,7 +22,7 @@ msis_file = find_msis_file()
 iri_file  = find_iri_file()
 
 model = AuroraModel(
-    [100, 600],    # altitude limits [km]
+    [100, 500],    # altitude limits [km]
     180:-30:0,     # pitch-angle bin edges [°] → 6 beams
     1000,          # maximum energy [eV]
     msis_file,
@@ -85,10 +85,10 @@ savedir = mktempdir()  # hide — redirect to OS temp so .mat files are not depl
 sim = AuroraSimulation(
     model,
     flux,
-    0.2,                # total simulation time [s]
+    0.5,                # total simulation time [s]
     0.01,               # output time step [s] (save every 10 ms)
     savedir;
-    CFL_number=128,     # CFL stability parameter (higher → coarser internal stepping)
+    CFL_number=256,     # CFL stability parameter (higher → coarser internal stepping)
     max_memory_gb=4.0   # memory budget [GB] — controls loop partitioning
 )
 ```
@@ -147,25 +147,56 @@ readdir(savedir)
 AURORA.jl provides helper plotting functions to visualize results through a [Makie](https://github.com/MakieOrg/Makie.jl) extension. 
 Install and load a Makie backend to access them (more information about this in [`Visualization`](@ref "Visualization")).
 
-### Volume excitation rate
+### Input flux
+
+[`plot_input`](@ref) can be used to inspect the prescribed input spectrum directly from the simulation object:
 
 ```@example time_dep
 using CairoMakie
-CairoMakie.activate!() # hide
+
+fig = plot_input(sim)
+```
+
+### Volume excitation rate
+
+[`plot_excitation!`](@ref) can be used to visualize the volume excitation rate for a given emission line over altitude and time. 
+
+```@example time_dep
+using CairoMakie
 vol = load_volume_excitation(savedir)
 
 fig = Figure()
-ax  = Axis(fig[1, 1]; xlabel = "Time (s)", ylabel = "Altitude (km)", title = "4278 Å")
+ax  = Axis(fig[1, 1]; 
+           xlabel = "Time (s)", 
+           ylabel = "Altitude (km)", 
+           title = "4278 Å")
 hm  = plot_excitation!(ax, vol; field = :Q4278)
 Colorbar(fig[1, 2], hm; label = "photons/m³/s")
 fig
 ```
 
-### Column emission intensity
+Altitude profiles for specific time-steps can also be visualized using the `time_index` keyword argument.
 
 ```@example time_dep
 using CairoMakie
-CairoMakie.activate!() # hide
+vol = load_volume_excitation(savedir)
+
+fig = Figure()
+ax  = Axis(fig[1, 1];
+           xlabel = "Excitation rate (photons/m³/s)",
+           ylabel = "Altitude (km)",
+           xscale = log10,
+           title = "4278 Å")
+plot_excitation!(ax, vol; field = :Q4278, time_index = 15)
+fig
+```
+
+### Column emission intensity
+
+[`plot_column_excitation!`](@ref) can be used to visualize the column-integrated emission intensities (as would be seen from the ground) for several emission lines (by default 4278 Å, 6730 Å, 7774 Å, 8446 Å, O1D and O1S).
+
+```@example time_dep
+using CairoMakie
 col = load_column_excitation(savedir)
 
 fig = Figure()
@@ -183,19 +214,19 @@ stepping over time:
 
 ```@example time_dep
 using CairoMakie
-CairoMakie.activate!() # hide
 animate_Ie_in_time(savedir; framerate = 15)
-nothing # hide
+cp(joinpath(savedir, "animation.mp4"), "animation.mp4"; force=true);  # hide
+println("") # hide
 ```
 
 ```@raw html
-<video autoplay loop muted playsinline controls src="../data/my_first_simulation/animation.mp4"/>
+<video autoplay loop muted playsinline controls src="../animation.mp4" />
 ```
 
 For the full API of all visualization functions, see [Visualization](@ref).
 
 ## Next steps
 
-- [Steady-state simulation](@ref "Steady-State Simulation") — the steady-state special case.
+- [Steady-state simulation](@ref "Steady-State Simulation") — run the steady-state special case.
 - [Input flux](@ref "Input Flux") — explore all spectrum and modulation types.
 - [Post-processing & analysis](@ref "Post-Processing") — detailed walkthrough of all analysis functions.
