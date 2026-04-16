@@ -94,8 +94,7 @@ Calculate the cross-section for a given species and their different energy state
   species
 """
 function get_cross_section(species_name, E_centers::AbstractVector)
-    filename = pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
-    state_name = readdlm(filename, String, comments=true, comment_char='%')
+    state_name = get_level_names(species_name)
     function_name = "e_" * species_name .* state_name
 
     σ_species = zeros(size(state_name, 1), length(E_centers))
@@ -108,6 +107,22 @@ function get_cross_section(species_name, E_centers::AbstractVector)
 end
 
 get_cross_section(species_name, energy_grid::EnergyGrid) = get_cross_section(species_name, energy_grid.E_centers)
+
+"""
+    get_level_names(species_name)
+
+Return the names of the excited/ionized states for a given species as a `Vector{String}`.
+
+# Example
+```julia
+get_level_names("N2")  # → ["_elastic", "_rot0_2", ..., "_ionization"]
+```
+"""
+function get_level_names(species_name)
+    filename = pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.name")
+    state_name = readdlm(filename, String, comments=true, comment_char='%')
+    return vec(state_name)
+end
 
 function Base.show(io::IO, cs::CrossSectionData)
     nE = size(cs.σ_neutrals.σ_N2, 2)
