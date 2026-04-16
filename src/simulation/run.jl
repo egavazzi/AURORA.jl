@@ -35,6 +35,7 @@ function _solve!(sim::AuroraSimulation, ::TimeDependentSolver)
     @info "Starting time-dependent simulation..."
     cache = get_cache(sim)
     time = sim.time::RefinedTimeGrid
+    n_E = sim.model.energy_grid.n
 
     fill!(cache.I0, 0.0)
     fill!(cache.Ie, 0.0)
@@ -51,8 +52,11 @@ function _solve!(sim::AuroraSimulation, ::TimeDependentSolver)
         i_start = 1 + (i_loop - 1) * (time.n_t_per_loop - 1)
         i_stop = time.n_t_per_loop + (i_loop - 1) * (time.n_t_per_loop - 1)
         Ie_top_local = @view cache.Ie_top[:, i_start:i_stop, :]
+        progress = Progress(n_E;
+                    desc=string("Solving [loop ", i_loop, "/", time.n_loop, "]"),
+                    dt=1.0)
 
-        energy_loop!(sim, Ie_top_local, i_loop, time.n_loop)
+        energy_loop!(sim, Ie_top_local, progress)
 
         # Save current loop final state to I0 for continuity to next loop
         cache.I0 .= cache.Ie[:, end, :]
@@ -78,13 +82,15 @@ end
 function _solve_single_step_steady_state!(sim::AuroraSimulation)
     @info "Starting single-step steady-state simulation..."
     cache = get_cache(sim)
+    n_E = sim.model.energy_grid.n
 
     fill!(cache.I0, 0.0)
     fill!(cache.Ie, 0.0)
     fill!(cache.matrices.Q, 0.0)
 
     Ie_top_local = @view cache.Ie_top[:, 1, :]
-    energy_loop!(sim, Ie_top_local, 1, 1)
+    progress = Progress(n_E; desc="Solving", dt=1.0)
+    energy_loop!(sim, Ie_top_local, progress)
     save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1, 1)
 
     return sim
@@ -94,6 +100,8 @@ function _solve_multi_step_steady_state!(sim::AuroraSimulation)
     @info "Starting multi-step steady-state simulation..."
     cache = get_cache(sim)
     time = sim.time::UniformTimeGrid
+    n_E = sim.model.energy_grid.n
+    progress = Progress(time.n_steps * n_E; desc="Solving", dt=1.0)
 
     for i_step in 1:time.n_steps
         # Reset state for each independent step
@@ -103,25 +111,22 @@ function _solve_multi_step_steady_state!(sim::AuroraSimulation)
 
         # Extract the boundary condition for this time step
         Ie_top_local = @view cache.Ie_top[:, i_step, :]
-        energy_loop!(sim, Ie_top_local, i_step, time.n_steps)
+        energy_loop!(sim, Ie_top_local, progress)
 
         # Accumulate result into the save array
         cache.Ie_save[:, i_step, :] .= @view cache.Ie[:, 1, :]
     end
 
     # Save all steps to a single file
-    save_results(sim, cache.Ie_save, cache.t_loop, cache.I0, 1, 1)
+    save_results(sim, cache.Ie_save, time.t, cache.I0, 1, 1)
 
     return sim
 end
 
-function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::Int)
+function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
     cache = get_cache(sim)
     model = sim.model
-    E_centers = model.energy_grid.E_centers
     n_E = model.energy_grid.n
-
-    progress = Progress(n_E; desc=string("Calculating flux for step ", i_loop, "/", n_loop), dt=1.0)
 
     # Energy loop: solve transport in descending energy order.
     # High-to-low ensures cascading sources are available when solving lower energies.
