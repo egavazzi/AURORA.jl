@@ -26,6 +26,20 @@ using GLMakie
 
 ## Functions
 
+### Model setup
+
+```@docs; canonical=false
+plot_model
+```
+
+### Simulation input
+
+```@docs; canonical=false
+plot_input
+```
+
+### Simulation results
+
 ```@docs; canonical=false
 plot_excitation!
 plot_column_excitation!

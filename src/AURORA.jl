@@ -222,6 +222,31 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 function plot_column_excitation! end
 export plot_column_excitation!
 
+"""
+    plot_model(model::AuroraModel; panels=[:all])
+
+Plot the model setup: atmosphere, energy grid, cross-sections, phase functions, and
+scattering data.
+
+Returns a `Dict{Symbol, Figure}` with one figure per panel. Use the `panels` keyword to
+select which panels to plot.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Available panels
+`:atmosphere`, `:energy_levels`, `:energy_grid`, `:cross_sections`, `:phase_functions`,
+`:scattering`, or `:all` (default) to plot everything.
+
+# Examples
+```julia
+using CairoMakie
+figs = plot_model(model)
+figs = plot_model(model; panels=[:atmosphere, :cross_sections])
+```
+"""
+function plot_model end
+export plot_model
+
 # Precompile selected functions
 include("precompiles.jl")
 
