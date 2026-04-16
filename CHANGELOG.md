@@ -1,8 +1,9 @@
 # Changelog
 
-- **Breaking** New simulation interface [#114](https://github.com/egavazzi/AURORA.jl/pull/114)
+- **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125)
   - Simulations are now set up by building an `AuroraModel`, creating an `InputFlux`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The old `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
-  - See the [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
+  - Possibility to visualize the model, the input, etc.
+  - Visit the (recently updated and expanded) [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
 - Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
