@@ -17,7 +17,7 @@ using TestItems
     # --- Steady-state simulation ---
     ss_dir = mktempdir(; cleanup = true)
     let flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim = AuroraSimulation(model, flux, ss_dir)
+        sim = AuroraSimulation(model, flux, ss_dir; solver=SteadyStateSolver())
         run!(sim)
     end
     make_volume_excitation_file(ss_dir)
@@ -26,7 +26,8 @@ using TestItems
     # --- Time-dependent simulation (2 loops) ---
     td_dir = mktempdir(; cleanup = true)
     let flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
-        sim = AuroraSimulation(model, flux, 0.1, 0.01, td_dir; CFL_number = 128, n_loop = 2)
+        sim = AuroraSimulation(model, flux, td_dir;
+                               solver=TimeDependentSolver(0.1, 0.01; CFL_number=128, n_loop=2))
         run!(sim)
     end
     make_volume_excitation_file(td_dir)

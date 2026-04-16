@@ -21,9 +21,8 @@ function build_simulation_cache(sim::AuroraSimulation)
     neutral_densities = n_neutrals(model.ionosphere)
     n_E = model.energy_grid.n
 
-    # Set up time grid (single step for steady-state, multiple steps for time-dependent)
-    n_t = isnothing(sim.time) ? 1 : sim.time.n_t_per_loop
-    t_loop = isnothing(sim.time) ? (1:1:1) : range(0.0, step=sim.time.dt_resolved, length=sim.time.n_t_per_loop)
+    # Set up time grid dimensions for working arrays
+    n_t, t_loop = _cache_time_params(sim)
 
     # Initialize solver and physical process caches
     solver = SolverCache()
@@ -37,7 +36,7 @@ function build_simulation_cache(sim::AuroraSimulation)
     B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
 
     # Pre-compute input flux data
-    Ie_top = isnothing(sim.time) ? compute_flux(sim.flux, model) : compute_flux(sim.flux, model, sim.time.t)
+    Ie_top = _compute_input_flux(sim)
 
     # Bundle cascading functions for future easy access
     # TODO: can we do this in a more elegant way? Maybe we should have a dedicated struct?
@@ -49,11 +48,53 @@ function build_simulation_cache(sim::AuroraSimulation)
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
     Ie = zeros(length(z) * length(μ_center), n_t, n_E)
-    n_t_save = isnothing(sim.time) ? 1 : length(0:sim.time.dt_requested:t_loop[end])
+    n_t_save = _save_time_length(sim, t_loop)
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
     return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0, Ie_top,
                            t_loop, phase_fcn_neutrals, B2B_fragment, cascading_neutrals)
+end
+
+# Time parameters for working arrays: (n_t, t_loop)
+_cache_time_params(sim::AuroraSimulation) = _cache_time_params(sim, sim.solver)
+
+function _cache_time_params(sim::AuroraSimulation, ::SteadyStateSolver)
+    # Both single-step and multi-step SS solve one time slice at a time
+    return 1, (1:1:1)
+end
+function _cache_time_params(sim::AuroraSimulation, ::TimeDependentSolver)
+    time = sim.time::RefinedTimeGrid
+    n_t = time.n_t_per_loop
+    t_loop = range(0.0, step=time.dt_resolved, length=time.n_t_per_loop)
+    return n_t, t_loop
+end
+
+# Compute input flux: dispatch on solver type
+_compute_input_flux(sim::AuroraSimulation) = _compute_input_flux(sim, sim.solver)
+
+function _compute_input_flux(sim::AuroraSimulation, solver::SteadyStateSolver)
+    if is_multi_step(solver)
+        # Multi-step SS: compute flux at all time points (like TD)
+        return compute_flux(sim.flux, sim.model, sim.time.t)
+    else
+        # Single-step SS: no time grid
+        return compute_flux(sim.flux, sim.model)
+    end
+end
+function _compute_input_flux(sim::AuroraSimulation, ::TimeDependentSolver)
+    return compute_flux(sim.flux, sim.model, sim.time.t)
+end
+
+# Number of time steps to save
+_save_time_length(sim::AuroraSimulation, t_loop) = _save_time_length(sim, sim.solver, t_loop)
+
+function _save_time_length(sim::AuroraSimulation, solver::SteadyStateSolver, t_loop)
+    # Multi-step SS: save all steps; single-step SS: save 1
+    return is_multi_step(solver) ? sim.time.n_steps : 1
+end
+function _save_time_length(sim::AuroraSimulation, ::TimeDependentSolver, t_loop)
+    time = sim.time::RefinedTimeGrid
+    return length(0:time.dt_requested:t_loop[end])
 end
 
 # Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).

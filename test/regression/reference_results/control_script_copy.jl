@@ -25,7 +25,7 @@ savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Run the simulation
-sim = AuroraSimulation(model, flux, savedir)
+sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
 run!(sim)
 
 ## Analyze the results
@@ -72,7 +72,8 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
                  beams=1, z_source=1000.0)
 
 ## Run the simulation
-sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop=2)
+sim = AuroraSimulation(model, flux, savedir;
+                       solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop=2))
 run!(sim)
 
 ## Analyze the results

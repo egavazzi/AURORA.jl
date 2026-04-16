@@ -71,7 +71,7 @@
 
             model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
             flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0); beams = 1:2)
-            sim = AuroraSimulation(model, flux, savedir)
+            sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
 
             @test plot_input(sim) isa Figure
         end

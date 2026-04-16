@@ -8,11 +8,6 @@ B_angle_to_zenith = 13;         # (°) angle between the B-field line and the ze
 
 t_total = 0.5;                  # (s) total simulation time
 dt = 0.001;                     # (s) time step for saving data
-
-# Options to control how the simulation is split into time chunks to manage memory:
-# n_loop = 10;                  # (optional) define manually the number of loops to run
-# max_memory_gb = 8.0           # (optional) determine n_loop based on limit memory usage
-
 CFL_number = 128;
 
 msis_file = find_msis_file(
@@ -36,10 +31,14 @@ savedir = make_savedir(root_savedir, name_savedir)
 flux = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
                  beams=1, z_source=3000.0)
 
-## Create the simulation
-sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number)
+## Create and run the simulation
+solver = TimeDependentSolver(t_total, dt;
+                             CFL_number,
+                             # n_loop = 10,             # (optional) define manually the number of loops to run
+                             # max_memory_gb = 8.0,     # (optional) or determine n_loop based on limit memory usage
+                             )
 
-## Run the simulation
+sim = AuroraSimulation(model, flux, savedir; solver)
 run!(sim)
 
 ## Run the analysis

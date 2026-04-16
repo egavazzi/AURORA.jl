@@ -20,8 +20,9 @@
                             B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), ConstantModulation();
                          beams=1, z_source=500.0)
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir;
-                               CFL_number, n_loop=1)
+        sim = AuroraSimulation(model, flux, savedir;
+                               solver=TimeDependentSolver(t_total, dt;
+                                                          CFL_number, n_loop=1))
         run!(sim)
     end
 

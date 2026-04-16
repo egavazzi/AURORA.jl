@@ -14,10 +14,11 @@
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
                          beams=1:2, z_source=500.0)
 
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop=2)
+        sim = AuroraSimulation(model, flux, savedir;
+                               solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop=2))
 
         @test sim.cache === nothing
-        @test sim.time isa ResolvedTimeGrid
+        @test sim.time isa RefinedTimeGrid
         @test sim.time.dt_resolved <= sim.time.dt_requested
 
         initialize!(sim)
@@ -39,7 +40,7 @@ end
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
-        sim = AuroraSimulation(model, flux, savedir)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
 
         @test sim.cache === nothing
 

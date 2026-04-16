@@ -25,11 +25,12 @@ savedir = make_savedir(root_savedir, name_savedir)
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Create and run the simulation
-sim = AuroraSimulation(model, flux, savedir)
+# Single-step steady-state:
+sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
 run!(sim)
 
 ## Analyze the results
 make_Ie_top_file(sim)
 make_volume_excitation_file(sim)
 make_current_file(sim)
-# make_column_excitation_file(sim) -- does not make sense for steady-state
+make_column_excitation_file(sim)

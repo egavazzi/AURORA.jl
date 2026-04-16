@@ -374,7 +374,7 @@ end
         # Define input flux
         flux = InputFlux(MaxwellianSpectrum(1e-3, 50); beams=1)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
         run!(sim)
         @test true
     end
@@ -393,7 +393,7 @@ end
         # Define input flux
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
         run!(sim)
         @test true
     end
@@ -417,7 +417,8 @@ end
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
                          beams=1:2, z_source=500.0)
         # Run simulation
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        sim = AuroraSimulation(model, flux, savedir;
+                               solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop))
         run!(sim)
         @test true
     end
@@ -441,7 +442,8 @@ end
         flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SinusoidalFlickering(5.0);
                          beams=1, z_source=1000.0)
         # Run simulation
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        sim = AuroraSimulation(model, flux, savedir;
+                               solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop))
         run!(sim)
         @test true
     end
