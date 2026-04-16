@@ -235,7 +235,7 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 
 # Available panels
 `:atmosphere`, `:energy_levels`, `:energy_grid`, `:cross_sections`, `:phase_functions`,
-`:scattering`, `:beam_weights`, or `:all` (default) to plot everything.
+`:scattering`, or `:all` (default) to plot everything.
 
 # Examples
 ```julia

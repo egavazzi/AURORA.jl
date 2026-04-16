@@ -100,4 +100,30 @@
             save_to_file = false, dt_steps = 0)
     end
 
+    @testset "plot_model smoke" begin
+        model = SharedSimResults.model
+
+        # default: all panels
+        figs = plot_model(model)
+        @test figs isa Dict{Symbol, Figure}
+        @test Set(keys(figs)) == Set([:atmosphere, :energy_levels, :energy_grid,
+                                      :cross_sections, :phase_functions, :scattering])
+        for (_, fig) in figs
+            @test fig isa Figure
+        end
+
+        # panels kwarg: subset
+        figs2 = plot_model(model; panels = [:atmosphere, :energy_grid])
+        @test Set(keys(figs2)) == Set([:atmosphere, :energy_grid])
+
+        # single panel
+        figs3 = plot_model(model; panels = [:cross_sections])
+        @test haskey(figs3, :cross_sections)
+        @test length(figs3) == 1
+
+        # unknown panel warns but doesn't error
+        figs4 = @test_logs (:warn, r"Unknown panel") plot_model(model; panels = [:bogus])
+        @test isempty(figs4)
+    end
+
 end

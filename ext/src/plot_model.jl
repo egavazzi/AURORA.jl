@@ -89,13 +89,13 @@ end
 # Energy grid
 # ======================================================================================== #
 function _plot_energy_grid(model)
-    E = model.energy_grid.E_centers
-    dE = model.energy_grid.ΔE
+    E_centers = model.energy_grid.E_centers
+    ΔE = model.energy_grid.ΔE
 
     fig = Figure(size = (800, 600))
     ax = Axis(fig[1, 1]; xlabel="Energy (eV)", ylabel="Energy bin size (eV)",
               title="Energy variation of energy bin size")
-    scatterlines!(ax, E, dE; color=:red)
+    scatterlines!(ax, E_centers, ΔE; color=:red)
 
     return fig
 end
@@ -295,10 +295,10 @@ function _plot_scattering(model)
         ax = Axis(fig[row, col]; title="$(θ_hi)° – $(θ_lo)°",
                   xticks=0:30:180, yticks=0:30:180)
         if row == 2 && col == ceil(Int, n_cols / 2)
-            ax.xlabel = "Scattering angle"
+            ax.xlabel = "scattering-angle"
         end
         if col == 1
-            ax.ylabel = "From angle"
+            ax.ylabel = "from-angle"
         end
         heatmap!(ax, 0:180, 0:180, P_scatter[:, :, i_beam];
                  colormap=:inferno, colorrange=(0, 1))
