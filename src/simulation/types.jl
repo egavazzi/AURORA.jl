@@ -142,11 +142,11 @@ directly to auto-initialize and execute the simulation.
 sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
 # Multi-step steady-state
-sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(0.5, 0.01))
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.5, dt=0.01))
 
 # Time-dependent
 sim = AuroraSimulation(model, flux, savedir;
-                       mode=TimeDependentMode(0.5, 0.001; CFL_number=128))
+                       mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 ```
 """
 mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}

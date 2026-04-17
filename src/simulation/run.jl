@@ -11,7 +11,7 @@ appropriate execution path based on the selected mode.
 # Examples
 ```julia
 sim = AuroraSimulation(model, flux, savedir;
-                       mode=TimeDependentMode(0.5, 0.001; CFL_number=128))
+                       mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 run!(sim)
 ```
 """

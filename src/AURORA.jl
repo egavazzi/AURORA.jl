@@ -89,7 +89,7 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 ```julia
 using CairoMakie
 sim = AuroraSimulation(model, flux, savedir;
-                       mode=TimeDependentMode(0.5, 0.001))
+                       mode=TimeDependentMode(duration=0.5, dt=0.001))
 fig = plot_input(sim)
 ```
 """

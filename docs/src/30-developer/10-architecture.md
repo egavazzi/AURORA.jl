@@ -168,7 +168,7 @@ The dispatch between steady-state and time-dependent is controlled by the
 
 - **Steady-state** ([`SteadyStateMode`](@ref)): No time stepping. The solver finds the
   equilibrium flux for each energy level by inverting a sparse linear system
-  (``M \cdot I_e = Q``). With time parameters (`SteadyStateMode(duration, dt)`), each
+  (``M \cdot I_e = Q``). With time parameters (`SteadyStateMode(duration=..., dt=...)`), each
   time point is solved independently (multi-step steady-state).
 
 - **Time-dependent** ([`TimeDependentMode`](@ref)): The Crank-Nicolson scheme advances

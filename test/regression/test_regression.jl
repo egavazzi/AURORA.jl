@@ -51,10 +51,6 @@ end
     E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-    duration = 0.2
-    dt = 0.01
-    CFL_number = 128;
-
     msis_file = joinpath(@__DIR__, "reference_results", "msis_20051008-2200_70N-19E.txt")
     iri_file = joinpath(@__DIR__, "reference_results", "iri_20051008-2200_70N-19E.txt")
 
@@ -72,7 +68,8 @@ end
 
     ## Run the simulation
     sim = AuroraSimulation(model, flux, savedir;
-                           mode=TimeDependentMode(duration, dt; CFL_number, n_loop=2))
+                           mode=TimeDependentMode(duration = 0.2, dt = 0.01,
+                                                  CFL_number = 128, n_loop = 2))
     run!(sim)
 
     ## Analyze the results

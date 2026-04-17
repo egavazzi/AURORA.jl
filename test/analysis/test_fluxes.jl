@@ -11,9 +11,6 @@
         θ_lims = 180:-90:0  # 2 beams: beam 1 down (μ<0), beam 2 up (μ>0)
         E_max = 100
         B_angle_to_zenith = 13
-        duration = 0.1
-        dt = 0.01
-        CFL_number = 128
 
         model = AuroraModel(altitude_lims, θ_lims, E_max,
                             find_msis_file(), find_iri_file(),
@@ -21,8 +18,8 @@
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), ConstantModulation();
                          beams=1, z_source=500.0)
         sim = AuroraSimulation(model, flux, savedir;
-                               mode=TimeDependentMode(duration, dt;
-                                                          CFL_number, n_loop=1))
+                               mode=TimeDependentMode(duration = 0.1, dt = 0.01,
+                                                      CFL_number = 128, n_loop = 1))
         run!(sim)
     end
 

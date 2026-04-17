@@ -30,7 +30,7 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 1000); beams=1:2)
 sim = AuroraSimulation(model, flux, savedir; mode=SteadyState())
 run!(sim)
 # Multi-step steady-state (each step solved independently):
-# sim = AuroraSimulation(model, flux, savedir; mode=SteadyState(0.5, 0.05))
+# sim = AuroraSimulation(model, flux, savedir; mode=SteadyState(duration=0.5, dt=0.05))
 # run!(sim)
 
 ## Analyze the results

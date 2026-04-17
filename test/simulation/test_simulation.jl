@@ -4,9 +4,7 @@
         θ_lims = 180:-45:0
         E_max = 100
         B_angle_to_zenith = 13
-        duration = 0.1
-        dt = 0.01
-        CFL_number = 128
+
         msis_file = find_msis_file()
         iri_file = find_iri_file()
 
@@ -15,7 +13,8 @@
                          beams=1:2, z_source=500.0)
 
         sim = AuroraSimulation(model, flux, savedir;
-                               mode=TimeDependentMode(duration, dt; CFL_number, n_loop=2))
+                               mode=TimeDependentMode(duration = 0.1, dt = 0.01,
+                                                      CFL_number = 128, n_loop = 2))
 
         @test sim.cache === nothing
         @test sim.time isa RefinedTimeGrid
@@ -109,18 +108,18 @@ end
 
 @testitem "TimeDependentMode divisibility check" begin
     # duration not an integer multiple of dt → error
-    @test_throws ErrorException TimeDependentMode(0.05, 0.02; CFL_number=64)
+    @test_throws ErrorException TimeDependentMode(duration=0.05, dt=0.02, CFL_number=64)
 
     # exact multiple → succeeds
-    mode = TimeDependentMode(0.04, 0.01; CFL_number=64)
+    mode = TimeDependentMode(duration=0.04, dt=0.01, CFL_number=64)
     @test mode.duration == 0.04
     @test mode.dt == 0.01
 end
 
 @testitem "Mode aliases construct canonical types" begin
     steady_state = SteadyState()
-    multi_step = SteadyState(0.04, 0.01)
-    time_dependent = TimeDependent(0.04, 0.01; CFL_number=64)
+    multi_step = SteadyState(duration=0.04, dt=0.01)
+    time_dependent = TimeDependent(duration=0.04, dt=0.01, CFL_number=64)
 
     @test steady_state isa SteadyStateMode
     @test multi_step isa SteadyStateMode

@@ -14,7 +14,7 @@ abstract type AbstractMode end
 
 """
     SteadyStateMode()
-    SteadyStateMode(duration, dt)
+    SteadyStateMode(; duration, dt)
 
 Solve each time step independently as a steady-state (time-independent) transport problem.
 
@@ -31,7 +31,7 @@ is solved in steady-state.
 sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
 # Multi-step steady-state (each time point solved independently)
-sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(0.5, 0.01))
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.5, dt=0.01))
 ```
 """
 struct SteadyStateMode <: AbstractMode
@@ -40,7 +40,7 @@ struct SteadyStateMode <: AbstractMode
 
     SteadyStateMode() = new(nothing, nothing)
 
-    function SteadyStateMode(duration, dt)
+    function SteadyStateMode(; duration, dt)
         duration > 0 || error("duration must be positive, got $duration")
         dt > 0 || error("dt must be positive, got $dt")
         dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
@@ -57,23 +57,21 @@ is_multi_step(mode::SteadyStateMode) = !isnothing(mode.duration)
 
 """
     SteadyState()
-    SteadyState(duration, dt)
+    SteadyState(; duration, dt)
 
 Convenience alias for [`SteadyStateMode`](@ref).
 """
 const SteadyState = SteadyStateMode
 
 """
-    TimeDependentMode(duration, dt; CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
+    TimeDependentMode(; duration, dt, CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
 
 Solve the transport equation in a time-dependent manner with a Crank-Nicolson scheme.
 
-# Arguments
+# Keyword Arguments
 - `duration`: total simulation time (s)
 - `dt`: time step for saving data (s). The internal time step may be finer to satisfy
   the CFL condition.
-
-# Keyword Arguments
 - `CFL_number = 64`: CFL stability factor. Crank-Nicolson is unconditionally stable,
   so large values are acceptable (it will affects the accuracy though).
 - `max_memory_gb = 8.0`: memory budget (GB) used to auto-split the simulation into loops.
@@ -82,7 +80,7 @@ Solve the transport equation in a time-dependent manner with a Crank-Nicolson sc
 # Examples
 ```julia
 sim = AuroraSimulation(model, flux, savedir;
-                       mode=TimeDependentMode(0.5, 0.001; CFL_number=128))
+                       mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 ```
 """
 struct TimeDependentMode <: AbstractMode
@@ -91,26 +89,27 @@ struct TimeDependentMode <: AbstractMode
     CFL_number::Float64
     max_memory_gb::Float64
     n_loop::Union{Nothing, Int}
-end
 
-function TimeDependentMode(duration, dt; CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
-    duration > 0 || error("duration must be positive, got $duration")
-    dt > 0 || error("dt must be positive, got $dt")
-    dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
-    n_intervals = Float64(duration) / Float64(dt)
-    isapprox(n_intervals, round(n_intervals); atol=1e-10, rtol=1e-10) ||
-        error("duration ($duration) must be an integer multiple of dt ($dt)")
-    CFL_number > 0 || error("CFL_number must be positive, got $CFL_number")
-    max_memory_gb > 0 || error("max_memory_gb must be positive, got $max_memory_gb")
-    if !isnothing(n_loop)
-        n_loop > 0 || error("n_loop must be positive, got $n_loop")
+    function TimeDependentMode(; duration, dt, CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
+        # A bunch of input validation to fail early if the user config is invalid
+        duration > 0 || error("duration must be positive, got $duration")
+        dt > 0 || error("dt must be positive, got $dt")
+        dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
+        n_intervals = Float64(duration) / Float64(dt)
+        isapprox(n_intervals, round(n_intervals); atol=1e-10, rtol=1e-10) ||
+            error("duration ($duration) must be an integer multiple of dt ($dt)")
+        CFL_number > 0 || error("CFL_number must be positive, got $CFL_number")
+        max_memory_gb > 0 || error("max_memory_gb must be positive, got $max_memory_gb")
+        if !isnothing(n_loop)
+            n_loop > 0 || error("n_loop must be positive, got $n_loop")
+        end
+        return new(Float64(duration), Float64(dt), Float64(CFL_number),
+                   Float64(max_memory_gb), n_loop)
     end
-    return TimeDependentMode(Float64(duration), Float64(dt), Float64(CFL_number),
-                             Float64(max_memory_gb), n_loop)
 end
 
 """
-    TimeDependent(duration, dt; CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
+    TimeDependent(; duration, dt, CFL_number=64, max_memory_gb=8.0, n_loop=nothing)
 
 Convenience alias for [`TimeDependentMode`](@ref).
 """

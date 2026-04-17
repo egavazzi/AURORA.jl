@@ -30,7 +30,7 @@ flux = InputFlux(
 # Create and run a short time-dependent simulation
 savedir = mkpath(joinpath("data", "my_first_simulation"))
 sim = AuroraSimulation(model, flux, savedir;
-                       mode=TimeDependentMode(0.2, 0.01; CFL_number=128))
+                       mode=TimeDependentMode(duration=0.2, dt=0.01, CFL_number=128))
 run!(sim)
 ```
 

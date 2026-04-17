@@ -87,10 +87,10 @@ sim = AuroraSimulation(
     flux,
     savedir;
     mode=TimeDependentMode(
-        0.5,                # total simulation time [s]
-        0.01;               # output time step [s] (save every 10 ms)
-        CFL_number=256,     # CFL stability parameter (higher → coarser internal stepping)
-        max_memory_gb=4.0   # memory budget [GB] — controls loop partitioning
+        duration=0.5,           # total simulation time [s]
+        dt=0.01,                # output time step [s] (save every 10 ms)
+        CFL_number=256,         # CFL stability parameter (higher → coarser internal stepping)
+        max_memory_gb=4.0       # memory budget [GB] — controls loop partitioning
     )
 )
 ```
