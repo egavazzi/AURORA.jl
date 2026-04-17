@@ -124,12 +124,12 @@ function solve_energy_step!(sim::AuroraSimulation, iE::Int, Ie_top_local; first_
     model = sim.model
 
     if isnothing(sim.time)
-        @views steady_state_scheme_optimized!(cache.Ie[:, 1, iE], model,
+        @views steady_state_scheme!(cache.Ie[:, 1, iE], model,
                                               cache.matrices, iE,
                                               Ie_top_local[:, iE], cache.solver;
                                               first_iteration)
     else
-        @views Crank_Nicolson_optimized!(cache.Ie[:, :, iE], cache.t_loop, model,
+        @views Crank_Nicolson!(cache.Ie[:, :, iE], cache.t_loop, model,
                                          v_of_E(model.energy_grid.E_centers[iE]),
                                          cache.matrices, iE,
                                          Ie_top_local[:, :, iE], cache.I0[:, iE],

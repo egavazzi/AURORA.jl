@@ -92,7 +92,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    steady_state_scheme_optimized!(Ie, model, matrices, iE, Ie_top, cache; first_iteration = false)
+    steady_state_scheme!(Ie, model, matrices, iE, Ie_top, cache; first_iteration = false)
 
 Solve the steady-state electron transport equation for energy level `iE`.
 
@@ -136,7 +136,7 @@ The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
 - `cache`: `SolverCache` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
 - `first_iteration`: whether this is the first call (creates structure) or subsequent (reuses)
 """
-function steady_state_scheme_optimized!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache; first_iteration = false)
+function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache; first_iteration = false)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)

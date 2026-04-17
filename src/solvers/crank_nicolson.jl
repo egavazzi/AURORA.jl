@@ -118,7 +118,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    Crank_Nicolson_optimized!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
 
 Solve the time-dependent electron transport equation for energy level `iE`
 using the Crank-Nicolson implicit scheme.
@@ -172,7 +172,7 @@ Both matrices share the same block structure as the steady-state system:
 - `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
 - `first_iteration`: whether this is the first call
 """
-function Crank_Nicolson_optimized!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)

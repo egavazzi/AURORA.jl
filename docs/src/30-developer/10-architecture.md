@@ -65,9 +65,9 @@ src/
 │   ├── transport_matrices.jl    # TransportMatrices struct
 │   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
 │   ├── crank_nicolson.jl        # Standard Crank-Nicolson scheme
-│   ├── crank_nicolson_optimized.jl  # In-place optimized version
+│   ├── crank_nicolson.jl  # In-place optimized version
 │   ├── steady_state.jl          # Steady-state solver
-│   └── steady_state_optimized.jl    # In-place optimized version
+│   └── steady_state.jl    # In-place optimized version
 │
 ├── simulation/
 │   ├── types.jl                 # AuroraSimulation, ResolvedTimeGrid
@@ -136,8 +136,8 @@ energy_loop!(sim, Ie_top, i_loop, n_loop)
     │   └── update_Ddiffusion!()  # Spatial diffusion operator
     │
     ├── solve_energy_step!(sim, iE, Ie_top)
-    │   ├── [steady-state] → steady_state_scheme_optimized!()
-    │   └── [time-dependent] → Crank_Nicolson_optimized!()
+    │   ├── [steady-state] → steady_state_scheme!()
+    │   └── [time-dependent] → Crank_Nicolson!()
     │
     └── update_Q!(sim, iE)   # Source terms for lower energies
         ├── e-e collision energy transfer
