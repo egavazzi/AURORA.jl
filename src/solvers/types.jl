@@ -48,7 +48,8 @@ function SteadyStateMode(; duration=nothing, dt=nothing)
     duration > 0 || error("duration must be positive, got $duration")
     dt > 0 || error("dt must be positive, got $dt")
     dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
-    mod(duration, dt) > 1e-10 * dt && error("duration ($duration) must be an integer multiple of dt ($dt)")
+    isapprox(round(duration / dt) * dt, duration; rtol=1e-10) ||
+        error("duration ($duration) must be an integer multiple of dt ($dt)")
     return SteadyStateMode(Float64(duration), Float64(dt))
 end
 
@@ -99,7 +100,8 @@ struct TimeDependentMode <: AbstractMode
         duration > 0 || error("duration must be positive, got $duration")
         dt > 0 || error("dt must be positive, got $dt")
         dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
-        mod(duration, dt) > 1e-10 * dt && error("duration ($duration) must be an integer multiple of dt ($dt)")
+        isapprox(round(duration / dt) * dt, duration; rtol=1e-10) ||
+            error("duration ($duration) must be an integer multiple of dt ($dt)")
         CFL_number > 0 || error("CFL_number must be positive, got $CFL_number")
         max_memory_gb > 0 || error("max_memory_gb must be positive, got $max_memory_gb")
         if !isnothing(n_loop)
