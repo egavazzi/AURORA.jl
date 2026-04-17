@@ -6,7 +6,7 @@ altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
 E_max = 1000;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-t_total = 0.5;                  # (s) total simulation time
+duration = 0.5;                  # (s) total simulation time
 dt = 0.001;                     # (s) time step for saving data
 CFL_number = 128;
 
@@ -32,13 +32,13 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=100), SinusoidalFlickering(5.0);
                  beams=1, z_source=3000.0)
 
 ## Create and run the simulation
-solver = TimeDependentSolver(t_total, dt;
-                             CFL_number,
-                             # n_loop = 10,             # (optional) define manually the number of loops to run
-                             # max_memory_gb = 8.0,     # (optional) or determine n_loop based on limit memory usage
-                             )
+mode = TimeDependent(duration, dt;
+                     CFL_number,
+                     # n_loop = 10,             # (optional) define manually the number of loops to run
+                     # max_memory_gb = 8.0,     # (optional) or determine n_loop based on limit memory usage
+                     )
 
-sim = AuroraSimulation(model, flux, savedir; solver)
+sim = AuroraSimulation(model, flux, savedir; mode)
 run!(sim)
 
 ## Run the analysis
