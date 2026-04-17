@@ -277,12 +277,16 @@ When `half_weight=true` (used by Crank-Nicolson), the coefficients are halved
 so that the matrices represent `Ddz/2` directly.
 """
 function build_spatial_operators(z; half_weight::Bool = false)
-    h4diffu = [z[1] - (z[2] - z[1]); z]
-    h4diffd = [z; z[end] + (z[end] - z[end - 1])]
+    z_ghost_bottom = z[1] - (z[2] - z[1])
+    z_ghost_top = z[end] + (z[end] - z[end - 1])
+
+    z_extended_bottom = [z_ghost_bottom; z]
+    z_extended_top = [z; z_ghost_top]
+
     scale = half_weight ? 2.0 : 1.0
-    Ddz_Up   = spdiagm(-1 => -1 ./ (scale .* diff(h4diffu[2:end])),
-                         0 =>  1 ./ (scale .* diff(h4diffu[1:end])))
-    Ddz_Down = spdiagm( 0 => -1 ./ (scale .* diff(h4diffd[1:end])),
-                         1 =>  1 ./ (scale .* diff(h4diffd[1:(end - 1)])))
+    Ddz_Up   = spdiagm(-1 => -1 ./ (scale .* diff(z_extended_bottom[2:end])),
+                         0 =>  1 ./ (scale .* diff(z_extended_bottom[1:end])))
+    Ddz_Down = spdiagm( 0 => -1 ./ (scale .* diff(z_extended_top[1:end])),
+                         1 =>  1 ./ (scale .* diff(z_extended_top[1:(end - 1)])))
     return Ddz_Up, Ddz_Down
 end
