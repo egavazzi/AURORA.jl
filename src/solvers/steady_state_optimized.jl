@@ -355,7 +355,7 @@ Where:
 The resulting sparse matrix `Mlhs` has a block structure:
 ```
 ┌─────────┬─────────┬─────────┐
-│ Block   │ Block   │ Block   │  Each block is n_z × n_z
+│ Block   │ Block   │ Block   │  Each block is n_z x n_z
 │ (1,1)   │ (1,2)   │ (1,3)   │  (n_z = number of altitudes)
 ├─────────┼─────────┼─────────┤
 │ Block   │ Block   │ Block   │  Off-diagonal blocks (i1≠i2):
@@ -376,10 +376,10 @@ Jacobian = ∂f/∂Ie = Mlhs
 - `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
-    - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
+    - `B`: scattering matrix [s⁻¹], size (n_z x n_angle x n_angle)
     - `D`: pitch-angle diffusion coefficient [s⁻¹], size (n_angle,)
-    - `Q`: source term [m⁻² s⁻¹], size (n_z × n_angle × n_energy)
-    - `Ddiffusion`: spatial diffusion matrix, size (n_z × n_z)
+    - `Q`: source term [m⁻² s⁻¹], size (n_z x n_angle x n_energy)
+    - `Ddiffusion`: spatial diffusion matrix, size (n_z x n_z)
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: Cache object storing Mlhs, mapping, KLU, and differentiation matrices

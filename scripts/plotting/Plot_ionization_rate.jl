@@ -20,7 +20,7 @@ using CairoMakie
 ## Load data
 ## ====================================================================================== ##
 
-full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260409-1812"
+full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260416-1811"
 
 data = load_volume_excitation(full_path_to_directory)
 
@@ -93,7 +93,7 @@ vlines!(ax_top, [data.t[10]]; color = :white, linewidth = 2, linestyle = :dash)
 ax_Q = Axis(fig[2, 1]; xlabel = "Ionization rate (/m³/s)", ylabel = "Altitude (km)",
             xscale = log10, xminorticksvisible = true, yminorticksvisible = true,
             yminorticks = IntervalsBetween(9), xticksmirrored = true, yticksmirrored = true)
-plot_excitation!(ax_Q, data; time_index = 50)
+plot_excitation!(ax_Q, data; time_index = 5)
 rowsize!(fig.layout, 1, Relative(1/4))
 ylims!(ax_Q, 100, 500)
 display(fig)

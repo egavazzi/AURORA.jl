@@ -16,15 +16,15 @@ using CairoMakie
 ## Load data
 ## ====================================================================================== ##
 
-full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260410-1015"
-full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260409-1812"
+full_path_to_directory = "/home/etienne/Documents/Julia/AURORA.jl/data/backup/20260416-1811"
+
 
 data_Q = load_volume_excitation(full_path_to_directory)
 data_I = load_column_excitation(full_path_to_directory)
 
 
 ## ====================================================================================== ##
-## Volume emission rates (2×2 heatmap grid)
+## Volume emission rates (2x2 heatmap grid)
 ## ====================================================================================== ##
 
 wavelengths = [:Q4278, :Q6730, :Q7774, :Q8446]

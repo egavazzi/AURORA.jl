@@ -91,7 +91,7 @@ src/
 | Type | Role |
 |------|------|
 | [`AuroraModel`](@ref) | Physical model: grids + atmosphere + cross sections |
-| [`InputFlux`](@ref) | Precipitating electron specification: spectrum × modulation |
+| [`InputFlux`](@ref) | Precipitating electron specification: spectrum x modulation |
 | [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + timing + output |
 | `SimulationCache` | Internal workspace: solver matrices, flux arrays, factorizations |
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |

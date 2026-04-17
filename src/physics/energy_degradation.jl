@@ -195,7 +195,7 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_e
                 partition_fraction = partition_fraction / sum(partition_fraction)
 
                 # Add the degraded electron flux to Q
-                # Q[z,t,E'] += Ie_scatter[z,t] × partition_fraction[E'] × σ × min(1, E_loss/dE)
+                # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
                 @tturbo for i_u in eachindex(findall(x -> x != 0, partition_fraction))
                     for j in axes(Q, 2)
                         for k in axes(Q, 1)

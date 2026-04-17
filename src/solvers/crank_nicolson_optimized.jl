@@ -481,7 +481,7 @@ Mrhs = Ddt - μ*Ddz/2 - A/2 + B/2 + D*Ddiffusion/2
 Both matrices have the same block structure as in steady-state:
 ```
 ┌─────────┬─────────┬─────────┐
-│ Block   │ Block   │ Block   │  Each block is n_z × n_z
+│ Block   │ Block   │ Block   │  Each block is n_z x n_z
 │ (1,1)   │ (1,2)   │ (1,3)   │
 ├─────────┼─────────┼─────────┤
 │ Block   │ Block   │ Block   │  Off-diagonal: angular scattering
@@ -493,16 +493,16 @@ Both matrices have the same block structure as in steady-state:
 ```
 
 # Arguments
-- `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle × n_t) to store results
+- `Ie`: pre-allocated output array [m⁻² s⁻¹], size (n_z * n_angle x n_t) to store results
 - `t`: time grid [s]
 - `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `v`: electron velocity [km/s]
 - `matrices::TransportMatrices`: container with
     - `A`: electron loss rate [s⁻¹]
-    - `B`: scattering matrix [s⁻¹], size (n_z × n_angle × n_angle)
+    - `B`: scattering matrix [s⁻¹], size (n_z x n_angle x n_angle)
     - `D`: pitch-angle diffusion coefficient [s⁻¹], size (n_angle,)
     - `Q`: source term [m⁻² s⁻¹] at each time step
-    - `Ddiffusion`: spatial diffusion matrix (n_z × n_z)
+    - `Ddiffusion`: spatial diffusion matrix (n_z x n_z)
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]

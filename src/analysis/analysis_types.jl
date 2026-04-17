@@ -7,10 +7,10 @@ Result of the volume excitation rate computation. Contains the volume excitation
 rates on the altitude x time grid, as saved in `Qzt_all_L.mat`.
 
 # Fields
-- `Q4278`, `Q6730`, `Q7774`, `Q8446`, `QO1D`, `QO1S`: volume excitation rates (photons/m³/s) as `Matrix{Float64}` (n_z × n_t)
+- `Q4278`, `Q6730`, `Q7774`, `Q8446`, `QO1D`, `QO1S`: volume excitation rates (photons/m³/s) as `Matrix{Float64}` (n_z x n_t)
 - `Q7774_O`, `Q7774_O2`: species-resolved contributions to `Q7774`
 - `Q8446_O`, `Q8446_O2`: species-resolved contributions to `Q8446`
-- `QOi`, `QO2i`, `QN2i`: ionization rates (/m³/s) as `Matrix{Float64}` (n_z × n_t)
+- `QOi`, `QO2i`, `QN2i`: ionization rates (/m³/s) as `Matrix{Float64}` (n_z x n_t)
 - `h_atm`: altitude grid (m) as `Vector{Float64}`
 - `t`: time grid (s) as `Vector{Float64}`
 - `savedir`: directory from which the result was loaded, or `nothing`

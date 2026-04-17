@@ -646,7 +646,7 @@ end
 function estimate_simulation_memory(n_z::Int, n_μ::Int, n_t::Int, n_E::Int)
     bytes_per_float64 = 8
 
-    # Main Ie array: (n_z * n_μ) × n_t × n_E
+    # Main Ie array: (n_z * n_μ) x n_t x n_E
     Ie_elements = n_z * n_μ * n_t * n_E
     Ie_bytes = Ie_elements * bytes_per_float64
 
