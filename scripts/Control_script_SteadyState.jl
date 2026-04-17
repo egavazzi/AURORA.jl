@@ -22,12 +22,16 @@ name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
 ## Define input flux
-flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
+flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 1000); beams=1:2)
 
 ## Create and run the simulation
+## Create and run the simulation
 # Single-step steady-state:
-sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyState())
 run!(sim)
+# Multi-step steady-state (each step solved independently):
+# sim = AuroraSimulation(model, flux, savedir; mode=SteadyState(0.5, 0.05))
+# run!(sim)
 
 ## Analyze the results
 make_Ie_top_file(sim)

@@ -103,7 +103,7 @@ import LibGit2
 import Pkg
 function save_parameters(sim::AuroraSimulation)
     model = sim.model
-    solver = sim.solver
+    mode = sim.mode
 
 	savefile = joinpath(sim.savedir, "parameters.txt")
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
@@ -118,7 +118,7 @@ function save_parameters(sim::AuroraSimulation)
         write(f, "E_max = $(model.energy_grid.E_max) \n")
         write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
         write(f, "\n")
-        write(f, "solver = $solver \n")
+        write(f, "mode = $mode \n")
         _write_time_params(f, sim)
         write(f, "\n")
         write(f, "flux = $(sim.flux) \n")
@@ -128,25 +128,25 @@ function save_parameters(sim::AuroraSimulation)
     end
 end
 
-function _write_time_params(f::IO, sim::AuroraSimulation)
-    if sim.time isa RefinedTimeGrid
-        time = sim.time
-        write(f, "t_total = $(time.t_total) \n")
-        write(f, "dt = $(time.dt_requested) \n")
-        write(f, "dt_resolved = $(time.dt_resolved) \n")
-        write(f, "t = $(time.t) \n")
-        write(f, "n_loop = $(time.n_loop) \n")
-        write(f, "CFL_factor = $(time.CFL_factor) \n")
-    elseif sim.time isa UniformTimeGrid
-        time = sim.time
-        write(f, "t_total = $(time.t_total) \n")
-        write(f, "dt = $(time.dt) \n")
-        write(f, "n_steps = $(time.n_steps) \n")
-        write(f, "t = $(time.t) \n")
-    else
-        write(f, "t_total = nothing \n")
-        write(f, "dt = nothing \n")
-    end
+_write_time_params(f::IO, sim::AuroraSimulation) = _write_time_params(f, sim.time)
+
+function _write_time_params(f::IO, time::RefinedTimeGrid)
+    write(f, "duration = $(time.duration) \n")
+    write(f, "dt = $(time.dt_requested) \n")
+    write(f, "dt_resolved = $(time.dt_resolved) \n")
+    write(f, "t = $(time.t) \n")
+    write(f, "n_loop = $(time.n_loop) \n")
+    write(f, "CFL_factor = $(time.CFL_factor) \n")
+end
+function _write_time_params(f::IO, time::UniformTimeGrid)
+    write(f, "duration = $(time.duration) \n")
+    write(f, "dt = $(time.dt) \n")
+    write(f, "n_steps = $(time.n_steps) \n")
+    write(f, "t = $(time.t) \n")
+end
+function _write_time_params(f::IO, ::SingleStepConfig)
+    write(f, "duration = nothing \n")
+    write(f, "dt = nothing \n")
 end
 
 
@@ -181,6 +181,12 @@ function save_Ie_top(sim::AuroraSimulation, Ie_top, t)
     close(file)
 end
 
+_mode_type_tag(::RefinedTimeGrid)  = "time_dependent"
+_mode_type_tag(::UniformTimeGrid)  = "steady_state_multi_step"
+_mode_type_tag(::SingleStepConfig) = "steady_state_single_step"
+
+_solver_type_tag(::TimeDependentMode) = "time_dependent"
+_solver_type_tag(::SteadyStateMode)   = "steady_state"
 
 using MAT: matopen
 using Printf: @sprintf
@@ -195,8 +201,9 @@ function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
     # Reduce t_run to match the t_sampling
     t_run = t_run[1:CFL_factor:end]
 
-    # Solver type tag for downstream analysis
-    solver_type = sim.solver isa SteadyStateSolver ? "steady_state" : "time_dependent"
+    # Mode type tags for downstream analysis
+    mode_type = _mode_type_tag(sim.time)
+    solver_type = _solver_type_tag(sim.mode)
 
     savefile = joinpath(sim.savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")
@@ -209,6 +216,7 @@ function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
 		write(file, "h_atm", z)
 		write(file, "I0", I0)
         write(file, "solver_type", solver_type)
+        write(file, "mode_type", mode_type)
 		write(file, "mu_scatterings", Dict(
 			"P_scatter" => scattering.P_scatter,
             "BeamWeight_relative" => scattering.Ω_subbeam_relative,

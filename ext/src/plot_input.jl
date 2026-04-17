@@ -28,7 +28,7 @@ function AURORA.plot_input(sim::AURORA.AuroraSimulation)
     Ω_beam = model.scattering.Ω_beam
     flux = sim.flux
 
-    if isnothing(sim.time)
+    if sim.time isa AURORA.SingleStepConfig
         # Single-step steady-state: no time grid
         Ie_top = AURORA.compute_flux(flux, model)
         return _plot_input_steady_state(Ie_top, E_centers, ΔE, θ_lims, Ω_beam, flux)

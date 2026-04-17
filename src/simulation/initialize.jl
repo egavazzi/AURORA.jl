@@ -56,46 +56,35 @@ function build_simulation_cache(sim::AuroraSimulation)
 end
 
 # Time parameters for working arrays: (n_t, t_loop)
-_cache_time_params(sim::AuroraSimulation) = _cache_time_params(sim, sim.solver)
+_cache_time_params(sim::AuroraSimulation) = _cache_time_params(sim.time)
 
-function _cache_time_params(sim::AuroraSimulation, ::SteadyStateSolver)
-    # Both single-step and multi-step SS solve one time slice at a time
+function _cache_time_params(::SingleStepConfig)
+    # Single-step steady-state solves one time slice
     return 1, (1:1:1)
 end
-function _cache_time_params(sim::AuroraSimulation, ::TimeDependentSolver)
-    time = sim.time::RefinedTimeGrid
+function _cache_time_params(::UniformTimeGrid)
+    # Multi-step steady-state still solves one time slice at a time
+    return 1, (1:1:1)
+end
+function _cache_time_params(time::RefinedTimeGrid)
     n_t = time.n_t_per_loop
     t_loop = range(0.0, step=time.dt_resolved, length=time.n_t_per_loop)
     return n_t, t_loop
 end
 
-# Compute input flux: dispatch on solver type
-_compute_input_flux(sim::AuroraSimulation) = _compute_input_flux(sim, sim.solver)
+# Compute input flux: dispatch on time config type
+_compute_input_flux(sim::AuroraSimulation) = _compute_input_flux(sim, sim.time)
 
-function _compute_input_flux(sim::AuroraSimulation, solver::SteadyStateSolver)
-    if is_multi_step(solver)
-        # Multi-step SS: compute flux at all time points (like TD)
-        return compute_flux(sim.flux, sim.model, sim.time.t)
-    else
-        # Single-step SS: no time grid
-        return compute_flux(sim.flux, sim.model)
-    end
-end
-function _compute_input_flux(sim::AuroraSimulation, ::TimeDependentSolver)
-    return compute_flux(sim.flux, sim.model, sim.time.t)
-end
+_compute_input_flux(sim::AuroraSimulation, ::SingleStepConfig) = compute_flux(sim.flux, sim.model)
+_compute_input_flux(sim::AuroraSimulation, time::UniformTimeGrid) = compute_flux(sim.flux, sim.model, time.t)
+_compute_input_flux(sim::AuroraSimulation, time::RefinedTimeGrid) = compute_flux(sim.flux, sim.model, time.t)
 
 # Number of time steps to save
-_save_time_length(sim::AuroraSimulation, t_loop) = _save_time_length(sim, sim.solver, t_loop)
+_save_time_length(sim::AuroraSimulation, t_loop) = _save_time_length(sim.time, t_loop)
 
-function _save_time_length(sim::AuroraSimulation, solver::SteadyStateSolver, t_loop)
-    # Multi-step SS: save all steps; single-step SS: save 1
-    return is_multi_step(solver) ? sim.time.n_steps : 1
-end
-function _save_time_length(sim::AuroraSimulation, ::TimeDependentSolver, t_loop)
-    time = sim.time::RefinedTimeGrid
-    return length(0:time.dt_requested:t_loop[end])
-end
+_save_time_length(::SingleStepConfig, t_loop) = 1
+_save_time_length(time::UniformTimeGrid, t_loop) = time.n_steps
+_save_time_length(time::RefinedTimeGrid, t_loop) = length(0:time.dt_requested:t_loop[end])
 
 # Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
 # These phase functions describe the angular distribution of particles after collisions.

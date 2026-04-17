@@ -62,7 +62,7 @@ src/
 │   └── scattering.jl            # Pitch-angle scattering matrices
 │
 ├── solvers/
-│   ├── types.jl                 # AbstractSolver, SteadyStateSolver, TimeDependentSolver
+│   ├── types.jl                 # AbstractMode, SteadyStateMode, TimeDependentMode
 │   ├── transport_matrices.jl    # TransportMatrices struct
 │   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
 │   ├── crank_nicolson.jl        # Standard Crank-Nicolson scheme
@@ -71,7 +71,7 @@ src/
 │   └── steady_state_optimized.jl    # In-place optimized version
 │
 ├── simulation/
-│   ├── types.jl                 # AuroraSimulation, AbstractTimeGrid, RefinedTimeGrid, UniformTimeGrid
+│   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
 │   ├── cache.jl                 # SimulationCache, SolverCache, DegradationCache
 │   ├── initialize.jl            # initialize! — allocates cache
 │   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
@@ -93,8 +93,8 @@ src/
 |------|------|
 | [`AuroraModel`](@ref) | Physical model: grids + atmosphere + cross sections |
 | [`InputFlux`](@ref) | Precipitating electron specification: spectrum × modulation |
-| [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + solver + output |
-| [`AbstractSolver`](@ref) | Solver strategy: [`SteadyStateSolver`](@ref) or [`TimeDependentSolver`](@ref) |
+| [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + mode + output |
+| [`AbstractMode`](@ref) | Solver strategy: [`SteadyStateMode`](@ref) or [`TimeDependentMode`](@ref) |
 | `SimulationCache` | Internal workspace: solver matrices, flux arrays, factorizations |
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
 | [`RefinedTimeGrid`](@ref) | Time discretization with CFL refinement and loop partitioning |
@@ -118,17 +118,17 @@ run!(sim::AuroraSimulation)
 │
 └── solve!(sim)
     │
-    ├─── [steady-state: SteadyStateSolver, single-step]
+    ├─── [steady-state: SteadyStateMode, single-step]
     │    └── energy_loop!(sim, Ie_top, 1, 1)
     │
-    ├─── [steady-state: SteadyStateSolver, multi-step]
+    ├─── [steady-state: SteadyStateMode, multi-step]
     │    └── for i_step in 1:n_steps
     │        ├── Reset solver state
     │        ├── Compute Ie_top for this time point
     │        ├── energy_loop!(sim, Ie_top_step, 1, 1)
     │        └── Accumulate results
     │
-    └─── [time-dependent: TimeDependentSolver]
+    └─── [time-dependent: TimeDependentMode]
          └── for i_loop in 1:n_loop
              ├── Extract Ie_top chunk for this time window
              ├── energy_loop!(sim, Ie_top_chunk, i_loop, n_loop)
@@ -164,14 +164,14 @@ when the solver reaches the lower energy levels. This is what we refer to as the
 ## Steady-state vs. time-dependent
 
 The dispatch between steady-state and time-dependent is controlled by the
-[`AbstractSolver`](@ref) type stored in `sim.solver`:
+[`AbstractMode`](@ref) type stored in `sim.mode`:
 
-- **Steady-state** ([`SteadyStateSolver`](@ref)): No time stepping. The solver finds the
+- **Steady-state** ([`SteadyStateMode`](@ref)): No time stepping. The solver finds the
   equilibrium flux for each energy level by inverting a sparse linear system
-  (``M \cdot I_e = Q``). With time parameters (`SteadyStateSolver(t_total, dt)`), each
+  (``M \cdot I_e = Q``). With time parameters (`SteadyStateMode(duration, dt)`), each
   time point is solved independently (multi-step steady-state).
 
-- **Time-dependent** ([`TimeDependentSolver`](@ref)): The Crank-Nicolson scheme advances
+- **Time-dependent** ([`TimeDependentMode`](@ref)): The Crank-Nicolson scheme advances
   the solution in time at each energy level. The simulation may be split into multiple
   *loops* (time chunks) to fit within a memory budget, controlled by `max_memory_gb`.
 

@@ -374,7 +374,7 @@ end
         # Define input flux
         flux = InputFlux(MaxwellianSpectrum(1e-3, 50); beams=1)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
         run!(sim)
         @test true
     end
@@ -393,7 +393,7 @@ end
         # Define input flux
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
         run!(sim)
         @test true
     end
@@ -406,7 +406,7 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        t_total = 0.1;                  # (s) total simulation time
+        duration = 0.1;                  # (s) total simulation time
         dt = 0.01;                      # (s) time step for saving data
         n_loop = 2;                     # number of loops to run
         CFL_number = 128;
@@ -418,7 +418,7 @@ end
                          beams=1:2, z_source=500.0)
         # Run simulation
         sim = AuroraSimulation(model, flux, savedir;
-                               solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop))
+                               mode=TimeDependentMode(duration, dt; CFL_number, n_loop))
         run!(sim)
         @test true
     end
@@ -431,7 +431,7 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        t_total = 0.1;                  # (s) total simulation time
+        duration = 0.1;                  # (s) total simulation time
         dt = 0.01;                      # (s) time step for saving data
         n_loop = 2;                     # number of loops to run
         CFL_number = 128;
@@ -443,7 +443,7 @@ end
                          beams=1, z_source=1000.0)
         # Run simulation
         sim = AuroraSimulation(model, flux, savedir;
-                               solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop))
+                               mode=TimeDependentMode(duration, dt; CFL_number, n_loop))
         run!(sim)
         @test true
     end

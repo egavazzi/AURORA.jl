@@ -20,7 +20,7 @@
     flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
     ## Run the simulation
-    sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
+    sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
     run!(sim)
 
     ## Analyze the results
@@ -51,7 +51,7 @@ end
     E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-    t_total = 0.2
+    duration = 0.2
     dt = 0.01
     CFL_number = 128;
 
@@ -72,7 +72,7 @@ end
 
     ## Run the simulation
     sim = AuroraSimulation(model, flux, savedir;
-                           solver=TimeDependentSolver(t_total, dt; CFL_number, n_loop=2))
+                           mode=TimeDependentMode(duration, dt; CFL_number, n_loop=2))
     run!(sim)
 
     ## Analyze the results

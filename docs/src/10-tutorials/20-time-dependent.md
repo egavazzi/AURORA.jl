@@ -76,7 +76,7 @@ See the [Input flux](@ref "Input Flux") tutorial for other spectrum types, modul
 ## Step 3: Create and run the simulation
 
 Bundle the model and input flux into an [`AuroraSimulation`](@ref). For a time-dependent
-simulation, pass a [`TimeDependentSolver`](@ref) specifying the total duration and output
+simulation, pass a [`TimeDependentMode`](@ref) specifying the total duration and output
 cadence:
 
 ```@example time_dep
@@ -86,7 +86,7 @@ sim = AuroraSimulation(
     model,
     flux,
     savedir;
-    solver=TimeDependentSolver(
+    mode=TimeDependentMode(
         0.5,                # total simulation time [s]
         0.01;               # output time step [s] (save every 10 ms)
         CFL_number=256,     # CFL stability parameter (higher → coarser internal stepping)
@@ -98,7 +98,7 @@ sim = AuroraSimulation(
 ### Understanding the time grid
 
 The [`RefinedTimeGrid`](@ref) is constructed automatically from the
-[`TimeDependentSolver`](@ref) parameters. It determines two key quantities:
+[`TimeDependentMode`](@ref) parameters. It determines two key quantities:
 
 - **`dt_resolved`**: the internal time step, chosen to satisfy the CFL condition. This is
   typically much smaller than the requested output `dt`.
