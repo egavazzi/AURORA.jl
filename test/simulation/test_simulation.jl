@@ -56,14 +56,13 @@ end
         θ_lims = 180:-90:0
         E_max = 100
         B_angle_to_zenith = 13
-        duration = 0.04
-        dt = 0.01
+
         msis_file = find_msis_file()
         iri_file = find_iri_file()
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SinusoidalFlickering(5.0); beams=1:2)
-        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration, dt))
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration = 0.04, dt = 0.01))
 
         run!(sim)
 
@@ -95,15 +94,14 @@ end
     end
 end
 
-@testitem "UniformTimeGrid divisibility check" begin
+@testitem "SteadyStateMode divisibility check" begin
     # duration not an integer multiple of dt → error
-    @test_throws ErrorException UniformTimeGrid(0.05, 0.02)
+    @test_throws ErrorException SteadyStateMode(duration=0.05, dt=0.02)
 
     # exact multiple → succeeds
-    grid = UniformTimeGrid(0.04, 0.01)
-    @test grid.n_steps == 5   # includes t=0 and t=duration (n_intervals + 1)
-    @test grid.duration == 0.04
-    @test grid.dt == 0.01
+    mode = SteadyStateMode(duration=0.04, dt=0.01)
+    @test mode.duration == 0.04
+    @test mode.dt == 0.01
 end
 
 @testitem "TimeDependentMode divisibility check" begin

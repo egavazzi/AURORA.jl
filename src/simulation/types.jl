@@ -51,11 +51,7 @@ function UniformTimeGrid(duration, dt)
     dt > 0 || error("dt must be positive, got $dt")
     dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
 
-    n_intervals = Float64(duration) / Float64(dt)
-    n_intervals_round = round(Int, n_intervals)
-    isapprox(n_intervals, n_intervals_round; atol=1e-10, rtol=1e-10) ||
-        error("duration ($duration) must be an integer multiple of dt ($dt)")
-
+    n_intervals_round = round(Int, Float64(duration) / Float64(dt))
     n_steps = n_intervals_round + 1
     t = range(0.0, stop=Float64(duration), length=n_steps)
     return UniformTimeGrid(Float64(duration), Float64(dt), t, n_steps)

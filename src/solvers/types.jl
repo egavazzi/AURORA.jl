@@ -37,15 +37,19 @@ sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.5, 
 struct SteadyStateMode <: AbstractMode
     duration::Union{Nothing, Float64}
     dt::Union{Nothing, Float64}
+end
 
-    SteadyStateMode() = new(nothing, nothing)
-
-    function SteadyStateMode(; duration, dt)
-        duration > 0 || error("duration must be positive, got $duration")
-        dt > 0 || error("dt must be positive, got $dt")
-        dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
-        return new(Float64(duration), Float64(dt))
+function SteadyStateMode(; duration=nothing, dt=nothing)
+    if isnothing(duration) && isnothing(dt)
+        return SteadyStateMode(nothing, nothing)
     end
+    isnothing(duration) && error("duration is missing (dt=$dt was provided)")
+    isnothing(dt) && error("dt is missing (duration=$duration was provided)")
+    duration > 0 || error("duration must be positive, got $duration")
+    dt > 0 || error("dt must be positive, got $dt")
+    dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
+    mod(duration, dt) > 1e-10 * dt && error("duration ($duration) must be an integer multiple of dt ($dt)")
+    return SteadyStateMode(Float64(duration), Float64(dt))
 end
 
 """
@@ -95,9 +99,7 @@ struct TimeDependentMode <: AbstractMode
         duration > 0 || error("duration must be positive, got $duration")
         dt > 0 || error("dt must be positive, got $dt")
         dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
-        n_intervals = Float64(duration) / Float64(dt)
-        isapprox(n_intervals, round(n_intervals); atol=1e-10, rtol=1e-10) ||
-            error("duration ($duration) must be an integer multiple of dt ($dt)")
+        mod(duration, dt) > 1e-10 * dt && error("duration ($duration) must be an integer multiple of dt ($dt)")
         CFL_number > 0 || error("CFL_number must be positive, got $CFL_number")
         max_memory_gb > 0 || error("max_memory_gb must be positive, got $max_memory_gb")
         if !isnothing(n_loop)
