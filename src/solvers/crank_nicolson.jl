@@ -237,7 +237,11 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
         Ie[:, i_t + 1] = Ie_finer
     end
 
-    Ie[Ie .< 0] .= 0   # fluxes should never be negative
+    # Check for negative values (if it happens we have a problem) and clamp to zero
+    if any(Ie .< 0)
+        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        Ie[Ie .< 0] .= 0
+    end
 
     return nothing
 end

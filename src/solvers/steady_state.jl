@@ -179,7 +179,12 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
 
     # ── Solve  Mlhs · Ie = Q ──
     Ie .= cache.KLU \ Q_local
-    Ie[Ie .< 0] .= 0   # fluxes should never be negative
+
+    # Check for negative values (if it happens we have a problem) and clamp to zero
+    if any(Ie .< 0)
+        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        Ie[Ie .< 0] .= 0
+    end
 
     return nothing
 end
