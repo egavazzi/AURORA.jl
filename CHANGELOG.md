@@ -1,6 +1,6 @@
 # Changelog
 
-- **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125)
+- **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126)
   - Simulations are now set up by building an `AuroraModel`, creating an `InputFlux`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The old `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Possibility to visualize the model, the input, etc.
   - Visit the (recently updated and expanded) [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
