@@ -23,6 +23,15 @@ using TestItems
     make_volume_excitation_file(ss_dir)
     make_column_excitation_file(ss_dir)
 
+    # --- Multi-step steady-state simulation ---
+    ms_ss_dir = mktempdir(; cleanup = true)
+    let flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
+        sim = AuroraSimulation(model, flux, ms_ss_dir; solver=SteadyStateSolver(0.1, 0.01))
+        run!(sim)
+    end
+    make_volume_excitation_file(ms_ss_dir)
+    make_column_excitation_file(ms_ss_dir)
+
     # --- Time-dependent simulation (2 loops) ---
     td_dir = mktempdir(; cleanup = true)
     let flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)

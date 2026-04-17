@@ -61,20 +61,60 @@
     end
 
     @testset "plot_input(sim) smoke" begin
-        mktempdir() do savedir
-            altitude_lims = [100, 200]
-            θ_lims = 180:-45:0
-            E_max = 100
-            B_angle_to_zenith = 13
-            msis_file = find_msis_file()
-            iri_file = find_iri_file()
+        altitude_lims = [100, 200]
+        θ_lims = 180:-45:0
+        E_max = 100
+        B_angle_to_zenith = 13
+        msis_file = find_msis_file()
+        iri_file = find_iri_file()
+        savedir = "fake_dir"  # won't be used since we're not running the sim
 
-            model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-            flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0); beams = 1:2)
-            sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0); beams = 1:2)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver())
 
-            @test plot_input(sim) isa Figure
-        end
+        @test plot_input(sim) isa Figure
+    end
+
+    @testset "multi-step SS smoke" begin
+        vol_ms = load_volume_excitation(SharedSimResults.ms_ss_dir)
+        col_ms = load_column_excitation(SharedSimResults.ms_ss_dir)
+        inp_ms = load_input(SharedSimResults.ms_ss_dir)
+
+        # plot_excitation! heatmap over time
+        fig1 = Figure()
+        ax1 = Axis(fig1[1, 1])
+        @test plot_excitation!(ax1, vol_ms) isa Makie.Heatmap
+
+        # plot_excitation! single time slice
+        fig2 = Figure()
+        ax2 = Axis(fig2[1, 1]; xscale = log10)
+        mid_t = cld(length(vol_ms.t), 2)
+        @test plot_excitation!(ax2, vol_ms; time_index = mid_t) isa Makie.Lines
+
+        # plot_column_excitation!
+        fig3 = Figure()
+        ax3 = Axis(fig3[1, 1]; yscale = log10)
+        @test plot_column_excitation!(ax3, col_ms) isa Vector{Makie.Lines}
+
+        # plot_input! from loaded data
+        fig4 = Figure()
+        ax4 = Axis(fig4[1, 1]; yscale = log10)
+        @test plot_input!(ax4, inp_ms; beams = 1) isa Makie.Heatmap
+
+        # plot_input from sim object
+        altitude_lims = [100, 200]
+        θ_lims = 180:-45:0
+        E_max = 100
+        B_angle_to_zenith = 13
+        msis_file = find_msis_file()
+        iri_file = find_iri_file()
+        savedir = "fake_dir"  # won't be used since we're not running the sim
+
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver(0.04, 0.01))
+        @test plot_input(sim) isa Figure
     end
 
     # This testset will display figures when run on a personal machine, which is to be

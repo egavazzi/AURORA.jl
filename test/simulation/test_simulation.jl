@@ -49,3 +49,34 @@ end
         @test sim.cache !== nothing
     end
 end
+
+@testitem "Multi-step SS: saved t_run matches time grid" begin
+    using MAT
+    mktempdir() do savedir
+        altitude_lims = [100, 200]
+        θ_lims = 180:-90:0
+        E_max = 100
+        B_angle_to_zenith = 13
+        t_total = 0.04
+        dt = 0.01
+        msis_file = find_msis_file()
+        iri_file = find_iri_file()
+
+        model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SinusoidalFlickering(5.0); beams=1:2)
+        sim = AuroraSimulation(model, flux, savedir; solver=SteadyStateSolver(t_total, dt))
+
+        run!(sim)
+
+        data = matread(joinpath(savedir, "IeFlickering-01.mat"))
+        t_run = vec(data["t_run"])
+        expected_t = collect(sim.time.t)
+
+        # t_run must span the full time axis, not be a scalar 1
+        @test length(t_run) == length(expected_t)
+        @test t_run ≈ expected_t
+
+        # Ie_ztE time dimension must also match
+        @test size(data["Ie_ztE"], 2) == length(expected_t)
+    end
+end
