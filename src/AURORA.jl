@@ -43,10 +43,9 @@ include("solvers/matrix_building.jl")
 include("physics/cascading.jl")
 include("physics/energy_degradation.jl")
 
-include("solvers/crank_nicolson.jl")
-include("solvers/crank_nicolson_optimized.jl")
-include("solvers/steady_state.jl")
+include("solvers/sparse_indexing.jl")
 include("solvers/steady_state_optimized.jl")
+include("solvers/crank_nicolson_optimized.jl")
 
 include("simulation/cache.jl")
 include("simulation/types.jl")
