@@ -65,10 +65,9 @@ src/
 │   ├── types.jl                 # AbstractMode, SteadyStateMode, TimeDependentMode
 │   ├── transport_matrices.jl    # TransportMatrices struct
 │   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
-│   ├── crank_nicolson.jl        # Standard Crank-Nicolson scheme
-│   ├── crank_nicolson.jl  # In-place optimized version
-│   ├── steady_state.jl          # Steady-state solver
-│   └── steady_state.jl    # In-place optimized version
+│   ├── sparse_indexing.jl       # Shared sparse infrastructure: BlockIndices, OperatorDiagonals, sparsity builders
+│   ├── steady_state.jl          # Steady-state solver (in-place, allocation-free)
+│   └── crank_nicolson.jl        # Crank-Nicolson time-dependent solver (in-place, allocation-free)
 │
 ├── simulation/
 │   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
@@ -96,7 +95,10 @@ src/
 | [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + mode + output |
 | [`AbstractMode`](@ref) | Solver strategy: [`SteadyStateMode`](@ref) or [`TimeDependentMode`](@ref) |
 | `SimulationCache` | Internal workspace: solver matrices, flux arrays, factorizations |
+| `SolverCache` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
+| `BlockIndices` | Pre-computed `nzval` index arrays for a single block (replaces `Dict`-based mapping) |
+| `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down`, `Ddiffusion` (extracted once, reused each energy step) |
 | [`RefinedTimeGrid`](@ref) | Time discretization with CFL refinement and loop partitioning |
 | [`UniformTimeGrid`](@ref) | Simple uniform grid for multi-step steady-state simulations |
 
