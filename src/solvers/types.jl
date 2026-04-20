@@ -78,7 +78,7 @@ Solve the transport equation in a time-dependent manner with a Crank-Nicolson sc
 - `dt`: time step for saving data (s). The internal time step may be finer to satisfy
   the CFL condition.
 - `CFL_number = 64`: CFL stability factor. Crank-Nicolson is unconditionally stable,
-  so large values are acceptable (it will affects the accuracy though).
+  so large values are acceptable (it will affect the accuracy though).
 - `max_memory_gb = 8.0`: memory budget (GB) used to auto-split the simulation into loops.
 - `n_loop = nothing`: manually specify the number of loops. Overrides `max_memory_gb`.
 

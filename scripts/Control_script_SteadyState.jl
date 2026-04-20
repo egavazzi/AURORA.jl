@@ -22,7 +22,7 @@ name_savedir = ""   # name of the experiment folder
 savedir = make_savedir(root_savedir, name_savedir)
 
 ## Define input flux
-flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 1000); beams=1:2)
+flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Create and run the simulation
 ## Create and run the simulation
