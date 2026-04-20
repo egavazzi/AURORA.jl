@@ -14,7 +14,7 @@ on:
       arch:
         required: false
         type: string
-        default: x64
+        default: default
       allow_failure:
         required: false
         type: boolean
