@@ -1,26 +1,89 @@
-struct ResolvedTimeGrid{T<:AbstractRange{Float64}}
-    t_total::Float64
+"""
+    AbstractTimeConfig
+
+Abstract supertype for resolved time configurations used by simulations.
+
+Concrete subtypes:
+- [`SingleStepConfig`](@ref): explicit single-step configuration for steady-state simulations
+- [`UniformTimeGrid`](@ref): simple uniform grid for multi-step steady-state simulations
+- [`RefinedTimeGrid`](@ref): CFL-refined grid for time-dependent simulations
+"""
+abstract type AbstractTimeConfig end
+
+"""
+    SingleStepConfig()
+
+Explicit single-step time configuration.
+
+Used for steady-state simulations without temporal evolution.
+"""
+struct SingleStepConfig <: AbstractTimeConfig
+    t::UnitRange{Int}
+    n_steps::Int
+end
+
+SingleStepConfig() = SingleStepConfig(1:1, 1)
+
+function Base.show(io::IO, ::SingleStepConfig)
+    print(io, "SingleStepConfig()")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", ::SingleStepConfig)
+    print(io, "SingleStepConfig (single-step)")
+end
+
+"""
+    UniformTimeGrid(duration, dt)
+
+A simple uniform time grid for multi-step steady-state simulations.
+
+Each time point is solved independently — no CFL refinement or loop splitting is needed.
+"""
+struct UniformTimeGrid{T<:AbstractRange{Float64}} <: AbstractTimeConfig
+    duration::Float64
+    dt::Float64
+    t::T
+    n_steps::Int
+end
+
+function UniformTimeGrid(duration, dt)
+    duration > 0 || error("duration must be positive, got $duration")
+    dt > 0 || error("dt must be positive, got $dt")
+    dt <= duration || error("dt ($dt) must be ≤ duration ($duration)")
+
+    n_intervals_round = round(Int, Float64(duration) / Float64(dt))
+    n_steps = n_intervals_round + 1
+    t = range(0.0, stop=Float64(duration), length=n_steps)
+    return UniformTimeGrid(Float64(duration), Float64(dt), t, n_steps)
+end
+
+function Base.show(io::IO, time::UniformTimeGrid)
+    print(io, "UniformTimeGrid(duration=$(time.duration), dt=$(time.dt), n_steps=$(time.n_steps))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", time::UniformTimeGrid)
+    println(io, "UniformTimeGrid:")
+    println(io, "├── Duration:   ", time.duration, " s")
+    println(io, "├── dt:         ", time.dt, " s")
+    print(io,   "└── n_steps:    ", time.n_steps)
+end
+
+struct RefinedTimeGrid{T<:AbstractRange{Float64}} <: AbstractTimeConfig
+    duration::Float64
     dt_requested::Float64
     dt_resolved::Float64
-    CFL_number::Float64
     CFL_factor::Int
     t::T
     n_loop::Int
-    max_memory_gb::Float64
     n_t_per_loop::Int
 end
 
-function ResolvedTimeGrid(model::AuroraModel, t_total, dt;
-                          CFL_number=64, n_loop=nothing, max_memory_gb=8.0)
-    # Validate all input parameters
-    t_total > 0 || error("t_total must be positive, got $t_total")
-    dt > 0 || error("dt must be positive, got $dt")
-    dt <= t_total || error("dt ($dt) must be ≤ t_total ($t_total)")
-    CFL_number > 0 || error("CFL_number must be positive, got $CFL_number")
-    max_memory_gb > 0 || error("max_memory_gb must be positive, got $max_memory_gb")
-    if !isnothing(n_loop)
-        n_loop > 0 || error("n_loop must be positive, got $n_loop")
-    end
+function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
+    duration = mode.duration
+    dt = mode.dt
+    CFL_number = mode.CFL_number
+    max_memory_gb = mode.max_memory_gb
+    n_loop = mode.n_loop
 
     # Extract grid dimensions from the model
     z = model.altitude_grid.h
@@ -29,7 +92,7 @@ function ResolvedTimeGrid(model::AuroraModel, t_total, dt;
     v_max = v_of_E(maximum(model.energy_grid.E_centers))
 
     # Apply CFL criteria to resolve the time grid and calculate CFL factor
-    t_resolved, CFL_factor = CFL_criteria(t_total, dt, z, v_max, CFL_number)
+    t_resolved, CFL_factor = CFL_criteria(duration, dt, z, v_max, CFL_number)
     # Determine number of loops based on memory constraints, or use provided value
     n_loop_resolved = isnothing(n_loop) ? calculate_n_loop(t_resolved, length(z), n_μ, n_E;
                                                            max_memory_gb=max_memory_gb) : Int(n_loop)
@@ -41,77 +104,99 @@ function ResolvedTimeGrid(model::AuroraModel, t_total, dt;
     dt_resolved = length(t_resolved) > 1 ? Float64(t_resolved[2] - t_resolved[1]) : Float64(dt)
 
     # Return fully configured time grid
-    return ResolvedTimeGrid(Float64(t_total), Float64(dt), dt_resolved, Float64(CFL_number),
-                            CFL_factor, t_resolved, n_loop_resolved,
-                            Float64(max_memory_gb), n_t_per_loop)
+    return RefinedTimeGrid(Float64(duration), Float64(dt), dt_resolved,
+                            CFL_factor, t_resolved, n_loop_resolved, n_t_per_loop)
 end
 
-function Base.show(io::IO, time::ResolvedTimeGrid)
-    print(io, "ResolvedTimeGrid(t_total=$(time.t_total), dt=$(time.dt_requested), n_loop=$(time.n_loop))")
+function Base.show(io::IO, time::RefinedTimeGrid)
+    print(io, "RefinedTimeGrid(duration=$(time.duration), dt=$(time.dt_requested), n_loop=$(time.n_loop))")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", time::ResolvedTimeGrid)
-    println(io, "ResolvedTimeGrid:")
-    println(io, "├── Total time:    ", time.t_total, " s")
+function Base.show(io::IO, ::MIME"text/plain", time::RefinedTimeGrid)
+    println(io, "RefinedTimeGrid:")
+    println(io, "├── Duration:      ", time.duration, " s")
     println(io, "├── Requested dt:  ", time.dt_requested, " s")
     println(io, "├── Resolved dt:   ", time.dt_resolved, " s")
-    println(io, "├── CFL number:    ", time.CFL_number)
     println(io, "├── CFL factor:    ", time.CFL_factor)
     println(io, "├── n_loop:        ", time.n_loop)
-    println(io, "├── steps / loop:  ", time.n_t_per_loop)
-    print(io,   "└── memory budget: ", time.max_memory_gb, " GB")
+    print(io,   "└── steps / loop:  ", time.n_t_per_loop)
 end
 
+
 """
-    AuroraSimulation{M<:AuroraModel, F<:InputFlux}
+    AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
 
 A complete simulation configuration, bundling the physical model, input flux,
-output directory, resolved time grid, and lazy simulation cache.
+mode strategy, output directory, resolved time configuration, and lazy simulation cache.
 
 Use [`initialize!`](@ref) to allocate the workspace explicitly, or call [`run!`](@ref)
 directly to auto-initialize and execute the simulation.
+
+# Examples
+```julia
+# Single-step steady-state
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+
+# Multi-step steady-state
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.5, dt=0.01))
+
+# Time-dependent
+sim = AuroraSimulation(model, flux, savedir;
+                       mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
+```
 """
-mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux}
+mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
     const model::M
     const flux::F
+    const mode::S
     const savedir::String
-    const time::Union{ResolvedTimeGrid, Nothing}
+    const time::AbstractTimeConfig
     const save_input_flux::Bool
     cache::Union{Nothing, SimulationCache}
 end
 
-function AuroraSimulation(model::AuroraModel, flux::InputFlux, t_total, dt, savedir;
-                          CFL_number=64, n_loop=nothing, max_memory_gb=8.0,
+function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
+                          mode::AbstractMode=SteadyStateMode(),
                           save_input_flux=true)
-    time = ResolvedTimeGrid(model, t_total, dt; CFL_number, n_loop, max_memory_gb)
-    return AuroraSimulation(model, flux, String(savedir), time, save_input_flux, nothing)
+    time = _build_time_config(model, mode)
+    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux, nothing)
 end
 
-function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
-                          save_input_flux=true)
-    return AuroraSimulation(model, flux, String(savedir), nothing, save_input_flux, nothing)
-end
+# Build the appropriate time configuration based on the mode
+_build_time_config(model::AuroraModel, mode::SteadyStateMode) =
+    is_multi_step(mode) ? UniformTimeGrid(mode.duration, mode.dt) : SingleStepConfig()
+_build_time_config(model::AuroraModel, mode::TimeDependentMode) =
+    RefinedTimeGrid(model, mode)
 
 function Base.show(io::IO, sim::AuroraSimulation)
-    mode = isnothing(sim.time) ? "steady-state" : "time-dependent"
-    print(io, "AuroraSimulation($mode)")
+    mode_name = sim.mode isa SteadyStateMode ? "steady-state" : "time-dependent"
+    print(io, "AuroraSimulation($mode_name)")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
-    mode = isnothing(sim.time) ? "Steady-state" : "Time-dependent"
-    println(io, "AuroraSimulation ($mode):")
+    mode_name = sim.mode isa SteadyStateMode ? "Steady-state" : "Time-dependent"
+    println(io, "AuroraSimulation ($mode_name):")
     println(io, "├── Model:       ", sim.model)
     println(io, "├── Flux:        ", sim.flux)
+    println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.savedir)
-    if isnothing(sim.time)
-        println(io, "├── Time:        steady-state")
-    else
-        println(io, "├── t_total:     ", sim.time.t_total, " s")
-        println(io, "├── dt request:  ", sim.time.dt_requested, " s")
-        println(io, "├── dt resolved: ", sim.time.dt_resolved, " s")
-        println(io, "├── CFL:         ", sim.time.CFL_number)
-        println(io, "├── n_loop:      ", sim.time.n_loop)
-    end
+    _show_time_fields(io, sim.time)
     println(io, "├── Cache:       ", sim.cache === nothing ? "not initialized" : "initialized")
     print(io,   "└── Save flux:   ", sim.save_input_flux)
+end
+
+function _show_time_fields(io::IO, time::RefinedTimeGrid)
+    println(io, "├── duration:    ", time.duration, " s")
+    println(io, "├── dt request:  ", time.dt_requested, " s")
+    println(io, "├── dt resolved: ", time.dt_resolved, " s")
+    println(io, "├── CFL factor:  ", time.CFL_factor)
+    println(io, "├── n_loop:      ", time.n_loop)
+end
+function _show_time_fields(io::IO, time::UniformTimeGrid)
+    println(io, "├── duration:    ", time.duration, " s")
+    println(io, "├── dt:          ", time.dt, " s")
+    println(io, "├── n_steps:     ", time.n_steps)
+end
+function _show_time_fields(io::IO, ::SingleStepConfig)
+    println(io, "├── Time:        single-step")
 end

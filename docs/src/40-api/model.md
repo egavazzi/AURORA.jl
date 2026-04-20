@@ -14,6 +14,14 @@ AuroraModel
 AuroraSimulation
 ```
 
+## Mode/Solver types
+
+```@docs; canonical=false
+AbstractMode
+SteadyStateMode
+TimeDependentMode
+```
+
 ## Simulation lifecycle
 
 ```@docs; canonical=false

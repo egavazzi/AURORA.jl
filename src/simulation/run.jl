@@ -6,11 +6,12 @@ using ProgressMeter: Progress, next!
 Execute the simulation described by `sim`.
 
 Automatically calls [`initialize!`](@ref) when needed, then dispatches to the
-time-dependent or steady-state execution path.
+appropriate execution path based on the selected mode.
 
 # Examples
 ```julia
-sim = AuroraSimulation(model, flux, 0.5, 0.001, savedir)
+sim = AuroraSimulation(model, flux, savedir;
+                       mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 run!(sim)
 ```
 """
@@ -19,7 +20,8 @@ function run!(sim::AuroraSimulation)
         initialize!(sim)
     end
     if sim.save_input_flux
-        save_Ie_top(sim, sim.cache.Ie_top, isnothing(sim.time) ? (1:1:1) : sim.time.t)
+        t_save = _save_time_axis(sim.time)
+        save_Ie_top(sim, sim.cache.Ie_top, t_save)
     end
     save_parameters(sim)
     save_neutrals(sim)
@@ -27,19 +29,17 @@ function run!(sim::AuroraSimulation)
     return sim
 end
 
-function solve!(sim::AuroraSimulation)
-    @info "Starting simulation..."
-    if isnothing(sim.time)
-        solve_steady_state!(sim)
-    else
-        solve_time_dependent!(sim)
-    end
-    return sim
-end
+_save_time_axis(::SingleStepConfig) = (1:1:1)
+_save_time_axis(time::UniformTimeGrid) = time.t
+_save_time_axis(time::RefinedTimeGrid) = time.t
 
-function solve_time_dependent!(sim::AuroraSimulation)
+solve!(sim::AuroraSimulation) = _solve!(sim, sim.mode)
+
+function _solve!(sim::AuroraSimulation, ::TimeDependentMode)
+    @info "Starting time-dependent simulation..."
     cache = get_cache(sim)
-    time = sim.time
+    time = sim.time::RefinedTimeGrid
+    n_E = sim.model.energy_grid.n
 
     fill!(cache.I0, 0.0)
     fill!(cache.Ie, 0.0)
@@ -56,8 +56,11 @@ function solve_time_dependent!(sim::AuroraSimulation)
         i_start = 1 + (i_loop - 1) * (time.n_t_per_loop - 1)
         i_stop = time.n_t_per_loop + (i_loop - 1) * (time.n_t_per_loop - 1)
         Ie_top_local = @view cache.Ie_top[:, i_start:i_stop, :]
+        progress = Progress(n_E;
+                    desc=string("Solving [loop ", i_loop, "/", time.n_loop, "]"),
+                    dt=1.0)
 
-        energy_loop!(sim, Ie_top_local, i_loop, time.n_loop)
+        energy_loop!(sim, Ie_top_local, progress)
 
         # Save current loop final state to I0 for continuity to next loop
         cache.I0 .= cache.Ie[:, end, :]
@@ -71,29 +74,58 @@ function solve_time_dependent!(sim::AuroraSimulation)
     return sim
 end
 
-function solve_steady_state!(sim::AuroraSimulation)
+_solve!(sim::AuroraSimulation, ::SteadyStateMode) = _solve!(sim, sim.time)
+_solve!(sim::AuroraSimulation, ::SingleStepConfig)  = _solve_single_step_steady_state!(sim)
+_solve!(sim::AuroraSimulation, ::UniformTimeGrid)   = _solve_multi_step_steady_state!(sim)
+
+function _solve_single_step_steady_state!(sim::AuroraSimulation)
+    @info "Starting single-step steady-state simulation..."
     cache = get_cache(sim)
+    n_E = sim.model.energy_grid.n
 
     fill!(cache.I0, 0.0)
     fill!(cache.Ie, 0.0)
     fill!(cache.matrices.Q, 0.0)
 
     Ie_top_local = @view cache.Ie_top[:, 1, :]
-    energy_loop!(sim, Ie_top_local, 1, 1)
+    progress = Progress(n_E; desc="Solving", dt=1.0)
+    energy_loop!(sim, Ie_top_local, progress)
     save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1, 1)
 
     return sim
 end
 
-function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::Int)
+function _solve_multi_step_steady_state!(sim::AuroraSimulation)
+    @info "Starting multi-step steady-state simulation..."
+    cache = get_cache(sim)
+    time = sim.time::UniformTimeGrid
+    n_E = sim.model.energy_grid.n
+    progress = Progress(time.n_steps * n_E; desc="Solving", dt=1.0)
+
+    for i_step in 1:time.n_steps
+        # Reset state for each independent step
+        fill!(cache.I0, 0.0)
+        fill!(cache.Ie, 0.0)
+        fill!(cache.matrices.Q, 0.0)
+
+        # Extract the boundary condition for this time step
+        Ie_top_local = @view cache.Ie_top[:, i_step, :]
+        energy_loop!(sim, Ie_top_local, progress)
+
+        # Accumulate result into the save array
+        cache.Ie_save[:, i_step, :] .= @view cache.Ie[:, 1, :]
+    end
+
+    # Save all steps to a single file
+    save_results(sim, cache.Ie_save, time.t, cache.I0, 1, 1)
+
+    return sim
+end
+
+function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
     cache = get_cache(sim)
     model = sim.model
-    E_centers = model.energy_grid.E_centers
     n_E = model.energy_grid.n
-
-    progress = isnothing(sim.time) ?
-               Progress(n_E, desc="Calculating flux",  dt=1.0) :
-               Progress(n_E; desc=string("Calculating flux for loop ", i_loop, "/", n_loop), dt=1.0)
 
     # Energy loop: solve transport in descending energy order.
     # High-to-low ensures cascading sources are available when solving lower energies.
@@ -104,7 +136,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::
                                                   cache.B2B_fragment)
 
         # Solve transport equation for current energy
-        solve_energy_step!(sim, iE, Ie_top_local; first_iteration=(iE == n_E))
+        _solve_energy_step!(sim, sim.mode, iE, Ie_top_local; first_iteration=(iE == n_E))
 
         # Update source term Q for lower energies from current energy's:
         # - inelastic scattering collisions → degradation → lower energies
@@ -119,23 +151,28 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, i_loop::Int, n_loop::
     return sim
 end
 
-function solve_energy_step!(sim::AuroraSimulation, iE::Int, Ie_top_local; first_iteration=false)
+function _solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
+                             iE::Int, Ie_top_local; first_iteration=false)
     cache = get_cache(sim)
     model = sim.model
 
-    if isnothing(sim.time)
-        @views steady_state_scheme_optimized!(cache.Ie[:, 1, iE], model,
-                                              cache.matrices, iE,
-                                              Ie_top_local[:, iE], cache.solver;
-                                              first_iteration)
-    else
-        @views Crank_Nicolson_optimized!(cache.Ie[:, :, iE], cache.t_loop, model,
-                                         v_of_E(model.energy_grid.E_centers[iE]),
-                                         cache.matrices, iE,
-                                         Ie_top_local[:, :, iE], cache.I0[:, iE],
-                                         cache.solver; first_iteration)
-    end
+    @views steady_state_scheme_optimized!(cache.Ie[:, 1, iE], model,
+                                          cache.matrices, iE,
+                                          Ie_top_local[:, iE], cache.solver;
+                                          first_iteration)
+    return sim
+end
 
+function _solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
+                             iE::Int, Ie_top_local; first_iteration=false)
+    cache = get_cache(sim)
+    model = sim.model
+
+    @views Crank_Nicolson_optimized!(cache.Ie[:, :, iE], cache.t_loop, model,
+                                     v_of_E(model.energy_grid.E_centers[iE]),
+                                     cache.matrices, iE,
+                                     Ie_top_local[:, :, iE], cache.I0[:, iE],
+                                     cache.solver; first_iteration)
     return sim
 end
 

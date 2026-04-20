@@ -25,7 +25,7 @@ savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Run the simulation
-sim = AuroraSimulation(model, flux, savedir)
+sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 run!(sim)
 
 ## Analyze the results
@@ -52,10 +52,6 @@ altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
 E_max = 500;                   # (eV) upper limit to the energy grid
 B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-t_total = 0.2;                  # (s) total simulation time
-dt = 0.01;                      # (s) time step for saving data
-CFL_number = 128;
-
 msis_file = "test/regression/reference_results/msis_20051008-2200_70N-19E.txt"
 iri_file = "test/regression/reference_results/iri_20051008-2200_70N-19E.txt"
 
@@ -72,7 +68,9 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
                  beams=1, z_source=1000.0)
 
 ## Run the simulation
-sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop=2)
+sim = AuroraSimulation(model, flux, savedir;
+                       mode=TimeDependentMode(duration = 0.2, dt = 0.01,
+                                              CFL_number = 128, n_loop = 2))
 run!(sim)
 
 ## Analyze the results

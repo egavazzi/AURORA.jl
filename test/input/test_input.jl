@@ -374,7 +374,7 @@ end
         # Define input flux
         flux = InputFlux(MaxwellianSpectrum(1e-3, 50); beams=1)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir)
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
         run!(sim)
         @test true
     end
@@ -393,7 +393,7 @@ end
         # Define input flux
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         # Run simulation
-        sim = AuroraSimulation(model, flux, savedir)
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
         run!(sim)
         @test true
     end
@@ -406,10 +406,6 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        t_total = 0.1;                  # (s) total simulation time
-        dt = 0.01;                      # (s) time step for saving data
-        n_loop = 2;                     # number of loops to run
-        CFL_number = 128;
         msis_file = find_msis_file();
         iri_file = find_iri_file();
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -417,7 +413,9 @@ end
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
                          beams=1:2, z_source=500.0)
         # Run simulation
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        sim = AuroraSimulation(model, flux, savedir;
+                               mode=TimeDependentMode(duration = 0.1, dt = 0.01,
+                                                      CFL_number = 128, n_loop = 2))
         run!(sim)
         @test true
     end
@@ -430,10 +428,6 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        t_total = 0.1;                  # (s) total simulation time
-        dt = 0.01;                      # (s) time step for saving data
-        n_loop = 2;                     # number of loops to run
-        CFL_number = 128;
         msis_file = find_msis_file();
         iri_file = find_iri_file();
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -441,7 +435,9 @@ end
         flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SinusoidalFlickering(5.0);
                          beams=1, z_source=1000.0)
         # Run simulation
-        sim = AuroraSimulation(model, flux, t_total, dt, savedir; CFL_number, n_loop)
+        sim = AuroraSimulation(model, flux, savedir;
+                               mode=TimeDependentMode(duration = 0.1, dt = 0.01,
+                                                      CFL_number = 128, n_loop = 2))
         run!(sim)
         @test true
     end
