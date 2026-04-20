@@ -37,6 +37,9 @@ export InputFlux, evaluate_spectrum, apply_modulation, compute_flux
 export Ie_top_from_file
 
 
+include("solvers/types.jl")
+export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent
+
 include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 
@@ -49,7 +52,8 @@ include("solvers/crank_nicolson.jl")
 
 include("simulation/cache.jl")
 include("simulation/types.jl")
-export AuroraSimulation, ResolvedTimeGrid
+export AuroraSimulation
+export AbstractTimeConfig, SingleStepConfig, UniformTimeGrid, RefinedTimeGrid
 include("simulation/initialize.jl")
 export initialize!
 include("simulation/run.jl")
@@ -83,7 +87,8 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 # Examples
 ```julia
 using CairoMakie
-sim = AuroraSimulation(model, flux, 0.5, 0.001, savedir)
+sim = AuroraSimulation(model, flux, savedir;
+                       mode=TimeDependentMode(duration=0.5, dt=0.001))
 fig = plot_input(sim)
 ```
 """
