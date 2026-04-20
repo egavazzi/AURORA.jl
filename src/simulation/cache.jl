@@ -5,30 +5,22 @@ mutable struct SolverCache
     KLU::KLU.KLUFactorization{Float64, Int64}
     Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    mapping::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    mapping_lhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    mapping_rhs::Matrix{Dict{Tuple{Symbol,Int},Int}}
-    Ddz_Up::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    Ddz_Down::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
+    indices_lhs::Matrix{BlockIndices}     # nzval index map for Mlhs  (SS + CN)
+    indices_rhs::Matrix{BlockIndices}     # nzval index map for Mrhs  (CN only)
+    op_diags::OperatorDiagonals           # dense diagonals of Ddz_Up, Ddz_Down, Ddiffusion
 end
 
 function SolverCache()
     KLU_factorization = klu(spdiagm(0 => ones(1)))
     Mlhs = spdiagm(0 => ones(1))
     Mrhs = spdiagm(0 => ones(1))
-    Ddz_Up = spdiagm(0 => ones(1))
-    Ddz_Down = spdiagm(0 => ones(1))
-    Ddiffusion = spdiagm(0 => ones(1))
-    mapping = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_lhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_lhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
-    mapping_rhs = Matrix{Dict{Tuple{Symbol,Int},Int}}(undef, 1, 1)
-    mapping_rhs[1, 1] = Dict{Tuple{Symbol,Int},Int}()
+    dummy_bi = BlockIndices(Int[], Int[], Int[], 0, 0, 0)
+    indices_lhs = fill(dummy_bi, 1, 1)
+    indices_rhs = fill(dummy_bi, 1, 1)
+    op_diags = OperatorDiagonals(
+        [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0])
 
-    return SolverCache(KLU_factorization, Mlhs, Mrhs, mapping, mapping_lhs, mapping_rhs,
-                       Ddz_Up, Ddz_Down, Ddiffusion)
+    return SolverCache(KLU_factorization, Mlhs, Mrhs, indices_lhs, indices_rhs, op_diags)
 end
 
 mutable struct DegradationCache

@@ -156,10 +156,10 @@ function _solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
     cache = get_cache(sim)
     model = sim.model
 
-    @views steady_state_scheme_optimized!(cache.Ie[:, 1, iE], model,
-                                          cache.matrices, iE,
-                                          Ie_top_local[:, iE], cache.solver;
-                                          first_iteration)
+    @views steady_state_scheme!(cache.Ie[:, 1, iE], model,
+                                cache.matrices, iE,
+                                Ie_top_local[:, iE], cache.solver;
+                                first_iteration)
     return sim
 end
 
@@ -168,11 +168,11 @@ function _solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
     cache = get_cache(sim)
     model = sim.model
 
-    @views Crank_Nicolson_optimized!(cache.Ie[:, :, iE], cache.t_loop, model,
-                                     v_of_E(model.energy_grid.E_centers[iE]),
-                                     cache.matrices, iE,
-                                     Ie_top_local[:, :, iE], cache.I0[:, iE],
-                                     cache.solver; first_iteration)
+    @views Crank_Nicolson!(cache.Ie[:, :, iE], cache.t_loop, model,
+                           v_of_E(model.energy_grid.E_centers[iE]),
+                           cache.matrices, iE,
+                           Ie_top_local[:, :, iE], cache.I0[:, iE],
+                           cache.solver; first_iteration)
     return sim
 end
 

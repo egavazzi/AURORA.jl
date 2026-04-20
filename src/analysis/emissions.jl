@@ -359,7 +359,7 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     # To explain how this function is working, let's follow an example.
     # Suppose we have the following Q matrix:
     #     julia> Q
-    #     5×5 Matrix{Float64}:
+    #     5x5 Matrix{Float64}:
     #     0.65745   0.0652896  0.313073   0.4075     0.811552
     #     0.780153  0.530831   0.546205   0.575431   0.707561
     #     0.573467  0.555628   0.567592   0.88814    0.728269
@@ -392,7 +392,7 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     # input to the interpolator `itp`,  which has for effect to "shift" that value in time.
     # Continuing our example from above, and taking c = 1 for simplicity, we get
     #     julia> I = [itp(z[i], (t[j] - (z[i] - z[1]) / 1)) for i in eachindex(z), j in eachindex(t)]
-    #     5×5 Matrix{Float64}:
+    #     5x5 Matrix{Float64}:
     #     0.65745  0.0652896  0.313073  0.4075    0.811552
     #     0.0      0.780153   0.530831  0.546205  0.575431
     #     0.0      0.0        0.573467  0.555628  0.567592

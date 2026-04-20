@@ -1,122 +1,247 @@
+# Optimized Crank-Nicolson scheme using direct nzval modification.
+# This version avoids allocations by reusing sparse matrix structures for both
+# Mlhs and Mrhs, writing physics values directly via pre-computed index arrays.
+
 using KLU: klu, klu!
-using LinearAlgebra: Diagonal, ldiv!, mul!
-using SparseArrays: spdiagm, sparse, dropzeros!, findnz
+using LinearAlgebra: ldiv!, mul!
+using SparseArrays: spdiagm
 
-function Crank_Nicolson(t, h_atm, μ, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
-    Ie = Array{Float64}(undef, length(h_atm) * length(μ), length(t))
+# ──────────────────────────────────────────────────────────────────────────────
+# Matrix value update
+# ──────────────────────────────────────────────────────────────────────────────
 
-    # Extract matrices from container
-    A = matrices.A
-    B = matrices.B
-    D = @view(matrices.D[iE, :])  # Extract D slice for current energy
-    Q_slice = @view(matrices.Q[:, :, iE])  # Extract Q slice for current energy
-    Ddiffusion = matrices.Ddiffusion
+"""
+    update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
+                                    A, B, D, ddt, op, μ, n_z)
 
-    # Spatial differentiation matrices, for up and down streams
-    # Here we tuck on a fictious height one tick below lowest height and on tick above highest
-    # height just to make it possible to use the diff function.
-    h4diffu = [h_atm[1] - (h_atm[2] - h_atm[1]) ; h_atm]
-    h4diffd = [h_atm ; h_atm[end] + (h_atm[end] - h_atm[end-1])]
-    Ddz_Up   = spdiagm(-1 => -1 ./ (2 .* diff(h4diffu[2:end])),
-                        0 =>  1 ./ (2 .* diff(h4diffu[1:end])))
-    Ddz_Down = spdiagm( 0 => -1 ./ (2 .* diff(h4diffd[1:end])),
-                        1 =>  1 ./ (2 .* diff(h4diffd[1:end-1])))
+Fill both `Mlhs` and `Mrhs` with the Crank-Nicolson operator values using the
+pre-computed `BlockIndices` arrays and dense `OperatorDiagonals`.
 
-    # Temporal differentiation matrix
-    dt = t[2] - t[1]
-    Ddt = Diagonal([1 ./ (v * dt) for i in h_atm])
+`ddt` is the scalar `1/(v·Δt)` (constant for all altitudes).
 
-    # Building the CN matrices
-    Nz = length(h_atm)
-    row_l = Vector{Int64}() # maybe using sizehint could help?
-    col_l = Vector{Int64}()
-    val_l = Vector{Float64}()
-    row_r = Vector{Int64}()
-    col_r = Vector{Int64}()
-    val_r = Vector{Float64}()
-    for i1 in axes(B, 2)
-        for i2 in axes(B, 2)
-            A_tmp = A
-            B_tmp = B[:, i1, i2]
+The physics formulas (per stream direction) are:
+```
+Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2  −  D·Ddiffusion
+Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2  +  D·Ddiffusion
+```
+where `Ddz` already contains the `/2` factor (built with `half_weight=true`).
+"""
+function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
+                                         A, B, D, ddt::Float64,
+                                         op::OperatorDiagonals, μ, n_z)
+    n_angle = length(μ)
+    nz_lhs = Mlhs.nzval
+    nz_rhs = Mrhs.nzval
+    interior = 2:(n_z - 1)
+
+    for i1 in 1:n_angle
+        for i2 in 1:n_angle
+            bl = idx_lhs[i1, i2]
+            br = idx_rhs[i1, i2]
+            B_tmp = @view B[:, i1, i2]
+
             if i1 != i2
-                tmp_lhs = -B_tmp/2
-                tmp_lhs[1] = tmp_lhs[end] = 0
-
-                tmp_rhs = B_tmp/2
-                tmp_rhs[1] = tmp_rhs[end] = 0
-
-                idx_row = (i1 - 1) * Nz .+ (1:Nz)
-                idx_col = (i2 - 1) * Nz .+ (1:Nz)
-                append!(row_l, idx_row)
-                append!(col_l, idx_col)
-                append!(val_l, tmp_lhs)
-                append!(row_r, idx_row)
-                append!(col_r, idx_col)
-                append!(val_r, tmp_rhs)
+                # ── Off-diagonal blocks: scattering coupling ── #
+                #   Mlhs: -B/2,   Mrhs: +B/2
+                @views nz_lhs[bl.diag] .= .-B_tmp[interior] ./ 2
+                @views nz_rhs[br.diag] .=   B_tmp[interior] ./ 2
             else
-                if μ[i1] < 0    # downward fluxes
-                    tmp_lhs =   μ[i1] .* Ddz_Down .+ Ddt .+ Diagonal(A_tmp/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
-                    tmp_rhs = - μ[i1] .* Ddz_Down .+ Ddt .- Diagonal(A_tmp/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
-                    tmp_lhs[[1, end], :] .= 0
-                    tmp_lhs[end, end] = 1
-                else            # upward fluxes
-                    tmp_lhs =   μ[i1] .* Ddz_Up .+ Ddt .+ Diagonal(A_tmp/2) .- D[i1] .* Ddiffusion .+ Diagonal(-B_tmp/2)
-                    tmp_rhs = - μ[i1] .* Ddz_Up .+ Ddt .- Diagonal(A_tmp/2) .+ D[i1] .* Ddiffusion .+ Diagonal( B_tmp/2)
-                    tmp_lhs[[1, end], :] .= 0
-                    tmp_lhs[end, end-1:end] = [-1, 1]
-                end
-                tmp_rhs[[1, end], :] .= 0
-                tmp_lhs[1, 1] = 1
+                # ── Diagonal blocks: transport + loss + diffusion ── #
+                nz_lhs[bl.bc_first] = 1.0           # bottom boundary
 
-                idx_row = (i1 - 1) * Nz .+ findnz(tmp_lhs)[1]
-                idx_col = (i2 - 1) * Nz .+ findnz(tmp_lhs)[2]
-                append!(row_l, idx_row)
-                append!(col_l, idx_col)
-                append!(val_l, findnz(tmp_lhs)[3])
-                idx_row = (i1 - 1) * Nz .+ findnz(tmp_rhs)[1]
-                idx_col = (i2 - 1) * Nz .+ findnz(tmp_rhs)[2]
-                append!(row_r, idx_row)
-                append!(col_r, idx_col)
-                append!(val_r, findnz(tmp_rhs)[3])
+                μ_i = μ[i1]
+                D_i = D[i1]
+                A_half = @view A[interior]           # used as A/2 below
+
+                if μ_i < 0   # ── downward streams ──
+
+                    # Main diagonal
+                    #   Mlhs: ddt + μ·Ddz + A/2 - B/2 - D·Ddiff
+                    #   Mrhs: ddt - μ·Ddz - A/2 + B/2 + D·Ddiff
+                    @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
+                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                               .- D_i .* op.Ddiff_diag[interior])
+                    @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
+                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                               .+ D_i .* op.Ddiff_diag[interior])
+
+                    # Super-diagonal: μ·Ddz_super - D·Ddiff_super  /  negated
+                    @views nz_lhs[bl.super] .= ( μ_i .* op.Ddz_Down_super[interior]
+                                                .- D_i .* op.Ddiff_super[interior])
+                    @views nz_rhs[br.super] .= (-μ_i .* op.Ddz_Down_super[interior]
+                                                .+ D_i .* op.Ddiff_super[interior])
+
+                    # Sub-diagonal (diffusion only, may be empty)
+                    if !isempty(bl.sub)
+                        @views nz_lhs[bl.sub] .= .- D_i .* op.Ddiff_sub[interior .- 1]
+                        @views nz_rhs[br.sub] .=    D_i .* op.Ddiff_sub[interior .- 1]
+                    end
+
+                    # Top boundary
+                    nz_lhs[bl.bc_last] = 1.0
+
+                else         # ── upward streams ──
+
+                    # Main diagonal
+                    @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
+                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                               .- D_i .* op.Ddiff_diag[interior])
+                    @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
+                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                               .+ D_i .* op.Ddiff_diag[interior])
+
+                    # Sub-diagonal: μ·Ddz_sub - D·Ddiff_sub  /  negated
+                    @views nz_lhs[bl.sub] .= ( μ_i .* op.Ddz_Up_sub[interior .- 1]
+                                              .- D_i .* op.Ddiff_sub[interior .- 1])
+                    @views nz_rhs[br.sub] .= (-μ_i .* op.Ddz_Up_sub[interior .- 1]
+                                              .+ D_i .* op.Ddiff_sub[interior .- 1])
+
+                    # Super-diagonal (diffusion only, may be empty)
+                    if !isempty(bl.super)
+                        @views nz_lhs[bl.super] .= .- D_i .* op.Ddiff_super[interior]
+                        @views nz_rhs[br.super] .=    D_i .* op.Ddiff_super[interior]
+                    end
+
+                    # Top boundary: ∂Ie/∂z = 0  →  [-1, 1]
+                    nz_lhs[bl.bc_last_sub] = -1.0
+                    nz_lhs[bl.bc_last]     =  1.0
+                end
             end
         end
     end
-    Mlhs = sparse!(row_l, col_l, val_l)
-    Mrhs = sparse!(row_r, col_r, val_r)
-    dropzeros!(Mlhs)    # for performance
-    dropzeros!(Mrhs)    # for performance
 
-    # Boundary indices
-    index_bottom = 1:n_z:(n_angle*n_z)
-    index_top = n_z:n_z:(n_angle*n_z)
+    return Mlhs, Mrhs
+end
 
-    # Initialize with I0, then enforce boundary from Ie_top[:, 1]
-    # (important for file-based input where Ie_top[:, 1] may be nonzero)
+# ──────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+
+Solve the time-dependent electron transport equation for energy level `iE`
+using the Crank-Nicolson implicit scheme.
+
+On the **first call** the sparse matrix structures, nzval index arrays, and
+operator diagonals are computed and stored in `cache`.  On subsequent calls
+only the numerical values in `Mlhs.nzval` / `Mrhs.nzval` are updated (zero
+allocations on the hot path).
+
+# Mathematical Background
+
+The time-dependent electron transport equation is:
+```
+∂Ie/∂t + μ·v ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ − D·∇²Ie = Q
+```
+
+Crank-Nicolson gives second-order accuracy in time:
+```
+Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  (Q^(n+1) + Q^n)/2
+```
+
+with
+```
+Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 − D·Ddiffusion
+Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 + D·Ddiffusion
+```
+
+Both matrices share the same block structure as the steady-state system:
+```
+┌─────────┬─────────┬─────────┐
+│ Block   │ Block   │ Block   │  Each block is n_z × n_z
+│ (1,1)   │ (1,2)   │ (1,3)   │
+├─────────┼─────────┼─────────┤
+│ Block   │ Block   │ Block   │  Off-diagonal: angular scattering
+│ (2,1)   │ (2,2)   │ (2,3)   │
+├─────────┼─────────┼─────────┤
+│ Block   │ Block   │ Block   │  Diagonal: transport + diffusion
+│ (3,1)   │ (3,2)   │ (3,3)   │
+└─────────┴─────────┴─────────┘
+```
+
+# Arguments
+- `Ie`: pre-allocated output array [m⁻² s⁻¹], size `(n_z * n_angle, n_t)`
+- `t`: time grid [s]
+- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
+- `v`: electron velocity [km/s]
+- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
+- `iE`: current energy index
+- `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
+- `I0`: initial condition [m⁻² s⁻¹]
+- `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
+- `first_iteration`: whether this is the first call
+"""
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    z = model.s_field
+    μ = model.pitch_angle_grid.μ_center
+    n_z = length(z)
+    n_angle = length(μ)
+
+    # Extract physics data for this energy level
+    A = matrices.A
+    B = matrices.B
+    D = @view(matrices.D[iE, :])
+    Q_slice = @view(matrices.Q[:, :, iE])
+    Ddiffusion = matrices.Ddiffusion
+
+    # Temporal coefficient (scalar — all altitudes have the same 1/(v·Δt))
+    dt = t[2] - t[1]
+    ddt = 1.0 / (v * dt)
+
+    # ── First iteration: build sparsity patterns, index maps, operator diags ──
+    if first_iteration
+        Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
+        cache.Mlhs, cache.Mrhs = create_transport_sparsity_pattern(
+            n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
+        cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
+        cache.indices_rhs = extract_nzval_indices(cache.Mrhs, n_z, n_angle)
+        cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+    end
+
+    # ── Update matrix values (fast, no allocations) ──
+    update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs,
+                                    cache.indices_lhs, cache.indices_rhs,
+                                    A, B, D, ddt, cache.op_diags, μ, n_z)
+
+    # ── Boundary indices ──
+    index_bottom = 1:n_z:(n_angle * n_z)
+    index_top    = n_z:n_z:(n_angle * n_z)
+
+    # ── Initial condition ──
     Ie[:, 1] = I0
     Ie[index_bottom, 1] .= 0.0
-    Ie[index_top, 1] .= @view(Ie_top[:, 1])
+    Ie[index_top,    1] .= @view(Ie_top[:, 1])
     Ie_finer = Ie[:, 1]
     b = similar(Ie_finer)
 
+    # ── Factorise / re-factorise ──
     if first_iteration
-        cache.KLU = klu(Mlhs)
+        cache.KLU = klu(cache.Mlhs)
     else
-        klu!(cache.KLU, Mlhs)
+        klu!(cache.KLU, cache.Mlhs)
     end
 
-    for i_t in 1:length(t) - 1
+    # ── Time-stepping loop ──
+    for i_t in 1:(length(t) - 1)
         Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
         Q_local[index_bottom] .= 0.0
-        Q_local[index_top] .= @view(Ie_top[:, i_t + 1])
+        Q_local[index_top]    .= @view(Ie_top[:, i_t + 1])
 
-        mul!(b, Mrhs, Ie_finer)
+        # Crank-Nicolson step:  Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  Q
+        mul!(b, cache.Mrhs, Ie_finer)
         Ie_finer .= b
         Ie_finer .+= Q_local
         ldiv!(cache.KLU, Ie_finer)
 
         Ie[:, i_t + 1] = Ie_finer
     end
-    Ie[Ie .< 0] .= 0; # the fluxes should never be negative
 
-    return Ie
+    # Check for negative values (if it happens we have a problem) and clamp to zero
+    if any(Ie .< 0)
+        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        Ie[Ie .< 0] .= 0
+    end
+
+    return nothing
 end
