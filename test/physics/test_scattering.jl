@@ -1,3 +1,15 @@
+@testitem "ScatteringData construction" begin
+    θ_lims = 180:-30:0
+    sd = AURORA.ScatteringData(θ_lims)
+
+    @test sd isa AURORA.ScatteringData
+    n_beams = length(θ_lims) - 1
+    @test size(sd.Ω_subbeam_relative, 1) == n_beams
+    @test size(sd.P_scatter, 1) == size(sd.P_scatter, 2)
+    @test length(sd.Ω_beam) == n_beams
+    @test length(sd.θ_scatter) > 0
+end
+
 @testitem "θ_lims validation" begin
     # Test that θ_lims must include 180°
     @test_throws ArgumentError AURORA.validate_θ_lims(170:-10:0)
