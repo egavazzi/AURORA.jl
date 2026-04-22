@@ -2,7 +2,6 @@ using Dates: Dates, now
 using HCubature: hcubature
 using Interpolations: linear_interpolation
 using MAT: matopen
-using ProgressMeter: Progress, next!
 
 
 # ======================================================================================== #
@@ -346,7 +345,7 @@ Calculate cascading transfer matrices for N₂ ionization.
 # Reference
 Equation from Itikawa 1986 J. Phys. Chem. Ref. Data
 """
-function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4)
+function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4; verbose = true)
     # N₂ ionization thresholds for different states (eV)
     ionization_thresholds = [15.581, 16.73, 18.75, 24, 42]
 
@@ -354,8 +353,7 @@ function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4)
     n_thresholds = length(ionization_thresholds)
     Q_transfer_matrix = zeros(n_energies, n_energies, n_thresholds)
 
-    println("Pre-calculating all energy-degradations for e⁻ - N₂ ionizing collisions.")
-    println("Starting at ", Dates.format(now(), "HH:MM:SS"))
+    verbose && print("Calculating energy-degradation transfer matrices for e⁻ - N₂ ionizing collisions...")
 
     # Loop over ionization thresholds (reverse order for display purposes)
     for i_threshold in n_thresholds:-1:1
@@ -363,10 +361,6 @@ function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4)
 
         # Find first energy bin above ionization threshold
         i_min_primary = findfirst(x -> x > threshold, E_grid)
-
-        progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("N₂ threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
-                           color=:blue, dt=0.01)
 
         # Loop over primary electron energy bins
         for i_primary in i_min_primary:n_energies
@@ -417,10 +411,10 @@ function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4)
                     end
                 end
             end
-            next!(progress)
         end
     end
 
+    verbose && println(" done.")
     return Q_transfer_matrix, E_grid, ionization_thresholds
 end
 
@@ -437,7 +431,7 @@ Calculate cascading transfer matrices for O₂ ionization.
 # Returns
 - `Q_transfer_matrix`: Transfer matrix [n_energies, n_energies, n_thresholds]
 """
-function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2)
+function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2; verbose = true)
     # O₂ ionization thresholds (eV)
     ionization_thresholds = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
 
@@ -445,16 +439,11 @@ function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2)
     n_thresholds = length(ionization_thresholds)
     Q_transfer_matrix = zeros(n_energies, n_energies, n_thresholds)
 
-    println("Pre-calculating all energy-degradations for e⁻ - O₂ ionizing collisions.")
-    println("Starting at ", Dates.format(now(), "HH:MM:SS"))
+    verbose && print("Calculating energy-degradation transfer matrices for e⁻ - O₂ ionizing collisions...")
 
     for i_threshold in n_thresholds:-1:1
         threshold = ionization_thresholds[i_threshold]
         i_min_primary = findfirst(x -> x > threshold, E_grid)
-
-        progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("O₂ threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
-                           color=:blue, dt=0.01)
 
         for i_primary in i_min_primary:n_energies
             E_primary_bin_min = E_grid[i_primary]
@@ -502,10 +491,10 @@ function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2)
                     end
                 end
             end
-            next!(progress)
         end
     end
 
+    verbose && println(" done.")
     return Q_transfer_matrix, E_grid, ionization_thresholds
 end
 
@@ -553,7 +542,7 @@ Calculate cascading transfer matrices for atomic O ionization.
 # Returns
 - `Q_transfer_matrix`: Transfer matrix [n_energies, n_energies, n_thresholds]
 """
-function calculate_cascading_O(E_grid, dE)
+function calculate_cascading_O(E_grid, dE; verbose = true)
     # O ionization thresholds for different states (eV)
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
 
@@ -561,8 +550,7 @@ function calculate_cascading_O(E_grid, dE)
     n_thresholds = length(ionization_thresholds)
     Q_transfer_matrix = zeros(n_energies, n_energies, n_thresholds)
 
-    println("Pre-calculating all energy-degradations for e⁻ - O ionizing collisions.")
-    println("Starting at ", Dates.format(now(), "HH:MM:SS"))
+    verbose && print("Calculating energy-degradation transfer matrices for e⁻ - O ionizing collisions...")
 
     # Loop over ionization thresholds (reverse order for display purposes)
     for i_threshold in n_thresholds:-1:1
@@ -570,10 +558,6 @@ function calculate_cascading_O(E_grid, dE)
 
         # Find first energy bin above ionization threshold
         i_min_primary = findfirst(x -> x > threshold, E_grid)
-
-        progress = Progress(n_energies - i_min_primary + 1;
-                           desc=string("O threshold ", n_thresholds - i_threshold + 1, "/", n_thresholds),
-                           color=:blue, dt=0.01)
 
         # Loop over primary electron energy bins
         for i_primary in i_min_primary:n_energies
@@ -628,9 +612,9 @@ function calculate_cascading_O(E_grid, dE)
                     end
                 end
             end
-            next!(progress)
         end
     end
 
+    verbose && println(" done.")
     return Q_transfer_matrix, E_grid, ionization_thresholds
 end
