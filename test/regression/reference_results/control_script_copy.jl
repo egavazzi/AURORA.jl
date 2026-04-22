@@ -17,9 +17,7 @@ iri_file = "test/regression/reference_results/iri_20051008-2200_70N-19E.txt"
 model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
 ## Define where to save the results
-root_savedir = "temp_results/"   # name of the root folder
-name_savedir = "SS/"   # name of the experiment folder
-savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
+savedir = mktempdir()
 
 ## Define input flux
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
@@ -30,11 +28,11 @@ run!(sim)
 
 ## Analyze the results
 make_volume_excitation_file(sim)
-make_column_excitation_file(sim)
-make_current_file(sim)
 
-
-
+## Overwrite the reference results
+source_file = joinpath(savedir, "Qzt_all_L.mat")
+dest_file = "test/regression/reference_results/SS/Qzt_all_L.mat"
+cp(source_file, dest_file; force = true)
 
 
 
@@ -59,9 +57,7 @@ iri_file = "test/regression/reference_results/iri_20051008-2200_70N-19E.txt"
 model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
 ## Define where to save the results
-root_savedir = "temp_results/"   # name of the root folder
-name_savedir = "TD/"   # name of the experiment folder
-savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
+savedir = mktempdir()
 
 ## Define input flux
 flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
@@ -75,5 +71,8 @@ run!(sim)
 
 ## Analyze the results
 make_volume_excitation_file(sim)
-make_column_excitation_file(sim)
-make_current_file(sim)
+
+## Overwrite the reference results
+source_file = joinpath(savedir, "Qzt_all_L.mat")
+dest_file = "test/regression/reference_results/TD/Qzt_all_L.mat"
+cp(source_file, dest_file; force = true)

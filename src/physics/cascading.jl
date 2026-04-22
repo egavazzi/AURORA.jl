@@ -405,8 +405,7 @@ function calculate_cascading_N2(E_grid, dE, lorentzian_width = 11.4; verbose = t
 
                         result, _ = hcubature(integrand,
                                              [E_degraded_bin_min, 0.0],
-                                             [E_degraded_bin_max, 1.0],
-                                             rtol=1e-4, atol=1e-10)
+                                             [E_degraded_bin_max, 1.0])
                         Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                     end
                 end
@@ -485,8 +484,7 @@ function calculate_cascading_O2(E_grid, dE, lorentzian_width = 15.2; verbose = t
 
                         result, _ = hcubature(integrand,
                                              [E_degraded_bin_min, 0.0],
-                                             [E_degraded_bin_max, 1.0],
-                                             rtol=1e-4, atol = 1e-10)
+                                             [E_degraded_bin_max, 1.0])
                         Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                     end
                 end
@@ -606,8 +604,7 @@ function calculate_cascading_O(E_grid, dE; verbose = true)
 
                         result, _ = hcubature(integrand,
                                              [E_degraded_bin_min, 0.0],
-                                             [E_degraded_bin_max, 1.0],
-                                             rtol=1e-4, atol=0)
+                                             [E_degraded_bin_max, 1.0])
                         Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                     end
                 end

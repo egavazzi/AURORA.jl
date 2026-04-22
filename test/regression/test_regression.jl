@@ -12,9 +12,7 @@
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
     ## Define where to save the results
-    root_savedir = "temp_results/"   # name of the root folder
-    name_savedir = "temp/"   # name of the experiment folder
-    savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
+    savedir = mktempdir()
 
     ## Define input flux
     flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
@@ -39,8 +37,6 @@
     rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
                max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
     println("Maximum relative difference: ", maximum(rel_diff))
-
-    rm("temp_results", recursive=true)
 end
 
 
@@ -58,9 +54,7 @@ end
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
     ## Define where to save the results
-    root_savedir = "temp_results/"   # name of the root folder
-    name_savedir = "temp/"   # name of the experiment folder
-    savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")
+    savedir = mktempdir()
 
     ## Define input flux
     flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
@@ -88,6 +82,4 @@ end
     rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
                max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
     println("Maximum relative difference: ", maximum(rel_diff))
-
-    rm("temp_results", recursive=true)
 end
