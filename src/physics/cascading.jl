@@ -94,218 +94,127 @@ function save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thr
 end
 
 
-
-
-
-
-
-
-
-
-# ======================================================================================== #
-#                                  CASCADING FUNCTIONS                                     #
-# ======================================================================================== #
-
-
-let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
-    """
-        cascading_N2(E_grid, E_primary_energy, E_ionization_threshold, spectrum_type)
-
-    Compute cascading electron spectra for N₂ ionization.
-
-    # Arguments
-    - `E`: Energy grid for electrons (eV), Vector [nE] (last element of the grid is omitted)
-    - `dE`: Energy grid step size (eV), Vector [nE]
-    - `E_primary_energy`: Primary electron energy (eV), scalar
-    - `E_ionization_threshold`: Ionization threshold energy (eV), scalar
-    - `spectrum_type`: "s" for secondary electrons, "c" for cascading (degraded primary) electrons
-
-    # Returns
-    - Electron energy spectrum, unnormalized, Vector [nE]. Depending on `spectrum_type`, it is
-    either the spectra of the secondary e⁻, or of the degraded primary e⁻
-
-    # Reference
-    Equation from Itikawa 1986 J. Phys. Chem. Ref. Data
-    """
-    global function cascading_N2(E_grid, dE, E_primary_energy, E_ionization_threshold, spectrum_type)
-
-        # Width of the Lorentzian like secondary spectra, from Itikawa 1986 (eV)
-        lorentzian_width = 11.4
-
-        # Check if we need to recalculate or reload the transfer matrix
-        # 1. if Q is empty, definitely yes
-        # 2. if the E_grid_for_Q is smaller than E_grid, then yes (but the opposite is fine)
-        # 3. if the E_grid_for_Q and E_grid are different, then yes
-        needs_recalculation = isempty(Q_transfer_matrix) ||
-                              length(E_grid) > length(E_grid_for_Q) ||
-                              E_grid_for_Q[1:length(E_grid)] != E_grid
-
-        if needs_recalculation
-            species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "N2")
-
-            # Try to find a pre-computed cascading spectra file with matching energy grid
-            file_found, filepath = find_cascading_file(E_grid, species_dir)
-
-            if file_found
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = load_cascading_matrices(filepath)
-            else
-                println("Could not find a file with matching energy grid.")
-                println("Starting to calculate the requested cascading-matrices.")
-
-                # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_N2(E_grid, dE, lorentzian_width)
-
-                # Save the results for future use
-                save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
-                                       species_dir, "N2")
-            end
-        end
-
-        # Return the requested spectrum type
-        if spectrum_type == "s"
-            # Secondary electron spectrum: simple Lorentzian formula
-            E_excess = E_primary_energy - E_ionization_threshold
-            secondary_spectrum = 1 ./ (lorentzian_width^2 .+ E_grid.^2) .* (E_grid .< E_excess / 2)
-            return secondary_spectrum
-
-        elseif spectrum_type == "c"
-            # Cascading (degraded primary) spectrum: extract directly from transfer matrix
-            i_threshold = findmin(abs.(E_ionization_threshold .- ionization_thresholds))[2]
-            i_primary = findmin(abs.(E_grid_for_Q .- E_primary_energy))[2]
-            cascading_spectrum = Q_transfer_matrix[i_primary, 1:length(E_grid), i_threshold]
-            return cascading_spectrum
-        end
-    end
+mutable struct SpeciesCascadingCache
+    species::Symbol
+    Q_transfer_matrix::Array{Float64, 3}
+    E_grid_for_Q::Vector{Float64}
+    ionization_thresholds::Vector{Float64}
 end
 
-let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
-    """
-        cascading_O2(E_grid, dE, E_primary_energy, E_ionization_threshold, spectrum_type)
-
-    Compute cascading electron spectra for O₂ ionization.
-
-    # Arguments
-    - `E_grid`: Energy grid for electrons (eV), Vector [nE] (last element of the grid is omitted)
-    - `dE`: Energy grid step size (eV), Vector [nE]
-    - `E_primary_energy`: Primary electron energy (eV), scalar
-    - `E_ionization_threshold`: Ionization threshold energy (eV), scalar
-    - `spectrum_type`: "s" for secondary electrons, "c" for cascading (degraded primary) electrons
-
-    # Returns
-    - Electron energy spectrum, unnormalized, Vector [nE]. Depending on `spectrum_type`, it is
-    either the spectra of the secondary e⁻, or of the degraded primary e⁻
-    """
-    global function cascading_O2(E_grid, dE, E_primary_energy, E_ionization_threshold, spectrum_type)
-
-        # Width of the Lorentzian like secondary spectra (eV)
-        lorentzian_width = 15.2
-
-        # Check if we need to recalculate or reload the transfer matrix
-        needs_recalculation = isempty(Q_transfer_matrix) ||
-                              length(E_grid) > length(E_grid_for_Q) ||
-                              E_grid_for_Q[1:length(E_grid)] != E_grid
-
-        if needs_recalculation
-            species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "O2")
-
-            # Try to find a pre-computed cascading spectra file with matching energy grid
-            file_found, filepath = find_cascading_file(E_grid, species_dir)
-
-            if file_found
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = load_cascading_matrices(filepath)
-            else
-                println("Could not find a file with matching energy grid.")
-                println("Starting to calculate the requested cascading-matrices.")
-
-                # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O2(E_grid, dE, lorentzian_width)
-
-                # Save the results for future use
-                save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
-                                       species_dir, "O2")
-            end
-        end
-
-        if spectrum_type == "s"
-            E_excess = E_primary_energy - E_ionization_threshold
-            secondary_spectrum = 1 ./ (lorentzian_width^2 .+ E_grid.^2) .* (E_grid .< E_excess / 2)
-            return secondary_spectrum
-
-        elseif spectrum_type == "c"
-            i_threshold = findmin(abs.(E_ionization_threshold .- ionization_thresholds))[2]
-            i_primary = findmin(abs.(E_grid_for_Q .- E_primary_energy))[2]
-            cascading_spectrum = Q_transfer_matrix[i_primary, 1:length(E_grid), i_threshold]
-            return cascading_spectrum
-        end
-    end
+function SpeciesCascadingCache(species::Symbol)
+    return SpeciesCascadingCache(species, zeros(0, 0, 0), Float64[], Float64[])
 end
 
+struct CascadingCache
+    species::NTuple{3, SpeciesCascadingCache}
+end
 
-let Q_transfer_matrix = [], E_grid_for_Q = [], ionization_thresholds = []
-    """
-        cascading_O(E_grid, dE, E_primary_energy, E_ionization_threshold, spectrum_type)
+function CascadingCache()
+    return CascadingCache((
+        SpeciesCascadingCache(:N2),
+        SpeciesCascadingCache(:O2),
+        SpeciesCascadingCache(:O),
+    ))
+end
 
-    Compute cascading electron spectra for atomic O ionization.
+Base.getindex(cache::CascadingCache, index::Int) = cache.species[index]
+Base.length(cache::CascadingCache) = length(cache.species)
+Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
-    # Arguments
-    - `E_grid`: Energy grid for electrons (eV), Vector [nE] (last element of the grid is omitted)
-    - `dE`: Energy grid step size (eV), Vector [nE]
-    - `E_primary_energy`: Primary electron energy (eV), scalar
-    - `E_ionization_threshold`: Ionization threshold energy (eV), scalar
-    - `spectrum_type`: "s" for secondary electrons, "c" for cascading (degraded primary) electrons
+species_label(cache::SpeciesCascadingCache) = String(cache.species)
 
-    # Returns
-    - Electron energy spectrum, unnormalized, Vector [nE]. Depending on `spectrum_type`, it is
-    either the spectra of the secondary e⁻, or of the degraded primary e⁻
-    """
-    global function cascading_O(E_grid, dE, E_primary_energy, E_ionization_threshold, spectrum_type)
+function cascading_lorentzian_width(cache::SpeciesCascadingCache)
+    if cache.species == :N2
+        return 11.4
+    elseif cache.species == :O2
+        return 15.2
+    end
 
-        # Interpolate parameters based on primary energy
+    error("Lorentzian width is only defined for N2 and O2 cascading.")
+end
+
+cascading_species_dir(cache::SpeciesCascadingCache) =
+    pkgdir(AURORA, "internal_data", "e_cascading", species_label(cache))
+
+function needs_cascading_reload(cache::SpeciesCascadingCache, E_grid)
+    return isempty(cache.Q_transfer_matrix) ||
+           length(E_grid) > length(cache.E_grid_for_Q) ||
+           cache.E_grid_for_Q[1:length(E_grid)] != E_grid
+end
+
+function calculate_cascading_matrices(species::Symbol, E_grid, dE)
+    if species == :N2
+        return calculate_cascading_N2(E_grid, dE, 11.4)
+    elseif species == :O2
+        return calculate_cascading_O2(E_grid, dE, 15.2)
+    elseif species == :O
+        return calculate_cascading_O(E_grid, dE)
+    end
+
+    error("Unsupported cascading species: $(species)")
+end
+
+function ensure_cascading_loaded!(cache::SpeciesCascadingCache, E_grid, dE)
+    needs_cascading_reload(cache, E_grid) || return cache
+
+    species_dir = cascading_species_dir(cache)
+    file_found, filepath = find_cascading_file(E_grid, species_dir)
+
+    if file_found
+        cache.Q_transfer_matrix, cache.E_grid_for_Q, cache.ionization_thresholds =
+            load_cascading_matrices(filepath)
+    else
+        println("Could not find a file with matching energy grid.")
+        println("Starting to calculate the requested cascading-matrices.")
+
+        cache.Q_transfer_matrix, cache.E_grid_for_Q, cache.ionization_thresholds =
+            calculate_cascading_matrices(cache.species, E_grid, dE)
+
+        save_cascading_matrices(cache.Q_transfer_matrix, cache.E_grid_for_Q,
+                                cache.ionization_thresholds, species_dir,
+                                species_label(cache))
+    end
+
+    return cache
+end
+
+function secondary_spectrum(cache::SpeciesCascadingCache, E_grid, dE,
+                            E_primary_energy, E_ionization_threshold)
+    ensure_cascading_loaded!(cache, E_grid, dE)
+
+    E_excess = E_primary_energy - E_ionization_threshold
+
+    if cache.species == :O
         A_factor, B_factor = interpolate_O_parameters(E_primary_energy)
-        A_factor *= 1.25  # Empirical correction factor
-
-        # Check if we need to recalculate or reload the transfer matrix
-        needs_recalculation = isempty(Q_transfer_matrix) ||
-                              length(E_grid) > length(E_grid_for_Q) ||
-                              E_grid_for_Q[1:length(E_grid)] != E_grid
-
-        if needs_recalculation
-            species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "O")
-
-            # Try to find a pre-computed cascading spectra file with matching energy grid
-            file_found, filepath = find_cascading_file(E_grid, species_dir)
-
-            if file_found
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = load_cascading_matrices(filepath)
-            else
-                println("Could not find a file with matching energy grid.")
-                println("Starting to calculate the requested cascading-matrices.")
-
-                # Calculate transfer matrices
-                Q_transfer_matrix, E_grid_for_Q, ionization_thresholds = calculate_cascading_O(E_grid, dE)
-
-                # Save the results for future use
-                save_cascading_matrices(Q_transfer_matrix, E_grid_for_Q, ionization_thresholds,
-                                       species_dir, "O")
-            end
-        end
-
-        # Return the requested spectrum type
-        if spectrum_type == "s"
-            # Secondary electron spectrum: empirical formula for atomic oxygen
-            E_excess = E_primary_energy - E_ionization_threshold
-            secondary_spectrum = B_factor ./ (1 .+ (E_grid ./ A_factor).^(5/3)) .* (E_grid .< E_excess / 2)
-            return secondary_spectrum
-
-        elseif spectrum_type == "c"
-            # Cascading (degraded primary) spectrum: extract directly from transfer matrix
-            i_threshold = findmin(abs.(E_ionization_threshold .- ionization_thresholds))[2]
-            i_primary = findmin(abs.(E_grid_for_Q .- E_primary_energy))[2]
-            cascading_spectrum = Q_transfer_matrix[i_primary, 1:length(E_grid), i_threshold]
-            return cascading_spectrum
-        end
+        A_factor *= 1.25
+        return B_factor ./ (1 .+ (E_grid ./ A_factor).^(5 / 3)) .* (E_grid .< E_excess / 2)
     end
+
+    lorentzian_width = cascading_lorentzian_width(cache)
+    return 1 ./ (lorentzian_width^2 .+ E_grid.^2) .* (E_grid .< E_excess / 2)
 end
+
+function primary_spectrum(cache::SpeciesCascadingCache, E_grid, dE,
+                          E_primary_energy, E_ionization_threshold)
+    ensure_cascading_loaded!(cache, E_grid, dE)
+
+    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
+    i_primary = findmin(abs.(cache.E_grid_for_Q .- E_primary_energy))[2]
+    return cache.Q_transfer_matrix[i_primary, 1:length(E_grid), i_threshold]
+end
+
+
+
+
+
+
+
+
+
+
+# ======================================================================================== #
+#                               CACHE-BACKED SPECTRA API                                   #
+# ======================================================================================== #
 
 
 

@@ -38,12 +38,10 @@ function build_simulation_cache(sim::AuroraSimulation)
     # Pre-compute input flux data
     Ie_top = _compute_input_flux(sim)
 
-    # Bundle cascading functions for future easy access
-    # TODO: can we do this in a more elegant way? Maybe we should have a dedicated struct?
-    # Or maybe we should simply put them in DegradationCache?
-    cascading_neutrals = (cascading_N2, cascading_O2, cascading_O)
+    # Build the cascading cache
+    cascading = CascadingCache()
     # Pre-load/calculate the cascading transfer matrices.
-    preload_cascading_matrices!(model, cascading_neutrals)
+    preload_cascading_matrices!(model, cascading)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
@@ -51,8 +49,8 @@ function build_simulation_cache(sim::AuroraSimulation)
     n_t_save = _save_time_length(sim, t_loop)
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
-    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0, Ie_top,
-                           t_loop, phase_fcn_neutrals, B2B_fragment, cascading_neutrals)
+    return SimulationCache(solver, degradation, cascading, matrices, Ie, Ie_save, I0,
+                           Ie_top, t_loop, phase_fcn_neutrals, B2B_fragment)
 end
 
 # Time parameters for working arrays: (n_t, t_loop)
@@ -102,19 +100,12 @@ function compute_phase_functions(model::AuroraModel)
     return phase_fcn_neutrals
 end
 
-# Trigger the first (potentially expensive) load-or-compute step for all three species
-# cascading functions. The closures store their transfer matrices in module-level `let`
-# blocks indexed by E_grid; once loaded they stay warm for the session.
-function preload_cascading_matrices!(model::AuroraModel, cascading_functions::Tuple)
+# Trigger the first (potentially expensive) load-or-compute step for all three species.
+function preload_cascading_matrices!(model::AuroraModel, cascading::CascadingCache)
     E_grid = model.energy_grid.E_edges[1:end-1]
     dE = model.energy_grid.ΔE
-    # Random ionization threshold (non-physical)
-    E_threshold = 15.0
-    # Any primary energy above the ionization threshold works
-    E_primary = 40.0
-    # We just use some random numbers for the ionization thresholds
-    for cascading_func in cascading_functions
-        cascading_func(E_grid, dE, E_primary, E_threshold, "s")
+    for species_cache in cascading
+        ensure_cascading_loaded!(species_cache, E_grid, dE)
     end
     return nothing
 end

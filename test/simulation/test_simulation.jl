@@ -23,6 +23,8 @@
         initialize!(sim)
 
         @test sim.cache !== nothing
+        @test sim.cache.cascading isa AURORA.CascadingCache
+        @test all(!isempty(species_cache.E_grid_for_Q) for species_cache in sim.cache.cascading)
         @test size(sim.cache.Ie, 2) == sim.time.n_t_per_loop
         @test size(sim.cache.Ie_top, 2) == length(sim.time.t)
     end

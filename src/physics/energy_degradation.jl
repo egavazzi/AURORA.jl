@@ -5,7 +5,7 @@ using LoopVectorization: @tturbo
 #################################################################################
 
 function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_levels,
-                   B2B_inelastic_neutrals, cascading_neutrals, E_edges, E_centers, ΔE, iE, Ω_beam,
+                   B2B_inelastic_neutrals, cascading_cache, E_edges, E_centers, ΔE, iE, Ω_beam,
                    μ_center, cache)
 
     # e-e collisions
@@ -20,17 +20,18 @@ function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_
         σ = σ_neutrals[i];                          # Array with collision cross sections
         E_levels = collision_levels[i];            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
-        cascading = cascading_neutrals[i];          # Cascading function for the current i-th species
+        species_cascading = cascading_cache[i]
 
         add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
-        add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, cascading, E_edges, E_centers, ΔE, iE, Ω_beam, μ_center)
+        add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading,
+                                   E_edges, E_centers, ΔE, iE, Ω_beam, μ_center)
     end
 end
 
 
 
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
-                   B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
+                   B2B_inelastic_neutrals, cascading_cache, iE, cache)
 
     z = model.altitude_grid.h
     ne = model.ionosphere.ne
@@ -64,7 +65,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         σ = σ_neutrals[i]                          # Array with collision cross sections
         E_levels = collision_levels[i]            # Array with collision enery levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
-        cascading = cascading_neutrals[i]          # Cascading function for the current i-th species
+        species_cascading = cascading_cache[i]
 
         add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
 
@@ -80,7 +81,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
             prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
                                     n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
             prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
-                                    σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
+                                    σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
@@ -267,7 +268,7 @@ for iI in 1:(iE - 1)
 end
 ```
 =#
-function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, cascading, E_edges, E_centers, ΔE, iE,
+function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE,
                                     Ω_beam, μ_center)
 
     Ionization = zeros(size(Ie, 1), size(Ie, 2))
@@ -298,13 +299,17 @@ function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, cascading, E_e
                 end
 
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = secondary_spectrum(species_cascading,
+                                                         @view(E_edges[1:end-1]), ΔE,
+                                                         E_edges[iE], E_levels[i_level, 1])
                 # We use the average energy of the e- in the current energy bin
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = primary_spectrum(species_cascading,
+                                                     @view(E_edges[1:end-1]), ΔE,
+                                                     E_edges[iE], E_levels[i_level, 1])
 
                 if sum(secondary_e_spectra) > 0
                     # normalise
@@ -414,7 +419,7 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
 end
 
 function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
-                                             σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
+                                             σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE)
     # Loop through the different collisions for the current neutral species
     for i_level in axes(E_levels, 1)[2:end]
         # Continue with the ionizing collisions (will produce secondary e-)
@@ -431,13 +436,17 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "s");
+                secondary_e_spectra = secondary_spectrum(species_cascading,
+                                                         @view(E_edges[1:end-1]), ΔE,
+                                                         E_edges[iE], E_levels[i_level, 1])
                 # We use the average energy of the e- in the current energy bin
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_levels[i_level, 1], "c");
+                primary_e_spectra = primary_spectrum(species_cascading,
+                                                     @view(E_edges[1:end-1]), ΔE,
+                                                     E_edges[iE], E_levels[i_level, 1])
 
                 if sum(secondary_e_spectra) > 0
                     # normalise

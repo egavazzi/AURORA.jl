@@ -164,7 +164,8 @@ vector for the current energy ``iE``:
      *cascading transfer matrices* (one per species) map the ionization rate at energy
      ``E'`` to the degraded-primary production at energy ``E < E'``.
 
-
+The cascading transfer matrices are loaded or computed through the per-species entries of
+`CascadingCache` and then reused from `SimulationCache` for the rest of the simulation.
 
 ## The energy-descending loop
 
