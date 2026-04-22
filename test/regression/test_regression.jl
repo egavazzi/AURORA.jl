@@ -19,6 +19,7 @@
 
     ## Run the simulation
     sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+    initialize!(sim; force_recompute=true)
     run!(sim)
 
     ## Analyze the results
@@ -64,6 +65,7 @@ end
     sim = AuroraSimulation(model, flux, savedir;
                            mode=TimeDependentMode(duration = 0.2, dt = 0.01,
                                                   CFL_number = 128, n_loop = 2))
+    initialize!(sim; force_recompute=true)
     run!(sim)
 
     ## Analyze the results

@@ -154,18 +154,22 @@ function calculate_cascading_matrices(species::Symbol, E_grid, dE)
     error("Unsupported cascading species: $(species)")
 end
 
-function ensure_cascading_loaded!(cache::SpeciesCascadingCache, E_grid, dE)
-    needs_cascading_reload(cache, E_grid) || return cache
+function ensure_cascading_loaded!(cache::SpeciesCascadingCache, E_grid, dE;
+                                  force_recompute::Bool = false)
+    force_recompute || needs_cascading_reload(cache, E_grid) || return cache
 
     species_dir = cascading_species_dir(cache)
-    file_found, filepath = find_cascading_file(E_grid, species_dir)
+    file_found, filepath = force_recompute ? (false, "") : find_cascading_file(E_grid, species_dir)
 
     if file_found
         cache.Q_transfer_matrix, cache.E_grid_for_Q, cache.ionization_thresholds =
             load_cascading_matrices(filepath)
     else
-        println("Could not find a file with matching energy grid.")
-        println("Starting to calculate the requested cascading-matrices.")
+        if force_recompute
+            println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
+        else
+            println("Could not find a file with matching energy grid.")
+        end
 
         cache.Q_transfer_matrix, cache.E_grid_for_Q, cache.ionization_thresholds =
             calculate_cascading_matrices(cache.species, E_grid, dE)

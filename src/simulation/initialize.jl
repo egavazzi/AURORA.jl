@@ -7,13 +7,13 @@ Allocate or re-allocate the working cache for `sim`.
 This step performs the expensive setup that depends on the model geometry and the
 resolved time grid, but does not write any output files.
 """
-function initialize!(sim::AuroraSimulation)
+function initialize!(sim::AuroraSimulation; force_recompute::Bool = false)
     @info "Initializing simulation..."
-    sim.cache = build_simulation_cache(sim)
+    sim.cache = build_simulation_cache(sim; force_recompute)
     return nothing
 end
 
-function build_simulation_cache(sim::AuroraSimulation)
+function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = false)
     # Extract model geometry and grids
     model = sim.model
     z = model.altitude_grid.h
@@ -41,7 +41,7 @@ function build_simulation_cache(sim::AuroraSimulation)
     # Build the cascading cache
     cascading = CascadingCache()
     # Pre-load/calculate the cascading transfer matrices.
-    preload_cascading_matrices!(model, cascading)
+    preload_cascading_matrices!(model, cascading; force_recompute)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
@@ -101,11 +101,12 @@ function compute_phase_functions(model::AuroraModel)
 end
 
 # Trigger the first (potentially expensive) load-or-compute step for all three species.
-function preload_cascading_matrices!(model::AuroraModel, cascading::CascadingCache)
+function preload_cascading_matrices!(model::AuroraModel, cascading::CascadingCache;
+                                     force_recompute::Bool = false)
     E_grid = model.energy_grid.E_edges[1:end-1]
     dE = model.energy_grid.ΔE
     for species_cache in cascading
-        ensure_cascading_loaded!(species_cache, E_grid, dE)
+        ensure_cascading_loaded!(species_cache, E_grid, dE; force_recompute)
     end
     return nothing
 end
