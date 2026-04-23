@@ -313,7 +313,7 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
 
     # Pre-allocate hcubature work buffer. One per thread (heap located).
     bufs = [hcubature_buffer(CascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
-                             (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.nthreads()]
+                             (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
 
     # Loop over ionization thresholds
     for i_threshold in n_thresholds:-1:1
