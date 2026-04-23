@@ -319,7 +319,7 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
         i_min_primary = searchsortedfirst(E_left, threshold, lt = <=)
 
         # Loop over primary electron energy bins
-        Threads.@threads for i_primary in i_min_primary:n_E
+        Threads.@threads :static for i_primary in i_min_primary:n_E
             E_primary_bin_min = E_edges[i_primary]      # left edge
             E_primary_bin_max = E_edges[i_primary + 1]  # right edge
 
@@ -347,7 +347,7 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
                     result, _ = hcubature(integrand,
                                          (E_degraded_bin_min, 0.0),
                                          (E_degraded_bin_max, 1.0);
-                                         buffer = bufs[Threads.threadid()]
+                                         buffer = bufs[Threads.threadid()],
                                          )
                     Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                 end
