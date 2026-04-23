@@ -103,10 +103,8 @@ end
 # Trigger the first (potentially expensive) load-or-compute step for all three species.
 function preload_cascading_matrices!(model::AuroraModel, cascading::CascadingCache;
                                      force_recompute::Bool = false)
-    E_grid = model.energy_grid.E_edges[1:end-1]
-    dE = model.energy_grid.ΔE
     for species_cache in cascading
-        ensure_cascading_loaded!(species_cache, E_grid, dE; force_recompute)
+        ensure_cascading_loaded!(species_cache, model.energy_grid; force_recompute)
     end
     return nothing
 end

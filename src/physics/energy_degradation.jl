@@ -5,8 +5,12 @@ using LoopVectorization: @tturbo
 #################################################################################
 
 function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_levels,
-                   B2B_inelastic_neutrals, cascading_cache, E_edges, E_centers, ΔE, iE, Ω_beam,
+                   B2B_inelastic_neutrals, cascading_cache, energy_grid::EnergyGrid, iE, Ω_beam,
                    μ_center, cache)
+
+    E_edges = energy_grid.E_edges
+    E_centers = energy_grid.E_centers
+    ΔE = energy_grid.ΔE
 
     # e-e collisions
     @views if iE > 1
@@ -22,9 +26,9 @@ function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_
         B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
         species_cascading = cascading_cache[i]
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
         add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading,
-                                   E_edges, E_centers, ΔE, iE, Ω_beam, μ_center)
+                                   energy_grid, iE, Ω_beam, μ_center)
     end
 end
 
@@ -39,9 +43,10 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     n_neutrals_data = n_neutrals(model.ionosphere)
     σ_neutrals = model.cross_sections.σ_neutrals
     collision_levels = model.cross_sections.collision_levels
-    E_edges = model.energy_grid.E_edges
-    E_centers = model.energy_grid.E_centers
-    ΔE = model.energy_grid.ΔE
+    energy_grid = model.energy_grid
+    E_edges = energy_grid.E_edges
+    E_centers = energy_grid.E_centers
+    ΔE = energy_grid.ΔE
     Ω_beam = model.scattering.Ω_beam
     μ_center = model.pitch_angle_grid.μ_center
 
@@ -67,7 +72,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
         species_cascading = cascading_cache[i]
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
 
         # Zero out the ionization fragment arrays for this species
         fill!(Ionization_fragment_1[i], 0)
@@ -81,7 +86,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
             prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
                                     n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
             prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
-                                    σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE)
+                                    σ, E_levels, species_cascading, energy_grid, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
@@ -152,7 +157,9 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid::EnergyGrid, iE, cache)
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     # Use cached matrices to avoid allocations
     Ie_scatter = cache.Ie_scatter
 
@@ -268,9 +275,11 @@ for iI in 1:(iE - 1)
 end
 ```
 =#
-function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE,
+function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading, energy_grid::EnergyGrid, iE,
                                     Ω_beam, μ_center)
 
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     Ionization = zeros(size(Ie, 1), size(Ie, 2))
     Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
     n_repeated_over_μt = repeat(n, length(μ_center), length(t))
@@ -300,7 +309,7 @@ function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascad
 
                 # Calculate the spectra of the secondary e-
                 secondary_e_spectra = secondary_spectrum(species_cascading,
-                                                         @view(E_edges[1:end-1]), ΔE,
+                                                         energy_grid,
                                                          E_edges[iE], E_levels[i_level, 1])
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
@@ -308,7 +317,7 @@ function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascad
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
                 primary_e_spectra = primary_spectrum(species_cascading,
-                                                     @view(E_edges[1:end-1]), ΔE,
+                                                     energy_grid,
                                                      E_edges[iE], E_levels[i_level, 1])
 
                 if sum(secondary_e_spectra) > 0
@@ -419,7 +428,9 @@ function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_frag
 end
 
 function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
-                                             σ, E_levels, species_cascading, E_edges, E_centers, ΔE, iE)
+                                             σ, E_levels, species_cascading, energy_grid::EnergyGrid, iE)
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     # Loop through the different collisions for the current neutral species
     for i_level in axes(E_levels, 1)[2:end]
         # Continue with the ionizing collisions (will produce secondary e-)
@@ -437,7 +448,7 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
                 secondary_e_spectra = secondary_spectrum(species_cascading,
-                                                         @view(E_edges[1:end-1]), ΔE,
+                                                         energy_grid,
                                                          E_edges[iE], E_levels[i_level, 1])
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
@@ -445,7 +456,7 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
                 primary_e_spectra = primary_spectrum(species_cascading,
-                                                     @view(E_edges[1:end-1]), ΔE,
+                                                     energy_grid,
                                                      E_edges[iE], E_levels[i_level, 1])
 
                 if sum(secondary_e_spectra) > 0
