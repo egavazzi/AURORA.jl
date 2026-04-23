@@ -1,4 +1,4 @@
-# Copy of the script that was used to generate the reference results
+# Helper to regenerate reference results after volontary numerical breaking changes.
 
 # ======================================================================================== #
 #                                  STEADY STATE                                            #
@@ -24,6 +24,7 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Run the simulation
 sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+initialize!(sim; force_recompute=true)
 run!(sim)
 
 ## Analyze the results
@@ -67,6 +68,7 @@ flux = InputFlux(FlatSpectrum(1e-2; E_min=100.0), SinusoidalFlickering(5.0);
 sim = AuroraSimulation(model, flux, savedir;
                        mode=TimeDependentMode(duration = 0.2, dt = 0.01,
                                               CFL_number = 128, n_loop = 2))
+initialize!(sim; force_recompute=true)
 run!(sim)
 
 ## Analyze the results

@@ -192,7 +192,7 @@ function secondary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGri
 
     if cache.species == :O
         A_factor, B_factor = interpolate_O_parameters(E_primary_energy)
-        A_factor *= 1.25
+        # A_factor *= 1.25
         return B_factor ./ (1 .+ (E_left ./ A_factor).^(5 / 3)) .* (E_left .< E_excess / 2)
     end
 
@@ -215,35 +215,9 @@ end
 
 
 
-
-
-
-# ======================================================================================== #
-#                               CACHE-BACKED SPECTRA API                                   #
-# ======================================================================================== #
-
-
-
-
-
-
-
-
-
-
 # ======================================================================================== #
 #                                CALCULATION FUNCTIONS                                     #
 # ======================================================================================== #
-
-# Notes:
-# Each function has a version where the integration is done with hcubature, and one
-# version where it is done with quadgk. The integration might be easier to understand when
-# looking at the quadgk versions.
-# From my testing, the quadgk versions are faster for N2 and O2, but slower for O (I believe
-# because of the ^(5/3) factor that get called more times in the quadgk version). The
-# hcubature versions are the one used by default because they were the one used before the
-# refactor of the cascading functions.
-
 """
     calculate_cascading_N2(energy_grid, lorentzian_width)
 
