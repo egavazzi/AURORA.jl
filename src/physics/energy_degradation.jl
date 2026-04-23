@@ -308,11 +308,16 @@ function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascad
                 end
 
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = secondary_spectrum(species_cascading,
-                                                         energy_grid,
-                                                         E_edges[iE], E_levels[i_level, 1])
+                secondary_e_spectra_left  = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[1:end-1]),
+                                                               E_edges[iE], E_levels[i_level, 1])
+                secondary_e_spectra_right = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[2:end]),
+                                                               E_edges[iE], E_levels[i_level, 1])
                 # Approximate the bin-integrated secondary spectrum with a trapezoidal rule.
-                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
+                secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
@@ -447,16 +452,20 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
 
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
-                secondary_e_spectra = secondary_spectrum(species_cascading,
-                                                         energy_grid,
-                                                         E_edges[iE], E_levels[i_level, 1])
+                secondary_e_spectra_left  = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[1:end-1]),
+                                                               E_edges[iE], E_levels[i_level, 1])
+                secondary_e_spectra_right = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[2:end]),
+                                                               E_edges[iE], E_levels[i_level, 1])
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
-                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
+                secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = primary_spectrum(species_cascading,
-                                                     energy_grid,
+                primary_e_spectra = primary_spectrum(species_cascading, energy_grid,
                                                      E_edges[iE], E_levels[i_level, 1])
 
                 if sum(secondary_e_spectra) > 0

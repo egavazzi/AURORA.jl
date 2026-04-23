@@ -5,7 +5,7 @@ using MAT: matopen
 
 
 # ======================================================================================== #
-#                                   UTILITY FUNCTIONS                                      #
+#                              DISK CACHING FUNCTIONS                                      #
 # ======================================================================================== #
 
 
@@ -212,16 +212,19 @@ function ensure_cascading_loaded!(cache::SpeciesCascadingCache, energy_grid::Ene
     return cache
 end
 
+# Calculate secondary electron distribution over the energy grid defined by E_secondary, for
+# a given primary energy and ionization threshold.
 function secondary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
-                            E_primary_energy, E_ionization_threshold)
+                            E_secondary, E_primary_energy, E_ionization_threshold)
     ensure_cascading_loaded!(cache, energy_grid)
 
-    E_left = @view(energy_grid.E_edges[1:end-1])
     E_excess = E_primary_energy - E_ionization_threshold
 
-    return cache.spec.secondary_law.(E_left, E_primary_energy) .* (E_left .< E_excess / 2)
+    return cache.spec.secondary_law.(E_secondary, E_primary_energy) .* (E_secondary .< E_excess / 2)
 end
 
+# Load the degraded primary electron distribution over the energy grid defined by
+# `energy_grid`, for a given initial primary energy and ionization threshold.
 function primary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
                           E_primary_energy, E_ionization_threshold)
     ensure_cascading_loaded!(cache, energy_grid)
