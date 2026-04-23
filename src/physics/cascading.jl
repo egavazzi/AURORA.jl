@@ -151,7 +151,7 @@ mutable struct SpeciesCascadingCache
     ionization_thresholds::Vector{Float64}
 end
 
-# Intialization constructor
+# Initialization constructor
 function SpeciesCascadingCache(spec::CascadingSpec)
     return SpeciesCascadingCache(spec, zeros(0, 0, 0), Float64[], Float64[])
 end

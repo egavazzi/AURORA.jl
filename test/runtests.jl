@@ -43,6 +43,4 @@ using TestItems
     make_volume_excitation_file(td_dir)
     make_column_excitation_file(td_dir)
 end
-
-# @run_package_tests verbose=true filter=ti->occursin("/test/regression/", String(ti.filename))
 @run_package_tests verbose=true

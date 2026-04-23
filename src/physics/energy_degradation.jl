@@ -311,7 +311,7 @@ function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascad
                 secondary_e_spectra = secondary_spectrum(species_cascading,
                                                          energy_grid,
                                                          E_edges[iE], E_levels[i_level, 1])
-                # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
+                # Approximate the bin-integrated secondary spectrum with a trapezoidal rule.
                 secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
