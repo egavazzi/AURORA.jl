@@ -132,6 +132,7 @@ function DefaultCascadingSpecO()
     end
     law = function (E_s, E_p)
         A_factor, B_factor = interpolate_O_parameters(E_p)
+        A_factor *= 1.25  # Empirical correction factor
         return B_factor / (1 + (E_s / A_factor)^(5 / 3))
     end
     cache_dir = pkgdir(AURORA, "internal_data", "e_cascading", "O")
