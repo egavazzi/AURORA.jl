@@ -316,37 +316,40 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
         threshold = ionization_thresholds[i_threshold]
 
         # Find first energy bin above ionization threshold
-        i_min_primary = findfirst(x -> x > threshold, E_left)
+        i_min_primary = searchsortedfirst(E_left, threshold, lt = <=)
 
         # Loop over primary electron energy bins
         Threads.@threads for i_primary in i_min_primary:n_E
-            E_primary_bin_min = E_edges[i_primary]
-            E_primary_bin_max = E_edges[i_primary + 1]
+            E_primary_bin_min = E_edges[i_primary]      # left edge
+            E_primary_bin_max = E_edges[i_primary + 1]  # right edge
 
-            # Maximum secondary degraded energy: half of excess energy (otherwise it is
-            # considered a primary electron)
-            E_degraded_max_physical = (E_primary_bin_min - threshold) / 2
-            i_max_degraded = findlast(x -> x < E_degraded_max_physical, E_left)
+            # Maximum secondary electron energy: half of the excess energy. (above this
+            # it is considered a degraded primary)
+            E_secondary_max = (E_primary_bin_min - threshold) / 2
 
-            if !isnothing(i_max_degraded)
-                integrand = CascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
-                                               threshold, spec.secondary_law)
+            # First bin that can receive a degraded primary electron. Its left edge is
+            # ≤ E_secondary_max but its right edge extends into the degraded-primary range,
+            # so it is included as the lower bound.
+            i_min_degraded = searchsortedlast(E_left, E_secondary_max, lt = <)
+            i_min_degraded == 0 && continue  # E_secondary_max below energy grid minimum; skip
 
-                # Loop over degraded electron energy bins
-                for i_degraded in i_max_degraded:(i_primary - 1)
-                    E_degraded_bin_min = E_edges[i_degraded]
-                    E_degraded_bin_max = min(E_edges[i_degraded + 1],
-                                             E_primary_bin_max - threshold)
+            integrand = CascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                           threshold, spec.secondary_law)
 
-                    # Integrate only if limits are physical
-                    if E_degraded_bin_max > E_degraded_bin_min
-                        result, _ = hcubature(integrand,
-                                             (E_degraded_bin_min, 0.0),
-                                             (E_degraded_bin_max, 1.0);
-                                             buffer = bufs[Threads.threadid()]
-                                             )
-                        Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
-                    end
+            # Loop over degraded primary electron energy bins
+            for i_degraded in i_min_degraded:(i_primary - 1)
+                E_degraded_bin_min = E_edges[i_degraded]
+                E_degraded_bin_max = min(E_edges[i_degraded + 1],
+                                         E_primary_bin_max - threshold)
+
+                # Integrate only if limits are physical
+                if E_degraded_bin_max > E_degraded_bin_min
+                    result, _ = hcubature(integrand,
+                                         (E_degraded_bin_min, 0.0),
+                                         (E_degraded_bin_max, 1.0);
+                                         buffer = bufs[Threads.threadid()]
+                                         )
+                    Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                 end
             end
         end
