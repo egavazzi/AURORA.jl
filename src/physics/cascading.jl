@@ -1,5 +1,5 @@
 using Dates: Dates, now
-using HCubature: hcubature
+using HCubature: hcubature, hcubature_buffer
 using Interpolations: linear_interpolation, Flat
 using MAT: matopen
 
@@ -241,6 +241,39 @@ end
 #                                CALCULATION FUNCTIONS                                     #
 # ======================================================================================== #
 
+"""
+    CascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
+
+Callable integrand used by `hcubature` to integrate the degraded-primary transfer matrix.
+"""
+struct CascadingIntegrand{FT, F}
+    E_primary_bin_min::FT
+    E_primary_bin_max::FT
+    threshold::FT
+    secondary_law::F
+end
+
+function (integrand::CascadingIntegrand)(vars)
+    # integration variables passed by hcubature; u_primary ∈ [0, 1] is the mapped primary-energy coordinate
+    E_degraded, u_primary = vars
+
+    # The lower bound of E_primary depends on E_degraded (it must exceed E_degraded + threshold
+    # so that the secondary electron energy is positive). This makes the 2D integration domain
+    # non-rectangular (trapezoidal). To handle this with hcubature, we map E_primary onto
+    # u_primary ∈ [0, 1] where u_primary = 0 corresponds to E_primary_lower and u_primary = 1
+    # corresponds to E_primary_bin_max. The Jacobian dE_primary/du_primary is included below.
+    E_primary_lower = max(integrand.E_primary_bin_min, E_degraded + integrand.threshold)
+    jacobian = integrand.E_primary_bin_max - E_primary_lower
+    jacobian <= 0 && return 0.0 # not really necessary as
+                                # (E_primary_lower ≤ E_degraded_bin_max + threshold ≤ E_primary_bin_max)
+                                # but one is never too safe
+
+    E_primary = E_primary_lower + u_primary * jacobian
+    E_secondary = E_primary - integrand.threshold - E_degraded
+
+    return jacobian * integrand.secondary_law(E_secondary, integrand.E_primary_bin_min)
+end
+
 
 """
     calculate_transfer_matrix(spec, energy_grid)
@@ -274,7 +307,11 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
-    # Loop over ionization thresholds (reverse order for display purposes)
+    # Pre-allocate hcubature work buffer. One per thread (heap located).
+    bufs = [hcubature_buffer(CascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+                             (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.nthreads()]
+
+    # Loop over ionization thresholds
     for i_threshold in n_thresholds:-1:1
         threshold = ionization_thresholds[i_threshold]
 
@@ -282,15 +319,19 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
         i_min_primary = findfirst(x -> x > threshold, E_left)
 
         # Loop over primary electron energy bins
-        for i_primary in i_min_primary:n_E
+        Threads.@threads for i_primary in i_min_primary:n_E
             E_primary_bin_min = E_edges[i_primary]
             E_primary_bin_max = E_edges[i_primary + 1]
 
-            # Maximum degraded energy: half of excess energy
+            # Maximum secondary degraded energy: half of excess energy (otherwise it is
+            # considered a primary electron)
             E_degraded_max_physical = (E_primary_bin_min - threshold) / 2
             i_max_degraded = findlast(x -> x < E_degraded_max_physical, E_left)
 
             if !isnothing(i_max_degraded)
+                integrand = CascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                               threshold, spec.secondary_law)
+
                 # Loop over degraded electron energy bins
                 for i_degraded in i_max_degraded:(i_primary - 1)
                     E_degraded_bin_min = E_edges[i_degraded]
@@ -299,31 +340,11 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
 
                     # Integrate only if limits are physical
                     if E_degraded_bin_max > E_degraded_bin_min
-                        function integrand(vars)
-                            E_degraded, u_primary = vars
-
-                            # To be able to integrate over a cube, we perform a change of
-                            # variable. The variable E_primary that varies from E_prim_min
-                            # to E_primary_bin_max is replaced by a variable u_primary
-                            # that varies from [0, 1].
-                            # We have to do this because the lower limit E_prim_min varies with respect
-                            # to the other variable of our integral (E-degraded). As such, its
-                            # integration domain has the shape of a triangle/trapezoid.
-                            E_prim_min = max(E_primary_bin_min, E_degraded + threshold)
-                            E_primary_mapped = E_prim_min + u_primary * (E_primary_bin_max - E_prim_min)
-                            # We need a jacobian due to our change of variable
-                            jacobian = E_primary_bin_max - E_prim_min
-
-                            # Calculate secondary electron energy
-                            E_secondary = E_primary_mapped - threshold - E_degraded
-                            distribution = spec.secondary_law(E_secondary, E_primary_bin_min)
-
-                            return distribution * jacobian
-                        end
-
                         result, _ = hcubature(integrand,
-                                             [E_degraded_bin_min, 0.0],
-                                             [E_degraded_bin_max, 1.0])
+                                             (E_degraded_bin_min, 0.0),
+                                             (E_degraded_bin_max, 1.0);
+                                             buffer = bufs[Threads.threadid()]
+                                             )
                         Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
                     end
                 end
