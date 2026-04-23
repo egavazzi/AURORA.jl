@@ -56,7 +56,7 @@ function make_energy_grid(E_max)
 end
 
 function Base.show(io::IO, grid::EnergyGrid)
-    print(io, "EnergyGrid($(grid.E_edges[1])-$(grid.E_edges[end]) eV, $(grid.n) bins)")
+    print(io, "EnergyGrid($(round(grid.E_edges[1], digits=2)) - $(round(grid.E_edges[end], digits=2)) eV, $(grid.n) bins)")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::EnergyGrid)

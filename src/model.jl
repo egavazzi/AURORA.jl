@@ -68,7 +68,7 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
 end
 
 function Base.show(io::IO, model::AuroraModel)
-    print(io, "AuroraModel($(model.altitude_grid), $(model.energy_grid))")
+    print(io, "AuroraModel($(model.altitude_grid), $(model.energy_grid), $(model.pitch_angle_grid))")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
