@@ -257,33 +257,51 @@ end
 function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
                                   n, Ie, t, z, μ_center, Ω_beam, iE,
                                   cache, i_species)
-    # Use pre-filled cached matrices (filled at cache creation)
-    n_repeated_over_μt = cache.n_repeated_over_μt[i_species]
-    n_repeated_over_t = cache.n_repeated_over_t[i_species]
+    source_sum = cache.ionization_source_sum
 
-    # PRIMARY ELECTRONS: stay in original pitch-angle beam
-    primary_e_flux .= n_repeated_over_μt .* @view(Ie[:, :, iE])
-
-    # SECONDARY ELECTRONS: incident flux redistributed isotropically over all pitch angles,
-    # using the solid-angle weight fractions Ω_beam[μᵢ] / sum(Ω_beam)
     n_z = length(z)
     n_μ = length(μ_center)
     n_t = size(Ie, 2)
-    sum_Ω_beam = sum(Ω_beam)
+    inv_sum_Ω_beam = inv(sum(Ω_beam))
 
+    # PRIMARY ELECTRONS: simply the incident flux in each pitch-angle beam, weighted by the
+    # neutral density. The primary electrons continue propagating in the same direction (beam)
+    # after the collision.
     @tturbo for it in 1:n_t
-        for i_μᵢ in 1:n_μ
-            for i_μⱼ in 1:n_μ
-                for iz in 1:n_z
-                    row_μᵢ = (i_μᵢ - 1) * n_z + iz
-                    row_μⱼ = (i_μⱼ - 1) * n_z + iz
-                    secondary_e_flux[row_μᵢ, it] += n_repeated_over_t[iz, it] *
-                                                     Ie[row_μⱼ, it, iE] *
-                                                     Ω_beam[i_μᵢ] / sum_Ω_beam
-                end
+        for i_μ in 1:n_μ
+            for iz in 1:n_z
+                row = (i_μ - 1) * n_z + iz
+                primary_e_flux[row, it] = n[iz] * Ie[row, it, iE]
             end
         end
     end
+
+    # SECONDARY ELECTRONS: we first compute the total incident flux (summed over pitch-angle beams)
+    @tturbo for it in 1:n_t
+        for iz in 1:n_z
+            source_total = 0.0
+            for i_μ in 1:n_μ
+                row = (i_μ - 1) * n_z + iz
+                source_total += Ie[row, it, iE]
+            end
+            source_sum[iz, it] = source_total
+        end
+    end
+
+    # SECONDARY ELECTRONS: which we then redistribute isotropically over all pitch angles,
+    # using the solid-angle weight fractions Ω_beam[μᵢ] / sum(Ω_beam). We also weight by the
+    # neutral density.
+    @tturbo for it in 1:n_t
+        for i_μ in 1:n_μ
+            beam_weight = Ω_beam[i_μ] * inv_sum_Ω_beam
+            for iz in 1:n_z
+                row = (i_μ - 1) * n_z + iz
+                secondary_e_flux[row, it] = n[iz] * source_sum[iz, it] * beam_weight
+            end
+        end
+    end
+
+    return nothing
 end
 
 function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,

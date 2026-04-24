@@ -145,23 +145,23 @@ end
 # ======================================================================================== #
 
 # Species specific cascading cache container
-mutable struct SpeciesCascadingCache
-    spec::CascadingSpec
+mutable struct SpeciesCascadingCache{S<:CascadingSpec}
+    spec::S
     Q_transfer_matrix::Array{Float64, 3}
     E_edges_for_Q::Vector{Float64}
     ionization_thresholds::Vector{Float64}
 end
 
 # Initialization constructor
-function SpeciesCascadingCache(spec::CascadingSpec)
-    return SpeciesCascadingCache(spec, zeros(0, 0, 0), Float64[], Float64[])
+function SpeciesCascadingCache(spec::S) where {S<:CascadingSpec}
+    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), Float64[], Float64[])
 end
 
 # Somewhat temporary container to hold all our three species specific caches
 # TODO: To be removed when we have fully moved towards a fully modular setup with things
 # attached to species inside the model.
-struct CascadingCache
-    species::NTuple{3, SpeciesCascadingCache}
+struct CascadingCache{T<:Tuple}
+    species::T
 end
 # And its initialization constructor
 function CascadingCache()
@@ -180,9 +180,12 @@ species_label(cache::SpeciesCascadingCache) = cache.spec.name
 
 function needs_cascading_reload(cache::SpeciesCascadingCache, energy_grid::EnergyGrid)
     E_edges = energy_grid.E_edges
-    return isempty(cache.Q_transfer_matrix) ||
-           length(E_edges) > length(cache.E_edges_for_Q) ||
-           cache.E_edges_for_Q[1:length(E_edges)] != E_edges
+
+    isempty(cache.Q_transfer_matrix) && return true
+    length(E_edges) > length(cache.E_edges_for_Q) && return true
+    @view(cache.E_edges_for_Q[1:length(E_edges)]) != E_edges && return true
+
+    return false
 end
 
 function ensure_cascading_loaded!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
@@ -217,7 +220,6 @@ end
 # a given primary energy and ionization threshold.
 function secondary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
                             E_secondary, E_primary_energy, E_ionization_threshold)
-    ensure_cascading_loaded!(cache, energy_grid)
 
     E_excess = E_primary_energy - E_ionization_threshold
 
@@ -228,7 +230,6 @@ end
 # `energy_grid`, for a given initial primary energy and ionization threshold.
 function primary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
                           E_primary_energy, E_ionization_threshold)
-    ensure_cascading_loaded!(cache, energy_grid)
 
     i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
     i_primary = findmin(abs.(@view(cache.E_edges_for_Q[1:end-1]) .- E_primary_energy))[2]
