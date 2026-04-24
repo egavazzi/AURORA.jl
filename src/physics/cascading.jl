@@ -122,14 +122,14 @@ end
 
 function DefaultCascadingSpecO()
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
-    function interpolate_O_parameters(E_primary)
-        energy_params = [100, 200, 500, 1000, 2000]  # eV
-        B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
-        A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
-        A_factor = linear_interpolation(energy_params, A_params, extrapolation_bc = Flat())(E_primary)
-        B_factor = linear_interpolation(energy_params, B_params, extrapolation_bc = Flat())(E_primary)
-        return (A_factor, B_factor)
-    end
+    energy_params = [100, 200, 500, 1000, 2000]  # eV
+    B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
+    A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
+    A_interp = linear_interpolation(energy_params, A_params, extrapolation_bc = Flat())
+    B_interp = linear_interpolation(energy_params, B_params, extrapolation_bc = Flat())
+
+    interpolate_O_parameters = E_primary -> (A_interp(E_primary), B_interp(E_primary))
+
     law = function (E_s, E_p)
         A_factor, B_factor = interpolate_O_parameters(E_p)
         A_factor *= 1.25  # Empirical correction factor
