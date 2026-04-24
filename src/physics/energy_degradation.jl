@@ -5,7 +5,7 @@ using LoopVectorization: @tturbo
 #################################################################################
 
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
-                   B2B_inelastic_neutrals, cascading_neutrals, iE, cache)
+                   B2B_inelastic_neutrals, cascading_cache, iE, cache)
 
     z = model.altitude_grid.h
     ne = model.ionosphere.ne
@@ -13,9 +13,10 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     n_neutrals_data = n_neutrals(model.ionosphere)
     σ_neutrals = model.cross_sections.σ_neutrals
     collision_levels = model.cross_sections.collision_levels
-    E_edges = model.energy_grid.E_edges
-    E_centers = model.energy_grid.E_centers
-    ΔE = model.energy_grid.ΔE
+    energy_grid = model.energy_grid
+    E_edges = energy_grid.E_edges
+    E_centers = energy_grid.E_centers
+    ΔE = energy_grid.ΔE
     Ω_beam = model.scattering.Ω_beam
     μ_center = model.pitch_angle_grid.μ_center
 
@@ -39,9 +40,9 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         σ = σ_neutrals[i]                          # Array with collision cross sections
         E_levels = collision_levels[i]            # Array with collision energy levels and number of secondary e-
         B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probabilities of scattering from beam to beam
-        cascading = cascading_neutrals[i]          # Cascading function for the current i-th species
+        species_cascading = cascading_cache[i]
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
 
         # Zero out the ionization arrays for this species
         fill!(secondary_e_flux[i], 0)
@@ -55,7 +56,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
                                      n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
-                                        σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
+                                        σ, E_levels, species_cascading, energy_grid, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
@@ -126,7 +127,9 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, E_edges, ΔE, iE, cache)
+function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid::EnergyGrid, iE, cache)
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     # Use cached matrices to avoid allocations
     Ie_scatter = cache.Ie_scatter
 
@@ -266,7 +269,10 @@ function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
 end
 
 function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
-                                     σ, E_levels, cascading, E_edges, E_centers, ΔE, iE)
+                                     σ, E_levels, species_cascading,
+                                     energy_grid::EnergyGrid, iE)
+    E_edges = energy_grid.E_edges
+    ΔE = energy_grid.ΔE
     # Loop through the ionization channels (E_levels[:,2] > 0) for the current neutral species.
     # For each channel, compute the energy spectra for secondaries and degraded primaries, then
     # accumulate them weighted by the channel's cross-section. This factorizes all channels into
@@ -282,13 +288,22 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             i_degrade = i_min:i_max
 
             if !isempty(i_degrade) && i_degrade[1] < iE
-                # Secondary electron energy spectrum ("s" mode: analytic distribution)
-                # Average over the primary energy bin using the bin midpoint correction
-                secondary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_loss, "s")
-                secondary_e_spectra = (secondary_e_spectra .+ secondary_e_spectra[[2:end; end]]) .* ΔE / 2
+                # Calculate the spectra of the secondary e-
+                secondary_e_spectra_left  = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[1:end-1]),
+                                                               E_edges[iE], E_loss)
+                secondary_e_spectra_right = secondary_spectrum(species_cascading,
+                                                               energy_grid,
+                                                               @view(E_edges[2:end]),
+                                                               E_edges[iE], E_loss)
+                # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
+                secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
 
-                # Degraded primary electron energy spectrum ("c" mode: Q-matrix lookup)
-                primary_e_spectra = cascading(@view(E_edges[1:end-1]), ΔE, E_edges[iE], E_loss, "c")
+                # Calculate the distribution of the ionizing (= primary) e-, that have lost the
+                # corresponding amount of energy
+                primary_e_spectra = primary_spectrum(species_cascading, energy_grid,
+                                                     E_edges[iE], E_loss)
 
                 if sum(secondary_e_spectra) > 0
                     secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra) # normalize sum to 1

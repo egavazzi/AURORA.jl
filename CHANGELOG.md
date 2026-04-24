@@ -7,7 +7,8 @@
 - Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
-- **Numerical breaking** Minor correction of the Crank-Nicolson top boundary indexing/timing, which changes numerical results very slightly [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
+- **Numerical Breaking** Minor correction of the Crank-Nicolson top boundary indexing/timing, which changes numerical results very slightly [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
+- **Numerical Breaking** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
 
 
 ## v0.7.0 - 2026-03-25

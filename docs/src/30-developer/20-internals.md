@@ -157,14 +157,15 @@ vector for the current energy ``iE``:
    neutral states.
 3. **Ionization**:
    - *Secondary electrons*: produced when a neutral is ionized and emitted isotropically
-     over all pitch angles. The energy distribution of secondaries is species-dependent.
-     Pre-computed *cascading transfer matrices* (one per species) map the ionization rate
-     at energy ``E'`` to the secondary electron production at energy ``E < E'``.
+     over all pitch angles. The energy distribution of secondaries is evaluated from a
+     species-dependent analytic law and then rebinned onto the simulation energy grid.
    - *Degraded primaries*: the ionizing electron continues in the same beam at reduced
-     energy (ionization potential + energy given to the secondary).
+     energy (ionization potential + energy given to the secondary). Pre-computed
+     *cascading transfer matrices* (one per species) map the ionization rate at energy
+     ``E'`` to the degraded-primary production at energy ``E < E'``.
 
-These cascading transfer matrices are computed once (by `cascading_N2()`, `cascading_O2()`,
-`cascading_O()`) and cached in `internal_data/e_cascading/` for reuse.
+The cascading transfer matrices are loaded or computed through the per-species entries of
+`CascadingCache` and then reused from `SimulationCache` for the rest of the simulation.
 
 ## The energy-descending loop
 
