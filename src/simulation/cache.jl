@@ -90,6 +90,7 @@ end
 struct SimulationCache
     solver::SolverCache
     degradation::DegradationCache
+    cascading::CascadingCache
     matrices::TransportMatrices
     Ie::Array{Float64, 3}
     Ie_save::Array{Float64, 3}
@@ -98,5 +99,4 @@ struct SimulationCache
     t_loop
     phase_fcn_neutrals
     B2B_fragment
-    cascading_neutrals
 end

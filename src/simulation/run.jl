@@ -142,7 +142,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
         # - inelastic scattering collisions → degradation → lower energies
         # - ionization collisions → cascading secondaries & degraded primaries
         update_Q!(cache.matrices, cache.Ie, model, cache.t_loop,
-                  B2B_inelastic_neutrals, cache.cascading_neutrals,
+                  B2B_inelastic_neutrals, cache.cascading,
                   iE, cache.degradation)
 
         next!(progress)

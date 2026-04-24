@@ -44,10 +44,12 @@ An electron ionizes a neutral, producing:
 1. A **secondary electron** — ejected from the neutral. Secondary electrons are emitted
    **isotropically** over all pitch angles, i.e. they are redistributed uniformly across
    all beams weighted by their solid angle. Their energy distribution is
-   species-dependent and determined by pre-computed cascading transfer matrices
+   species-dependent and evaluated from a species-dependent analytic law before being
+   rebinned onto the simulation energy grid.
 2. A **degraded primary** — the incident electron, which continues at reduced energy
    (reduced by the ionization potential plus the energy given to the secondary) and in the
-   **same pitch-angle beam** as the original electron.
+   **same pitch-angle beam** as the original electron. Its lower-energy redistribution is
+   obtained from the pre-computed cascading transfer matrices.
 
 Both the secondary and degraded primary electrons contribute to the source term for
 lower energy bins.
