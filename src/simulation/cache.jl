@@ -26,6 +26,7 @@ end
 mutable struct DegradationCache{N}
     n_repeated_over_μt::NTuple{N, Matrix{Float64}}
     n_repeated_over_t::NTuple{N, Matrix{Float64}}
+    thermal_e_loss::Vector{Float64}
     Ie_scatter::Matrix{Float64}
     secondary_e_flux::NTuple{N, Matrix{Float64}}     # isotropic secondary e- flux per species (shape: n_z·n_μ x n_t)
     primary_e_flux::NTuple{N, Matrix{Float64}}       # forward primary e- flux per species    (shape: n_z·n_μ x n_t)
@@ -36,12 +37,13 @@ end
 function DegradationCache()
     n_repeated_over_μt = ntuple(_ -> zeros(1, 1), Val(3))
     n_repeated_over_t = ntuple(_ -> zeros(1, 1), Val(3))
+    thermal_e_loss = zeros(1)
     Ie_scatter = zeros(1, 1)
     secondary_e_flux     = ntuple(_ -> zeros(1, 1), Val(3))
     primary_e_flux       = ntuple(_ -> zeros(1, 1), Val(3))
     secondary_e_spectrum = ntuple(_ -> zeros(1), Val(3))
     primary_e_spectrum   = ntuple(_ -> zeros(1), Val(3))
-    return DegradationCache(n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+    return DegradationCache(n_repeated_over_μt, n_repeated_over_t, thermal_e_loss, Ie_scatter,
                             secondary_e_flux, primary_e_flux,
                             secondary_e_spectrum, primary_e_spectrum)
 end
@@ -73,6 +75,7 @@ function DegradationCache(n_neutrals::NTuple{N, <:AbstractVector},
         return repeated
     end
 
+    thermal_e_loss = Vector{Float64}(undef, n_z)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
 
     secondary_e_flux = ntuple(_ -> zeros(n_z * n_μ, n_t), Val(N))
@@ -80,7 +83,8 @@ function DegradationCache(n_neutrals::NTuple{N, <:AbstractVector},
     secondary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
     primary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
 
-    return DegradationCache(n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
+    return DegradationCache(n_repeated_over_μt, n_repeated_over_t,
+                            thermal_e_loss, Ie_scatter,
                             secondary_e_flux, primary_e_flux,
                             secondary_e_spectrum, primary_e_spectrum)
 end

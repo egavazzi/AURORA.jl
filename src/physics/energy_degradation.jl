@@ -20,12 +20,16 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     Ω_beam = model.scattering.Ω_beam
     μ_center = model.pitch_angle_grid.μ_center
 
+    n_z = length(z)
+    n_μ = length(μ_center)
+
     Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
-    @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E_centers[iE], ne, Te) / ΔE[iE],
-                                   outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
+    if iE > 1
+        loss_to_thermal_electrons!(cache.thermal_e_loss, E_centers[iE], ne, Te)
+        add_thermal_electron_collisions!(@view(Q[:, :, iE - 1]), @view(Ie[:, :, iE]),
+                                         cache.thermal_e_loss, ΔE[iE], n_z, n_μ)
     end
 
     # Get the pre-allocated ionization arrays from cache
@@ -70,6 +74,19 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     end
 end
 
+
+function add_thermal_electron_collisions!(Q_slice, Ie_slice, thermal_e_loss, ΔE, n_z, n_μ)
+    @tturbo for i_t in axes(Ie_slice, 2)
+        for i_μ in 1:n_μ
+            for i_z in 1:n_z
+                row = (i_μ - 1) * n_z + i_z
+                Q_slice[row, i_t] += thermal_e_loss[i_z] * Ie_slice[row, i_t] / ΔE
+            end
+        end
+    end
+
+    return nothing
+end
 
 
 
