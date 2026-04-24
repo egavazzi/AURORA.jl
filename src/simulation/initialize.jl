@@ -26,7 +26,7 @@ function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = f
 
     # Initialize solver and physical process caches
     solver = SolverCache()
-    degradation = DegradationCache(neutral_densities, length(μ_center), n_t, length(z), n_E)
+    degradation = DegradationCache(Tuple(neutral_densities), length(μ_center), n_t, length(z), n_E)
     matrices = initialize_transport_matrices(model, t_loop)
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)

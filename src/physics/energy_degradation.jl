@@ -62,7 +62,8 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     # If there is no ionization to add (everything is zero), skip the update of Q
     # Mmh the compiler seems to be smart enough to skip the update of Q anyway when
     # everything is zero. But let's keep this if statement just in case.
-    if !(iszero(secondary_e_spectrum) && iszero(primary_e_spectrum))
+    has_ionization = any(!iszero, secondary_e_spectrum) || any(!iszero, primary_e_spectrum)
+    if has_ionization
         add_ionization_collisions!(Q, iE,
                                    secondary_e_flux, primary_e_flux,
                                    secondary_e_spectrum, primary_e_spectrum)
@@ -321,22 +322,23 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     end
 end
 
-function add_ionization_collisions!(Q, iE,
-                              secondary_e_flux, primary_e_flux,
-                              secondary_e_spectrum, primary_e_spectrum)
-    # One pass per species: accumulate secondary and primary ionization contributions
-    # into Q for all lower energy bins. The species loop is outside @tturbo so that
-    # the code works for any number of species.
-    for i_s in eachindex(secondary_e_flux)
-        sec_flux = secondary_e_flux[i_s]
-        pri_flux = primary_e_flux[i_s]
-        sec_spec = secondary_e_spectrum[i_s]
-        pri_spec = primary_e_spectrum[i_s]
+@generated function add_ionization_collisions!(Q, iE,
+                                               secondary_e_flux::NTuple{N, <:AbstractMatrix},
+                                               primary_e_flux::NTuple{N, <:AbstractMatrix},
+                                               secondary_e_spectrum::NTuple{N, <:AbstractVector},
+                                               primary_e_spectrum::NTuple{N, <:AbstractVector}) where {N}
+
+    # Unroll the loop over species to accumulate in Q only once and reduce memory access.
+    terms = [:(secondary_e_flux[$i_s][k, j] * secondary_e_spectrum[$i_s][iI] +
+               primary_e_flux[$i_s][k, j] * primary_e_spectrum[$i_s][iI])
+             for i_s in 1:N]
+    rhs = reduce((a, b) -> :($a + $b), terms)
+
+    quote
         @tturbo for iI in 1:(iE - 1)
             for j in axes(Q, 2)
                 for k in axes(Q, 1)
-                    Q[k, j, iI] += sec_flux[k, j] * sec_spec[iI] +  # secondary electrons of species i_s
-                                   pri_flux[k, j] * pri_spec[iI]     # degraded primaries of species i_s
+                    Q[k, j, iI] += $rhs
                 end
             end
         end
