@@ -145,21 +145,25 @@ sim = AuroraSimulation(model, flux, savedir;
                        mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 ```
 """
-mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
+mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
+                               T<:AbstractTimeConfig, C<:SimulationCache}
     const model::M
     const flux::F
     const mode::S
     const savedir::String
-    const time::AbstractTimeConfig
+    const time::T
     const save_input_flux::Bool
-    cache::Union{Nothing, SimulationCache}
+    cache::C
+    cache_initialized::Bool
 end
 
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
                           mode::AbstractMode=SteadyStateMode(),
                           save_input_flux=true)
     time = _build_time_config(model, mode)
-    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux, nothing)
+    cache = empty_simulation_cache(model, time)
+    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux,
+                            cache, false)
 end
 
 # Build the appropriate time configuration based on the mode
@@ -181,7 +185,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.savedir)
     _show_time_fields(io, sim.time)
-    println(io, "├── Cache:       ", sim.cache === nothing ? "not initialized" : "initialized")
+    println(io, "├── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
     print(io,   "└── Save flux:   ", sim.save_input_flux)
 end
 

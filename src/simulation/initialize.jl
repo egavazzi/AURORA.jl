@@ -10,7 +10,36 @@ resolved time grid, but does not write any output files.
 function initialize!(sim::AuroraSimulation; force_recompute::Bool = false)
     @info "Initializing simulation..."
     sim.cache = build_simulation_cache(sim; force_recompute)
+    sim.cache_initialized = true
     return nothing
+end
+
+function empty_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
+    neutral_densities = n_neutrals(model.ionosphere)
+    _, t_loop = _cache_time_params(time)
+
+    solver = SolverCache()
+    degradation = DegradationCache(Tuple(neutral_densities), 1, 1, 1, 1)
+    cascading = CascadingCache()
+    matrices = TransportMatrices(1, 1, 1, 1)
+    Ie = zeros(1, 1, 1)
+    Ie_save = zeros(1, 1, 1)
+    I0 = zeros(1, 1)
+    Ie_top = zeros(1, 1, 1)
+    phase_fcn_neutrals = _empty_phase_functions(model)
+    B2B_fragment = zeros(size(model.scattering.Ω_subbeam_relative, 1),
+                         size(model.scattering.P_scatter, 2),
+                         size(model.scattering.P_scatter, 3))
+
+    return SimulationCache(solver, degradation, cascading, matrices, Ie, Ie_save, I0,
+                           Ie_top, t_loop, phase_fcn_neutrals, B2B_fragment)
+end
+
+function _empty_phase_functions(model::AuroraModel)
+    n_theta = length(model.scattering.θ_scatter)
+    n_energy = model.energy_grid.n
+    empty_phase_pair() = (zeros(n_theta, n_energy), zeros(n_theta, n_energy))
+    return (empty_phase_pair(), empty_phase_pair(), empty_phase_pair())
 end
 
 function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = false)
