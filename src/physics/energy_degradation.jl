@@ -326,11 +326,9 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
                 secondary_e_spectra_left  = secondary_spectrum(species_cascading,
-                                                               energy_grid,
                                                                @view(E_edges[1:end-1]),
                                                                E_edges[iE], E_loss)
                 secondary_e_spectra_right = secondary_spectrum(species_cascading,
-                                                               energy_grid,
                                                                @view(E_edges[2:end]),
                                                                E_edges[iE], E_loss)
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
@@ -338,8 +336,7 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = primary_spectrum(species_cascading, energy_grid,
-                                                     E_edges[iE], E_loss)
+                primary_e_spectra = primary_spectrum(species_cascading, E_edges[iE], E_loss)
 
                 if sum(secondary_e_spectra) > 0
                     secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra) # normalize sum to 1

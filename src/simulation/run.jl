@@ -178,7 +178,6 @@ end
 
 function get_cache(sim::AuroraSimulation)
     cache = sim.cache
-    !sim.cache_initialized &&
-        error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
+    !sim.cache_initialized && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
     return cache
 end

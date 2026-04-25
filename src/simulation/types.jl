@@ -161,7 +161,7 @@ function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
                           mode::AbstractMode=SteadyStateMode(),
                           save_input_flux=true)
     time = _build_time_config(model, mode)
-    cache = empty_simulation_cache(model, time)
+    cache = build_dummy_simulation_cache(model, time)
     return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux,
                             cache, false)
 end
@@ -184,23 +184,23 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Flux:        ", sim.flux)
     println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.savedir)
-    _show_time_fields(io, sim.time)
+    show_time_fields(io, sim.time)
     println(io, "├── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
     print(io,   "└── Save flux:   ", sim.save_input_flux)
 end
 
-function _show_time_fields(io::IO, time::RefinedTimeGrid)
+function show_time_fields(io::IO, time::RefinedTimeGrid)
     println(io, "├── duration:    ", time.duration, " s")
     println(io, "├── dt request:  ", time.dt_requested, " s")
     println(io, "├── dt resolved: ", time.dt_resolved, " s")
     println(io, "├── CFL factor:  ", time.CFL_factor)
     println(io, "├── n_loop:      ", time.n_loop)
 end
-function _show_time_fields(io::IO, time::UniformTimeGrid)
+function show_time_fields(io::IO, time::UniformTimeGrid)
     println(io, "├── duration:    ", time.duration, " s")
     println(io, "├── dt:          ", time.dt, " s")
     println(io, "├── n_steps:     ", time.n_steps)
 end
-function _show_time_fields(io::IO, ::SingleStepConfig)
+function show_time_fields(io::IO, ::SingleStepConfig)
     println(io, "├── Time:        single-step")
 end
