@@ -11,7 +11,7 @@ using MAT: matopen
 struct CascadingSpec{F}
     name::String
     ionization_thresholds::Vector{Float64}
-    secondary_law::F   # callable (E_secondary, E_primary_ref) -> Float64
+    secondary_law::F   # callable (E_secondary, E_primary) -> Float64
 end
 
 function DefaultCascadingSpecN2()
@@ -143,30 +143,39 @@ struct CascadingIntegrand{FT, F}
     secondary_law::F
 end
 
+
+
 function (integrand::CascadingIntegrand)(vars)
     # integration variables passed by hcubature; u_primary ∈ [0, 1] is the mapped primary-energy coordinate
     E_degraded, u_primary = vars
 
     # The lower bound of E_primary depends on E_degraded (it must exceed E_degraded + threshold
-    # so that the secondary electron energy is positive). This makes the 2D integration domain
-    # non-rectangular (trapezoidal). To handle this with hcubature, we map E_primary onto
-    # u_primary ∈ [0, 1] where u_primary = 0 corresponds to E_primary_lower and u_primary = 1
-    # corresponds to E_primary_bin_max. The Jacobian dE_primary/du_primary is included below.
+    # so that the secondary electron energy is positive).
+    # The upper bound of E_primary also depends on E_degraded (it must exceed
+    # 2 * E_degraded + threshold, as the degraded primary must be by definition more
+    # energetic than the secondary).
+    # This comes from
+    #       E_secondary = E_primary - threshold - E_degraded
+    # and
+    #       E_secondary ≤ E_degraded
+    #   =>  E_primary - threshold - E_degraded ≤ E_degraded
+    #   =>  E_primary ≤ 2 * E_degraded + threshold
+    # This makes the 2D integration domain non-rectangular (trapezoidal).
+    # To handle this with hcubature, we map E_primary onto u_primary ∈ [0, 1] where
+    # u_primary = 0 corresponds to E_primary_lower and u_primary = 1 corresponds to
+    # E_primary_upper. The Jacobian dE_primary/du_primary of this transformation is
+    # included below.
     E_primary_lower = max(integrand.E_primary_bin_min, E_degraded + integrand.threshold)
-    jacobian = integrand.E_primary_bin_max - E_primary_lower
+    E_primary_upper = min(integrand.E_primary_bin_max, integrand.threshold + 2 * E_degraded)
+    jacobian = E_primary_upper - E_primary_lower
     jacobian <= 0 && return 0.0 # not really necessary as
-                                # (E_primary_lower ≤ E_degraded_bin_max + threshold ≤ E_primary_bin_max)
+                                # (E_primary_lower ≤ E_primary_upper)
                                 # but one is never too safe
 
     E_primary = E_primary_lower + u_primary * jacobian
     E_secondary = E_primary - integrand.threshold - E_degraded
 
-    # TODO
-    # We pass the **bin left edge energy** as argument to the secondary law. It is only
-    # O that really takes it in and use it. This is consistent with the legacy code, but
-    # should we pass the actual primary energy instead?
-
-    return jacobian * integrand.secondary_law(E_secondary, integrand.E_primary_bin_min)
+    return jacobian * integrand.secondary_law(E_secondary, E_primary)
 end
 
 
@@ -178,8 +187,8 @@ The matrix can later be used to directly get the degraded primary electron distr
 any given primary energy and ionization threshold.
 
 The outer loop structure is identical for all species. The only species-specific ingredients are
-- `spec.secondary_law(E_secondary, E_primary_bin_min) -> Float64`, which describes how secondary
-    electrons distribute in energy given a primary electron at the left edge of the current bin.
+- `spec.secondary_law(E_secondary, E_primary) -> Float64`, which describes how secondary
+    electrons distribute in energy given a primary electron at the current integration energy.
 - `spec.ionization_thresholds`, which define the ionization thresholds for the species and thus
     the number of transfer matrices to calculate.
 
@@ -233,8 +242,7 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
             # Loop over degraded primary electron energy bins
             for i_degraded in i_min_degraded:(i_primary - 1)
                 E_degraded_bin_min = E_edges[i_degraded]
-                E_degraded_bin_max = min(E_edges[i_degraded + 1],
-                                         E_primary_bin_max - threshold)
+                E_degraded_bin_max = E_edges[i_degraded + 1]
 
                 # Integrate only if limits are physical
                 if E_degraded_bin_max > E_degraded_bin_min
@@ -267,12 +275,19 @@ end
 
 # Load the degraded primary electron distribution over the energy grid defined by
 # `energy_grid`, for a given initial primary energy and ionization threshold.
-function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
+function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                           E_ionization_threshold)
 
     i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    i_primary = findmin(abs.(@view(cache.E_edges_for_Q[1:end-1]) .- E_primary_energy))[2]
     return cache.Q_transfer_matrix[i_primary, :, i_threshold]
+end
+
+function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
+                          E_ionization_threshold)
+
+    i_primary = searchsortedlast(cache.E_edges_for_Q, E_primary_energy) - 1
+    i_primary = clamp(i_primary, 1, size(cache.Q_transfer_matrix, 1))
+    return primary_spectrum(cache, i_primary, E_ionization_threshold)
 end
 
 

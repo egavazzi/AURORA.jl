@@ -308,6 +308,7 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
                                      σ, E_levels, species_cascading,
                                      energy_grid::EnergyGrid, iE)
     E_edges = energy_grid.E_edges
+    E_centers = energy_grid.E_centers
     ΔE = energy_grid.ΔE
     # Loop through the ionization channels (E_levels[:,2] > 0) for the current neutral species.
     # For each channel, compute the energy spectra for secondaries and degraded primaries, then
@@ -327,16 +328,16 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
                 # Calculate the spectra of the secondary e-
                 secondary_e_spectra_left  = secondary_spectrum(species_cascading,
                                                                @view(E_edges[1:end-1]),
-                                                               E_edges[iE], E_loss)
+                                                               E_centers[iE], E_loss)
                 secondary_e_spectra_right = secondary_spectrum(species_cascading,
                                                                @view(E_edges[2:end]),
-                                                               E_edges[iE], E_loss)
+                                                               E_centers[iE], E_loss)
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
                 secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = primary_spectrum(species_cascading, E_edges[iE], E_loss)
+                primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
                 if sum(secondary_e_spectra) > 0
                     secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra) # normalize sum to 1
