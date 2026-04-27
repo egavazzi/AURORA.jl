@@ -39,20 +39,33 @@ thermal electron energy Ee = kB*Te/qₑ.
   electrons, Planet. Space Sci., 19, 113-117.
 """
 function loss_to_thermal_electrons(E::Real, nₑ, Tₑ)
+    Le = similar(nₑ, Float64)
+    return loss_to_thermal_electrons!(Le, E, nₑ, Tₑ)
+end
+
+# Calculate energy loss function using Swartz & Nisbet (1971) formula
+function loss_to_thermal_electrons!(Le, E::Real, nₑ, Tₑ)
+    @assert axes(Le) == axes(nₑ) == axes(Tₑ)
+
     kB = 1.380662e-23     # Boltzmann constant [J/K]
     qₑ = 1.6021773e-19    # elementary charge [C]
+    velocity = v_of_E(E)
+    energy_factor = 3.0271e-10 / (E^0.44 * velocity)
 
-    # Thermal electron energy in eV
-    Eₑ = kB / qₑ * Tₑ
-
-    # Calculate energy loss function using Swartz & Nisbet (1971) formula
-    Le = 3.0271e-10 * nₑ .^ 0.97 ./ E^0.44 .* ((E .- Eₑ) ./ (E .- 0.53 * Eₑ)) .^ 2.36  / v_of_E(E)
-
-    # Set loss to zero when E < Ee (below thermal energy)
-    Le[E .< Eₑ] .= 0
+    for i in eachindex(Le)
+        Eₑ = kB / qₑ * Tₑ[i] # thermal electron energy in eV
+        if E < Eₑ
+            Le[i] = 0.0
+        else
+            ratio = (E - Eₑ) / (E - 0.53 * Eₑ)
+            Le[i] = energy_factor * nₑ[i]^0.97 * ratio^2.36
+        end
+    end
 
     return Le
 end
+
+
 
 # Depreciated function, for demo
 function beams2beams_demo(phase_fcn, P_scatter, Ω_subbeam_relative)
