@@ -20,7 +20,7 @@ function run!(sim::AuroraSimulation)
         initialize!(sim)
     end
     if sim.save_input_flux
-        t_save = _save_time_axis(sim.time)
+        t_save = save_time_axis(sim.time)
         save_Ie_top(sim, sim.cache.Ie_top, t_save)
     end
     save_parameters(sim)
@@ -29,13 +29,13 @@ function run!(sim::AuroraSimulation)
     return sim
 end
 
-_save_time_axis(::SingleStepConfig) = (1:1:1)
-_save_time_axis(time::UniformTimeGrid) = time.t
-_save_time_axis(time::RefinedTimeGrid) = time.t
+save_time_axis(::SingleStepConfig) = (1:1:1)
+save_time_axis(time::UniformTimeGrid) = time.t
+save_time_axis(time::RefinedTimeGrid) = time.t
 
-solve!(sim::AuroraSimulation) = _solve!(sim, sim.mode)
+solve!(sim::AuroraSimulation) = solve!(sim, sim.mode)
 
-function _solve!(sim::AuroraSimulation, ::TimeDependentMode)
+function solve!(sim::AuroraSimulation, ::TimeDependentMode)
     @info "Starting time-dependent simulation..."
     cache = get_cache(sim)
     time = sim.time::RefinedTimeGrid
@@ -74,11 +74,11 @@ function _solve!(sim::AuroraSimulation, ::TimeDependentMode)
     return sim
 end
 
-_solve!(sim::AuroraSimulation, ::SteadyStateMode) = _solve!(sim, sim.time)
-_solve!(sim::AuroraSimulation, ::SingleStepConfig)  = _solve_single_step_steady_state!(sim)
-_solve!(sim::AuroraSimulation, ::UniformTimeGrid)   = _solve_multi_step_steady_state!(sim)
+solve!(sim::AuroraSimulation, ::SteadyStateMode) = solve!(sim, sim.time)
+solve!(sim::AuroraSimulation, ::SingleStepConfig)  = solve_single_step_steady_state!(sim)
+solve!(sim::AuroraSimulation, ::UniformTimeGrid)   = solve_multi_step_steady_state!(sim)
 
-function _solve_single_step_steady_state!(sim::AuroraSimulation)
+function solve_single_step_steady_state!(sim::AuroraSimulation)
     @info "Starting single-step steady-state simulation..."
     cache = get_cache(sim)
     n_E = sim.model.energy_grid.n
@@ -95,7 +95,7 @@ function _solve_single_step_steady_state!(sim::AuroraSimulation)
     return sim
 end
 
-function _solve_multi_step_steady_state!(sim::AuroraSimulation)
+function solve_multi_step_steady_state!(sim::AuroraSimulation)
     @info "Starting multi-step steady-state simulation..."
     cache = get_cache(sim)
     time = sim.time::UniformTimeGrid
@@ -136,7 +136,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
                                                   cache.B2B_fragment)
 
         # Solve transport equation for current energy
-        _solve_energy_step!(sim, sim.mode, iE, Ie_top_local; first_iteration=(iE == n_E))
+        solve_energy_step!(sim, sim.mode, iE, Ie_top_local; first_iteration=(iE == n_E))
 
         # Update source term Q for lower energies from current energy's:
         # - inelastic scattering collisions → degradation → lower energies
@@ -151,7 +151,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
     return sim
 end
 
-function _solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
+function solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
                              iE::Int, Ie_top_local; first_iteration=false)
     cache = get_cache(sim)
     model = sim.model
@@ -163,7 +163,7 @@ function _solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
     return sim
 end
 
-function _solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
+function solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
                              iE::Int, Ie_top_local; first_iteration=false)
     cache = get_cache(sim)
     model = sim.model
