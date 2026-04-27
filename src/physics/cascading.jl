@@ -52,14 +52,15 @@ end
 # Species specific cascading cache container
 mutable struct SpeciesCascadingCache{S<:CascadingSpec}
     spec::S
-    Q_transfer_matrix::Array{Float64, 3}
-    E_edges_for_Q::Vector{Float64}
+    primary_transfer_matrix::Array{Float64, 3}
+    secondary_transfer_matrix::Array{Float64, 3}
+    E_edges::Vector{Float64}
     ionization_thresholds::Vector{Float64}
 end
 
 # Initialization constructor
 function SpeciesCascadingCache(spec::S) where {S<:CascadingSpec}
-    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), Float64[], Float64[])
+    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), zeros(0, 0, 0), Float64[], Float64[])
 end
 
 # Somewhat temporary container to hold all our three species specific caches
@@ -97,26 +98,36 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
                            find_cascading_file(cache.spec, E_edges)
 
     if file_found
-        cascading_data = load_cascading_matrices(filepath)
-        # Trim them to fit the simulation energy grid
-        cache.Q_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
-        cache.E_edges_for_Q = cascading_data[2][1:length(E_edges)]
-        cache.ionization_thresholds = cascading_data[3]
+        try
+            cascading_data = load_cascading_matrices(filepath)
+            # Trim them to fit the simulation energy grid
+            cache.primary_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
+            cache.secondary_transfer_matrix = cascading_data[2][1:length(E_edges)-1, 1:length(E_edges)-1, :]
+            cache.E_edges = cascading_data[3][1:length(E_edges)]
+            cache.ionization_thresholds = cascading_data[4]
+            return nothing
+        catch
+            println("Found incompatible cascading cache file $(basename(filepath)); recomputing.")
+        end
+    end
+
+    if force_recompute
+        println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
     else
-        if force_recompute
-            println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
-        else
+        if !file_found
             println("Could not find a file with matching energy grid.")
         end
-
-        cascading_data = calculate_cascading_matrices(cache.spec, E_edges)
-        cache.Q_transfer_matrix = cascading_data[1]
-        cache.E_edges_for_Q = cascading_data[2]
-        cache.ionization_thresholds = cascading_data[3]
-
-        save_cascading_matrices(cache.Q_transfer_matrix, cache.E_edges_for_Q,
-                                cache.ionization_thresholds, cache.spec.name)
     end
+
+    cascading_data = calculate_cascading_matrices(cache.spec, E_edges)
+    cache.primary_transfer_matrix = cascading_data[1]
+    cache.secondary_transfer_matrix = cascading_data[2]
+    cache.E_edges = cascading_data[3]
+    cache.ionization_thresholds = cascading_data[4]
+
+    save_cascading_matrices(cache.primary_transfer_matrix, cache.secondary_transfer_matrix,
+                            cache.E_edges, cache.ionization_thresholds,
+                            cache.spec.name)
 
     return nothing
 end
@@ -131,12 +142,43 @@ end
 #                                CALCULATION FUNCTIONS                                     #
 # ======================================================================================== #
 
+#=
+The implementation here can be a bit hard to follow, so here are some explanations.
+
+For each primary energy bin (outer loop), we want to calculate the distribution of
+probabilities of degraded primary. To do this, we loop over allowed degraded primary bins
+(inner loop). For each degraded primary bin, we fix a degraded primary energy inside of it,
+and integrate over the allowed primary energies that can produce this degraded primary energy.
+For each of these allowed primary energies and fixed degraded primary energy, the secondary
+energy is determined by energy conservation, and we can evaluate the secondary distribution
+law for that specific secondary energy to get the probability of this specific combination
+of primary and degraded primary energies. Then we fix another degraded primary energy inside
+the degraded bin, and repeat until we have covered the whole degraded primary bin.
+Mathematically, all of this translates into a double integral.
+
+We do the same thing for the secondary transfer matrix, except that we now inner loop over
+allowed secondary bins, and for each fixed secondary energy we integrate over the allowed
+primary energies that can produce this secondary energy.
+=#
+
 """
-    CascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
+    DegradedCascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
 
 Callable integrand used by `hcubature` to integrate the degraded-primary transfer matrix.
 """
-struct CascadingIntegrand{FT, F}
+struct DegradedCascadingIntegrand{FT, F}
+    E_primary_bin_min::FT
+    E_primary_bin_max::FT
+    threshold::FT
+    secondary_law::F
+end
+
+"""
+    DegradedCascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
+
+Callable integrand used by `hcubature` to integrate the secondary transfer matrix.
+"""
+struct SecondaryCascadingIntegrand{FT, F}
     E_primary_bin_min::FT
     E_primary_bin_max::FT
     threshold::FT
@@ -145,21 +187,22 @@ end
 
 
 
-function (integrand::CascadingIntegrand)(vars)
+function (integrand::DegradedCascadingIntegrand)(vars)
     # integration variables passed by hcubature; u_primary ∈ [0, 1] is the mapped primary-energy coordinate
     E_degraded, u_primary = vars
 
     # The lower bound of E_primary depends on E_degraded (it must exceed E_degraded + threshold
     # so that the secondary electron energy is positive).
-    # The upper bound of E_primary also depends on E_degraded (it must exceed
-    # 2 * E_degraded + threshold, as the degraded primary must be by definition more
-    # energetic than the secondary).
+    # The upper bound of E_primary also depends on E_degraded (it cannot exceed
+    # 2 * E_degraded + threshold, otherwise the secondary would be more energetic than
+    # the degraded primary.
     # This comes from
     #       E_secondary = E_primary - threshold - E_degraded
     # and
     #       E_secondary ≤ E_degraded
     #   =>  E_primary - threshold - E_degraded ≤ E_degraded
     #   =>  E_primary ≤ 2 * E_degraded + threshold
+    #
     # This makes the 2D integration domain non-rectangular (trapezoidal).
     # To handle this with hcubature, we map E_primary onto u_primary ∈ [0, 1] where
     # u_primary = 0 corresponds to E_primary_lower and u_primary = 1 corresponds to
@@ -178,13 +221,30 @@ function (integrand::CascadingIntegrand)(vars)
     return jacobian * integrand.secondary_law(E_secondary, E_primary)
 end
 
+function (integrand::SecondaryCascadingIntegrand)(vars)
+    E_secondary, u_primary = vars
+
+    # For a fixed secondary energy, we enforce E_secondary <= E_degraded with
+    # E_degraded = E_primary - threshold - E_secondary, which implies
+    # E_primary >= threshold + 2 * E_secondary.
+    E_primary_lower = max(integrand.E_primary_bin_min,
+                          integrand.threshold + 2 * E_secondary)
+    E_primary_upper = integrand.E_primary_bin_max
+    jacobian = E_primary_upper - E_primary_lower
+    jacobian <= 0 && return 0.0
+
+    E_primary = E_primary_lower + u_primary * jacobian
+
+    return jacobian * integrand.secondary_law(E_secondary, E_primary)
+end
+
 
 """
     calculate_cascading_matrices(spec, E_edges; verbose=true)
 
 Calculate the energy-degradation transfer matrix for a species defined by its `CascadingSpec`.
-The matrix can later be used to directly get the degraded primary electron distribution for
-any given primary energy and ionization threshold.
+The matrices can later be used to directly get the degraded primary and secondary electron
+distributions for any given primary energy and ionization threshold.
 
 The outer loop structure is identical for all species. The only species-specific ingredients are
 - `spec.secondary_law(E_secondary, E_primary) -> Float64`, which describes how secondary
@@ -197,8 +257,9 @@ The outer loop structure is identical for all species. The only species-specific
 - `E_edges`: Energy grid edges to match (eV)
 
 # Returns
-- `(Q_transfer_matrix, E_edges, ionization_thresholds)`: Transfer matrix [n_E, n_E, n_thresholds],
-    energy grid edges, and ionization thresholds
+- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
+    degraded-primary transfer matrix [n_E, n_E, n_thresholds], secondary transfer matrix
+    [n_E, n_E, n_thresholds], energy grid edges, and ionization thresholds
 """
 function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true)
     E_left = @view(E_edges[1:end-1])
@@ -206,92 +267,133 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
 
     ionization_thresholds = spec.ionization_thresholds
     n_thresholds = length(ionization_thresholds)
-    Q_transfer_matrix = zeros(n_E, n_E, n_thresholds)
+    primary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
+    secondary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
-    # Pre-allocate hcubature work buffer. One per thread (heap located).
-    bufs = [hcubature_buffer(CascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
-                             (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
+    # Pre-allocate hcubature work buffers. One per thread (heap located).
+    primary_bufs = [hcubature_buffer(DegradedCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+                                     (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
+    secondary_bufs = [hcubature_buffer(SecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+                                       (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
 
     # Loop over ionization thresholds
     for i_threshold in n_thresholds:-1:1
         threshold = ionization_thresholds[i_threshold]
 
-        # Find first energy bin above ionization threshold
-        i_min_primary = searchsortedfirst(E_left, threshold, lt = <=)
+        # Find the first primary bin whose left edge is above the threshold and can
+        # therefore be contribute to ionization collisions.
+        i_min_primary = searchsortedfirst(E_left, threshold)
 
         # Loop over primary electron energy bins
         Threads.@threads :static for i_primary in i_min_primary:n_E
             E_primary_bin_min = E_edges[i_primary]      # left edge
             E_primary_bin_max = E_edges[i_primary + 1]  # right edge
 
-            # Maximum secondary electron energy: half of the excess energy. (above this
-            # it is considered a degraded primary)
-            E_secondary_max = (E_primary_bin_min - threshold) / 2
+            # Define the integrands for this primary bin and ionization threshold.
+            degraded_integrand = DegradedCascadingIntegrand(E_primary_bin_min,
+                                                           E_primary_bin_max,
+                                                           threshold,
+                                                           spec.secondary_law)
+            secondary_integrand = SecondaryCascadingIntegrand(E_primary_bin_min,
+                                                              E_primary_bin_max,
+                                                              threshold,
+                                                              spec.secondary_law)
 
-            # First bin that can receive a degraded primary electron. Its left edge is
-            # ≤ E_secondary_max but its right edge extends into the degraded-primary range,
-            # so it is included as the lower bound.
-            i_min_degraded = searchsortedlast(E_left, E_secondary_max, lt = <)
-            i_min_degraded == 0 && continue  # E_secondary_max below energy grid minimum; skip
 
-            integrand = CascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
-                                           threshold, spec.secondary_law)
-
+            # For a fixed primary energy, the secondary/degraded boundary sits at half of
+            # the excess energy. Using the lower edge of the primary bin gives the lowest
+            # such boundary for this primary bin.
+            E_secondary_boundary_lower = (E_primary_bin_min - threshold) / 2
+            # First bin that can receive a degraded primary electron. Its left edge can be
+            # ≤ E_secondary_boundary_lower as long as its right edge extends into
+            # the degraded-primary range. As such, we select based on the first right edge
+            # above the lowest secondary/degraded boundary for this primary bin.
+            i_min_degraded = searchsortedlast(E_left, E_secondary_boundary_lower)
+            # If the lowest secondary/degraded boundary lies below the grid minimum, skip.
+            i_min_degraded == 0 && continue
             # Loop over degraded primary electron energy bins
             for i_degraded in i_min_degraded:(i_primary - 1)
                 E_degraded_bin_min = E_edges[i_degraded]
                 E_degraded_bin_max = E_edges[i_degraded + 1]
-
                 # Integrate only if limits are physical
                 if E_degraded_bin_max > E_degraded_bin_min
-                    result, _ = hcubature(integrand,
+                    result, _ = hcubature(degraded_integrand,
                                          (E_degraded_bin_min, 0.0),
                                          (E_degraded_bin_max, 1.0);
-                                         buffer = bufs[Threads.threadid()],
+                                         buffer = primary_bufs[Threads.threadid()],
                                          )
-                    Q_transfer_matrix[i_primary, i_degraded, i_threshold] = result
+                    primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
+                end
+            end
+
+
+            # Using the upper edge of the primary bin gives the highest secondary/degraded
+            # boundary for this primary bin.
+            E_secondary_boundary_upper = (E_primary_bin_max - threshold) / 2
+            # Last bin that can receive a secondary electron. Its left edge must be below
+            # the highest secondary/degraded boundary for this primary bin.
+            i_max_secondary = searchsortedlast(E_left, E_secondary_boundary_upper)
+            # Theoritically the secondary/degraded boundary could lie above the left edge of
+            # the primary bin (if we use a very coarse grid). Ensure it must be under.
+            i_max_secondary = min(i_max_secondary, i_primary - 1)
+            # Loop over the secondary electron energy bins
+            for i_secondary in 1:i_max_secondary
+                E_secondary_bin_min = E_edges[i_secondary]
+                E_secondary_bin_max = E_edges[i_secondary + 1]
+                # Integrate only if limits are physical
+                if E_secondary_bin_max > E_secondary_bin_min
+                    result, _ = hcubature(secondary_integrand,
+                                         (E_secondary_bin_min, 0.0),
+                                         (E_secondary_bin_max, 1.0);
+                                         buffer = secondary_bufs[Threads.threadid()],
+                                         )
+                    secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
                 end
             end
         end
     end
 
     verbose && println(" done.")
-    return Q_transfer_matrix, E_edges, ionization_thresholds
+    return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds
 end
 
 
-# Calculate secondary electron distribution over the energy grid defined by `E_secondary`,
-# for a given primary energy and ionization threshold.
-function secondary_spectrum(cache::SpeciesCascadingCache, E_secondary, E_primary_energy,
+# Load the secondary electron distribution, for a given initial primary energy index
+# and ionization threshold.
+function secondary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                             E_ionization_threshold)
 
-    E_excess = E_primary_energy - E_ionization_threshold
+    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
+    return cache.secondary_transfer_matrix[i_primary, :, i_threshold]
+end
 
-    return cache.spec.secondary_law.(E_secondary, E_primary_energy) .* (E_secondary .< E_excess / 2)
+function secondary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
+                            E_ionization_threshold)
+
+    i_primary = searchsortedlast(cache.E_edges, E_primary_energy) - 1
+    i_primary = clamp(i_primary, 1, size(cache.secondary_transfer_matrix, 1))
+    return secondary_spectrum(cache, i_primary, E_ionization_threshold)
 end
 
 
-# Load the degraded primary electron distribution over the energy grid defined by
-# `energy_grid`, for a given initial primary energy and ionization threshold.
+# Load the degraded primary electron distribution, for a given initial primary energy index
+# and ionization threshold.
 function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                           E_ionization_threshold)
 
     i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    return cache.Q_transfer_matrix[i_primary, :, i_threshold]
+    return cache.primary_transfer_matrix[i_primary, :, i_threshold]
 end
 
 function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
                           E_ionization_threshold)
 
-    i_primary = searchsortedlast(cache.E_edges_for_Q, E_primary_energy) - 1
-    i_primary = clamp(i_primary, 1, size(cache.Q_transfer_matrix, 1))
-    return primary_spectrum(cache, i_primary, E_ionization_threshold)
+    i_primary = searchsortedlast(cache.E_edges, E_primary_energy) - 1
+    i_primary = clamp(i_primary, 1, size(cache.primary_transfer_matrix, 1))
+    return secondary_spectrum(cache, i_primary, E_ionization_threshold)
 end
-
-
-
 
 
 
@@ -319,19 +421,21 @@ function find_cascading_file(spec::CascadingSpec, E_edges)
     cascading_files = readdir(species_dir)
 
     for filename in cascading_files
-        if !isdir(filename)
-            # We use a try block here due to old cascading files that can have different
-            # variable names (and thus for which loading will throw an error)
+        filepath = joinpath(species_dir, filename)
+        if !isdir(filepath) && endswith(filename, ".mat")
             try
-                filepath = joinpath(species_dir, filename)
                 file = matopen(filepath)
-                E_edges_saved = read(file, "E_edges")
-                close(file)
 
-                # Check if saved grid matches requested grid
-                if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
-                    return (true, filepath)
+                required_keys = ["Q_primary", "Q_secondary", "E_edges", "E_ionizations"]
+                if all(haskey(file, key) for key in required_keys)
+                    E_edges_saved = read(file, "E_edges")
+                    if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
+                        close(file)
+                        return (true, filepath)
+                    end
                 end
+
+                close(file)
             catch
                 continue
             end
@@ -351,41 +455,48 @@ Load pre-computed cascading matrices from a file.
 - `filepath`: Path to the .mat file containing cascading data
 
 # Returns
-- `(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)`: Tuple of loaded data
+- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
+    Tuple of loaded data
 """
 function load_cascading_matrices(filepath)
     println("Loading cascading-matrices from file: ", basename(filepath))
     file = matopen(filepath)
-    Q_transfer_matrix = read(file, "Q")
+    primary_transfer_matrix = read(file, "Q_primary")
+    secondary_transfer_matrix = read(file, "Q_secondary")
     ionization_thresholds = read(file, "E_ionizations")
-    E_edges_for_Q = read(file, "E_edges")
+    E_edges = read(file, "E_edges")
     close(file)
 
-    return (Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)
+    return (primary_transfer_matrix, secondary_transfer_matrix,
+            E_edges, ionization_thresholds)
 end
 
 
 """
-    save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_name)
+    save_cascading_matrices(primary_transfer_matrix, secondary_transfer_matrix,
+                            E_edges, ionization_thresholds, species_name)
 
 Save calculated cascading matrices to a file, located in the species-specific cascading data
 directory.
 
 # Arguments
-- `Q_transfer_matrix`: Transfer matrix to save
-- `E_edges_for_Q`: Energy grid edges used for calculations
+- `primary_transfer_matrix`: Transfer matrix to save
+- `secondary_transfer_matrix`: Secondary-electron transfer matrix to save
+- `E_edges`: Energy grid edges used for calculations
 - `ionization_thresholds`: Ionization threshold energies
 - `species_name`: Name of the species (for filename)
 """
-function save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_name)
+function save_cascading_matrices(primary_transfer_matrix, secondary_transfer_matrix,
+                                 E_edges, ionization_thresholds, species_name)
     species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "$species_name")
     filename = joinpath(species_dir,
                        string("CascadingSpec", species_name, "ionization_",
                              Dates.format(now(), "yyyymmdd-HHMMSS"),
                              ".mat"))
     file = matopen(filename, "w")
-    write(file, "Q", Q_transfer_matrix)
-    write(file, "E_edges", E_edges_for_Q)
+    write(file, "Q_primary", primary_transfer_matrix)
+    write(file, "Q_secondary", secondary_transfer_matrix)
+    write(file, "E_edges", E_edges)
     write(file, "E_ionizations", ionization_thresholds)
     close(file)
 end
