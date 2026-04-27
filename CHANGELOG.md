@@ -9,6 +9,7 @@
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - **Numerical Breaking** Minor correction of the Crank-Nicolson top boundary indexing/timing, which changes numerical results very slightly [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
+- **Numerical Breaking** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 
 
 ## v0.7.0 - 2026-03-25
