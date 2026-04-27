@@ -368,8 +368,8 @@ end
 function secondary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                             E_ionization_threshold)
 
-    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    return cache.secondary_transfer_matrix[i_primary, :, i_threshold]
+    i_threshold = findmin(x -> abs(x - E_ionization_threshold), cache.ionization_thresholds)[2]
+    return @view(cache.secondary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 function secondary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
@@ -386,8 +386,8 @@ end
 function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                           E_ionization_threshold)
 
-    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    return cache.primary_transfer_matrix[i_primary, :, i_threshold]
+    i_threshold = findmin(x -> abs(x - E_ionization_threshold), cache.ionization_thresholds)[2]
+    return @view(cache.primary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,

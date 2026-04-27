@@ -58,9 +58,9 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         idx_ionization = (E_levels[:, 2] .> 0)
         if minimum(E_levels[idx_ionization, 1]) < E_edges[iE]
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
-                                     n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
+                                     n, Ie, z, μ_center, Ω_beam, iE, cache)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
-                                        σ, E_levels, species_cascading, energy_grid, iE)
+                                        σ, E_levels, species_cascading, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
@@ -255,8 +255,8 @@ end
 ```
 =#
 function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
-                                  n, Ie, t, z, μ_center, Ω_beam, iE,
-                                  cache, i_species)
+                                  n, Ie, z, μ_center, Ω_beam, iE,
+                                  cache)
     source_sum = cache.ionization_source_sum
 
     n_z = length(z)
@@ -305,8 +305,7 @@ function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
 end
 
 function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
-                                     σ, E_levels, species_cascading,
-                                     energy_grid::EnergyGrid, iE)
+                                     σ, E_levels, species_cascading, iE)
     # Loop through the ionization channels (E_levels[:,2] > 0) for the current neutral species.
     # For each channel, compute the energy spectra for secondaries and degraded primaries, then
     # accumulate them weighted by the channel's cross-section. This factorizes all channels into
@@ -318,12 +317,14 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            if sum(secondary_e_spectra) > 0
-                secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra) # normalize sum to 1
-                secondary_e_spectra = E_levels[i_level, 2] .* secondary_e_spectra  # scale by number of secondaries
+            sum_secondary = sum(secondary_e_spectra)
+            sum_primary = sum(primary_e_spectra)
+            if sum_secondary > 0
+                secondary_e_spectra .= secondary_e_spectra ./ sum_secondary # normalize sum to 1
+                secondary_e_spectra .= E_levels[i_level, 2] .* secondary_e_spectra  # scale by number of secondaries
             end
-            if sum(primary_e_spectra) > 0
-                primary_e_spectra = primary_e_spectra ./ sum(primary_e_spectra) # normalize sum to 1
+            if sum_primary > 0
+                primary_e_spectra .= primary_e_spectra ./ sum_primary # normalize sum to 1
             end
 
             # Accumulate into the species-level spectrum, weighted by cross-section
