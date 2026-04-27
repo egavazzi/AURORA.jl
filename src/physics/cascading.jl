@@ -395,7 +395,7 @@ function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
 
     i_primary = searchsortedlast(cache.E_edges, E_primary_energy) - 1
     i_primary = clamp(i_primary, 1, size(cache.primary_transfer_matrix, 1))
-    return secondary_spectrum(cache, i_primary, E_ionization_threshold)
+    return primary_spectrum(cache, i_primary, E_ionization_threshold)
 end
 
 
@@ -424,24 +424,30 @@ function find_cascading_file(spec::CascadingSpec, E_edges)
     cascading_files = readdir(species_dir)
 
     for filename in cascading_files
+        if !endswith(filename, ".mat")
+            continue
+        end
+
+        if isdir(joinpath(species_dir, filename))
+            continue
+        end
+
         filepath = joinpath(species_dir, filename)
-        if !isdir(filepath) && endswith(filename, ".mat")
-            try
-                file = matopen(filepath)
+        try
+            file = matopen(filepath)
 
-                required_keys = ["Q_primary", "Q_secondary", "E_edges", "E_ionizations"]
-                if all(haskey(file, key) for key in required_keys)
-                    E_edges_saved = read(file, "E_edges")
-                    if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
-                        close(file)
-                        return (true, filepath)
-                    end
+            required_keys = ["Q_primary", "Q_secondary", "E_edges", "E_ionizations"]
+            if all(haskey(file, key) for key in required_keys)
+                E_edges_saved = read(file, "E_edges")
+                if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
+                    close(file)
+                    return (true, filepath)
                 end
-
-                close(file)
-            catch
-                continue
             end
+
+            close(file)
+        catch
+            continue
         end
     end
 
