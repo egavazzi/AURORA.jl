@@ -317,11 +317,13 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
             for i_degraded in i_min_degraded:(i_primary - 1)
                 E_degraded_bin_min = E_edges[i_degraded]
                 E_degraded_bin_max = E_edges[i_degraded + 1]
+                E_degraded_lower = max(E_degraded_bin_min, E_secondary_boundary_lower)
+                E_degraded_upper = min(E_degraded_bin_max, E_primary_bin_max - threshold)
                 # Integrate only if limits are physical
-                if E_degraded_bin_max > E_degraded_bin_min
+                if E_degraded_upper > E_degraded_lower
                     result, _ = hcubature(degraded_integrand,
-                                         (E_degraded_bin_min, 0.0),
-                                         (E_degraded_bin_max, 1.0);
+                                         (E_degraded_lower, 0.0),
+                                         (E_degraded_upper, 1.0);
                                          buffer = primary_bufs[Threads.threadid()],
                                          )
                     primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
@@ -342,11 +344,12 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
             for i_secondary in 1:i_max_secondary
                 E_secondary_bin_min = E_edges[i_secondary]
                 E_secondary_bin_max = E_edges[i_secondary + 1]
+                E_secondary_upper = min(E_secondary_bin_max, E_secondary_boundary_upper)
                 # Integrate only if limits are physical
-                if E_secondary_bin_max > E_secondary_bin_min
+                if E_secondary_upper > E_secondary_bin_min
                     result, _ = hcubature(secondary_integrand,
                                          (E_secondary_bin_min, 0.0),
-                                         (E_secondary_bin_max, 1.0);
+                                         (E_secondary_upper, 1.0);
                                          buffer = secondary_bufs[Threads.threadid()],
                                          )
                     secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
