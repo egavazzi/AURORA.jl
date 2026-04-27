@@ -43,4 +43,9 @@ using TestItems
     make_volume_excitation_file(td_dir)
     make_column_excitation_file(td_dir)
 end
+
+# Run all tests
 @run_package_tests verbose=true
+
+# Run only specific tests based on their filename
+# @run_package_tests verbose=true filter=ti->(endswith(ti.filename, "conservation.jl") )
