@@ -16,7 +16,7 @@ run!(sim)
 ```
 """
 function run!(sim::AuroraSimulation)
-    if sim.cache === nothing
+    if !sim.cache_initialized
         initialize!(sim)
     end
     if sim.save_input_flux
@@ -178,6 +178,6 @@ end
 
 function get_cache(sim::AuroraSimulation)
     cache = sim.cache
-    cache === nothing && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
+    !sim.cache_initialized && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
     return cache
 end

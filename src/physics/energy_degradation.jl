@@ -4,36 +4,6 @@ using LoopVectorization: @tturbo
 #                                   Update Q                                    #
 #################################################################################
 
-function demo_update_Q!(Q, Ie, z, t, ne, Te, n_neutrals, σ_neutrals, collision_levels,
-                   B2B_inelastic_neutrals, cascading_cache, energy_grid::EnergyGrid, iE, Ω_beam,
-                   μ_center, cache)
-
-    E_edges = energy_grid.E_edges
-    E_centers = energy_grid.E_centers
-    ΔE = energy_grid.ΔE
-
-    # e-e collisions
-    @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E_centers[iE], ne, Te) / ΔE[iE],
-                                outer = (length(μ_center), length(t))) .* Ie[:, :, iE];
-    end
-
-    # Loop over the species
-    for i in 1:length(n_neutrals)
-        n = n_neutrals[i];                          # Neutral density
-        σ = σ_neutrals[i];                          # Array with collision cross sections
-        E_levels = collision_levels[i];            # Array with collision enery levels and number of secondary e-
-        B2B_inelastic = B2B_inelastic_neutrals[i];  # Array with the probablities of scattering from beam to beam
-        species_cascading = cascading_cache[i]
-
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
-        add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading,
-                                   energy_grid, iE, Ω_beam, μ_center)
-    end
-end
-
-
-
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                    B2B_inelastic_neutrals, cascading_cache, iE, cache)
 
@@ -50,55 +20,73 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     Ω_beam = model.scattering.Ω_beam
     μ_center = model.pitch_angle_grid.μ_center
 
+    n_z = length(z)
+    n_μ = length(μ_center)
+
     Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
-    @views if iE > 1
-        Q[:, :, iE - 1] .+= repeat(loss_to_thermal_electrons(E_centers[iE], ne, Te) / ΔE[iE],
-                                   outer = (length(μ_center), length(t))) .* Ie[:, :, iE]
+    if iE > 1
+        loss_to_thermal_electrons!(cache.thermal_e_loss, E_centers[iE], ne, Te)
+        add_thermal_electron_collisions!(@view(Q[:, :, iE - 1]), @view(Ie[:, :, iE]),
+                                         cache.thermal_e_loss, ΔE[iE], n_z, n_μ)
     end
 
-    # Get the pre-allocated ionization fragment arrays from cache
-    Ionization_fragment_1 = cache.Ionization_fragment_1
-    Ionizing_fragment_1 = cache.Ionizing_fragment_1
-    Ionization_fragment_2 = cache.Ionization_fragment_2
-    Ionizing_fragment_2 = cache.Ionizing_fragment_2
+    # Get the pre-allocated ionization arrays from cache
+    secondary_e_flux     = cache.secondary_e_flux
+    primary_e_flux       = cache.primary_e_flux
+    secondary_e_spectrum = cache.secondary_e_spectrum
+    primary_e_spectrum   = cache.primary_e_spectrum
 
     # Loop over the neutral species
     for i in 1:length(n_neutrals_data)
         n = n_neutrals_data[i]                          # Neutral density
         σ = σ_neutrals[i]                          # Array with collision cross sections
-        E_levels = collision_levels[i]            # Array with collision enery levels and number of secondary e-
-        B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probablities of scattering from beam to beam
+        E_levels = collision_levels[i]            # Array with collision energy levels and number of secondary e-
+        B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probabilities of scattering from beam to beam
         species_cascading = cascading_cache[i]
 
         add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
 
-        # Zero out the ionization fragment arrays for this species
-        fill!(Ionization_fragment_1[i], 0)
-        fill!(Ionizing_fragment_1[i], 0)
-        fill!(Ionization_fragment_2[i], 0)
-        fill!(Ionizing_fragment_2[i], 0)
+        # Zero out the ionization arrays for this species
+        fill!(secondary_e_flux[i], 0)
+        fill!(primary_e_flux[i], 0)
+        fill!(secondary_e_spectrum[i], 0)
+        fill!(primary_e_spectrum[i], 0)
 
         # If the energy is too low, skip the ionization calculation (use zeros)
         idx_ionization = (E_levels[:, 2] .> 0)
         if minimum(E_levels[idx_ionization, 1]) < E_edges[iE]
-            prepare_first_ionization_fragment!(Ionization_fragment_1[i], Ionizing_fragment_1[i],
-                                    n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
-            prepare_second_ionization_fragment!(Ionization_fragment_2[i], Ionizing_fragment_2[i],
-                                    σ, E_levels, species_cascading, energy_grid, iE)
+            compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
+                                     n, Ie, t, z, μ_center, Ω_beam, iE, cache, i)
+            compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
+                                        σ, E_levels, species_cascading, energy_grid, iE)
         end
     end
     # If there is no ionization to add (everything is zero), skip the update of Q
     # Mmh the compiler seems to be smart enough to skip the update of Q anyway when
     # everything is zero. But let's keep this if statement just in case.
-    if !(iszero(Ionization_fragment_2) && iszero(Ionizing_fragment_2))
-        add_ionization_fragments!(Q, iE,
-                                  Ionization_fragment_1, Ionizing_fragment_1,
-                                  Ionization_fragment_2, Ionizing_fragment_2)
+    has_ionization = any(!iszero, secondary_e_spectrum) || any(!iszero, primary_e_spectrum)
+    if has_ionization
+        add_ionization_collisions!(Q, iE,
+                                   secondary_e_flux, primary_e_flux,
+                                   secondary_e_spectrum, primary_e_spectrum)
     end
 end
 
+
+function add_thermal_electron_collisions!(Q_slice, Ie_slice, thermal_e_loss, ΔE, n_z, n_μ)
+    @tturbo for i_t in axes(Ie_slice, 2)
+        for i_μ in 1:n_μ
+            for i_z in 1:n_z
+                row = (i_μ - 1) * n_z + i_z
+                Q_slice[row, i_t] += thermal_e_loss[i_z] * Ie_slice[row, i_t] / ΔE
+            end
+        end
+    end
+
+    return nothing
+end
 
 
 
@@ -224,228 +212,113 @@ end
 #################################################################################
 
 #=
-This is kind of the demo function for the ionization (legacy).
-For a given energy E and a neutral species n, this function does the following:
+The three functions below compute the ionization contribution to Q more efficiently
+than a straightforward per-channel loop would.
 
-1. Loop over the ionization collisions of the current neutral species n
-2. For each ionization collision, calculate the ionization matrix and ionizing matrix
-3. For each ionization collision, calculate the secondary_e_spectra vector and primary_e_spectra vector
-4. Add everything to Q
+The key insight is that for a given neutral species, the only quantities that vary
+across ionization channels are the cross-section σ[channel, iE] and the energy
+spectra for secondaries and degraded primaries. The spatial/angular structure of the
+electron flux is the same for all channels of the same species, so we factorize the
+calculation into two independent parts.
 
-Let's review the different elements:
+PART 1 — Spatial/angular flux (computed once per species with `compute_ionization_flux!`)
+  - `secondary_e_flux[i_s]` (shape: n_z·n_μ × n_t): incident electron flux redistributed
+    isotropically over all pitch angles, weighted by the neutral density.
+        secondary_e_flux = n × Ie[:, :, iE]    (uniformly spread over μ via solid angles)
+  - `primary_e_flux[i_s]` (shape: n_z·n_μ × n_t): incident electron flux staying in
+    its original pitch-angle beam, weighted by the neutral density.
+        primary_e_flux = n × Ie[:, :, iE]    (same pitch angle as the incident electron)
 
-## Ionization matrix, shape (n_μ x n_z, n_μ x n_z)
-It is the flux of secondary electrons. It is calculated as the product of the density of the
-neutral species, the cross-section of the current ionization collision, and the electron
-flux at the current energy. It is also redristibuted isotropically over the different angles.
-A simplified calculation looks like this:
-    Ionization_matrix = n * σ * Ie[:, :, iE]    (no isotropic redistribution here)
+PART 2 — Energy spectrum weights (computed once per species with `compute_ionization_spectra!`)
+  - `secondary_e_spectrum[i_s]` (shape: n_E): cross-section-weighted sum of the secondary
+    electron energy spectra over all ionization channels of the species:
+        secondary_e_spectrum = ∑_channels  secondary_e_spectra[channel] × σ[channel, iE]
+  - `primary_e_spectrum[i_s]` (shape: n_E): same but for the degraded primary electrons:
+        primary_e_spectrum = ∑_channels  primary_e_spectra[channel] × σ[channel, iE]
 
-## Ionizing matrix, shape (n_μ x n_z, n_μ x n_z)
-It is the flux of primary electrons. It is calculated as the product of the density of the
-neutral species, the cross-section of the current ionization collision, and the electron
-flux at the current energy. The difference with the flux of secondary electron (Ionization
-matrix) is that it is not redistributed (the primary electrons continue to propagate with
-the same pitch-angle as before).
-A simplified calculation looks like this:
-    Ionizing_matrix = n * σ * Ie[:, :, iE]
+The factorization in Part 2 is the key optimization: all ionization channels of a species
+are collapsed into a single spectrum vector, so the expensive (n_E × n_z × n_μ × n_t)
+accumulation into Q only needs to run once per species instead of once per channel.
 
-## secondary_e_spectra and primary_e_spectra vectors, both of shape (nE)
-These are calculated using the very fancy `cascading` function. The function calculates how
-the secondary and degraded primary electrons will be distributed in energy after the collision.
-They are scaled so that sum(secondary_e_spectra) = number_of_secondaries (1 or 2 depending
-on the collision) and sum(primary_e_spectra) = 1.
-
-
-The (Ionization matrix + secondary_e_spectra) and the (Ionizing matrix + primary_e_spectra)
-form two pairs. The first is used to calculate the final secondary electrons that will be
-created at lower energies, and the second one to calculate the final primary electrons that
-will be degraded in energy.
-
-These pairs are added to Q using a for loop of the following form
-
+The final accumulation into Q is done in `add_ionization_collisions!`:
 ```julia
-for iI in 1:(iE - 1)
-    for j in axes(Q, 2)
-        for k in axes(Q, 1)
-            Q[k, j, iI] += Ionization[k, j] * secondary_e_spectra[iI] +
-                            Ionizing[k, j] * primary_e_spectra[iI]
-        end
-    end
-end
-```
-=#
-function add_ionization_collisions!(Q, Ie, z, t, n, σ, E_levels, species_cascading, energy_grid::EnergyGrid, iE,
-                                    Ω_beam, μ_center)
-
-    E_edges = energy_grid.E_edges
-    ΔE = energy_grid.ΔE
-    Ionization = zeros(size(Ie, 1), size(Ie, 2))
-    Ionizing = Matrix{Float64}(undef, size(Ie, 1), size(Ie, 2))
-    n_repeated_over_μt = repeat(n, length(μ_center), length(t))
-    n_repeated_over_t = repeat(n, 1, length(t))
-
-    for i_level in axes(E_levels, 1)[2:end]
-        if E_levels[i_level, 2] > 0    # these collisions should produce secondary e-
-            # Find the energy bins where the e- in the current energy bin will degrade when
-            # losing E_levels[i_level, 1] eV
-            i_degrade = intersect(findall(x -> x > E_edges[iE] - E_levels[i_level, 1], @view(E_edges[2:end])),     # find lowest bin
-                                  findall(x -> x < E_edges[iE+1] - E_levels[i_level,1], @view(E_edges[1:end-1])))  # find highest bin
-
-            if !isempty(i_degrade) && i_degrade[1] < iE
-                # ISOTROPIC SECONDARY ELECTRONS
-
-                Ionizing .= n_repeated_over_μt .* (σ[i_level, iE] .* @view(Ie[:, :, iE]));
-                fill!(Ionization, 0)
-                @views for i_μ1 in eachindex(μ_center)
-                    for i_μ2 in eachindex(μ_center)
-                        Ionization[(i_μ1 - 1) * length(z) .+ (1:length(z)), :] .+=
-                            max.(0, n_repeated_over_t .*
-                                (σ[i_level, iE] .*
-                                Ie[(i_μ2 - 1) * length(z) .+ (1:length(z)), :, iE]) .*
-                                Ω_beam[i_μ1] ./ sum(Ω_beam))
-                    end
-                end
-
-                # Calculate the spectra of the secondary e-
-                secondary_e_spectra_left  = secondary_spectrum(species_cascading,
-                                                               energy_grid,
-                                                               @view(E_edges[1:end-1]),
-                                                               E_edges[iE], E_levels[i_level, 1])
-                secondary_e_spectra_right = secondary_spectrum(species_cascading,
-                                                               energy_grid,
-                                                               @view(E_edges[2:end]),
-                                                               E_edges[iE], E_levels[i_level, 1])
-                # Approximate the bin-integrated secondary spectrum with a trapezoidal rule.
-                secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
-
-                # Calculate the distribution of the ionizing (= primary) e-, that have lost the
-                # corresponding amount of energy
-                primary_e_spectra = primary_spectrum(species_cascading,
-                                                     energy_grid,
-                                                     E_edges[iE], E_levels[i_level, 1])
-
-                if sum(secondary_e_spectra) > 0
-                    # normalise
-                    secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra)
-                    # and multiply with the number of e- created
-                    secondary_e_spectra = E_levels[i_level, 2] .* secondary_e_spectra
-                end
-                if sum(primary_e_spectra) > 0
-                    # normalise
-                    primary_e_spectra = primary_e_spectra ./ sum(primary_e_spectra)
-                end
-
-                # and finally add this to the flux of degrading e-
-                @tturbo for iI in 1:(iE - 1)
-                    for j in axes(Q, 2)
-                        for k in axes(Q, 1)
-                            Q[k, j, iI] += Ionization[k, j] * secondary_e_spectra[iI] +
-                                           Ionizing[k, j] * primary_e_spectra[iI]
-                        end
-                    end
-                end
+for i_s in eachindex(secondary_e_flux)
+    for iI in 1:(iE - 1)
+        for j in axes(Q, 2)
+            for k in axes(Q, 1)
+                Q[k, j, iI] += secondary_e_flux[i_s][k, j] * secondary_e_spectrum[i_s][iI] +  # secondaries of species i_s
+                               primary_e_flux[i_s][k, j]   * primary_e_spectrum[i_s][iI]      # degraded primaries of species i_s
             end
         end
     end
 end
-
-
-
-#=
-The three following functions do the same thing as the function above, but in a much more
-efficient way.
-
-This refactoring is based on the fact that for a given neutral species n, the only variables
-that are changing with each ionization collision are the cross-section of the collision σ and
-the secondary_e_spectra and primary_e_spectra vectors. The rest of the calculation is the
-same for all ionization collisions of the same neutral species.
-Hence, we can split the ionization calculation into two parts:
-- one that is the same for all ionization of the same neutral species
-- one that is different for each ionization collision.
-This change introduces the possibility to do some factorization and greatly reduce the
-number of calculations and array memory access. Let see more in details how this works.
-
-In this new version, we have *for each neutral species*,
-1. The Ionization_fragment_1, which by analogy to the Ionization_matrix example, is equal to
-    Ionization_fragment_1 = n * Ie[:, :, iE]    (no isotropic redistribution here)
-2. The Ionizing_fragment_1, which by analogy to the Ionizing_matrix example, is equal to
-    Ionizing_fragment_1 = n * Ie[:, :, iE]
-These are calculated using the `prepare_first_ionization_fragment!()` function.
-
-3. The Ionization_fragment_2, which is equal to
-    Ionization_fragment_2 = ∑ secondary_e_spectra[i_level] .* σ[i_level]
-    where the sum is done over the ionization collisions of the current neutral species
-4. The Ionizing_fragment_2, which is equal to
-    Ionizing_fragment_2 = ∑ primary_e_spectra[i_level] .* σ[i_level]
-    where the sum is done over the ionization collisions of the current neutral species
-These are calculated using the `prepare_second_ionization_fragment!()` function. This is
-where the sweet factorization happens.
-
-Then we are simply able to add the fragments to Q using the following loop (from the
-function `add_ionization_fragments!()`), which needs to be run only once for the current energy.
-```julia
-for iI in 1:(iE - 1)
-    for j in axes(Q, 2)
-        for k in axes(Q, 1)
-            Q[k, j, iI] += Ionization_fragment_1[1][k, j] * Ionization_fragment_2[1][iI] +  # secondaries of species 1
-                            Ionization_fragment_1[2][k, j] * Ionization_fragment_2[2][iI] +  # secondaries of species 2
-                            Ionization_fragment_1[3][k, j] * Ionization_fragment_2[3][iI] +  # secondaries of species 3
-                            Ionizing_fragment_1[1][k, j] * Ionizing_fragment_2[1][iI] +  # primaries of species 1
-                            Ionizing_fragment_1[2][k, j] * Ionizing_fragment_2[2][iI] +  # primaries of species 2
-                            Ionizing_fragment_1[3][k, j] * Ionizing_fragment_2[3][iI]    # primaries of species 3
-        end
-    end
-end
 ```
 =#
-function prepare_first_ionization_fragment!(Ionization_fragment_1, Ionizing_fragment_1,
-                                            n, Ie, t, z, μ_center, Ω_beam, iE,
-                                            cache, i_species)
-    # Use pre-filled cached matrices (filled at cache creation)
-    n_repeated_over_μt = cache.n_repeated_over_μt[i_species]
-    n_repeated_over_t = cache.n_repeated_over_t[i_species]
+function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
+                                  n, Ie, t, z, μ_center, Ω_beam, iE,
+                                  cache, i_species)
+    source_sum = cache.ionization_source_sum
 
-    # PRIMARY ELECTRONS
-    Ionizing_fragment_1 .= n_repeated_over_μt .* @view(Ie[:, :, iE]);
-
-    # SECONDARY ELECTRONS (ISOTROPIC)
-    # Precompute constants
     n_z = length(z)
     n_μ = length(μ_center)
     n_t = size(Ie, 2)
-    sum_Ω_beam = sum(Ω_beam)
+    inv_sum_Ω_beam = inv(sum(Ω_beam))
 
-    # Use @tturbo for vectorized computation
+    # PRIMARY ELECTRONS: simply the incident flux in each pitch-angle beam, weighted by the
+    # neutral density. The primary electrons continue propagating in the same direction (beam)
+    # after the collision.
     @tturbo for it in 1:n_t
-        for i_μ1 in 1:n_μ
-            for i_μ2 in 1:n_μ
-                for iz in 1:n_z
-                    row_μ1 = (i_μ1 - 1) * n_z + iz
-                    row_μ2 = (i_μ2 - 1) * n_z + iz
-                    Ionization_fragment_1[row_μ1, it] += n_repeated_over_t[iz, it] *
-                                                          Ie[row_μ2, it, iE] *
-                                                          Ω_beam[i_μ1] / sum_Ω_beam
-                end
+        for i_μ in 1:n_μ
+            for iz in 1:n_z
+                row = (i_μ - 1) * n_z + iz
+                primary_e_flux[row, it] = n[iz] * Ie[row, it, iE]
             end
         end
     end
+
+    # SECONDARY ELECTRONS: we first compute the total incident flux (summed over pitch-angle beams)
+    @tturbo for it in 1:n_t
+        for iz in 1:n_z
+            source_total = 0.0
+            for i_μ in 1:n_μ
+                row = (i_μ - 1) * n_z + iz
+                source_total += Ie[row, it, iE]
+            end
+            source_sum[iz, it] = source_total
+        end
+    end
+
+    # SECONDARY ELECTRONS: which we then redistribute isotropically over all pitch angles,
+    # using the solid-angle weight fractions Ω_beam[μᵢ] / sum(Ω_beam). We also weight by the
+    # neutral density.
+    @tturbo for it in 1:n_t
+        for i_μ in 1:n_μ
+            beam_weight = Ω_beam[i_μ] * inv_sum_Ω_beam
+            for iz in 1:n_z
+                row = (i_μ - 1) * n_z + iz
+                secondary_e_flux[row, it] = n[iz] * source_sum[iz, it] * beam_weight
+            end
+        end
+    end
+
+    return nothing
 end
 
-function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fragment_2,
-                                             σ, E_levels, species_cascading, energy_grid::EnergyGrid, iE)
+function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
+                                     σ, E_levels, species_cascading,
+                                     energy_grid::EnergyGrid, iE)
     E_edges = energy_grid.E_edges
     ΔE = energy_grid.ΔE
-    # Loop through the different collisions for the current neutral species
+    # Loop through the ionization channels (E_levels[:,2] > 0) for the current neutral species.
+    # For each channel, compute the energy spectra for secondaries and degraded primaries, then
+    # accumulate them weighted by the channel's cross-section. This factorizes all channels into
+    # a single spectrum vector per species.
     for i_level in axes(E_levels, 1)[2:end]
-        # Continue with the ionizing collisions (will produce secondary e-)
-        if E_levels[i_level, 2] > 0
-            # Find the energy bins where the e- in the current energy bin will degrade when
-            # losing E_levels[i_level, 1] eV
+        if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
+            # Find the energy bins where the primary e- will land after losing E_loss eV
             E_loss = E_levels[i_level, 1]
             E_min = E_edges[iE] - E_loss           # Minimum energy after collision
             E_max = E_edges[iE+1] - E_loss         # Maximum energy after collision
-            # Find indices where degraded electrons end up
             i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)  # First bin with upper edge > E_min
             i_max = searchsortedlast(@view(E_edges[1:end-1]), E_max) # Last bin with lower edge < E_max
             i_degrade = i_min:i_max
@@ -453,51 +326,52 @@ function prepare_second_ionization_fragment!(Ionization_fragment_2, Ionizing_fra
             if !isempty(i_degrade) && i_degrade[1] < iE
                 # Calculate the spectra of the secondary e-
                 secondary_e_spectra_left  = secondary_spectrum(species_cascading,
-                                                               energy_grid,
                                                                @view(E_edges[1:end-1]),
-                                                               E_edges[iE], E_levels[i_level, 1])
+                                                               E_edges[iE], E_loss)
                 secondary_e_spectra_right = secondary_spectrum(species_cascading,
-                                                               energy_grid,
                                                                @view(E_edges[2:end]),
-                                                               E_edges[iE], E_levels[i_level, 1])
+                                                               E_edges[iE], E_loss)
                 # Approximate the bin-integrated secondary spectrum with the trapezoidal rule.
                 secondary_e_spectra = (secondary_e_spectra_left .+ secondary_e_spectra_right) .* ΔE / 2
 
                 # Calculate the distribution of the ionizing (= primary) e-, that have lost the
                 # corresponding amount of energy
-                primary_e_spectra = primary_spectrum(species_cascading, energy_grid,
-                                                     E_edges[iE], E_levels[i_level, 1])
+                primary_e_spectra = primary_spectrum(species_cascading, E_edges[iE], E_loss)
 
                 if sum(secondary_e_spectra) > 0
-                    # normalise
-                    secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra)
-                    # and multiply with the number of e- created
-                    secondary_e_spectra = E_levels[i_level, 2] .* secondary_e_spectra
+                    secondary_e_spectra = secondary_e_spectra ./ sum(secondary_e_spectra) # normalize sum to 1
+                    secondary_e_spectra = E_levels[i_level, 2] .* secondary_e_spectra  # scale by number of secondaries
                 end
                 if sum(primary_e_spectra) > 0
-                    # normalise
-                    primary_e_spectra = primary_e_spectra ./ sum(primary_e_spectra)
+                    primary_e_spectra = primary_e_spectra ./ sum(primary_e_spectra) # normalize sum to 1
                 end
 
-                Ionization_fragment_2 .+= secondary_e_spectra .* σ[i_level, iE]
-                Ionizing_fragment_2 .+= primary_e_spectra .* σ[i_level, iE]
+                # Accumulate into the species-level spectrum, weighted by cross-section
+                secondary_e_spectrum .+= secondary_e_spectra .* σ[i_level, iE]
+                primary_e_spectrum   .+= primary_e_spectra   .* σ[i_level, iE]
             end
         end
     end
 end
 
-function add_ionization_fragments!(Q, iE,
-                                   Ionization_fragment_1, Ionizing_fragment_1,
-                                   Ionization_fragment_2, Ionizing_fragment_2)
-    @tturbo for iI in 1:(iE - 1)
-        for j in axes(Q, 2)
-            for k in axes(Q, 1)
-                Q[k, j, iI] += Ionization_fragment_1[1][k, j] * Ionization_fragment_2[1][iI] +  # secondaries
-                               Ionization_fragment_1[2][k, j] * Ionization_fragment_2[2][iI] +  # secondaries
-                               Ionization_fragment_1[3][k, j] * Ionization_fragment_2[3][iI] +  # secondaries
-                               Ionizing_fragment_1[1][k, j] * Ionizing_fragment_2[1][iI] +  # primaries
-                               Ionizing_fragment_1[2][k, j] * Ionizing_fragment_2[2][iI] +  # primaries
-                               Ionizing_fragment_1[3][k, j] * Ionizing_fragment_2[3][iI]    # primaries
+@generated function add_ionization_collisions!(Q, iE,
+                                               secondary_e_flux::NTuple{N, <:AbstractMatrix},
+                                               primary_e_flux::NTuple{N, <:AbstractMatrix},
+                                               secondary_e_spectrum::NTuple{N, <:AbstractVector},
+                                               primary_e_spectrum::NTuple{N, <:AbstractVector}) where {N}
+
+    # Unroll the loop over species to accumulate in Q only once and reduce memory access.
+    terms = [:(secondary_e_flux[$i_s][k, j] * secondary_e_spectrum[$i_s][iI] +
+               primary_e_flux[$i_s][k, j] * primary_e_spectrum[$i_s][iI])
+             for i_s in 1:N]
+    rhs = reduce((a, b) -> :($a + $b), terms)
+
+    quote
+        @tturbo for iI in 1:(iE - 1)
+            for j in axes(Q, 2)
+                for k in axes(Q, 1)
+                    Q[k, j, iI] += $rhs
+                end
             end
         end
     end

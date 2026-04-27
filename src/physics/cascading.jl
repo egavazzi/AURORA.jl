@@ -3,97 +3,6 @@ using HCubature: hcubature, hcubature_buffer
 using Interpolations: linear_interpolation, Flat
 using MAT: matopen
 
-
-# ======================================================================================== #
-#                              DISK CACHING FUNCTIONS                                      #
-# ======================================================================================== #
-
-
-"""
-    find_cascading_file(E_edges, species_dir)
-
-Search for a pre-computed cascading spectra file with matching energy grid.
-
-# Arguments
-- `E_edges`: Energy grid edges to match
-- `species_dir`: Directory containing cascading data files for the species
-
-# Returns
-- `(file_found, filepath)`: Tuple of boolean and filepath string
-"""
-function find_cascading_file(E_edges, species_dir)
-    cascading_files = readdir(species_dir)
-
-    for filename in cascading_files
-        if !isdir(filename)
-            try
-                filepath = joinpath(species_dir, filename)
-                file = matopen(filepath)
-                E_edges_saved = read(file, "E_edges")
-                close(file)
-
-                # Check if saved grid matches requested grid
-                if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
-                    return (true, filepath)
-                end
-            catch
-                continue
-            end
-        end
-    end
-
-    return (false, "")
-end
-
-
-"""
-    load_cascading_matrices(filepath)
-
-Load pre-computed cascading matrices from a file.
-
-# Arguments
-- `filepath`: Path to the .mat file containing cascading data
-
-# Returns
-- `(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)`: Tuple of loaded data
-"""
-function load_cascading_matrices(filepath)
-    println("Loading cascading-matrices from file: ", basename(filepath))
-    file = matopen(filepath)
-    Q_transfer_matrix = read(file, "Q")
-    ionization_thresholds = read(file, "E_ionizations")
-    E_edges_for_Q = read(file, "E_edges")
-    close(file)
-
-    return (Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)
-end
-
-
-"""
-    save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_dir, species_name)
-
-Save calculated cascading matrices to a file.
-
-# Arguments
-- `Q_transfer_matrix`: Transfer matrix to save
-- `E_edges_for_Q`: Energy grid edges used for calculations
-- `ionization_thresholds`: Ionization threshold energies
-- `species_dir`: Directory to save the file
-- `species_name`: Name of the species (for filename)
-"""
-function save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_dir, species_name)
-    filename = joinpath(species_dir,
-                       string("CascadingSpec", species_name, "ionization_",
-                             Dates.format(now(), "yyyymmdd-HHMMSS"),
-                             ".mat"))
-    file = matopen(filename, "w")
-    write(file, "Q", Q_transfer_matrix)
-    write(file, "E_edges", E_edges_for_Q)
-    write(file, "E_ionizations", ionization_thresholds)
-    close(file)
-end
-
-
 # ======================================================================================== #
 #           CASCADING SPEC — Species specific cascading physics definition                 #
 # ======================================================================================== #
@@ -103,40 +12,36 @@ struct CascadingSpec{F}
     name::String
     ionization_thresholds::Vector{Float64}
     secondary_law::F   # callable (E_secondary, E_primary_ref) -> Float64
-    cache_dir::String
 end
 
 function DefaultCascadingSpecN2()
     ionization_thresholds = [15.581, 16.73, 18.75, 24.0, 42.0]
     law = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-    cache_dir = pkgdir(AURORA, "internal_data", "e_cascading", "N2")
-    return CascadingSpec("N2", ionization_thresholds, law, cache_dir)
+    return CascadingSpec("N2", ionization_thresholds, law)
 end
 
 function DefaultCascadingSpecO2()
     ionization_thresholds = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
     law = (E_s, E_p) -> 1.0 / (15.2^2 + E_s^2)
-    cache_dir = pkgdir(AURORA, "internal_data", "e_cascading", "O2")
-    return CascadingSpec("O2", ionization_thresholds, law, cache_dir)
+    return CascadingSpec("O2", ionization_thresholds, law)
 end
 
 function DefaultCascadingSpecO()
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
-    function interpolate_O_parameters(E_primary)
-        energy_params = [100, 200, 500, 1000, 2000]  # eV
-        B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
-        A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
-        A_factor = linear_interpolation(energy_params, A_params, extrapolation_bc = Flat())(E_primary)
-        B_factor = linear_interpolation(energy_params, B_params, extrapolation_bc = Flat())(E_primary)
-        return (A_factor, B_factor)
-    end
+    energy_params = [100, 200, 500, 1000, 2000]  # eV
+    B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
+    A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
+    A_interp = linear_interpolation(energy_params, A_params, extrapolation_bc = Flat())
+    B_interp = linear_interpolation(energy_params, B_params, extrapolation_bc = Flat())
+
+    interpolate_O_parameters = E_primary -> (A_interp(E_primary), B_interp(E_primary))
+
     law = function (E_s, E_p)
         A_factor, B_factor = interpolate_O_parameters(E_p)
         A_factor *= 1.25  # Empirical correction factor
         return B_factor / (1 + (E_s / A_factor)^(5 / 3))
     end
-    cache_dir = pkgdir(AURORA, "internal_data", "e_cascading", "O")
-    return CascadingSpec("O", ionization_thresholds, law, cache_dir)
+    return CascadingSpec("O", ionization_thresholds, law)
 end
 
 
@@ -145,23 +50,23 @@ end
 # ======================================================================================== #
 
 # Species specific cascading cache container
-mutable struct SpeciesCascadingCache
-    spec::CascadingSpec
+mutable struct SpeciesCascadingCache{S<:CascadingSpec}
+    spec::S
     Q_transfer_matrix::Array{Float64, 3}
     E_edges_for_Q::Vector{Float64}
     ionization_thresholds::Vector{Float64}
 end
 
 # Initialization constructor
-function SpeciesCascadingCache(spec::CascadingSpec)
-    return SpeciesCascadingCache(spec, zeros(0, 0, 0), Float64[], Float64[])
+function SpeciesCascadingCache(spec::S) where {S<:CascadingSpec}
+    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), Float64[], Float64[])
 end
 
 # Somewhat temporary container to hold all our three species specific caches
 # TODO: To be removed when we have fully moved towards a fully modular setup with things
 # attached to species inside the model.
-struct CascadingCache
-    species::NTuple{3, SpeciesCascadingCache}
+struct CascadingCache{T<:Tuple}
+    species::T
 end
 # And its initialization constructor
 function CascadingCache()
@@ -176,25 +81,27 @@ Base.getindex(cache::CascadingCache, index::Int) = cache.species[index]
 Base.length(cache::CascadingCache) = length(cache.species)
 Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
-species_label(cache::SpeciesCascadingCache) = cache.spec.name
-
-function needs_cascading_reload(cache::SpeciesCascadingCache, energy_grid::EnergyGrid)
-    E_edges = energy_grid.E_edges
-    return isempty(cache.Q_transfer_matrix) ||
-           length(E_edges) > length(cache.E_edges_for_Q) ||
-           cache.E_edges_for_Q[1:length(E_edges)] != E_edges
+function load_or_compute_cascading!(cache::CascadingCache, energy_grid::EnergyGrid;
+                                    force_recompute::Bool = false)
+    for species_cache in cache
+        load_or_compute_cascading!(species_cache, energy_grid; force_recompute)
+    end
+    return nothing
 end
 
-function ensure_cascading_loaded!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
-                                  force_recompute::Bool = false)
-    force_recompute || needs_cascading_reload(cache, energy_grid) || return cache
+function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
+                                    force_recompute::Bool = false)
+    E_edges = energy_grid.E_edges
 
     file_found, filepath = force_recompute ? (false, "") :
-                           find_cascading_file(energy_grid.E_edges, cache.spec.cache_dir)
+                           find_cascading_file(cache.spec, E_edges)
 
     if file_found
-        cache.Q_transfer_matrix, cache.E_edges_for_Q, cache.ionization_thresholds =
-            load_cascading_matrices(filepath)
+        cascading_data = load_cascading_matrices(filepath)
+        # Trim them to fit the simulation energy grid
+        cache.Q_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
+        cache.E_edges_for_Q = cascading_data[2][1:length(E_edges)]
+        cache.ionization_thresholds = cascading_data[3]
     else
         if force_recompute
             println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
@@ -202,37 +109,16 @@ function ensure_cascading_loaded!(cache::SpeciesCascadingCache, energy_grid::Ene
             println("Could not find a file with matching energy grid.")
         end
 
-        cache.Q_transfer_matrix, cache.E_edges_for_Q, cache.ionization_thresholds =
-            calculate_transfer_matrix(cache.spec, energy_grid)
+        cascading_data = calculate_cascading_matrices(cache.spec, E_edges)
+        cache.Q_transfer_matrix = cascading_data[1]
+        cache.E_edges_for_Q = cascading_data[2]
+        cache.ionization_thresholds = cascading_data[3]
 
         save_cascading_matrices(cache.Q_transfer_matrix, cache.E_edges_for_Q,
-                                cache.ionization_thresholds, cache.spec.cache_dir,
-                                cache.spec.name)
+                                cache.ionization_thresholds, cache.spec.name)
     end
 
-    return cache
-end
-
-# Calculate secondary electron distribution over the energy grid defined by E_secondary, for
-# a given primary energy and ionization threshold.
-function secondary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
-                            E_secondary, E_primary_energy, E_ionization_threshold)
-    ensure_cascading_loaded!(cache, energy_grid)
-
-    E_excess = E_primary_energy - E_ionization_threshold
-
-    return cache.spec.secondary_law.(E_secondary, E_primary_energy) .* (E_secondary .< E_excess / 2)
-end
-
-# Load the degraded primary electron distribution over the energy grid defined by
-# `energy_grid`, for a given initial primary energy and ionization threshold.
-function primary_spectrum(cache::SpeciesCascadingCache, energy_grid::EnergyGrid,
-                          E_primary_energy, E_ionization_threshold)
-    ensure_cascading_loaded!(cache, energy_grid)
-
-    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    i_primary = findmin(abs.(@view(cache.E_edges_for_Q[1:end-1]) .- E_primary_energy))[2]
-    return cache.Q_transfer_matrix[i_primary, 1:energy_grid.n, i_threshold]
+    return nothing
 end
 
 
@@ -275,35 +161,39 @@ function (integrand::CascadingIntegrand)(vars)
     E_primary = E_primary_lower + u_primary * jacobian
     E_secondary = E_primary - integrand.threshold - E_degraded
 
+    # TODO
+    # We pass the **bin left edge energy** as argument to the secondary law. It is only
+    # O that really takes it in and use it. This is consistent with the legacy code, but
+    # should we pass the actual primary energy instead?
+
     return jacobian * integrand.secondary_law(E_secondary, integrand.E_primary_bin_min)
 end
 
 
 """
-    calculate_transfer_matrix(spec, energy_grid)
+    calculate_cascading_matrices(spec, E_edges; verbose=true)
 
 Calculate the energy-degradation transfer matrix for a species defined by its `CascadingSpec`.
+The matrix can later be used to directly get the degraded primary electron distribution for
+any given primary energy and ionization threshold.
 
-The outer loop structure is identical for all species. The only species-specific ingredient is
-`spec.secondary_law(E_secondary, E_primary_bin_min) -> Float64`, which describes how secondary
-electrons distribute in energy given a primary electron at the left edge of the current bin.
-
-The second argument to `secondary_law` is the **bin left edge energy**, not the integrated
-`E_primary_mapped`, so that energy-dependent parameters (e.g. A, B for atomic O) are evaluated
-once per primary bin — consistent with how the O case was treated historically.
+The outer loop structure is identical for all species. The only species-specific ingredients are
+- `spec.secondary_law(E_secondary, E_primary_bin_min) -> Float64`, which describes how secondary
+    electrons distribute in energy given a primary electron at the left edge of the current bin.
+- `spec.ionization_thresholds`, which define the ionization thresholds for the species and thus
+    the number of transfer matrices to calculate.
 
 # Arguments
-- `spec`: `CascadingSpec` instance with ionization thresholds, secondary distribution law, and cache directory
-- `energy_grid`: Energy grid
+- `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
+- `E_edges`: Energy grid edges to match (eV)
 
 # Returns
 - `(Q_transfer_matrix, E_edges, ionization_thresholds)`: Transfer matrix [n_E, n_E, n_thresholds],
-  energy grid edges, and ionization thresholds
+    energy grid edges, and ionization thresholds
 """
-function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid; verbose = true)
-    E_edges = energy_grid.E_edges
+function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true)
     E_left = @view(E_edges[1:end-1])
-    n_E = energy_grid.n
+    n_E = length(E_left) # number of energy bins is one less than number of edges
 
     ionization_thresholds = spec.ionization_thresholds
     n_thresholds = length(ionization_thresholds)
@@ -361,4 +251,126 @@ function calculate_transfer_matrix(spec::CascadingSpec, energy_grid::EnergyGrid;
 
     verbose && println(" done.")
     return Q_transfer_matrix, E_edges, ionization_thresholds
+end
+
+
+# Calculate secondary electron distribution over the energy grid defined by `E_secondary`,
+# for a given primary energy and ionization threshold.
+function secondary_spectrum(cache::SpeciesCascadingCache, E_secondary, E_primary_energy,
+                            E_ionization_threshold)
+
+    E_excess = E_primary_energy - E_ionization_threshold
+
+    return cache.spec.secondary_law.(E_secondary, E_primary_energy) .* (E_secondary .< E_excess / 2)
+end
+
+
+# Load the degraded primary electron distribution over the energy grid defined by
+# `energy_grid`, for a given initial primary energy and ionization threshold.
+function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
+                          E_ionization_threshold)
+
+    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
+    i_primary = findmin(abs.(@view(cache.E_edges_for_Q[1:end-1]) .- E_primary_energy))[2]
+    return cache.Q_transfer_matrix[i_primary, :, i_threshold]
+end
+
+
+
+
+
+
+
+
+# ======================================================================================== #
+#                              DISK CACHING FUNCTIONS                                      #
+# ======================================================================================== #
+
+
+"""
+    find_cascading_file(E_edges, species_dir)
+
+Search for a pre-computed cascading spectra file with matching energy grid.
+
+# Arguments
+- `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
+- `E_edges`: Energy grid edges to match
+
+# Returns
+- `(file_found, filepath)`: Tuple of boolean and filepath string
+"""
+function find_cascading_file(spec::CascadingSpec, E_edges)
+    species_dir = pkgdir(AURORA, "internal_data", "e_cascading", spec.name)
+    cascading_files = readdir(species_dir)
+
+    for filename in cascading_files
+        if !isdir(filename)
+            # We use a try block here due to old cascading files that can have different
+            # variable names (and thus for which loading will throw an error)
+            try
+                filepath = joinpath(species_dir, filename)
+                file = matopen(filepath)
+                E_edges_saved = read(file, "E_edges")
+                close(file)
+
+                # Check if saved grid matches requested grid
+                if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
+                    return (true, filepath)
+                end
+            catch
+                continue
+            end
+        end
+    end
+
+    return (false, "")
+end
+
+
+"""
+    load_cascading_matrices(filepath)
+
+Load pre-computed cascading matrices from a file.
+
+# Arguments
+- `filepath`: Path to the .mat file containing cascading data
+
+# Returns
+- `(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)`: Tuple of loaded data
+"""
+function load_cascading_matrices(filepath)
+    println("Loading cascading-matrices from file: ", basename(filepath))
+    file = matopen(filepath)
+    Q_transfer_matrix = read(file, "Q")
+    ionization_thresholds = read(file, "E_ionizations")
+    E_edges_for_Q = read(file, "E_edges")
+    close(file)
+
+    return (Q_transfer_matrix, E_edges_for_Q, ionization_thresholds)
+end
+
+
+"""
+    save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_name)
+
+Save calculated cascading matrices to a file, located in the species-specific cascading data
+directory.
+
+# Arguments
+- `Q_transfer_matrix`: Transfer matrix to save
+- `E_edges_for_Q`: Energy grid edges used for calculations
+- `ionization_thresholds`: Ionization threshold energies
+- `species_name`: Name of the species (for filename)
+"""
+function save_cascading_matrices(Q_transfer_matrix, E_edges_for_Q, ionization_thresholds, species_name)
+    species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "$species_name")
+    filename = joinpath(species_dir,
+                       string("CascadingSpec", species_name, "ionization_",
+                             Dates.format(now(), "yyyymmdd-HHMMSS"),
+                             ".mat"))
+    file = matopen(filename, "w")
+    write(file, "Q", Q_transfer_matrix)
+    write(file, "E_edges", E_edges_for_Q)
+    write(file, "E_ionizations", ionization_thresholds)
+    close(file)
 end

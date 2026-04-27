@@ -2,8 +2,9 @@
     energy_grid = AURORA.EnergyGrid(100)
     cache = AURORA.CascadingCache()
 
-    secondary = AURORA.secondary_spectrum(cache[1], energy_grid, energy_grid.E_centers, 40.0, 15.581)
-    primary = AURORA.primary_spectrum(cache[1], energy_grid, 40.0, 15.581)
+    AURORA.load_or_compute_cascading!(cache, energy_grid)
+    secondary = AURORA.secondary_spectrum(cache[1], energy_grid.E_centers, 40.0, 15.581)
+    primary = AURORA.primary_spectrum(cache[1], 40.0, 15.581)
 
     @test length(cache) == 3
     @test length(secondary) == energy_grid.n
