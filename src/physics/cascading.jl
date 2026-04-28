@@ -511,30 +511,6 @@ function save_cascading_matrices(primary_transfer_matrix, secondary_transfer_mat
 end
 
 
-# Calculate secondary electron distribution over the energy grid defined by `E_secondary`,
-# for a given primary energy and ionization threshold.
-function secondary_spectrum(cache::SpeciesCascadingCache, E_secondary, E_primary_energy,
-                            E_ionization_threshold)
-
-    E_excess = E_primary_energy - E_ionization_threshold
-
-    return cache.spec.secondary_law.(E_secondary, E_primary_energy) .* (E_secondary .< E_excess / 2)
-end
-
-
-# Load the degraded primary electron distribution over the energy grid defined by
-# `energy_grid`, for a given initial primary energy and ionization threshold.
-function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
-                          E_ionization_threshold)
-
-    i_threshold = findmin(abs.(E_ionization_threshold .- cache.ionization_thresholds))[2]
-    i_primary = findmin(abs.(@view(cache.E_edges_for_Q[1:end-1]) .- E_primary_energy))[2]
-    return cache.Q_transfer_matrix[i_primary, :, i_threshold]
-end
-
-
-
-
 
 
 
