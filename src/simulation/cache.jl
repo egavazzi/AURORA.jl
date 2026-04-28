@@ -23,80 +23,55 @@ function SolverCache()
     return SolverCache(KLU_factorization, Mlhs, Mrhs, indices_lhs, indices_rhs, op_diags)
 end
 
-mutable struct DegradationCache
-    n_repeated_over_μt::Vector{Matrix{Float64}}
-    n_repeated_over_t::Vector{Matrix{Float64}}
+mutable struct DegradationCache{N}
+    ionization_source_sum::Matrix{Float64}           # total incident flux summed over beams (shape: n_z x n_t)
+    thermal_e_loss::Vector{Float64}
     Ie_scatter::Matrix{Float64}
-    Ionization_fragment_1::Vector{Matrix{Float64}}
-    Ionizing_fragment_1::Vector{Matrix{Float64}}
-    Ionization_fragment_2::Vector{Vector{Float64}}
-    Ionizing_fragment_2::Vector{Vector{Float64}}
+    secondary_e_flux::NTuple{N, Matrix{Float64}}     # isotropic secondary e- flux per species (shape: n_z·n_μ x n_t)
+    primary_e_flux::NTuple{N, Matrix{Float64}}       # forward primary e- flux per species    (shape: n_z·n_μ x n_t)
+    secondary_e_spectrum::NTuple{N, Vector{Float64}} # energy spectrum weighting for secondaries per species (shape: n_E)
+    primary_e_spectrum::NTuple{N, Vector{Float64}}   # energy spectrum weighting for primaries per species   (shape: n_E)
 end
 
 function DegradationCache()
-    n_repeated_over_μt = [zeros(1, 1) for _ in 1:3]
-    n_repeated_over_t = [zeros(1, 1) for _ in 1:3]
+    ionization_source_sum = zeros(1, 1)
+    thermal_e_loss = zeros(1)
     Ie_scatter = zeros(1, 1)
-    Ionization_fragment_1 = [zeros(1, 1) for _ in 1:3]
-    Ionizing_fragment_1 = [zeros(1, 1) for _ in 1:3]
-    Ionization_fragment_2 = [zeros(1) for _ in 1:3]
-    Ionizing_fragment_2 = [zeros(1) for _ in 1:3]
-    return DegradationCache(n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
-                            Ionization_fragment_1, Ionizing_fragment_1,
-                            Ionization_fragment_2, Ionizing_fragment_2)
+    secondary_e_flux     = ntuple(_ -> zeros(1, 1), Val(3))
+    primary_e_flux       = ntuple(_ -> zeros(1, 1), Val(3))
+    secondary_e_spectrum = ntuple(_ -> zeros(1), Val(3))
+    primary_e_spectrum   = ntuple(_ -> zeros(1), Val(3))
+    return DegradationCache(ionization_source_sum, thermal_e_loss, Ie_scatter,
+                            secondary_e_flux, primary_e_flux,
+                            secondary_e_spectrum, primary_e_spectrum)
 end
 
-function DegradationCache(n_neutrals, n_μ::Int, n_t::Int, n_z::Int, n_E::Int)
-    number_species = length(n_neutrals)
-
-    n_repeated_over_μt = Vector{Matrix{Float64}}(undef, number_species)
-    n_repeated_over_t = Vector{Matrix{Float64}}(undef, number_species)
-
-    for i_species in 1:number_species
-        n = n_neutrals[i_species]
-
-        n_repeated_over_μt[i_species] = Matrix{Float64}(undef, n_z * n_μ, n_t)
-        for i_t in 1:n_t
-            for i_μ in 1:n_μ
-                @views n_repeated_over_μt[i_species][(i_μ - 1) * n_z .+ (1:n_z), i_t] .= n
-            end
-        end
-
-        n_repeated_over_t[i_species] = Matrix{Float64}(undef, n_z, n_t)
-        for i_t in 1:n_t
-            @views n_repeated_over_t[i_species][:, i_t] .= n
-        end
-    end
-
+function DegradationCache(n_neutrals::NTuple{N, <:AbstractVector},
+                          n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
+    ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
+    thermal_e_loss = Vector{Float64}(undef, n_z)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
 
-    Ionization_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
-    Ionizing_fragment_1 = Vector{Matrix{Float64}}(undef, number_species)
-    Ionization_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
-    Ionizing_fragment_2 = Vector{Vector{Float64}}(undef, number_species)
+    secondary_e_flux = ntuple(_ -> zeros(n_z * n_μ, n_t), Val(N))
+    primary_e_flux = ntuple(_ -> zeros(n_z * n_μ, n_t), Val(N))
+    secondary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
+    primary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
 
-    for i_species in 1:number_species
-        Ionization_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
-        Ionizing_fragment_1[i_species] = zeros(n_z * n_μ, n_t)
-        Ionization_fragment_2[i_species] = zeros(n_E)
-        Ionizing_fragment_2[i_species] = zeros(n_E)
-    end
-
-    return DegradationCache(n_repeated_over_μt, n_repeated_over_t, Ie_scatter,
-                            Ionization_fragment_1, Ionizing_fragment_1,
-                            Ionization_fragment_2, Ionizing_fragment_2)
+    return DegradationCache(ionization_source_sum, thermal_e_loss, Ie_scatter,
+                            secondary_e_flux, primary_e_flux,
+                            secondary_e_spectrum, primary_e_spectrum)
 end
 
-struct SimulationCache
+struct SimulationCache{D<:DegradationCache, C<:CascadingCache, TL, P, B}
     solver::SolverCache
-    degradation::DegradationCache
-    cascading::CascadingCache
+    degradation::D
+    cascading::C
     matrices::TransportMatrices
     Ie::Array{Float64, 3}
     Ie_save::Array{Float64, 3}
     I0::Matrix{Float64}
     Ie_top::Array{Float64, 3}
-    t_loop
-    phase_fcn_neutrals
-    B2B_fragment
+    t_loop::TL
+    phase_fcn_neutrals::P
+    B2B_fragment::B
 end

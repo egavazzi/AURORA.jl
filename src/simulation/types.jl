@@ -145,21 +145,25 @@ sim = AuroraSimulation(model, flux, savedir;
                        mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
 ```
 """
-mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
+mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
+                               T<:AbstractTimeConfig, C<:SimulationCache}
     const model::M
     const flux::F
     const mode::S
     const savedir::String
-    const time::AbstractTimeConfig
+    const time::T
     const save_input_flux::Bool
-    cache::Union{Nothing, SimulationCache}
+    cache::C
+    cache_initialized::Bool
 end
 
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
                           mode::AbstractMode=SteadyStateMode(),
                           save_input_flux=true)
     time = _build_time_config(model, mode)
-    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux, nothing)
+    cache = build_dummy_simulation_cache(model, time)
+    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux,
+                            cache, false)
 end
 
 # Build the appropriate time configuration based on the mode
@@ -180,23 +184,23 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Flux:        ", sim.flux)
     println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.savedir)
-    _show_time_fields(io, sim.time)
-    println(io, "├── Cache:       ", sim.cache === nothing ? "not initialized" : "initialized")
+    show_time_fields(io, sim.time)
+    println(io, "├── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
     print(io,   "└── Save flux:   ", sim.save_input_flux)
 end
 
-function _show_time_fields(io::IO, time::RefinedTimeGrid)
+function show_time_fields(io::IO, time::RefinedTimeGrid)
     println(io, "├── duration:    ", time.duration, " s")
     println(io, "├── dt request:  ", time.dt_requested, " s")
     println(io, "├── dt resolved: ", time.dt_resolved, " s")
     println(io, "├── CFL factor:  ", time.CFL_factor)
     println(io, "├── n_loop:      ", time.n_loop)
 end
-function _show_time_fields(io::IO, time::UniformTimeGrid)
+function show_time_fields(io::IO, time::UniformTimeGrid)
     println(io, "├── duration:    ", time.duration, " s")
     println(io, "├── dt:          ", time.dt, " s")
     println(io, "├── n_steps:     ", time.n_steps)
 end
-function _show_time_fields(io::IO, ::SingleStepConfig)
+function show_time_fields(io::IO, ::SingleStepConfig)
     println(io, "├── Time:        single-step")
 end

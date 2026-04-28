@@ -16,15 +16,18 @@
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 2))
 
-        @test sim.cache === nothing
+        @test !sim.cache_initialized
         @test sim.time isa RefinedTimeGrid
         @test sim.time.dt_resolved <= sim.time.dt_requested
 
         initialize!(sim)
 
-        @test sim.cache !== nothing
+        @test sim.cache_initialized
         @test sim.cache.cascading isa AURORA.CascadingCache
-        @test all(!isempty(species_cache.E_edges_for_Q) for species_cache in sim.cache.cascading)
+        n_species = 3
+        @test sim.cache.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
+        @test sim.cache.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
+        @test all(!isempty(species_cache.E_edges) for species_cache in sim.cache.cascading)
         @test size(sim.cache.Ie, 2) == sim.time.n_t_per_loop
         @test size(sim.cache.Ie_top, 2) == length(sim.time.t)
     end
@@ -43,11 +46,11 @@ end
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
-        @test sim.cache === nothing
+        @test !sim.cache_initialized
 
         run!(sim)
 
-        @test sim.cache !== nothing
+        @test sim.cache_initialized
     end
 end
 

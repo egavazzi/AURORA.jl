@@ -1,14 +1,12 @@
-@testitem "θ_lims validation" begin
-    # Test that θ_lims must include 180°
-    @test_throws ArgumentError AURORA.validate_θ_lims(170:-10:0)
-    # Test that θ_lims must include 0°
-    @test_throws ArgumentError AURORA.validate_θ_lims(180:-10:10)
-    # Test that θ_lims must be in descending order
-    @test_throws ArgumentError AURORA.validate_θ_lims(0:10:180)
-    # Test that valid θ_lims passes
-    @test AURORA.validate_θ_lims(180:-10:0) === nothing
-    @test AURORA.validate_θ_lims(180:-45:0) === nothing
-    @test AURORA.validate_θ_lims([180, 140, 100, 80, 40, 0]) === nothing
+@testitem "ScatteringData construction" begin
+    grid = PitchAngleGrid(180:-30:0)
+    sd = AURORA.ScatteringData(grid)
+
+    @test sd isa AURORA.ScatteringData
+    @test size(sd.Ω_subbeam_relative, 1) == grid.n_beams
+    @test size(sd.P_scatter, 1) == size(sd.P_scatter, 2)
+    @test length(sd.Ω_beam) == grid.n_beams
+    @test length(sd.θ_scatter) > 0
 end
 
 @testitem "Rotation matrices" begin
