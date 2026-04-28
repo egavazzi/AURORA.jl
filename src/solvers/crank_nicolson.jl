@@ -7,7 +7,7 @@ using LinearAlgebra: ldiv!, mul!
 using SparseArrays: spdiagm
 
 """
-    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache)
 
 Solve the time-dependent electron transport equation for energy level `iE`
 using the Crank-Nicolson implicit scheme.
@@ -59,9 +59,8 @@ Both matrices share the same block structure as the steady-state system:
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
 - `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
-- `first_iteration`: whether this is the first call
 """
-function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -78,8 +77,8 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     dt = t[2] - t[1]
     ddt = 1.0 / (v * dt)
 
-    # ── First iteration: build sparsity patterns, index maps, operator diags ──
-    if first_iteration
+    # ── First call : build sparsity patterns, index maps, operator diags ──
+    if !cache.initialized
         Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
         cache.Mlhs, cache.Mrhs = create_transport_sparsity_pattern(
             n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
@@ -105,8 +104,9 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     rhs = similar(current)
 
     # ── Factorise / re-factorise ──
-    if first_iteration
+    if !cache.initialized
         cache.KLU = klu(cache.Mlhs)
+        cache.initialized = true
     else
         klu!(cache.KLU, cache.Mlhs)
     end
