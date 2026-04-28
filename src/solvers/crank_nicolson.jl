@@ -6,6 +6,135 @@ using KLU: klu, klu!
 using LinearAlgebra: ldiv!, mul!
 using SparseArrays: spdiagm
 
+"""
+    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+
+Solve the time-dependent electron transport equation for energy level `iE`
+using the Crank-Nicolson implicit scheme.
+
+On the **first call** the sparse matrix structures, nzval index arrays, and
+operator diagonals are computed and stored in `cache`.  On subsequent calls
+only the numerical values in `Mlhs.nzval` / `Mrhs.nzval` are updated (zero
+allocations on the hot path).
+
+# Mathematical Background
+
+The time-dependent electron transport equation is:
+```
+∂Ie/∂t + μ·v ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ − D·∇²Ie = Q
+```
+
+Crank-Nicolson gives second-order accuracy in time:
+```
+Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  (Q^(n+1) + Q^n)/2
+```
+
+with
+```
+Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 − D·Ddiffusion
+Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 + D·Ddiffusion
+```
+
+Both matrices share the same block structure as the steady-state system:
+```
+┌─────────┬─────────┬─────────┐
+│ Block   │ Block   │ Block   │  Each block is n_z × n_z
+│ (1,1)   │ (1,2)   │ (1,3)   │
+├─────────┼─────────┼─────────┤
+│ Block   │ Block   │ Block   │  Off-diagonal: angular scattering
+│ (2,1)   │ (2,2)   │ (2,3)   │
+├─────────┼─────────┼─────────┤
+│ Block   │ Block   │ Block   │  Diagonal: transport + diffusion
+│ (3,1)   │ (3,2)   │ (3,3)   │
+└─────────┴─────────┴─────────┘
+```
+
+# Arguments
+- `Ie`: pre-allocated output array [m⁻² s⁻¹], size `(n_z * n_angle, n_t)`
+- `t`: time grid [s]
+- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
+- `v`: electron velocity [km/s]
+- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
+- `iE`: current energy index
+- `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
+- `I0`: initial condition [m⁻² s⁻¹]
+- `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
+- `first_iteration`: whether this is the first call
+"""
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
+    z = model.s_field
+    μ = model.pitch_angle_grid.μ_center
+    n_z = length(z)
+    n_angle = length(μ)
+
+    # Extract physics data for this energy level
+    A = matrices.A
+    B = matrices.B
+    D = @view(matrices.D[iE, :])
+    Q_slice = @view(matrices.Q[:, :, iE])
+    Ddiffusion = matrices.Ddiffusion
+
+    # Temporal coefficient (scalar — all altitudes have the same 1/(v·Δt))
+    dt = t[2] - t[1]
+    ddt = 1.0 / (v * dt)
+
+    # ── First iteration: build sparsity patterns, index maps, operator diags ──
+    if first_iteration
+        Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
+        cache.Mlhs, cache.Mrhs = create_transport_sparsity_pattern(
+            n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
+        cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
+        cache.indices_rhs = extract_nzval_indices(cache.Mrhs, n_z, n_angle)
+        cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+    end
+
+    # ── Update matrix values (fast, no allocations) ──
+    update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs,
+                                    cache.indices_lhs, cache.indices_rhs,
+                                    A, B, D, ddt, cache.op_diags, μ, n_z)
+
+    # ── Boundary indices ──
+    index_bottom = 1:n_z:(n_angle * n_z)
+    index_top    = n_z:n_z:(n_angle * n_z)
+
+    # ── Initial condition ──
+    Ie[:, 1] .= I0
+    Ie[index_bottom, 1] .= 0.0
+    Ie[index_top,    1] .= @view(Ie_top[:, 1])
+    current = @view(Ie[:, 1])
+    rhs = similar(current)
+
+    # ── Factorise / re-factorise ──
+    if first_iteration
+        cache.KLU = klu(cache.Mlhs)
+    else
+        klu!(cache.KLU, cache.Mlhs)
+    end
+
+    # ── Time-stepping loop ──
+    for i_t in 1:(length(t) - 1)
+        next = @view Ie[:, i_t + 1]
+
+        # Crank-Nicolson step:  Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  Q
+        mul!(rhs, cache.Mrhs, current)
+        @views @. next = rhs + 0.5 * (Q_slice[:, i_t] + Q_slice[:, i_t + 1])
+        next[index_bottom] .= 0.0                           # bottom BC
+        next[index_top]    .= @view(Ie_top[:, i_t + 1])     # top BC
+        ldiv!(cache.KLU, next)
+
+        current = next
+    end
+
+    # Check for negative values (if it happens we have a problem) and clamp to zero
+    if any(Ie .< 0)
+        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        Ie[Ie .< 0] .= 0
+    end
+
+    return nothing
+end
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Matrix value update
 # ──────────────────────────────────────────────────────────────────────────────
@@ -111,137 +240,4 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
     end
 
     return Mlhs, Mrhs
-end
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
-
-Solve the time-dependent electron transport equation for energy level `iE`
-using the Crank-Nicolson implicit scheme.
-
-On the **first call** the sparse matrix structures, nzval index arrays, and
-operator diagonals are computed and stored in `cache`.  On subsequent calls
-only the numerical values in `Mlhs.nzval` / `Mrhs.nzval` are updated (zero
-allocations on the hot path).
-
-# Mathematical Background
-
-The time-dependent electron transport equation is:
-```
-∂Ie/∂t + μ·v ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ − D·∇²Ie = Q
-```
-
-Crank-Nicolson gives second-order accuracy in time:
-```
-Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  (Q^(n+1) + Q^n)/2
-```
-
-with
-```
-Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 − D·Ddiffusion
-Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 + D·Ddiffusion
-```
-
-Both matrices share the same block structure as the steady-state system:
-```
-┌─────────┬─────────┬─────────┐
-│ Block   │ Block   │ Block   │  Each block is n_z × n_z
-│ (1,1)   │ (1,2)   │ (1,3)   │
-├─────────┼─────────┼─────────┤
-│ Block   │ Block   │ Block   │  Off-diagonal: angular scattering
-│ (2,1)   │ (2,2)   │ (2,3)   │
-├─────────┼─────────┼─────────┤
-│ Block   │ Block   │ Block   │  Diagonal: transport + diffusion
-│ (3,1)   │ (3,2)   │ (3,3)   │
-└─────────┴─────────┴─────────┘
-```
-
-# Arguments
-- `Ie`: pre-allocated output array [m⁻² s⁻¹], size `(n_z * n_angle, n_t)`
-- `t`: time grid [s]
-- `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
-- `v`: electron velocity [km/s]
-- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
-- `iE`: current energy index
-- `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
-- `I0`: initial condition [m⁻² s⁻¹]
-- `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
-- `first_iteration`: whether this is the first call
-"""
-function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache; first_iteration = false)
-    z = model.s_field
-    μ = model.pitch_angle_grid.μ_center
-    n_z = length(z)
-    n_angle = length(μ)
-
-    # Extract physics data for this energy level
-    A = matrices.A
-    B = matrices.B
-    D = @view(matrices.D[iE, :])
-    Q_slice = @view(matrices.Q[:, :, iE])
-    Ddiffusion = matrices.Ddiffusion
-
-    # Temporal coefficient (scalar — all altitudes have the same 1/(v·Δt))
-    dt = t[2] - t[1]
-    ddt = 1.0 / (v * dt)
-
-    # ── First iteration: build sparsity patterns, index maps, operator diags ──
-    if first_iteration
-        Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
-        cache.Mlhs, cache.Mrhs = create_transport_sparsity_pattern(
-            n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
-        cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
-        cache.indices_rhs = extract_nzval_indices(cache.Mrhs, n_z, n_angle)
-        cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
-    end
-
-    # ── Update matrix values (fast, no allocations) ──
-    update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs,
-                                    cache.indices_lhs, cache.indices_rhs,
-                                    A, B, D, ddt, cache.op_diags, μ, n_z)
-
-    # ── Boundary indices ──
-    index_bottom = 1:n_z:(n_angle * n_z)
-    index_top    = n_z:n_z:(n_angle * n_z)
-
-    # ── Initial condition ──
-    Ie[:, 1] = I0
-    Ie[index_bottom, 1] .= 0.0
-    Ie[index_top,    1] .= @view(Ie_top[:, 1])
-    Ie_finer = Ie[:, 1]
-    b = similar(Ie_finer)
-
-    # ── Factorise / re-factorise ──
-    if first_iteration
-        cache.KLU = klu(cache.Mlhs)
-    else
-        klu!(cache.KLU, cache.Mlhs)
-    end
-
-    # ── Time-stepping loop ──
-    for i_t in 1:(length(t) - 1)
-        Q_local = (@view(Q_slice[:, i_t]) .+ @view(Q_slice[:, i_t + 1])) ./ 2
-        Q_local[index_bottom] .= 0.0
-        Q_local[index_top]    .= @view(Ie_top[:, i_t + 1])
-
-        # Crank-Nicolson step:  Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  Q
-        mul!(b, cache.Mrhs, Ie_finer)
-        Ie_finer .= b
-        Ie_finer .+= Q_local
-        ldiv!(cache.KLU, Ie_finer)
-
-        Ie[:, i_t + 1] = Ie_finer
-    end
-
-    # Check for negative values (if it happens we have a problem) and clamp to zero
-    if any(Ie .< 0)
-        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
-        Ie[Ie .< 0] .= 0
-    end
-
-    return nothing
 end
