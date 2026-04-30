@@ -37,7 +37,7 @@ using TestItems
     let flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
         sim = AuroraSimulation(model, flux, td_dir;
                                mode=TimeDependentMode(duration=0.1, dt=0.01,
-                                                      CFL_number=128, n_loop=2))
+                                                      CFL_number=128, n_loop=3))
         run!(sim)
     end
     make_volume_excitation_file(td_dir)

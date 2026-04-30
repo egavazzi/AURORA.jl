@@ -60,7 +60,7 @@ Both matrices share the same block structure as the steady-state system:
 - `I0`: initial condition [m⁻² s⁻¹]
 - `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
 """
-function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache)
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, Q, iE, Ie_top, I0, cache)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -70,7 +70,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     A = matrices.A
     B = matrices.B
     D = @view(matrices.D[iE, :])
-    Q_slice = @view(matrices.Q[:, :, iE])
+    Q_slice = @view(Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
 
     # Temporal coefficient (scalar — all altitudes have the same 1/(v·Δt))
@@ -127,7 +127,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
 
     # Check for negative values (if it happens we have a problem) and clamp to zero
     if any(Ie .< 0)
-        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values, with minimum $(minimum(Ie)))"
         Ie[Ie .< 0] .= 0
     end
 

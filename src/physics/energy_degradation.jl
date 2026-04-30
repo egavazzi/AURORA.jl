@@ -4,7 +4,7 @@ using LoopVectorization: @tturbo
 #                                   Update Q                                    #
 #################################################################################
 
-function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
+function update_Q!(Q, Ie, model::AuroraModel, t,
                    B2B_inelastic_neutrals, cascading_cache, iE, cache)
 
     z = model.altitude_grid.h
@@ -22,8 +22,6 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
 
     n_z = length(z)
     n_μ = length(μ_center)
-
-    Q = matrices.Q  # Extract Q for convenient access
 
     # e-e collisions
     if iE > 1

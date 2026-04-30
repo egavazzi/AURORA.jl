@@ -190,16 +190,13 @@ _solver_type_tag(::SteadyStateMode)   = "steady_state"
 
 using MAT: matopen
 using Printf: @sprintf
-function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
+function save_results(sim::AuroraSimulation, Ie_save, t_save, I0, i)
     energy_grid = sim.model.energy_grid
     μ_lims = sim.model.pitch_angle_grid.μ_lims
     z = sim.model.altitude_grid.h
     scattering = sim.model.scattering
 
-    # Extract the time array for the current loop
-	t_run = collect(t .+ t[end] * (i - 1))
-    # Reduce t_run to match the t_sampling
-    t_run = t_run[1:CFL_factor:end]
+    t_run = collect(t_save)
 
     # Mode type tags for downstream analysis
     mode_type = _mode_type_tag(sim.time)
@@ -223,6 +220,44 @@ function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
 			"BeamWeight" => scattering.Ω_beam,
 			"theta_scatter" => scattering.θ_scatter))
 	close(file)
+end
+
+function list_result_files(directory_to_process)
+    files = readdir(directory_to_process, join=true)
+    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
+    return files_to_process
+end
+
+function has_duplicate_result_boundary(t_local, previous_t_last)
+    previous_t_last === nothing && return false
+    isempty(t_local) && return false
+
+    scale = maximum((abs(previous_t_last), abs(first(t_local)), 1.0))
+    return isapprox(first(t_local), previous_t_last; rtol=0.0, atol=8 * eps(scale))
+end
+
+function drop_duplicate_result_boundary(Ie_ztE, t_local, previous_t_last)
+    if has_duplicate_result_boundary(t_local, previous_t_last)
+        return @view(Ie_ztE[:, 2:end, :]), @view(t_local[2:end]), true
+    end
+
+    return Ie_ztE, t_local, false
+end
+
+normalize_saved_time_axis(t_run) = t_run isa Number ? Float64[t_run] : vec(collect(t_run))
+
+function read_results(file; previous_t_last=nothing, drop_duplicate_boundary=true)
+    f = matopen(file)
+        Ie_ztE = read(f, "Ie_ztE")
+        t_local = normalize_saved_time_axis(read(f, "t_run"))
+    close(f)
+
+    if drop_duplicate_boundary
+        Ie_ztE, t_local, _ = drop_duplicate_result_boundary(Ie_ztE, t_local, previous_t_last)
+    end
+
+    return Ie_ztE, t_local
 end
 
 

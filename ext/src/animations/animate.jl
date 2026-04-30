@@ -84,8 +84,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     end
 
     ## Find the files to process
-    files = readdir(full_path_to_directory, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
+    files_to_process = AURORA.list_result_files(full_path_to_directory)
     n_files = length(files_to_process)
 
     ## Create file name
@@ -98,9 +97,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     ## Load data from the first file
     print("(1/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
     data = matread(files_to_process[1])
-    Ie_raw = data["Ie_ztE"]  # size of [n_mu x nz, nt, nE]
+    Ie_raw, t_run = AURORA.read_saved_result(files_to_process[1])
     μ_lims = vec(data["mu_lims"])
-    t_run = data["t_run"]
     E_centers = data["E_centers"]
     z = data["h_atm"]
 
@@ -178,21 +176,17 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         io = VideoStream(fig; framerate=framerate, visible=true)
     end
 
-    for i_file in 1:n_files
-        # Load data (first file already loaded)
+    previous_t_last = nothing
+    for (i_file, file) in enumerate(files_to_process)
         if i_file > 1
             print("($i_file/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-            data = matread(files_to_process[i_file])
-            Ie_raw = data["Ie_ztE"]
-            t_run = data["t_run"]
+            Ie_raw, t_run = AURORA.read_saved_result(file; previous_t_last=previous_t_last)
+            isempty(t_run) && continue
             Ie_plot = process_Ie(Ie_raw, t_run)
         end
 
-        # Animate (skip first timestep for files after the first, as it duplicates the
-        # previous file's last frame)
-        i_t_start = i_file == 1 ? 1 : 2
         println("animate.")
-        for i_t in i_t_start:dt_steps:length(t_run)
+        for i_t in 1:dt_steps:length(t_run)
             Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
             time[] = @sprintf("%.3f s", t_run[i_t])
             if save_to_file
@@ -200,6 +194,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
             end
             sleep(0.01)
         end
+
+        previous_t_last = t_run[end]
     end
 
     if save_to_file
