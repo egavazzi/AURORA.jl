@@ -17,8 +17,8 @@ struct Ionosphere{FT, V<:AbstractVector{FT}}
 end
 
 function Ionosphere(msis_file::AbstractString, iri_file::AbstractString,
-                    h_atm::AbstractVector)
-    n_neutrals, Tn = load_neutral_densities(msis_file, h_atm)
+                    h_atm::AbstractVector; oxygen_scale=1.0)
+    n_neutrals, Tn = load_neutral_densities(msis_file, h_atm; oxygen_scale)
     ne, Te = load_electron_densities(iri_file, h_atm)
     FT = eltype(Tn)
     return Ionosphere{FT, typeof(Tn)}(
@@ -49,6 +49,7 @@ Upper boundary conditions are applied to smoothly transition the densities to ze
 # Inputs
 - `msis_file`: absolute path to the msis file to read n_neutrals and Tn from. String
 - `h_atm`: altitude (m). Vector [nZ]
+- `oxygen_scale=1.0`: multiply the interpolated atomic oxygen density profile by this factor
 
 # Returns
 - `n_neutrals`: neutral densities (m⁻³). Named tuple of vectors ([nZ], ..., [nZ])
@@ -57,12 +58,14 @@ Upper boundary conditions are applied to smoothly transition the densities to ze
 # See also
 [`load_msis`](@ref), [`interpolate_msis_to_grid`](@ref)
 """
-function load_neutral_densities(msis_file, h_atm)
+function load_neutral_densities(msis_file, h_atm; oxygen_scale=1.0)
+    oxygen_scale < 0 && throw(ArgumentError("oxygen_scale must be non-negative"))
+
     msis_raw = load_msis(msis_file)
     msis = interpolate_msis_to_grid(msis_raw.data, h_atm)
     nN2 = msis.N2
     nO2 = msis.O2
-    nO = msis.O
+    nO = oxygen_scale .* msis.O
 
     # Apply upper boundary conditions to smoothly transition densities to zero
     # Set the last 3 points to zero

@@ -3,6 +3,7 @@
     msis_file = find_msis_file()
     iri_file = find_iri_file()
     iono = Ionosphere(msis_file, iri_file, z)
+    scaled_iono = Ionosphere(msis_file, iri_file, z; oxygen_scale=0.5)
 
     @test iono isa Ionosphere
     @test length(iono.nN2) == length(z)
@@ -22,6 +23,10 @@
     @test nn.nN2 === iono.nN2
     @test nn.nO2 === iono.nO2
     @test nn.nO === iono.nO
+
+    @test scaled_iono.nN2 ≈ iono.nN2
+    @test scaled_iono.nO2 ≈ iono.nO2
+    @test scaled_iono.nO ≈ 0.5 .* iono.nO
 end
 
 
@@ -32,11 +37,17 @@ end
     @test_nowarn n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
 
     n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
+    scaled_n_neutrals, _ = AURORA.load_neutral_densities(msis_file, z; oxygen_scale=0.5)
     for i in eachindex(n_neutrals)
         @test !any(isnan.(n_neutrals[i]))
         @test !any(isinf.(n_neutrals[i]))
         @test !any(n_neutrals[i] .< 0)
     end
+
+    @test scaled_n_neutrals.nN2 ≈ n_neutrals.nN2
+    @test scaled_n_neutrals.nO2 ≈ n_neutrals.nO2
+    @test scaled_n_neutrals.nO ≈ 0.5 .* n_neutrals.nO
+    @test_throws ArgumentError AURORA.load_neutral_densities(msis_file, z; oxygen_scale=-0.5)
 
     @test !any(isnan.(Tn))
     @test !any(isinf.(Tn))
