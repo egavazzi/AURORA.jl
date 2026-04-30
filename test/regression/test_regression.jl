@@ -85,3 +85,41 @@ end
                max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
     println("Maximum relative difference: ", maximum(rel_diff))
 end
+
+
+@testitem "AURORA time-dependent loop count invariance" begin
+    using MAT
+
+    altitude_lims = [100, 200]
+    θ_lims = 180:-90:0
+    E_max = 100
+    B_angle_to_zenith = 13
+
+    model = AuroraModel(altitude_lims, θ_lims, E_max,
+                        find_msis_file(), find_iri_file(),
+                        B_angle_to_zenith)
+    flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SinusoidalFlickering(5.0); beams=1:2)
+
+    function run_case(model, flux, n_loop)
+        savedir = mktempdir()
+        sim = AuroraSimulation(model, flux, savedir;
+                               mode=TimeDependentMode(duration = 0.1, dt = 0.01,
+                                                      CFL_number = 128, n_loop = n_loop))
+        run!(sim)
+        make_volume_excitation_file(savedir)
+
+        t_all = Float64[]
+        for file in AURORA.list_result_files(savedir)
+            append!(t_all, vec(matread(file)["t_run"]))
+        end
+
+        data = matread(joinpath(savedir, "Qzt_all_L.mat"))
+        return data["QO1S"], t_all
+    end
+
+    q_loop1, t_loop1 = run_case(model, flux, 1)
+    q_loop3, t_loop3 = run_case(model, flux, 3)
+
+    @test t_loop1 == t_loop3
+    @test all(isapprox.(q_loop1, q_loop3, rtol = 1e-4))
+end

@@ -16,6 +16,16 @@
     @test size(vol_td.Q4278) == (n_z_td, n_t_td)
     @test n_t_td > n_t_ss
     @test vol_td.savedir == SharedSimResults.td_dir
+
+    raw_t = Float64[]
+    let previous_t_last = nothing
+        for file in AURORA.list_result_files(SharedSimResults.td_dir)
+            _, t_local = AURORA.read_results(file; previous_t_last=previous_t_last)
+            append!(raw_t, collect(t_local))
+            previous_t_last = isempty(t_local) ? previous_t_last : t_local[end]
+        end
+    end
+    @test vol_td.t == raw_t
 end
 
 @testitem "load_column_excitation" setup=[SharedSimResults] begin
@@ -31,6 +41,16 @@ end
     @test col_td isa ColumnExcitationResult
     @test length(col_td.I_4278) == length(col_td.t)
     @test length(col_td.t) > length(col_ss.t)
+
+    raw_t = Float64[]
+    let previous_t_last = nothing
+        for file in AURORA.list_result_files(SharedSimResults.td_dir)
+            _, t_local = AURORA.read_results(file; previous_t_last=previous_t_last)
+            append!(raw_t, collect(t_local))
+            previous_t_last = isempty(t_local) ? previous_t_last : t_local[end]
+        end
+    end
+    @test col_td.t == raw_t
 end
 
 @testitem "load_input" setup=[SharedSimResults] begin
@@ -59,5 +79,32 @@ end
         touch(joinpath(twodir, "Ie_incoming_a.mat"))
         touch(joinpath(twodir, "Ie_incoming_b.mat"))
         @test_throws Exception find_input_file(twodir)
+    end
+end
+
+@testitem "read_results drops legacy duplicate boundaries" begin
+    using MAT
+
+    mktempdir() do savedir
+        file1 = joinpath(savedir, "IeFlickering-01.mat")
+        io = matopen(file1, "w")
+            write(io, "Ie_ztE", reshape(collect(1.0:12.0), 2, 3, 2))
+            write(io, "t_run", [0.0, 0.01, 0.02])
+        close(io)
+
+        file2 = joinpath(savedir, "IeFlickering-02.mat")
+        io = matopen(file2, "w")
+            write(io, "Ie_ztE", reshape(collect(13.0:24.0), 2, 3, 2))
+            write(io, "t_run", [0.02, 0.03, 0.04])
+        close(io)
+
+        files = AURORA.list_result_files(savedir)
+        Ie1, t1 = AURORA.read_results(files[1])
+        Ie2, t2 = AURORA.read_results(files[2]; previous_t_last=t1[end])
+
+        @test collect(t1) == [0.0, 0.01, 0.02]
+        @test collect(t2) == [0.03, 0.04]
+        @test size(Ie1, 2) == 3
+        @test size(Ie2, 2) == 2
     end
 end

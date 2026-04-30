@@ -102,3 +102,52 @@ end
     reduced_density = dropdims(sum(out["F"] .* reshape(out["dvpar"], :, 1, 1); dims = 1), dims = 1)
     @test conserved_density ≈ reduced_density rtol = 1e-10 atol = 1e-10
 end
+
+@testitem "make_psd_file drops legacy duplicate boundaries across files" begin
+    using AURORA
+    using MAT: matopen, matread
+
+    tmpdir = mktempdir()
+
+    E_edges = [10.0, 20.0, 40.0]
+    E_centers = [15.0, 30.0]
+    ΔE = diff(E_edges)
+    μ_lims = [-1.0, 0.0, 1.0]
+    h_atm = [100e3, 110e3]
+
+    Nz = length(h_atm)
+    nμ = length(μ_lims) - 1
+    nE = length(E_centers)
+
+    function write_input(path, t_run, offset)
+        Nt = length(t_run)
+        Ie = zeros(Float64, nμ * Nz, Nt, nE)
+        for i_E in 1:nE, i_t in 1:Nt, i_μ in 1:nμ, i_z in 1:Nz
+            Ie[(i_μ - 1) * Nz + i_z, i_t, i_E] = offset + i_z + i_μ + i_t + i_E
+        end
+
+        matopen(path, "w") do io
+            write(io, "Ie_ztE", Ie)
+            write(io, "E_edges", E_edges)
+            write(io, "E_centers", E_centers)
+            write(io, "dE", ΔE)
+            write(io, "mu_lims", μ_lims)
+            write(io, "t_run", t_run)
+            write(io, "h_atm", h_atm)
+        end
+    end
+
+    write_input(joinpath(tmpdir, "IeFlickering-01.mat"), [0.0, 0.01, 0.02], 0.0)
+    write_input(joinpath(tmpdir, "IeFlickering-02.mat"), [0.02, 0.03, 0.04], 100.0)
+
+    AURORA.make_psd_file(tmpdir; compute = :both)
+
+    out1 = matread(joinpath(tmpdir, "psd", "psd-01.mat"))
+    out2 = matread(joinpath(tmpdir, "psd", "psd-02.mat"))
+
+    @test vec(out1["t_run"]) == [0.0, 0.01, 0.02]
+    @test vec(out2["t_run"]) == [0.03, 0.04]
+    @test size(out1["f"], 3) == 3
+    @test size(out2["f"], 3) == 2
+    @test size(out2["F"], 3) == 2
+end

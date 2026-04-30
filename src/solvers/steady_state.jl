@@ -134,7 +134,7 @@ The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: `SolverCache` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
 """
-function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache)
+function steady_state_scheme!(Ie, model::AuroraModel, matrices, Q, iE, Ie_top, cache)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -144,7 +144,7 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     A = matrices.A
     B = matrices.B
     D = @view(matrices.D[iE, :])
-    Q_slice = @view(matrices.Q[:, :, iE])
+    Q_slice = @view(Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
 
     # ── First call: build sparsity pattern, index map, operator diagonals ──

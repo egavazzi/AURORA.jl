@@ -24,12 +24,7 @@ thermal electrons through Coulomb collisions. It is saved as a function of altit
 """
 function make_heating_rate_file(directory_to_process)
     ## Find the files to process
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
+    files_to_process = list_result_files(directory_to_process)
 
     if isempty(files_to_process)
         @warn "No simulation results found in $directory_to_process. Skipping heating rate calculations."
@@ -53,20 +48,12 @@ function make_heating_rate_file(directory_to_process)
 
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
+    previous_t_last = nothing
     ## Loop over the files
-    for (i_file, file) in enumerate(files_to_process)
-        ## Load simulation results for current file.
-        if i_file == 1
-            f = matopen(file)
-                Ie_ztE = read(f, "Ie_ztE")
-                t_local = read(f, "t_run")
-            close(f)
-        else
-            f = matopen(file)
-            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
-            t_local = read(f, "t_run")[2:end]
-            close(f)
-        end
+    for file in files_to_process
+        Ie_ztE, t_local = read_results(file; previous_t_last=previous_t_last)
+        previous_t_last = isempty(t_local) ? previous_t_last : t_local[end]
+        isempty(t_local) && (next!(p); continue)
 
         ## Sum Ie over the beams
         n_z = length(z)

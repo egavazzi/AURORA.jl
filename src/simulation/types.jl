@@ -238,6 +238,89 @@ function Base.show(io::IO, ::MIME"text/plain", time::UniformTimeGrid)
     print(io,   "└── n_steps:    ", time.n_steps)
 end
 
+struct TimeLoopSlice
+    resolved_indices::UnitRange{Int}
+    local_save_indices::StepRange{Int, Int}
+    output_indices::UnitRange{Int}
+end
+
+function build_time_loop_slices(n_resolved::Int, n_loop::Int, save_indices::StepRange{Int, Int})
+    n_intervals = n_resolved - 1
+    n_intervals > 0 || error("time-dependent simulations require at least two resolved time points")
+    n_loop > 0 || error("n_loop must be positive, got $n_loop")
+    n_loop <= n_intervals || error("n_loop ($n_loop) must be ≤ the number of resolved time intervals ($n_intervals)")
+
+    base_intervals = fld(n_intervals, n_loop)
+    extra_intervals = mod(n_intervals, n_loop)
+    save_stride = step(save_indices)
+    slices = Vector{TimeLoopSlice}(undef, n_loop)
+
+    resolved_start = 1
+    for i_loop in 1:n_loop
+        n_local_intervals = base_intervals + (i_loop <= extra_intervals ? 1 : 0)
+        resolved_stop = resolved_start + n_local_intervals
+
+        first_owned_resolved = i_loop == 1 ? resolved_start : resolved_start + 1
+        output_start = searchsortedfirst(save_indices, first_owned_resolved)
+        output_stop = searchsortedlast(save_indices, resolved_stop)
+        output_indices = output_start:output_stop
+
+        local_save_indices = if isempty(output_indices)
+            1:save_stride:0
+        else
+            first_local_save = save_indices[first(output_indices)] - resolved_start + 1
+            last_local_save = save_indices[last(output_indices)] - resolved_start + 1
+            first_local_save:save_stride:last_local_save
+        end
+
+        slices[i_loop] = TimeLoopSlice(resolved_start:resolved_stop,
+                                       local_save_indices,
+                                       output_indices)
+        resolved_start = resolved_stop
+    end
+
+    validate_time_loop_slices(slices, n_resolved, length(save_indices))
+
+    return slices
+end
+
+function validate_time_loop_slices(slices::Vector{TimeLoopSlice}, n_resolved::Int, n_save::Int)
+    isempty(slices) && error("at least one loop slice is required")
+    first(first(slices).resolved_indices) == 1 || error("loop partition must start at the first resolved time index")
+    last(last(slices).resolved_indices) == n_resolved || error("loop partition must end at the last resolved time index")
+
+    covered_intervals = 0
+    next_output_index = 1
+
+    for i_slice in eachindex(slices)
+        slice = slices[i_slice]
+        covered_intervals += length(slice.resolved_indices) - 1
+
+        if i_slice > 1
+            prev_slice = slices[i_slice - 1]
+            first(slice.resolved_indices) == last(prev_slice.resolved_indices) ||
+                error("adjacent loop slices must overlap by exactly one resolved time index")
+        end
+
+        length(slice.local_save_indices) == length(slice.output_indices) ||
+            error("loop slice save indices are inconsistent")
+
+        if !isempty(slice.local_save_indices)
+            first(slice.local_save_indices) >= 1 || error("local save indices must start within the loop window")
+            last(slice.local_save_indices) <= length(slice.resolved_indices) ||
+                error("local save indices must stay within the loop window")
+            first(slice.output_indices) == next_output_index ||
+                error("output save-grid ownership must be contiguous across loop slices")
+            next_output_index = last(slice.output_indices) + 1
+        end
+    end
+
+    covered_intervals == (n_resolved - 1) || error("loop partition must cover every resolved interval exactly once")
+    next_output_index == (n_save + 1) || error("loop partition must cover every saved output step exactly once")
+
+    return nothing
+end
+
 struct RefinedTimeGrid{T<:AbstractRange{Float64}} <: AbstractTimeConfig
     duration::Float64
     dt_requested::Float64
@@ -245,7 +328,11 @@ struct RefinedTimeGrid{T<:AbstractRange{Float64}} <: AbstractTimeConfig
     CFL_factor::Int
     t::T
     n_loop::Int
-    n_t_per_loop::Int
+    save_indices::StepRange{Int, Int}
+    save_t::Vector{Float64}
+    loop_slices::Vector{TimeLoopSlice}
+    max_loop_length::Int
+    max_save_steps::Int
 end
 
 function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
@@ -269,13 +356,20 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
     # Check if it actually fits in RAM
     check_n_loop(n_loop_resolved, length(z), n_μ, length(t_resolved), n_E)
 
-    # Calculate timesteps per loop and actual resolved timestep (can be different from the saving dt)
-    n_t_per_loop = (length(t_resolved) - 1) ÷ n_loop_resolved + 1
+    save_indices = 1:CFL_factor:length(t_resolved)
+    save_t = collect(t_resolved[save_indices])
+    loop_slices = build_time_loop_slices(length(t_resolved), n_loop_resolved, save_indices)
+    max_loop_length = maximum(length(slice.resolved_indices) for slice in loop_slices)
+    max_save_steps = maximum(length(slice.output_indices) for slice in loop_slices)
+
+    # Calculate actual resolved timestep (can be different from the saving dt)
     dt_resolved = length(t_resolved) > 1 ? Float64(t_resolved[2] - t_resolved[1]) : Float64(dt)
 
     # Return fully configured time grid
     return RefinedTimeGrid(Float64(duration), Float64(dt), dt_resolved,
-                            CFL_factor, t_resolved, n_loop_resolved, n_t_per_loop)
+                            CFL_factor, t_resolved, n_loop_resolved,
+                            save_indices, save_t, loop_slices,
+                            max_loop_length, max_save_steps)
 end
 
 function Base.show(io::IO, time::RefinedTimeGrid)
@@ -289,7 +383,7 @@ function Base.show(io::IO, ::MIME"text/plain", time::RefinedTimeGrid)
     println(io, "├── Resolved dt:   ", time.dt_resolved, " s")
     println(io, "├── CFL factor:    ", time.CFL_factor)
     println(io, "├── n_loop:        ", time.n_loop)
-    print(io,   "└── steps / loop:  ", time.n_t_per_loop)
+    print(io,   "└── max steps / loop:  ", time.max_loop_length)
 end
 
 

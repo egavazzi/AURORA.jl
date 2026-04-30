@@ -18,14 +18,16 @@ Returns a named tuple with fields:
 - `t_run`   : time vector [s], length `Nt`
 - `h_atm`   : altitude grid [m], length `Nz`
 """
-function load_Ie(path::AbstractString)
+function load_Ie(path::AbstractString; previous_t_last=nothing, drop_duplicate_boundary::Bool=true)
+    Ie_raw, t_run = read_results(path;
+                                            previous_t_last=previous_t_last,
+                                            drop_duplicate_boundary=drop_duplicate_boundary)
+
     file = matopen(path)
-    Ie_raw = read(file, "Ie_ztE")
     E_edges = vec(read(file, "E_edges"))
     E_centers = vec(read(file, "E_centers"))
     ΔE = vec(read(file, "dE"))
     μ_lims = vec(read(file, "mu_lims"))
-    t_run = vec(read(file, "t_run"))
     h_atm = vec(read(file, "h_atm"))
     close(file)
 
@@ -33,7 +35,7 @@ function load_Ie(path::AbstractString)
     Nz = length(h_atm)
     nμ = length(μ_lims) - 1
 
-    Ie = reshape(Ie_raw, Nz, nμ, length(t_run), nE)
+    Ie = reshape(Array(Ie_raw), Nz, nμ, length(t_run), nE)
 
     return (Ie = Ie, E_edges = E_edges, E_centers = E_centers, ΔE = ΔE, μ_lims = μ_lims, t_run = t_run, h_atm = h_atm)
 end
@@ -211,8 +213,12 @@ function make_psd_from_AURORA(
     path_to_file::AbstractString;
     compute::Symbol = :f_only,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
+    previous_t_last=nothing,
+    drop_duplicate_boundary::Bool = true,
 )
-    data = load_Ie(path_to_file)
+    data = load_Ie(path_to_file;
+                   previous_t_last=previous_t_last,
+                   drop_duplicate_boundary=drop_duplicate_boundary)
     grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
 
     if compute ∉ (:f_only, :F_only, :both)
@@ -280,12 +286,7 @@ function make_psd_file(
     output_prefix::AbstractString = "psd",
 )
     println("Converting Ie to PSD.")
-    files = readdir(directory_to_process, join = true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    sort!(
-        files_to_process,
-        by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]),
-    )
+    files_to_process = list_result_files(directory_to_process)
 
     if isempty(files_to_process)
         @warn "No simulation results found in $directory_to_process. Skipping phase-space density calculations."
@@ -295,6 +296,7 @@ function make_psd_file(
     n_files = length(files_to_process)
     psd_dir = joinpath(directory_to_process, "psd")
     mkpath(psd_dir)
+    previous_t_last = nothing
 
     for (i_file, file) in enumerate(files_to_process)
         match_result = match(r"IeFlickering-(\d+)\.mat", basename(file))
@@ -304,7 +306,11 @@ function make_psd_file(
         print("\rProcessing PSD: $(i_file)/$(n_files)")
         flush(stdout)
 
-        result = make_psd_from_AURORA(file; compute = compute, vpar_edges = vpar_edges)
+        result = make_psd_from_AURORA(file;
+                                      compute = compute,
+                                      vpar_edges = vpar_edges,
+                                      previous_t_last = previous_t_last)
+        previous_t_last = isempty(result.t_run) ? previous_t_last : result.t_run[end]
         outfile = joinpath(psd_dir, "$(output_prefix)-$(file_id).mat")
         write_psd_result(outfile, result)
     end
