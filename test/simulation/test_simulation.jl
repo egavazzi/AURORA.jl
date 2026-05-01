@@ -18,7 +18,7 @@
 
         @test !sim.cache_initialized
         @test sim.time isa RefinedTimeGrid
-        @test sim.time.dt_resolved <= sim.time.dt_requested
+        @test sim.time.dt_internal <= sim.time.dt
 
         initialize!(sim)
 

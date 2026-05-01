@@ -94,7 +94,7 @@ function get_time_parameters(::UniformTimeGrid)
 end
 function get_time_parameters(time::RefinedTimeGrid)
     n_t = time.n_t_per_loop
-    t_loop = range(0.0, step=time.dt_resolved, length=time.n_t_per_loop)
+    t_loop = range(0.0, step=time.dt_internal, length=time.n_t_per_loop)
     return n_t, t_loop
 end
 
@@ -108,7 +108,8 @@ compute_input_flux(sim::AuroraSimulation, time::RefinedTimeGrid) = compute_flux(
 n_steps_to_save(sim::AuroraSimulation, t_loop) = n_steps_to_save(sim.time, t_loop)
 n_steps_to_save(::SingleStepConfig, t_loop) = 1
 n_steps_to_save(time::UniformTimeGrid, t_loop) = time.n_steps
-n_steps_to_save(time::RefinedTimeGrid, t_loop) = length(0:time.dt_requested:t_loop[end])
+# n_save_per_loop + 1 to include the boundary/I0 column at the start of each loop
+n_steps_to_save(time::RefinedTimeGrid, t_loop) = time.n_save_per_loop + 1
 
 # Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
 # These phase functions describe the angular distribution of particles after collisions.

@@ -28,22 +28,26 @@ function v_of_E(E)
 	return v
 end
 
-function CFL_criteria(t_total, dt, z, v, CFL_number=64)
-    # The Courant-Freidrichs-Lewy (CFL) number normally hase to be small (<4) to ensure numerical
+function CFL_criteria(duration, dt, z, v, CFL_number=64)
+    # The Courant-Freidrichs-Lewy (CFL) number normally has to be small (<4) to ensure numerical
     # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
     # should be careful about numerical accuracy though.
     # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
     # on the results, while reducing computational time tremendously
     dz = z[2] - z[1]
-    # Calculate the maximum dt that still satisfies the CFL criteria.
+    # Maximum dt that satisfies the CFL condition
     dt_max = CFL_number * dz / v
-    # Then find the smallest integer that dt can be divided to become smaller than dt_max.
-    CFL_factor = ceil(Int, dt / dt_max) # that integer is the CFL_factor
-    # Build the time array with the finer time step
-    n_t_sampling = length(0:dt:t_total)
-    t = range(0, t_total, CFL_factor * (n_t_sampling - 1) + 1)
+    # Refinement factor: how many internal steps per save interval.
+    # dt_internal = dt / CFL_factor, which is exact by construction.
+    CFL_factor = ceil(Int, dt / dt_max)
+    # Number of save intervals (validated upstream to be an exact integer multiple of dt)
+    n_save = round(Int, duration / dt)
+    # Coarse save grid: the time points we want to write to disk.
+    t_save = range(0.0, n_save * dt; length = n_save + 1)
+    # Fine internal grid: CFL_factor sub-steps per save interval.
+    t_internal = range(0.0, n_save * dt; length = n_save * CFL_factor + 1)
 
-    return t, CFL_factor
+    return t_internal, t_save, CFL_factor
 end
 
 
@@ -132,9 +136,9 @@ _write_time_params(f::IO, sim::AuroraSimulation) = _write_time_params(f, sim.tim
 
 function _write_time_params(f::IO, time::RefinedTimeGrid)
     write(f, "duration = $(time.duration) \n")
-    write(f, "dt = $(time.dt_requested) \n")
-    write(f, "dt_resolved = $(time.dt_resolved) \n")
-    write(f, "t = $(time.t) \n")
+    write(f, "dt = $(time.dt) \n")
+    write(f, "dt_internal = $(time.dt_internal) \n")
+    write(f, "t_internal = $(time.t) \n")
     write(f, "n_loop = $(time.n_loop) \n")
     write(f, "CFL_factor = $(time.CFL_factor) \n")
 end
@@ -190,16 +194,11 @@ _solver_type_tag(::SteadyStateMode)   = "steady_state"
 
 using MAT: matopen
 using Printf: @sprintf
-function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
+function save_results(sim::AuroraSimulation, Ie_save, t_run, I0, i)
     energy_grid = sim.model.energy_grid
     μ_lims = sim.model.pitch_angle_grid.μ_lims
     z = sim.model.altitude_grid.h
     scattering = sim.model.scattering
-
-    # Extract the time array for the current loop
-	t_run = collect(t .+ t[end] * (i - 1))
-    # Reduce t_run to match the t_sampling
-    t_run = t_run[1:CFL_factor:end]
 
     # Mode type tags for downstream analysis
     mode_type = _mode_type_tag(sim.time)
@@ -211,7 +210,7 @@ function save_results(sim::AuroraSimulation, Ie_save, t, I0, i, CFL_factor)
 		write(file, "E_centers", energy_grid.E_centers)
 		write(file, "E_edges", energy_grid.E_edges)
 		write(file, "dE", energy_grid.ΔE)
-		write(file, "t_run", t_run)
+		write(file, "t_run", collect(Float64, t_run))
 		write(file, "mu_lims", collect(μ_lims))
 		write(file, "h_atm", z)
 		write(file, "I0", I0)
