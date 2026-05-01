@@ -54,19 +54,12 @@ function make_heating_rate_file(directory_to_process)
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
     ## Loop over the files
-    for (i_file, file) in enumerate(files_to_process)
+    for file in files_to_process
         ## Load simulation results for current file.
-        if i_file == 1
-            f = matopen(file)
-                Ie_ztE = read(f, "Ie_ztE")
-                t_local = read(f, "t_run")
-            close(f)
-        else
-            f = matopen(file)
-            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
-            t_local = read(f, "t_run")[2:end]
-            close(f)
-        end
+        f = matopen(file)
+            Ie_ztE = read(f, "Ie_ztE")
+            t_local = read(f, "t_run")
+        close(f)
 
         ## Sum Ie over the beams
         n_z = length(z)

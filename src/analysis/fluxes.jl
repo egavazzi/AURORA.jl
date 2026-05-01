@@ -1,4 +1,4 @@
-using MAT: matopen, matread
+using MAT: matopen
 using ProgressMeter: Progress, next!
 
 
@@ -21,12 +21,7 @@ max altitude used in the simulation).
 """
 function make_Ie_top_file(directory_to_process)
     ## Find the files to process
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
+    files_to_process = list_result_files(directory_to_process)
 
     if isempty(files_to_process)
         @warn "No simulation results found in $directory_to_process. Skipping top flux extraction."
@@ -34,12 +29,11 @@ function make_Ie_top_file(directory_to_process)
     end
 
     ## Load simulation grid
-    f = matopen(files_to_process[1])
-        z = read(f, "h_atm")
-        E_centers = read(f, "E_centers")
-        ΔE = read(f, "dE")
-        scattering_data = read(f, "mu_scatterings")
-    close(f)
+    first_result    = read_result(files_to_process[1])
+    z               = first_result.h_atm
+    E_centers       = first_result.E_centers
+    ΔE              = first_result.dE
+    scattering_data = first_result.mu_scatterings
     n_z = length(z)
     Ω_beam = scattering_data["BeamWeight"]
 
@@ -50,19 +44,11 @@ function make_Ie_top_file(directory_to_process)
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
     ## Loop over the files
-    for (i_file, file) in enumerate(files_to_process)
+    for file in files_to_process
         ## Load simulation results for current file.
-        if i_file == 1
-            f = matopen(file)
-                Ie_ztE = read(f, "Ie_ztE")
-                t_local = read(f, "t_run")
-            close(f)
-        else
-            f = matopen(file)
-            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
-            t_local = read(f, "t_run")[2:end]
-            close(f)
-        end
+        result  = read_result(file)
+        Ie_ztE  = result.Ie_ztE
+        t_local = result.t_run
 
         ## Extract Ie at the top for each beam
         Ie_top_local = Ie_ztE[n_z:n_z:end, :, :]
@@ -120,25 +106,19 @@ save the results in a new subfolder called`downsampled_10x`, inside the `directo
 The downsampled electron fluxes `Ie` will be saved in a subfolder inside the `directory_to_process`.
 """
 function downsampling_fluxes(directory_to_process, downsampling_factor)
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
+    files_to_process = list_result_files(directory_to_process)
 
-    for j in files_to_process
-        f = matopen(j)
-            Ie = read(f, "Ie_ztE") # [n_μ * nz, nt, nE]
-            E_centers = read(f, "E_centers")
-            E_edges = read(f, "E_edges")
-            ΔE = read(f, "dE")
-            t_run = read(f, "t_run")
-            μ_lims = read(f, "mu_lims")
-            z = read(f, "h_atm")
-            I0 = read(f, "I0")
-            scattering_data = read(f, "mu_scatterings")
-        close(f)
+    for f in files_to_process
+        r               = read_result(f)
+        Ie              = r.Ie_ztE    # [n_μ * nz, nt, nE]
+        E_centers       = r.E_centers
+        E_edges         = r.E_edges
+        ΔE              = r.dE
+        t_run           = r.t_run
+        μ_lims          = r.mu_lims
+        z               = r.h_atm
+        I0              = r.I0
+        scattering_data = r.mu_scatterings
 
         # downsample the data
         dt = diff(t_run)[1]
@@ -154,7 +134,7 @@ function downsampling_fluxes(directory_to_process, downsampling_factor)
         mkpath(full_path_to_new_subdir)
 
         # create new file
-        new_filename = splitdir(j)[2][1:end-4] * "d.mat" # add a 'd' after the number to indicate that it is downsampled
+        new_filename = splitdir(f)[2][1:end-4] * "d.mat" # add a 'd' after the number to indicate that it is downsampled
         full_path_to_new_filename = joinpath(full_path_to_new_subdir, new_filename)
         file = matopen(full_path_to_new_filename, "w")
             write(file, "Ie_ztE", Ie)
@@ -198,12 +178,7 @@ The following variables are saved to a file named *J.mat*:
 """
 function make_current_file(directory_to_process)
     ## Find the files to process
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
+    files_to_process = list_result_files(directory_to_process)
 
     if isempty(files_to_process)
         @warn "No simulation results found in $directory_to_process. Skipping current-density calculations."
@@ -211,11 +186,10 @@ function make_current_file(directory_to_process)
     end
 
     ## Load simulation grid
-    f = matopen(files_to_process[1])
-        z = read(f, "h_atm")
-        E_centers = read(f, "E_centers")
-        μ_lims = read(f, "mu_lims")
-    close(f)
+    first_result = read_result(files_to_process[1])
+    z            = first_result.h_atm
+    E_centers    = first_result.E_centers
+    μ_lims       = first_result.mu_lims
     μ_center = mu_avg(acosd.(μ_lims))
 
     ## Initialize arrays to store the results for each time-slice
@@ -231,19 +205,11 @@ function make_current_file(directory_to_process)
     n_files = length(files_to_process)
     p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
     ## Loop over the files
-    for (i_file, file) in enumerate(files_to_process)
+    for file in files_to_process
         ## Load simulation results for current file.
-        if i_file == 1
-            f = matopen(file)
-                Ie_ztE = read(f, "Ie_ztE")
-                t_local = read(f, "t_run")
-            close(f)
-        else
-            f = matopen(file)
-            @views Ie_ztE = read(f, "Ie_ztE")[:, 2:end, :]
-            t_local = read(f, "t_run")[2:end]
-            close(f)
-        end
+        result  = read_result(file)
+        Ie_ztE  = result.Ie_ztE
+        t_local = result.t_run
 
         ## Calculate the field aligned currents and energy flux
         n_z = length(z)
