@@ -22,8 +22,7 @@ abstract type AbstractMode end
 
 Solve each time step independently as a steady-state (time-independent) transport problem.
 
-When called **without arguments**, a single steady-state solve is performed — no time grid
-is created and the input flux must use [`ConstantModulation`](@ref).
+When called **without arguments**, a single steady-state solve is performed.
 
 When called **with `duration` and `dt`**, a [`UniformTimeGrid`](@ref) is built and each
 point is solved independently. This enables, e.g., a flickering input where each time step
@@ -333,7 +332,7 @@ loop_internal_count(time::RefinedTimeGrid, i_loop::Int) =
 """
     loop_save_start(time::RefinedTimeGrid, i_loop) → Int
 
-1-based index into `time.t_save` of the first (boundary) save point of loop `i_loop`.
+Return index in `time.t_save` of the first (boundary) save point of loop `i_loop`.
 """
 loop_save_start(time::RefinedTimeGrid, i_loop::Int) =
     (i_loop - 1) * time.n_save_per_loop + 1
@@ -341,7 +340,7 @@ loop_save_start(time::RefinedTimeGrid, i_loop::Int) =
 """
     loop_internal_start(time::RefinedTimeGrid, i_loop) → Int
 
-1-based index into `time.t` (the full internal grid) of the boundary point that starts
+Return index in `time.t` (the full internal grid) of the boundary point that starts
 loop `i_loop`.
 """
 loop_internal_start(time::RefinedTimeGrid, i_loop::Int) =

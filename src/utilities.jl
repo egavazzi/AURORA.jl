@@ -185,12 +185,12 @@ function save_Ie_top(sim::AuroraSimulation, Ie_top, t)
     close(file)
 end
 
-_mode_type_tag(::RefinedTimeGrid)  = "time_dependent"
-_mode_type_tag(::UniformTimeGrid)  = "steady_state_multi_step"
-_mode_type_tag(::SingleStepConfig) = "steady_state_single_step"
+mode_type_tag(::RefinedTimeGrid)  = "time_dependent"
+mode_type_tag(::UniformTimeGrid)  = "steady_state_multi_step"
+mode_type_tag(::SingleStepConfig) = "steady_state_single_step"
 
-_solver_type_tag(::TimeDependentMode) = "time_dependent"
-_solver_type_tag(::SteadyStateMode)   = "steady_state"
+solver_type_tag(::TimeDependentMode) = "time_dependent"
+solver_type_tag(::SteadyStateMode)   = "steady_state"
 
 using MAT: matopen
 using Printf: @sprintf
@@ -201,8 +201,8 @@ function save_results(sim::AuroraSimulation, Ie_save, t_run, I0, i)
     scattering = sim.model.scattering
 
     # Mode type tags for downstream analysis
-    mode_type = _mode_type_tag(sim.time)
-    solver_type = _solver_type_tag(sim.mode)
+    mode_type = mode_type_tag(sim.time)
+    solver_type = solver_type_tag(sim.mode)
 
     savefile = joinpath(sim.savedir, (@sprintf "IeFlickering-%02d.mat" i))
 	file = matopen(savefile, "w")

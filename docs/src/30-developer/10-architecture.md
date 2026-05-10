@@ -77,7 +77,7 @@ src/
 │
 ├── analysis/
 │   ├── analysis_types.jl        # Result types (VolumeExcitationResult, ColumnExcitationResult, IeTopResult)
-│   ├── io.jl                    # list_result_files, read_result helpers
+│   ├── utilities.jl             # Helpers
 │   ├── emissions.jl             # Volume and column excitation rates
 │   ├── fluxes.jl                # Electron flux post-processing and downsampling
 │   ├── heating.jl               # Electron heating rate
@@ -100,7 +100,8 @@ src/
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
 | `BlockIndices` | Pre-computed `nzval` index arrays for a single block (replaces `Dict`-based mapping) |
 | `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down`, `Ddiffusion` (extracted once, reused each energy step) |
-| [`RefinedTimeGrid`](@ref) | Time discretization with CFL refinement and loop partitioning. `t_save` defines the coarse output grid, `t` (internal) refines it by `CFL_factor`. Last loop may have fewer save points than earlier loops. |
+| [`RefinedTimeGrid`](@ref) | Time discretization with CFL refinement and loop partitioning. Last loop may have fewer save points 
+than earlier loops. |
 | [`UniformTimeGrid`](@ref) | Simple uniform grid for multi-step steady-state simulations |
 
 ## Execution flow

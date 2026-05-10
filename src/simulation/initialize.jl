@@ -16,10 +16,11 @@ end
 
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
     neutral_densities = n_neutrals(model.ionosphere)
+    N_neutrals = length(neutral_densities)
     _, t_loop = get_time_parameters(time)
 
     solver = SolverCache()
-    degradation = DegradationCache(Tuple(neutral_densities), 1, 1, 1, 1)
+    degradation = DegradationCache{N_neutrals}(1, 1, 1, 1)
     cascading = CascadingCache()
     matrices = TransportMatrices(1, 1, 1, 1)
     Ie = zeros(1, 1, 1)
@@ -48,6 +49,7 @@ function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = f
     z = model.altitude_grid.h
     μ_center = model.pitch_angle_grid.μ_center
     neutral_densities = n_neutrals(model.ionosphere)
+    N_neutrals = length(neutral_densities)
     n_E = model.energy_grid.n
 
     # Set up time grid dimensions for working arrays
@@ -55,7 +57,7 @@ function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = f
 
     # Initialize solver and physical process caches
     solver = SolverCache()
-    degradation = DegradationCache(Tuple(neutral_densities), length(μ_center), n_t, length(z), n_E)
+    degradation = DegradationCache{N_neutrals}(length(μ_center), n_t, length(z), n_E)
     matrices = initialize_transport_matrices(model, t_loop)
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)

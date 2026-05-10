@@ -3,7 +3,7 @@ using KLU: KLU, klu
 
 mutable struct SolverCache
     KLU::KLU.KLUFactorization{Float64, Int64}
-    initialized::Bool                     # true after the first KLU factorization
+    initialized::Bool
     Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     indices_lhs::Matrix{BlockIndices}     # nzval index map for Mlhs  (SS + CN)
@@ -47,8 +47,7 @@ function DegradationCache()
                             secondary_e_spectrum, primary_e_spectrum)
 end
 
-function DegradationCache(n_neutrals::NTuple{N, <:AbstractVector},
-                          n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
+function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
     ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
     thermal_e_loss = Vector{Float64}(undef, n_z)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)

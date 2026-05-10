@@ -62,7 +62,7 @@ export v_of_E, mu_avg, beam_weight, make_savedir
 include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
        load_volume_excitation, load_column_excitation, load_input
-include("analysis/io.jl")
+include("analysis/utilities.jl")
 export list_result_files, read_result
 include("analysis/psd.jl")
 include("analysis/emissions.jl")
