@@ -5,29 +5,34 @@
 #   - Files have duplicated or missing time steps at loop boundaries
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Unit tests — time grid properties (require only a model, no full run)
-# ──────────────────────────────────────────────────────────────────────────────
-
-@testitem "RefinedTimeGrid: basic properties (n_save=5, n_loop=3)" begin
+@testmodule TimeTestModel begin
     using AURORA
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
-    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-    flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+    const msis_file = find_msis_file()
+    const iri_file  = find_iri_file()
+    const model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
+end
 
-    # duration=0.05s, dt=0.01s  →  n_save = 5, n_loop = 3
-    # cld(5, 3) = 2  →  loops get [2, 2, 1] save intervals
-    sim  = AuroraSimulation(model, flux, mktempdir();
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Unit tests — time grid properties (no sim run)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@testitem "RefinedTimeGrid: basic properties" setup=[TimeTestModel] begin
+    using AURORA
+    flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+
+    # duration=0.05s, dt=0.01s, n_loop = 3
+    # cld(5, 3) = 2  →  loops should get 2, 2 and 1 save intervals
+    sim  = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
                             mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                    CFL_number=128, n_loop=3))
     time = sim.time
 
     @test time isa RefinedTimeGrid
-    @test time.n_save        == 5
-    @test time.n_loop        == 3
-    @test time.n_save_per_loop == 2      # cld(5,3)
-    @test time.n_t_per_loop  == 2 * time.CFL_factor + 1
+    @test time.n_save == 5
+    @test time.n_loop == 3
+    @test time.n_save_per_loop == 2
+    @test time.n_t_per_loop    == 2 * time.CFL_factor + 1
 
     # dt_internal is exact: dt / CFL_factor
     @test time.dt_internal   ≈ time.dt / time.CFL_factor  atol=1e-15
@@ -46,29 +51,25 @@
     @test time.t_save[end]   ≈ time.duration  atol=1e-15
 end
 
-@testitem "RefinedTimeGrid: loop_save_count gives correct partition" begin
+@testitem "RefinedTimeGrid: loop_save_count gives correct partition" setup=[TimeTestModel] begin
     using AURORA
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
-    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-    flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+    flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
 
     # Non-divisible: n_save=5, n_loop=3  →  [2, 2, 1]
-    sim_nd = AuroraSimulation(model, flux, mktempdir();
+    sim_nd = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
                               mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                      CFL_number=128, n_loop=3))
     t_nd = sim_nd.time
     @test AURORA.loop_save_count(t_nd, 1) == 2
     @test AURORA.loop_save_count(t_nd, 2) == 2
     @test AURORA.loop_save_count(t_nd, 3) == 1   # remainder
-    @test AURORA.loop_save_count(t_nd, 3) <= t_nd.n_save_per_loop  # last ≤ others
 
     # Sum equals total save intervals
     total = sum(AURORA.loop_save_count(t_nd, i) for i in 1:t_nd.n_loop)
     @test total == t_nd.n_save
 
     # Divisible: n_save=6, n_loop=3  →  [2, 2, 2]
-    sim_d = AuroraSimulation(model, flux, mktempdir();
+    sim_d = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
                              mode=TimeDependentMode(duration=0.06, dt=0.01,
                                                     CFL_number=128, n_loop=3))
     t_d = sim_d.time
@@ -78,14 +79,11 @@ end
     @test AURORA.loop_save_count(t_d, 3) == 2
 end
 
-@testitem "RefinedTimeGrid: loop_internal_start covers disjoint windows" begin
+@testitem "RefinedTimeGrid: loop_internal_start covers disjoint windows" setup=[TimeTestModel] begin
     using AURORA
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
-    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-    flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+    flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
 
-    sim  = AuroraSimulation(model, flux, mktempdir();
+    sim  = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
                             mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                    CFL_number=128, n_loop=3))
     time = sim.time
@@ -110,17 +108,14 @@ end
 # Integration tests — check actual file contents after run!
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testitem "Time-dependent 2 loops: t_run is exact, no overlap, no drift" begin
+@testitem "Time-dependent 2 loops: t_run is exact, no overlap, no drift" setup=[TimeTestModel] begin
     using MAT
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-        flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
 
         # duration=0.05s, dt=0.01s, n_save=5, n_loop=2
         # cld(5,2)=3  →  loops get [3, 2] save intervals
-        sim = AuroraSimulation(model, flux, savedir;
+        sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                       CFL_number=128, n_loop=2))
         run!(sim)
@@ -132,35 +127,25 @@ end
         t2 = vec(matread(files[2])["t_run"])
         t_all = vcat(t1, t2)
 
-        # No duplicate time points between files
-        @test t1[end] < t2[1]
-
         # Concatenated time equals the expected uniform save grid
         expected = collect(range(0.0, 0.05; length=6))   # [0, 0.01, 0.02, 0.03, 0.04, 0.05]
         @test t_all ≈ expected  atol=1e-12
 
-        # Uniform spacing throughout — this is the regression test for the drift bug
-        dts = diff(t_all)
-        @test all(abs.(dts .- 0.01) .< 1e-12)
-
-        # File 1 contains n_save_per_loop + 1 = 4 time points (including t=0)
+        # File 1 contains n_save_per_loop + 1 (the t=0 point) = 4 time points
         @test length(t1) == 4   # [0, 0.01, 0.02, 0.03]
         # File 2 contains the remainder: 2 time points
         @test length(t2) == 2   # [0.04, 0.05]
     end
 end
 
-@testitem "Time-dependent 3 loops (non-divisible): t_run is exact" begin
+@testitem "Time-dependent 3 loops (non-divisible): t_run is exact" setup=[TimeTestModel] begin
     using MAT
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-        flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
 
         # duration=0.05s, dt=0.01s, n_save=5, n_loop=3
         # cld(5,3)=2  →  loops get [2, 2, 1] save intervals
-        sim = AuroraSimulation(model, flux, savedir;
+        sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                       CFL_number=128, n_loop=3))
         run!(sim)
@@ -168,22 +153,14 @@ end
         files = list_result_files(savedir)
         @test length(files) == 3
 
-        _tv(x) = x isa AbstractArray ? vec(x) : [Float64(x)]
-        t1 = _tv(matread(files[1])["t_run"])
-        t2 = _tv(matread(files[2])["t_run"])
-        t3 = _tv(matread(files[3])["t_run"])
+        t1 = vec(matread(files[1])["t_run"])
+        t2 = vec(matread(files[2])["t_run"])
+        t3 = vec(matread(files[3])["t_run"])
         t_all = vcat(t1, t2, t3)
-
-        # No duplicate time points at loop boundaries
-        @test t1[end] < t2[1]
-        @test t2[end] < t3[1]
 
         # Full time axis is exact
         expected = collect(range(0.0, 0.05; length=6))
         @test t_all ≈ expected  atol=1e-12
-
-        # Uniform spacing
-        @test all(abs.(diff(t_all) .- 0.01) .< 1e-12)
 
         # Loop sizes: [3, 2, 1] time points per file
         @test length(t1) == 3   # [0, 0.01, 0.02]
@@ -192,17 +169,14 @@ end
     end
 end
 
-@testitem "Time-dependent 3 loops (divisible): uniform loop sizes" begin
+@testitem "Time-dependent 3 loops (divisible): uniform loop sizes" setup=[TimeTestModel] begin
     using MAT
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
-        flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.06); beams=1:2)
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.06); beams=1:2)
 
         # duration=0.06s, dt=0.01s, n_save=6, n_loop=3
         # cld(6,3)=2  →  loops all get [2, 2, 2] save intervals
-        sim = AuroraSimulation(model, flux, savedir;
+        sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.06, dt=0.01,
                                                       CFL_number=128, n_loop=3))
         run!(sim)
@@ -223,35 +197,31 @@ end
         t_all = vcat(t1, t2, t3)
         expected = collect(range(0.0, 0.06; length=7))
         @test t_all ≈ expected  atol=1e-12
-        @test all(abs.(diff(t_all) .- 0.01) .< 1e-12)
     end
 end
 
-@testitem "list_result_files: returns files sorted numerically" begin
+@testitem "list_result_files: returns files sorted numerically" setup=[TimeTestModel] begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
-        sim   = AuroraSimulation(model, flux, savedir;
-                                 mode=TimeDependentMode(duration=0.05, dt=0.01,
-                                                        CFL_number=128, n_loop=2))
+        sim   = AuroraSimulation(TimeTestModel.model, flux, savedir;
+                                 mode=TimeDependentMode(duration=0.1, dt=0.0005,
+                                                        CFL_number=200, n_loop=110))
         run!(sim)
 
         files = list_result_files(savedir)
-        @test length(files) == 2
+        @test length(files) == 110
         @test endswith(files[1], "IeFlickering-01.mat")
         @test endswith(files[2], "IeFlickering-02.mat")
+        @test endswith(files[100], "IeFlickering-100.mat")
+        @test endswith(files[101], "IeFlickering-101.mat")
+        @test endswith(files[end], "IeFlickering-110.mat")
     end
 end
 
-@testitem "read_result: returns named tuple with expected fields" begin
+@testitem "read_result: returns named tuple with expected fields" setup=[TimeTestModel] begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0); beams=1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+        sim   = AuroraSimulation(TimeTestModel.model, flux, savedir; mode=SteadyStateMode())
         run!(sim)
 
         files = list_result_files(savedir)
