@@ -10,7 +10,7 @@
 - **Numerical Breaking (small)** Minor correction of the Crank-Nicolson top boundary indexing/timing [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking (small)** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
 - **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
-
+- **Breaking** Saved files do no longer repeat the last/first time step of each loop across files [#134](https://github.com/egavazzi/AURORA.jl/pull/134)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
