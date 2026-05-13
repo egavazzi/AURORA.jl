@@ -313,23 +313,24 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
             E_loss = E_levels[i_level, 1]
+            n_secondary = E_levels[i_level, 2]
+            σ_level = σ[i_level, iE]
             # Retrieve precomputed, bin-integrated spectra from the cascading cache.
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            sum_secondary = sum(secondary_e_spectra)
-            sum_primary = sum(primary_e_spectra)
+            sum_secondary = sum(secondary_e_spectra)    # for normalization
+            sum_primary = sum(primary_e_spectra)        # for normalization
             if sum_secondary > 0
-                secondary_e_spectra .= secondary_e_spectra ./ sum_secondary # normalize sum to 1
-                secondary_e_spectra .= E_levels[i_level, 2] .* secondary_e_spectra  # scale by number of secondaries
+                # scale by cross-section, spectra normalization, and number of secondaries
+                secondary_scale = σ_level * n_secondary / sum_secondary
+                secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
             end
             if sum_primary > 0
-                primary_e_spectra .= primary_e_spectra ./ sum_primary # normalize sum to 1
+                # scale by cross-section and spectra normalization
+                primary_scale = σ_level / sum_primary
+                primary_e_spectrum .+= primary_e_spectra .* primary_scale
             end
-
-            # Accumulate into the species-level spectrum, weighted by cross-section
-            secondary_e_spectrum .+= secondary_e_spectra .* σ[i_level, iE]
-            primary_e_spectrum   .+= primary_e_spectra   .* σ[i_level, iE]
         end
     end
 end

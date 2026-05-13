@@ -3,6 +3,7 @@ using KLU: KLU, klu
 
 mutable struct SolverCache
     KLU::KLU.KLUFactorization{Float64, Int64}
+    initialized::Bool                     # true after the first KLU factorization
     Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     indices_lhs::Matrix{BlockIndices}     # nzval index map for Mlhs  (SS + CN)
@@ -20,7 +21,7 @@ function SolverCache()
     op_diags = OperatorDiagonals(
         [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0])
 
-    return SolverCache(KLU_factorization, Mlhs, Mrhs, indices_lhs, indices_rhs, op_diags)
+    return SolverCache(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs, op_diags)
 end
 
 mutable struct DegradationCache{N}

@@ -36,10 +36,6 @@ export AbstractModulation, ConstantModulation, SinusoidalFlickering, SquareFlick
 export InputFlux, evaluate_spectrum, apply_modulation, compute_flux
 export Ie_top_from_file
 
-
-include("solvers/types.jl")
-export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent
-
 include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 
@@ -53,6 +49,7 @@ include("solvers/crank_nicolson.jl")
 include("simulation/cache.jl")
 include("simulation/types.jl")
 export AuroraSimulation
+export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent
 export AbstractTimeConfig, SingleStepConfig, UniformTimeGrid, RefinedTimeGrid
 include("simulation/initialize.jl")
 export initialize!

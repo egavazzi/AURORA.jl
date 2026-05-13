@@ -10,9 +10,9 @@
     iri_file = joinpath(@__DIR__, "test_data/", "iri_20221102-1700_70N-19E.txt")
 
     # A warning must be emitted
-    @test_warn r"sentinel -1" AURORA.load_iri_data(iri_file)
+    @test_logs (:warn, r"sentinel -1") AURORA.load_iri_data(iri_file)
 
-    data = AURORA.load_iri_data(iri_file)
+    data = AURORA.load_iri_data(iri_file) # (will throw a warning, nothing to worry)
 
     # The 20 bottom sentinel levels (60–79 km) must have been removed:
     # original grid is 60:1:700 (641 pts), valid start is 80 km → 621 pts remain.

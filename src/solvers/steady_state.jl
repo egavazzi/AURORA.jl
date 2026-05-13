@@ -92,14 +92,13 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    steady_state_scheme!(Ie, model, matrices, iE, Ie_top, cache; first_iteration = false)
+    steady_state_scheme!(Ie, model, matrices, iE, Ie_top, cache)
 
 Solve the steady-state electron transport equation for energy level `iE`.
 
-On the **first call** (`first_iteration = true`) the sparse matrix structure,
-nzval index arrays, and operator diagonals are computed and stored in `cache`.
-On subsequent calls only the numerical values in `Mlhs.nzval` are updated
-(zero allocations on the hot path).
+On the **first call** the sparse matrix structure, nzval index arrays, and
+operator diagonals are computed and stored in `cache`. On subsequent calls only the numerical values in
+`Mlhs.nzval` are updated (zero allocations on the hot path).
 
 # Mathematical Background
 
@@ -134,9 +133,8 @@ The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: `SolverCache` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
-- `first_iteration`: whether this is the first call (creates structure) or subsequent (reuses)
 """
-function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache; first_iteration = false)
+function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -149,8 +147,8 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     Q_slice = @view(matrices.Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
 
-    # ── First iteration: build sparsity pattern, index map, operator diagonals ──
-    if first_iteration
+    # ── First call: build sparsity pattern, index map, operator diagonals ──
+    if !cache.initialized
         Ddz_Up, Ddz_Down = build_spatial_operators(z)
         cache.Mlhs       = create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion)
         cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
@@ -162,8 +160,9 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
                                 cache.op_diags, μ, n_z)
 
     # ── Factorise / re-factorise ──
-    if first_iteration
+    if !cache.initialized
         cache.KLU = klu(cache.Mlhs)
+        cache.initialized = true
     else
         klu!(cache.KLU, cache.Mlhs)
     end

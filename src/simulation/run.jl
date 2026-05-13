@@ -136,7 +136,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
                                                   cache.B2B_fragment)
 
         # Solve transport equation for current energy
-        solve_energy_step!(sim, sim.mode, iE, Ie_top_local; first_iteration=(iE == n_E))
+        solve_energy_step!(sim, sim.mode, iE, Ie_top_local)
 
         # Update source term Q for lower energies from current energy's:
         # - inelastic scattering collisions → degradation → lower energies
@@ -152,19 +152,18 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
 end
 
 function solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
-                             iE::Int, Ie_top_local; first_iteration=false)
+                             iE::Int, Ie_top_local)
     cache = get_cache(sim)
     model = sim.model
 
     @views steady_state_scheme!(cache.Ie[:, 1, iE], model,
                                 cache.matrices, iE,
-                                Ie_top_local[:, iE], cache.solver;
-                                first_iteration)
+                                Ie_top_local[:, iE], cache.solver)
     return sim
 end
 
 function solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
-                             iE::Int, Ie_top_local; first_iteration=false)
+                             iE::Int, Ie_top_local)
     cache = get_cache(sim)
     model = sim.model
 
@@ -172,7 +171,7 @@ function solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
                            v_of_E(model.energy_grid.E_centers[iE]),
                            cache.matrices, iE,
                            Ie_top_local[:, :, iE], cache.I0[:, iE],
-                           cache.solver; first_iteration)
+                           cache.solver)
     return sim
 end
 
