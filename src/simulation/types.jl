@@ -297,6 +297,18 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
     # All loops except the last get n_save_per_loop intervals.
     # The last gets the remainder (≤ n_save_per_loop).
     n_save_per_loop = cld(n_save, n_loop_resolved)
+
+    # With ceiling division, the first (n_loop-1) loops can collectively consume more
+    # save intervals than exist, leaving the last loop with 0 or a negative count.
+    # This happens when (n_loop-1)*cld(n_save, n_loop) > n_save. Throw an error if
+    # this is the case.
+    n_last_loop = n_save - (n_loop_resolved - 1) * n_save_per_loop
+    if n_last_loop < 1
+        throw(ArgumentError(
+            "n_loop=$n_loop_resolved is too large for n_save=$n_save: the last loop would " *
+            "have $n_last_loop save intervals (need ≥ 1). " *
+            "Reduce n_loop to ≤ $n_save, or increase duration/reduce dt."))
+    end
     # Maximum number of internal steps in a loop (used for cache allocation)
     n_t_per_loop = n_save_per_loop * CFL_factor + 1
 

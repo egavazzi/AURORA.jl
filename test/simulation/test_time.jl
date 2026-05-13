@@ -1,10 +1,3 @@
-# Tests for the time grid construction, loop partitioning, and saved file correctness.
-# These tests are specifically designed to catch the class of bugs where:
-#   - Loop boundaries don't align with save points
-#   - Saved time arrays drift or have non-uniform spacing
-#   - Files have duplicated or missing time steps at loop boundaries
-
-
 @testmodule TimeTestModel begin
     using AURORA
     const msis_file = find_msis_file()
@@ -153,9 +146,12 @@ end
         files = list_result_files(savedir)
         @test length(files) == 3
 
-        t1 = vec(matread(files[1])["t_run"])
-        t2 = vec(matread(files[2])["t_run"])
-        t3 = vec(matread(files[3])["t_run"])
+        # MAT.jl returns a Float64 scalar when t_run has only 1 element (1×1 matrix)
+        # Wrap in a vector in that case.
+        to_vec(x) = x isa Number ? [Float64(x)] : vec(x)
+        t1 = to_vec(matread(files[1])["t_run"])
+        t2 = to_vec(matread(files[2])["t_run"])
+        t3 = to_vec(matread(files[3])["t_run"])
         t_all = vcat(t1, t2, t3)
 
         # Full time axis is exact
@@ -204,7 +200,7 @@ end
     mktempdir() do savedir
         flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
         sim   = AuroraSimulation(TimeTestModel.model, flux, savedir;
-                                 mode=TimeDependentMode(duration=0.1, dt=0.0005,
+                                 mode=TimeDependentMode(duration=0.11, dt=0.0001,
                                                         CFL_number=200, n_loop=110))
         run!(sim)
 
