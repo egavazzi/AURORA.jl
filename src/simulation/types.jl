@@ -22,8 +22,7 @@ abstract type AbstractMode end
 
 Solve each time step independently as a steady-state (time-independent) transport problem.
 
-When called **without arguments**, a single steady-state solve is performed — no time grid
-is created and the input flux must use [`ConstantModulation`](@ref).
+When called **without arguments**, a single steady-state solve is performed.
 
 When called **with `duration` and `dt`**, a [`UniformTimeGrid`](@ref) is built and each
 point is solved independently. This enables, e.g., a flickering input where each time step
@@ -238,14 +237,33 @@ function Base.show(io::IO, ::MIME"text/plain", time::UniformTimeGrid)
     print(io,   "└── n_steps:    ", time.n_steps)
 end
 
-struct RefinedTimeGrid{T<:AbstractRange{Float64}} <: AbstractTimeConfig
+"""
+    RefinedTimeGrid
+
+Resolved time configuration for time-dependent simulations.
+
+The coarse save grid (`t_save`) is constructed from `dt` and `duration`,
+then the fine internal grid (`t`) is obtained by subdividing each save interval until the
+CFL condition is satisfied. The end result is a grid with `CFL_factor` sub-steps per save
+interval.
+
+Loops are partitioned by save intervals using ceiling division, so all loops have exactly
+`n_save_per_loop` save intervals, except the last one which gets the remainder (if any).
+
+See [`loop_save_count`](@ref), [`loop_save_start`](@ref), [`loop_internal_count`](@ref),
+[`loop_internal_start`](@ref) for helpers to index into these grids per loop.
+"""
+struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <: AbstractTimeConfig
     duration::Float64
-    dt_requested::Float64
-    dt_resolved::Float64
+    dt::Float64          # save cadence requested by the user
+    dt_internal::Float64 # internal step = dt / CFL_factor, exact by construction
     CFL_factor::Int
-    t::T
+    t::TI                # full internal time grid  (length = n_save * CFL_factor + 1)
+    t_save::TS           # coarse save grid          (length = n_save + 1)
+    n_save::Int          # total number of save intervals = round(Int, duration / dt)
     n_loop::Int
-    n_t_per_loop::Int
+    n_save_per_loop::Int # = cld(n_save, n_loop). Last loop gets the remainder (≤ than this)
+    n_t_per_loop::Int    # = n_save_per_loop * CFL_factor + 1  (max internal steps per loop)
 end
 
 function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
@@ -261,35 +279,98 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
     n_E = model.energy_grid.n
     v_max = v_of_E(maximum(model.energy_grid.E_centers))
 
-    # Apply CFL criteria to resolve the time grid and calculate CFL factor
-    t_resolved, CFL_factor = CFL_criteria(duration, dt, z, v_max, CFL_number)
-    # Determine number of loops based on memory constraints, or use provided value
-    n_loop_resolved = isnothing(n_loop) ? calculate_n_loop(t_resolved, length(z), n_μ, n_E;
-                                                           max_memory_gb=max_memory_gb) : Int(n_loop)
+    # Build the time grids.
+    t_internal, t_save, CFL_factor = CFL_criteria(duration, dt, z, v_max, CFL_number)
+    dt_internal = Float64(t_internal[2] - t_internal[1])
+
+    # Total number of save intervals (-1 because we do not count the initial time t=0)
+    n_save = length(t_save) - 1
+
+    # Determine number of loops based on memory constraints, or use the provided value
+    n_loop_resolved = isnothing(n_loop) ?
+                      calculate_n_loop(t_internal, length(z), n_μ, n_E; max_memory_gb) :
+                      Int(n_loop)
     # Check if it actually fits in RAM
-    check_n_loop(n_loop_resolved, length(z), n_μ, length(t_resolved), n_E)
+    check_n_loop(n_loop_resolved, length(z), n_μ, length(t_internal), n_E)
 
-    # Calculate timesteps per loop and actual resolved timestep (can be different from the saving dt)
-    n_t_per_loop = (length(t_resolved) - 1) ÷ n_loop_resolved + 1
-    dt_resolved = length(t_resolved) > 1 ? Float64(t_resolved[2] - t_resolved[1]) : Float64(dt)
+    # Partition save intervals across loops.
+    # All loops except the last get n_save_per_loop intervals.
+    # The last gets the remainder (≤ n_save_per_loop).
+    n_save_per_loop = cld(n_save, n_loop_resolved)
 
-    # Return fully configured time grid
-    return RefinedTimeGrid(Float64(duration), Float64(dt), dt_resolved,
-                            CFL_factor, t_resolved, n_loop_resolved, n_t_per_loop)
+    # With ceiling division, the first (n_loop-1) loops can collectively consume more
+    # save intervals than exist, leaving the last loop with 0 or a negative count.
+    # This happens when (n_loop-1)*cld(n_save, n_loop) > n_save. Throw an error if
+    # this is the case.
+    n_last_loop = n_save - (n_loop_resolved - 1) * n_save_per_loop
+    if n_last_loop < 1
+        throw(ArgumentError(
+            "n_loop=$n_loop_resolved is too large for n_save=$n_save: the last loop would " *
+            "have $n_last_loop save intervals (need ≥ 1). " *
+            "Reduce n_loop to ≤ $n_save, or increase duration/reduce dt."))
+    end
+    # Maximum number of internal steps in a loop (used for cache allocation)
+    n_t_per_loop = n_save_per_loop * CFL_factor + 1
+
+
+    return RefinedTimeGrid(Float64(duration), Float64(dt), dt_internal,
+                           CFL_factor, t_internal, t_save,
+                           n_save, n_loop_resolved, n_save_per_loop, n_t_per_loop)
 end
 
+"""
+    loop_save_count(time::RefinedTimeGrid, i_loop) → Int
+
+Number of save intervals covered by loop `i_loop`. All loops except the last cover
+`time.n_save_per_loop` intervals; the last loop covers the remainder (≤ `n_save_per_loop`).
+"""
+function loop_save_count(time::RefinedTimeGrid, i_loop::Int)
+    if i_loop < time.n_loop
+        return time.n_save_per_loop
+    else
+        return time.n_save - (time.n_loop - 1) * time.n_save_per_loop
+    end
+end
+
+"""
+    loop_internal_count(time::RefinedTimeGrid, i_loop) → Int
+
+Number of internal time steps (columns of `cache.Ie`) for loop `i_loop`,
+including the shared boundary point that initialises from `I0`.
+"""
+loop_internal_count(time::RefinedTimeGrid, i_loop::Int) =
+    loop_save_count(time, i_loop) * time.CFL_factor + 1
+
+"""
+    loop_save_start(time::RefinedTimeGrid, i_loop) → Int
+
+Return index in `time.t_save` of the first (boundary) save point of loop `i_loop`.
+"""
+loop_save_start(time::RefinedTimeGrid, i_loop::Int) =
+    (i_loop - 1) * time.n_save_per_loop + 1
+
+"""
+    loop_internal_start(time::RefinedTimeGrid, i_loop) → Int
+
+Return index in `time.t` (the full internal grid) of the boundary point that starts
+loop `i_loop`.
+"""
+loop_internal_start(time::RefinedTimeGrid, i_loop::Int) =
+    (i_loop - 1) * time.n_save_per_loop * time.CFL_factor + 1
+
 function Base.show(io::IO, time::RefinedTimeGrid)
-    print(io, "RefinedTimeGrid(duration=$(time.duration), dt=$(time.dt_requested), n_loop=$(time.n_loop))")
+    print(io, "RefinedTimeGrid(duration=$(time.duration), dt=$(time.dt), n_loop=$(time.n_loop))")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", time::RefinedTimeGrid)
     println(io, "RefinedTimeGrid:")
-    println(io, "├── Duration:      ", time.duration, " s")
-    println(io, "├── Requested dt:  ", time.dt_requested, " s")
-    println(io, "├── Resolved dt:   ", time.dt_resolved, " s")
-    println(io, "├── CFL factor:    ", time.CFL_factor)
-    println(io, "├── n_loop:        ", time.n_loop)
-    print(io,   "└── steps / loop:  ", time.n_t_per_loop)
+    println(io, "├── Duration:        ", time.duration, " s")
+    println(io, "├── dt:              ", time.dt, " s")
+    println(io, "├── Internal dt:     ", time.dt_internal, " s")
+    println(io, "├── CFL factor:      ", time.CFL_factor)
+    println(io, "├── n_loop:          ", time.n_loop)
+    println(io, "├── n_save_per_loop: ", time.n_save_per_loop)
+    print(io,   "└── steps / loop:    ", time.n_t_per_loop)
 end
 
 
@@ -370,11 +451,11 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
 end
 
 function show_time_fields(io::IO, time::RefinedTimeGrid)
-    println(io, "├── duration:    ", time.duration, " s")
-    println(io, "├── dt request:  ", time.dt_requested, " s")
-    println(io, "├── dt resolved: ", time.dt_resolved, " s")
-    println(io, "├── CFL factor:  ", time.CFL_factor)
-    println(io, "├── n_loop:      ", time.n_loop)
+    println(io, "├── duration:      ", time.duration, " s")
+    println(io, "├── dt:            ", time.dt, " s")
+    println(io, "├── dt (internal): ", time.dt_internal, " s")
+    println(io, "├── CFL factor:    ", time.CFL_factor)
+    println(io, "├── n_loop:        ", time.n_loop)
 end
 function show_time_fields(io::IO, time::UniformTimeGrid)
     println(io, "├── duration:    ", time.duration, " s")

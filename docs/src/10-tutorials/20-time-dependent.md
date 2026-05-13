@@ -100,7 +100,7 @@ sim = AuroraSimulation(
 The [`RefinedTimeGrid`](@ref) is constructed automatically from the
 [`TimeDependentMode`](@ref) parameters. It determines two key quantities:
 
-- **`dt_resolved`**: the internal time step, chosen to satisfy the CFL condition. This is
+- **`dt_internal`**: the internal time step, chosen to satisfy the CFL condition. This is
   typically much smaller than the requested output `dt`.
 - **`n_loop`**: the number of time chunks the simulation is split into. Each chunk is solved
   independently and its results are saved before moving to the next. This keeps memory

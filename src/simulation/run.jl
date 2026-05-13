@@ -42,33 +42,52 @@ function solve!(sim::AuroraSimulation, ::TimeDependentMode)
     n_E = sim.model.energy_grid.n
 
     fill!(cache.I0, 0.0)
-    fill!(cache.Ie, 0.0)
     fill!(cache.Ie_save, 0.0)
 
     for i_loop in 1:time.n_loop
         fill!(cache.Ie, 0.0)
         fill!(cache.matrices.Q, 0.0)
 
+        # Determine the number of internal steps and save points for this loop.
+        # All loops except the last have n_save_per_loop save intervals;
+        # the last loop has the remainder (i.e. ≤ n_save_per_loop).
+        n_save_loop         = loop_save_count(time, i_loop)
+        start_save_loop     = loop_save_start(time, i_loop)
+        stop_save_loop      = start_save_loop + n_save_loop
+        n_internal_loop     = loop_internal_count(time, i_loop)
+        start_internal_loop = loop_internal_start(time, i_loop)
+        stop_internal_loop  = start_internal_loop + n_internal_loop - 1
+
         # Extract the boundary condition (input flux) for this loop window.
-        # Windows overlap by 1 timestep to ensure continuity between loops:
-        # e.g. if n_t_per_loop=10, loop 1 gets timesteps [1-10], loop 2 gets [10-19],
-        # loop 3 gets [19-28], etc.
-        i_start = 1 + (i_loop - 1) * (time.n_t_per_loop - 1)
-        i_stop = time.n_t_per_loop + (i_loop - 1) * (time.n_t_per_loop - 1)
-        Ie_top_local = @view cache.Ie_top[:, i_start:i_stop, :]
+        # Each loop starts at the shared boundary point with the previous loop.
+        Ie_top_local = @view cache.Ie_top[:, start_internal_loop : stop_internal_loop, :]
+        # Actual internal time range for this loop (may be shorter for the last loop)
+        t_current_loop = cache.t_loop[1:n_internal_loop]
+
         progress = Progress(n_E;
-                    desc=string("Solving [loop ", i_loop, "/", time.n_loop, "]"),
-                    dt=1.0)
+                            desc = string("Solving [loop ", i_loop, "/", time.n_loop, "]"),
+                            dt = 1.0)
 
-        energy_loop!(sim, Ie_top_local, progress)
+        energy_loop!(sim, Ie_top_local, t_current_loop, progress)
 
-        # Save current loop final state to I0 for continuity to next loop
-        cache.I0 .= cache.Ie[:, end, :]
-        # Subsample output: save every CFL_factor-th timestep to disk (we don't want to
-        # save for _every_ timestep resolved internally)
-        cache.Ie_save .= @view cache.Ie[:, 1:time.CFL_factor:end, :]
-        # And save current loop to disk
-        save_results(sim, cache.Ie_save, cache.t_loop, cache.I0, i_loop, time.CFL_factor)
+        # Save current loop final state to I0 for continuity to next loop.
+        # Use n_internal_loop (not `end`) because last loop can be shorter (Ie from cache is
+        # pre-allocated to the max size n_t_per_loop).
+        cache.I0 .= @view cache.Ie[:, n_internal_loop, :]
+
+        # Subsample output: keep every CFL_factor-th column (gives n_save_loop + 1 columns,
+        # the +1 being the shared boundary/I0 point between loops).
+        n_save_cols = n_save_loop + 1
+        cache.Ie_save[:, 1:n_save_cols, :] .= @view cache.Ie[:, 1:time.CFL_factor:n_internal_loop, :]
+
+        # Build the save-time vector and Ie view for the current loop/file.
+        # Loop 1: include the t=0 boundary point.
+        # Loops 2+: skip the boundary (already saved in the previous file, no overlap).
+        skip           = i_loop > 1     # 0 for first loop, 1 for all others
+        t_save_tofile  = time.t_save[start_save_loop + skip : stop_save_loop]
+        Ie_save_tofile = @view cache.Ie_save[:, 1 + skip : n_save_cols, :]
+
+        save_results(sim, Ie_save_tofile, t_save_tofile, cache.I0, i_loop)
     end
 
     return sim
@@ -89,8 +108,8 @@ function solve_single_step_steady_state!(sim::AuroraSimulation)
 
     Ie_top_local = @view cache.Ie_top[:, 1, :]
     progress = Progress(n_E; desc="Solving", dt=1.0)
-    energy_loop!(sim, Ie_top_local, progress)
-    save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1, 1)
+    energy_loop!(sim, Ie_top_local, cache.t_loop, progress)
+    save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1)
 
     return sim
 end
@@ -110,19 +129,19 @@ function solve_multi_step_steady_state!(sim::AuroraSimulation)
 
         # Extract the boundary condition for this time step
         Ie_top_local = @view cache.Ie_top[:, i_step, :]
-        energy_loop!(sim, Ie_top_local, progress)
+        energy_loop!(sim, Ie_top_local, cache.t_loop, progress)
 
         # Accumulate result into the save array
         cache.Ie_save[:, i_step, :] .= @view cache.Ie[:, 1, :]
     end
 
     # Save all steps to a single file
-    save_results(sim, cache.Ie_save, time.t, cache.I0, 1, 1)
+    save_results(sim, cache.Ie_save, time.t, cache.I0, 1)
 
     return sim
 end
 
-function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
+function energy_loop!(sim::AuroraSimulation, Ie_top_local, t_loop, progress::Progress)
     cache = get_cache(sim)
     model = sim.model
     n_E = model.energy_grid.n
@@ -136,7 +155,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
                                                   cache.B2B_fragment)
 
         # Solve transport equation for current energy
-        solve_energy_step!(sim, sim.mode, iE, Ie_top_local)
+        solve_energy_step!(sim, sim.mode, iE, Ie_top_local, t_loop)
 
         # Update source term Q for lower energies from current energy's:
         # - inelastic scattering collisions → degradation → lower energies
@@ -152,7 +171,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, progress::Progress)
 end
 
 function solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
-                             iE::Int, Ie_top_local)
+                             iE::Int, Ie_top_local, t_loop)
     cache = get_cache(sim)
     model = sim.model
 
@@ -163,11 +182,12 @@ function solve_energy_step!(sim::AuroraSimulation, ::SteadyStateMode,
 end
 
 function solve_energy_step!(sim::AuroraSimulation, ::TimeDependentMode,
-                             iE::Int, Ie_top_local)
+                             iE::Int, Ie_top_local, t_loop)
     cache = get_cache(sim)
     model = sim.model
+    n_int = length(t_loop)
 
-    @views Crank_Nicolson!(cache.Ie[:, :, iE], cache.t_loop, model,
+    @views Crank_Nicolson!(cache.Ie[:, 1:n_int, iE], t_loop, model,
                            v_of_E(model.energy_grid.E_centers[iE]),
                            cache.matrices, iE,
                            Ie_top_local[:, :, iE], cache.I0[:, iE],

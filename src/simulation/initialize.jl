@@ -16,10 +16,11 @@ end
 
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
     neutral_densities = n_neutrals(model.ionosphere)
+    N_neutrals = length(neutral_densities)
     _, t_loop = get_time_parameters(time)
 
     solver = SolverCache()
-    degradation = DegradationCache(Tuple(neutral_densities), 1, 1, 1, 1)
+    degradation = DegradationCache{N_neutrals}(1, 1, 1, 1)
     cascading = CascadingCache()
     matrices = TransportMatrices(1, 1, 1, 1)
     Ie = zeros(1, 1, 1)
@@ -48,6 +49,7 @@ function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = f
     z = model.altitude_grid.h
     μ_center = model.pitch_angle_grid.μ_center
     neutral_densities = n_neutrals(model.ionosphere)
+    N_neutrals = length(neutral_densities)
     n_E = model.energy_grid.n
 
     # Set up time grid dimensions for working arrays
@@ -55,7 +57,7 @@ function build_simulation_cache(sim::AuroraSimulation; force_recompute::Bool = f
 
     # Initialize solver and physical process caches
     solver = SolverCache()
-    degradation = DegradationCache(Tuple(neutral_densities), length(μ_center), n_t, length(z), n_E)
+    degradation = DegradationCache{N_neutrals}(length(μ_center), n_t, length(z), n_E)
     matrices = initialize_transport_matrices(model, t_loop)
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)
@@ -94,7 +96,7 @@ function get_time_parameters(::UniformTimeGrid)
 end
 function get_time_parameters(time::RefinedTimeGrid)
     n_t = time.n_t_per_loop
-    t_loop = range(0.0, step=time.dt_resolved, length=time.n_t_per_loop)
+    t_loop = range(0.0, step=time.dt_internal, length=time.n_t_per_loop)
     return n_t, t_loop
 end
 
@@ -108,7 +110,8 @@ compute_input_flux(sim::AuroraSimulation, time::RefinedTimeGrid) = compute_flux(
 n_steps_to_save(sim::AuroraSimulation, t_loop) = n_steps_to_save(sim.time, t_loop)
 n_steps_to_save(::SingleStepConfig, t_loop) = 1
 n_steps_to_save(time::UniformTimeGrid, t_loop) = time.n_steps
-n_steps_to_save(time::RefinedTimeGrid, t_loop) = length(0:time.dt_requested:t_loop[end])
+# n_save_per_loop + 1 to include the boundary/I0 column at the start of each loop
+n_steps_to_save(time::RefinedTimeGrid, t_loop) = time.n_save_per_loop + 1
 
 # Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
 # These phase functions describe the angular distribution of particles after collisions.
