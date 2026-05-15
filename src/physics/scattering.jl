@@ -28,15 +28,19 @@ function ScatteringData(grid::PitchAngleGrid;
 end
 
 function Base.show(io::IO, sd::ScatteringData)
-    if policy.save_cache
-        save_scattering_cache(P_scatter, Ω_subbeam_relative, θ₁, θ_lims, n_direction; verbose, policy)
-    else
-        verbose && println("Scattering cache not saved (save_cache=false).")
-    end
-
-    return P_scatter, Ω_subbeam_relative, θ₁
+    n_beams = length(sd.Ω_beam)
+    n_dir = length(sd.θ_scatter)
+    print(io, "ScatteringData($(n_beams) beams, $(n_dir) directions)")
 end
 
+function Base.show(io::IO, ::MIME"text/plain", sd::ScatteringData)
+    n_beams = length(sd.Ω_beam)
+    n_dir = length(sd.θ_scatter)
+    println(io, "ScatteringData:")
+    println(io, "├── Beams: $(n_beams)")
+    println(io, "├── Directions: $(n_dir)")
+    print(io, "└── P_scatter: $(join(size(sd.P_scatter), 'x'))")
+end
 
 
 
