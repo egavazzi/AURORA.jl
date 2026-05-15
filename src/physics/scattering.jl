@@ -75,6 +75,7 @@ function scattering_cache_dir(policy::CachePolicy = CachePolicy())
 end
 
 function find_scattering_cache_file(θ_lims, n_direction;
+                                    verbose::Bool = true,
                                     policy::CachePolicy = CachePolicy())
     cache_dir = scattering_cache_dir(policy)
     isdir(cache_dir) || return (false, "")
@@ -91,7 +92,10 @@ function find_scattering_cache_file(θ_lims, n_direction;
                 all(haskey(file, key) for key in required_keys) || return nothing
 
                 version_saved = string(file["version_AURORA"])
-                version_saved == cache_version_string() || return nothing
+                if version_saved != cache_version_string()
+                    verbose && println("Skipping $(filename): built with AURORA $version_saved.")
+                    return nothing
+                end
 
                 θ_lims_file = file["theta_lims"]
                 n_direction_file = file["n_direction"]
@@ -110,7 +114,7 @@ function find_scattering_cache_file(θ_lims, n_direction;
 end
 
 function load_scattering_cache(filepath; verbose = true)
-    verbose && println("Loading scattering cache from file: ", basename(filepath), " ✅")
+    verbose && println("Loading scattering cache from file: $(basename(filepath))")
 
     P_scatter = nothing
     Ω_subbeam_relative = nothing
@@ -129,6 +133,7 @@ function load_scattering_cache(filepath; verbose = true)
 end
 
 function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_lims, n_direction;
+                               verbose::Bool = true,
                                policy::CachePolicy = CachePolicy())
     cache_dir = scattering_cache_dir(policy)
     mkpath(cache_dir)
@@ -143,6 +148,7 @@ function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_li
         file["theta_lims"] = Vector(θ_lims)
         file["n_direction"] = n_direction
     end
+    verbose && println("Saved scattering cache to $(basename(filename)).")
     return filename
 end
 
@@ -168,29 +174,26 @@ function load_or_compute_scattering_cache(θ_lims, n_direction=720;
                                           verbose = true,
                                           policy::CachePolicy = CachePolicy())
     file_found, filepath = policy.force_recompute ? (false, "") :
-                           find_scattering_cache_file(θ_lims, n_direction; policy)
+                           find_scattering_cache_file(θ_lims, n_direction; verbose, policy)
 
     if file_found
         try
             return load_scattering_cache(filepath; verbose)
-        catch
-            verbose && println("Failed to load scattering cache $(basename(filepath)); recomputing.")
+        catch err
+            @warn "Failed to load scattering cache $(basename(filepath)); recomputing."
         end
     end
 
-    if policy.force_recompute
-        verbose && println("Forcing recomputation of scattering-matrices (ignoring cached files on disk).")
-    else
-        verbose && println("Could not find a compatible scattering cache file.")
+    if !file_found && !policy.force_recompute
+        verbose && println("No compatible scattering cache found; computing...")
     end
-    verbose && println("Starting to calculate the requested scattering-matrices.")
 
     P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction; verbose)
 
     if policy.save_cache
-        save_scattering_cache(P_scatter, Ω_subbeam_relative, θ₁, θ_lims, n_direction; policy)
+        save_scattering_cache(P_scatter, Ω_subbeam_relative, θ₁, θ_lims, n_direction; verbose, policy)
     else
-        verbose && println("Computed scattering cache was not saved.")
+        verbose && println("Scattering cache not saved (save_cache=false).")
     end
 
     return P_scatter, Ω_subbeam_relative, θ₁

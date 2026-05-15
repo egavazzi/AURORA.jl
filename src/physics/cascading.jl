@@ -83,32 +83,34 @@ Base.length(cache::CascadingCache) = length(cache.species)
 Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
 """
-    load_or_compute_cascading_cache!(cache, energy_grid; policy=CachePolicy())
+    load_or_compute_cascading_cache!(cache, energy_grid; verbose=true, policy=CachePolicy())
 
 Populate the cascading cache for all neutral species.
 
 If compatible (i.e. same grid, same `version_AURORA`, etc) JLD2 cache files are found on
-disk, the matrices are loaded from there. If not, they are computed from scratch (and possibly saved to disk depending on CachePolicy
-options).
+disk, the matrices are loaded from there. If not, they are computed from scratch (and
+possibly saved to disk depending on `CachePolicy` options).
 """
 function load_or_compute_cascading_cache!(cache::CascadingCache, energy_grid::EnergyGrid;
+                                          verbose::Bool = true,
                                           policy::CachePolicy = CachePolicy())
     for species_cache in cache
-        load_or_compute_cascading_cache!(species_cache, energy_grid; policy)
+        load_or_compute_cascading_cache!(species_cache, energy_grid; verbose, policy)
     end
     return nothing
 end
 
 function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
+                                          verbose::Bool = true,
                                           policy::CachePolicy = CachePolicy())
     E_edges = energy_grid.E_edges
 
     file_found, filepath = policy.force_recompute ? (false, "") :
-                           find_cascading_cache_file(cache.spec, E_edges; policy)
+                           find_cascading_cache_file(cache.spec, E_edges; verbose, policy)
 
     if file_found
         try
-            cascading_data = load_cascading_cache(filepath)
+            cascading_data = load_cascading_cache(filepath; verbose)
             # Trim them to fit the simulation energy grid
             cache.primary_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
             cache.secondary_transfer_matrix = cascading_data[2][1:length(E_edges)-1, 1:length(E_edges)-1, :]
@@ -116,19 +118,15 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
             cache.ionization_thresholds = cascading_data[4]
             return nothing
         catch err
-            println("Failed to load cascading cache $(basename(filepath)); recomputing.")
+            @warn "Failed to load cascading cache $(basename(filepath)); recomputing."
         end
     end
 
-    if policy.force_recompute
-        println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
-    else
-        if !file_found
-            println("Could not find a compatible cascading cache file for $(cache.spec.name).")
-        end
+    if !file_found && !policy.force_recompute
+        verbose && println("No compatible cascading cache for $(cache.spec.name); computing...")
     end
 
-    cascading_data = calculate_cascading_matrices(cache.spec, E_edges)
+    cascading_data = calculate_cascading_matrices(cache.spec, E_edges; verbose)
     cache.primary_transfer_matrix = cascading_data[1]
     cache.secondary_transfer_matrix = cascading_data[2]
     cache.E_edges = cascading_data[3]
@@ -137,9 +135,9 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
     if policy.save_cache
         save_cascading_cache(cache.primary_transfer_matrix, cache.secondary_transfer_matrix,
                              cache.E_edges, cache.ionization_thresholds,
-                             cache.spec.name; policy)
+                             cache.spec.name; verbose, policy)
     else
-        println("Computed cascading cache for $(cache.spec.name) was not saved.")
+        verbose && println("Cascading cache for $(cache.spec.name) not saved (save_cache=false).")
     end
 
     return nothing
@@ -438,6 +436,7 @@ function cascading_cache_dir(spec::CascadingSpec, policy::CachePolicy = CachePol
 end
 
 function find_cascading_cache_file(spec::CascadingSpec, E_edges;
+                                   verbose::Bool = true,
                                    policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(spec, policy)
     isdir(species_dir) || return (false, "")
@@ -462,7 +461,7 @@ function find_cascading_cache_file(spec::CascadingSpec, E_edges;
 
                 version_saved = file["version_AURORA"]
                 if string(version_saved) != cache_version_string()
-                    println("Skipping cascading cache $(filename): built with AURORA $version_saved.")
+                    verbose && println("Skipping $(filename): built with AURORA $version_saved.")
                     return nothing
                 end
 
@@ -482,19 +481,20 @@ end
 
 
 """
-    load_cascading_cache(filepath)
+    load_cascading_cache(filepath; verbose=true)
 
 Load pre-computed cascading matrices from a cache file.
 
 # Arguments
-- `filepath`: Path to the .jld2 file containing cascading data
+- `filepath`: Path to the `.jld2` file containing cascading data
+- `verbose`: when `true`, print a cache-hit message to stdout
 
 # Returns
 - `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
     Tuple of loaded data
 """
-function load_cascading_cache(filepath)
-    println("Loading cascading-matrices from file: ", basename(filepath))
+function load_cascading_cache(filepath; verbose::Bool = true)
+    verbose && println("Loading cascading matrices from file: $(basename(filepath))")
     primary_transfer_matrix = nothing
     secondary_transfer_matrix = nothing
     ionization_thresholds = nothing
@@ -518,7 +518,7 @@ end
 """
     save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
                          E_edges, ionization_thresholds, species_name;
-                         policy=CachePolicy())
+                         verbose=true, policy=CachePolicy())
 
 Save calculated cascading matrices to a file, located in the species-specific cascading data
 directory.
@@ -529,10 +529,12 @@ directory.
 - `E_edges`: Energy grid edges used for calculations
 - `ionization_thresholds`: Ionization threshold energies
 - `species_name`: Name of the species (for filename)
+- `verbose`: when `true`, print a cache-save message to stdout
 - `policy.cache_root`: parent directory that contains the `e_cascading/` cache subtree
 """
 function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
                               E_edges, ionization_thresholds, species_name;
+                              verbose::Bool = true,
                               policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(CascadingSpec(species_name, Float64[], (_, _) -> 0.0),
                                       policy)
@@ -548,6 +550,7 @@ function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix
         file["E_edges"] = E_edges
         file["E_ionizations"] = ionization_thresholds
     end
+    verbose && println("Saved cascading matrices to $(basename(filename)).")
     return filename
 end
 
