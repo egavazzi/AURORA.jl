@@ -18,7 +18,7 @@ end
 
 """
     AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
-                verbose=true)
+                verbose=true, cache_policy=CachePolicy())
 
 Load the atmosphere, the energy grid, and the collision data into an `AuroraModel`.
 
@@ -34,6 +34,7 @@ Load the atmosphere, the energy grid, and the collision data into an `AuroraMode
 - `iri_file`: path to the iri file to use
 - `B_angle_to_zenith`: angle between magnetic field and zenith (degrees)
 - `verbose=true`: print progress messages when loading stuff
+- `cache_policy=CachePolicy()`: controls reuse and persistence of the internal cascading and scattering cache
 
 ## Returns
 An `AuroraModel` with fields:
@@ -47,11 +48,11 @@ An `AuroraModel` with fields:
 - `s_field::Vector`
 """
 function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
-                     verbose=true)
+                     verbose=true, cache_policy::CachePolicy = CachePolicy())
     altitude_grid = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
-    scattering = ScatteringData(pitch_angle_grid; verbose)
+    scattering = ScatteringData(pitch_angle_grid; verbose, policy=cache_policy)
     ionosphere = Ionosphere(msis_file, iri_file, altitude_grid.h)
     cross_sections = CrossSectionData(energy_grid)
     s_field = altitude_grid.h ./ cosd(B_angle_to_zenith)

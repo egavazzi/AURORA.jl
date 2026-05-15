@@ -12,6 +12,7 @@
 - **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 - **Breaking** Saved files do no longer repeat the last/first time step of each loop across files [#134](https://github.com/egavazzi/AURORA.jl/pull/134)
 - **Breaking** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
+- Cached cascading and scattering matrices created with different versions of AURORA are now skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)

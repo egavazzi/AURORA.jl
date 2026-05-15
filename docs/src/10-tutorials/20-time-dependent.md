@@ -43,6 +43,12 @@ The constructor performs several steps automatically:
 
 See [Discretization](@ref Discretization) to read more about the grids.
 
+Scattering and cascading transfer matrices are cached automatically under the package's
+`internal_data/` directory. If you want to rebuild them or avoid writing cache files during
+an exploratory run, pass a [`CachePolicy`](@ref) to [`AuroraModel`](@ref) or use the cache
+keywords on [`initialize!`](@ref).
+
+
 ## Step 2: Define the precipitating electron flux
 
 The precipitating electrons are specified by an [`InputFlux`](@ref), which combines an

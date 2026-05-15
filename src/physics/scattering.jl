@@ -1,5 +1,3 @@
-using Dates: Dates, now
-using MAT: matopen
 using ProgressMeter: Progress, next!
 using Rotations: AngleAxis
 
@@ -16,44 +14,17 @@ struct ScatteringData{FT, A<:AbstractArray{FT}, M<:AbstractMatrix{FT}, V<:Abstra
     θ_scatter::V
 end
 
-function ScatteringData(grid::PitchAngleGrid; n_direction=720, verbose=true)
+function ScatteringData(grid::PitchAngleGrid;
+                        n_direction = 720, verbose = true,
+                        policy::CachePolicy = CachePolicy())
     θ_lims = grid.θ_lims
     Ω_beam = beam_weight(θ_lims)
-    P_scatter, Ω_subbeam_relative, θ1 = find_scattering_matrices(θ_lims, n_direction;
-                                                                 verbose)
+    P_scatter, Ω_subbeam_relative, θ1 = load_or_compute_scattering(θ_lims, n_direction;
+                                                                   verbose, policy)
     FT = eltype(P_scatter)
     return ScatteringData{FT, typeof(P_scatter), typeof(Ω_subbeam_relative), typeof(Ω_beam)}(
         P_scatter, Ω_subbeam_relative, Ω_beam, vec(θ1)
     )
-end
-
-"""
-    load_scattering_matrices(grid::PitchAngleGrid)
-
-Load the scattering matrices for the given pitch-angle grid.
-
-# Arguments
-- `grid::PitchAngleGrid`: validated pitch-angle grid for the electron beams
-
-# Returns
-- `μ_lims`: cosine of the pitch angle limits of the e- beams. Vector [n_beam + 1]
-- `μ_center`: cosine of the pitch angle of the middle of the e- beams. Vector [n_beam]
-- `scattering`: NamedTuple with scattering matrix data:
-    + `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n\\_direction x n\\_direction]
-    + `Ω_subbeam_relative`: relative weight of each sub-beam within each beam. Matrix [n\\_beam x n\\_direction]
-    + `Ω_beam`: solid angle for each stream (ster). Vector [n_beam]
-    + `θ_scatter`: scattering angles used in the calculations. Vector [n_direction]
-"""
-function load_scattering_matrices(grid::PitchAngleGrid)
-    θ_lims = grid.θ_lims
-    μ_lims = grid.μ_lims
-    μ_center = grid.μ_center
-    Ω_beam = beam_weight(θ_lims) # this beam weight is calculated in a continuous way
-    P_scatter, Ω_subbeam_relative, θ₁ = find_scattering_matrices(θ_lims, 720)
-    scattering = (P_scatter = P_scatter, Ω_subbeam_relative = Ω_subbeam_relative,
-                     Ω_beam = Ω_beam, θ_scatter = θ₁)
-
-    return μ_lims, μ_center, scattering
 end
 
 function Base.show(io::IO, sd::ScatteringData)
@@ -70,80 +41,6 @@ function Base.show(io::IO, ::MIME"text/plain", sd::ScatteringData)
     println(io, "├── Directions: $(n_dir)")
     print(io, "└── P_scatter: $(join(size(sd.P_scatter), 'x'))")
 end
-
-
-"""
-    find_scattering_matrices(θ_lims, n_direction=720)
-
-Look for scattering matrices that match the pitch-angle limits `θ_lims` and the number
-of direction/sub-beams `n_direction`. If a file is found, the scattering matrices are
-directly loaded. Otherwise, they are calculated and saved to a file.
-
-# Calling
-`P_scatter, Ω_subbeam_relative, θ₁ = find_scattering_matrices(θ_lims, n_direction)`
-
-# Inputs
-- `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
-    corresponds to field aligned down, and 0° field aligned up.
-- `n_direction`: number of directions or sub-beams to use for the discretized calculations
-    of the scattering matrices. Defaults to 720 when left empty.
-
-# Outputs
-- `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
-    n`_`direction]
-- `Ω_subbeam_relative`: relative weight of each sub-beam within each beam, normalized so that
-    summing along the sub-beams gives 1 for each beam. Matrix [n`_`beam x n`_`direction]
-- `θ₁`: scattering angles used in the calculations. Vector [n_direction]
-"""
-function find_scattering_matrices(θ_lims, n_direction=720; verbose = true)
-    scattering_files = readdir(pkgdir(AURORA, "internal_data", "e_scattering"))
-    found_them = 0
-    for i1 in eachindex(scattering_files)
-        if !isdir(scattering_files[i1])
-            try
-                filename = pkgdir(AURORA, "internal_data", "e_scattering", scattering_files[i1])
-                file = matopen(filename)
-                θ_lims_file = read(file, "theta_lims")
-                n_direction_file = read(file, "n_direction")
-                close(file)
-                if θ_lims == θ_lims_file && n_direction == n_direction_file
-                    file = matopen(filename)
-                    P_scatter = read(file, "P_scatter")
-                    Ω_subbeam_relative = read(file, "subbeamweight_relative")
-                    θ₁ = read(file, "theta_scatter")
-                    close(file)
-                    found_them = 1
-                    verbose && println("Loading scattering-matrices from file: ", scattering_files[i1], " ✅")
-                    break
-                end
-            catch
-            end
-        end
-    end
-    if found_them == 0
-        verbose && println("Could not find file with matching pitch-angle grid.")
-        verbose && println("Starting to calculate the requested scattering-matrices.")
-
-        P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction;
-                                           verbose)
-
-        # Save the results for future use using the current internal naming scheme.
-        filename = pkgdir(AURORA, "internal_data", "e_scattering",
-                            string(length(θ_lims) - 1, "_streams_",
-                            Dates.format(now(), "yyyymmdd-HHMMSS"),
-                            ".mat"))
-        file = matopen(filename, "w")
-        write(file, "P_scatter", P_scatter)
-        write(file, "subbeamweight_relative", Ω_subbeam_relative)
-        write(file, "theta_scatter", θ₁)
-        write(file, "theta_lims", Vector(θ_lims))
-        write(file, "n_direction", n_direction)
-        close(file)
-    end
-
-    return P_scatter, Ω_subbeam_relative, θ₁
-end
-
 
 
 
