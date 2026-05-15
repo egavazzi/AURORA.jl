@@ -52,9 +52,7 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
     cache.ionization_thresholds = cascading_data[4]
 
     if policy.save_cache
-        save_cascading_cache(cache.primary_transfer_matrix, cache.secondary_transfer_matrix,
-                             cache.E_edges, cache.ionization_thresholds,
-                             cache.spec.name; verbose, policy)
+        save_cascading_cache(cache; verbose, policy)
     else
         verbose && println("Cascading cache for $(cache.spec.name) not saved (save_cache=false).")
     end
@@ -112,21 +110,20 @@ function load_cascading_cache(filepath; verbose::Bool = true)
     return (Q_primary, Q_secondary, E_edges, E_ionizations)
 end
 
-function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
-                              E_edges, ionization_thresholds, species_name;
+function save_cascading_cache(cache::SpeciesCascadingCache;
                               verbose::Bool = true,
                               policy::CachePolicy = CachePolicy())
-    species_dir = cascading_cache_dir(CascadingSpec(species_name, Float64[], (_, _) -> 0.0),
-                                      policy)
+    species_dir = cascading_cache_dir(cache.spec, policy)
     mkpath(species_dir)
     filename = joinpath(species_dir,
-                       string("cascading_", species_name, "_",
+                       string("cascading_", cache.spec.name, "_",
                              Dates.format(now(), "yyyymmdd-HHMMSS"),
                              ".jld2"))
     version_AURORA = cache_version_string()
-    Q_primary = primary_transfer_matrix
-    Q_secondary = secondary_transfer_matrix
-    E_ionizations = ionization_thresholds
+    Q_primary = cache.primary_transfer_matrix
+    Q_secondary = cache.secondary_transfer_matrix
+    E_edges = cache.E_edges
+    E_ionizations = cache.ionization_thresholds
     @save filename version_AURORA Q_primary Q_secondary E_edges E_ionizations
     verbose && println("Saved cascading matrices to $(basename(filename)).")
     return filename
