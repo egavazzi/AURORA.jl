@@ -23,7 +23,7 @@ DocMeta.setdocmeta!(AURORA, :DocTestSetup, :(using AURORA); recursive = true)
 const titles = Dict(
     "10-tutorials" => "Tutorials",
     "20-physics" => "Physics",
-    "30-developer" => "Implementation",
+    "30-implementation" => "Implementation",
     "40-api" => "API Reference",
 )
 

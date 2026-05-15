@@ -41,10 +41,13 @@ The constructor performs several steps automatically:
 - Loads electron densities and temperature from the IRI file.
 - Precomputes electron collision cross sections and scattering data.
 
+See [Discretization](@ref Discretization) to read more about the grids.
+
 Scattering and cascading transfer matrices are cached automatically under the package's
 `internal_data/` directory. If you want to rebuild them or avoid writing cache files during
 an exploratory run, pass a [`CachePolicy`](@ref) to [`AuroraModel`](@ref) or use the cache
 keywords on [`initialize!`](@ref).
+
 
 ## Step 2: Define the precipitating electron flux
 
