@@ -43,7 +43,7 @@ The default internal grid is piecewise non-uniform, with:
 
 - a constant step size (~ 11.65 eV) above 500 eV to resolve ionization collisions
 - finer and finer step sizes under 500 eV, down to 0.15 eV at 2eV, to resolve variations around
-the inelastic collisions thresholds
+  the inelastic collisions thresholds
 
 The energy grid is defined by:
 
