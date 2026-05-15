@@ -27,8 +27,33 @@ directly loaded. Otherwise, they are calculated and optionally saved to a file.
     summing along the sub-beams gives 1 for each beam. Matrix [n`_`beam x n`_`direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
-function scattering_cache_dir(policy::CachePolicy = CachePolicy())
-    return joinpath(policy.cache_root, "e_scattering")
+function load_or_compute_scattering_cache(θ_lims, n_direction=720;
+                                          verbose = true,
+                                          policy::CachePolicy = CachePolicy())
+    file_found, filepath = policy.force_recompute ? (false, "") :
+                           find_scattering_cache_file(θ_lims, n_direction; verbose, policy)
+
+    if file_found
+        try
+            return load_scattering_cache(filepath; verbose)
+        catch err
+            @warn "Failed to load scattering cache $(basename(filepath)). Recomputing." exception = err
+        end
+    end
+
+    if !file_found && !policy.force_recompute
+        verbose && println("No compatible scattering cache found. Computing...")
+    end
+
+    P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction; verbose)
+
+    if policy.save_cache
+        save_scattering_cache(P_scatter, Ω_subbeam_relative, θ₁, θ_lims, n_direction; verbose, policy)
+    else
+        verbose && println("Scattering cache not saved (save_cache=false).")
+    end
+
+    return P_scatter, Ω_subbeam_relative, θ₁
 end
 
 function find_scattering_cache_file(θ_lims, n_direction;
@@ -79,7 +104,7 @@ function load_scattering_cache(filepath; verbose = true)
     jldopen(filepath, "r") do file
         version_saved = string(file["version_AURORA"])
         if version_saved != cache_version_string()
-            error("Found incompatible scattering cache file $(basename(filepath)); recomputing.")
+            error("Found incompatible scattering cache file $(basename(filepath)). Recomputing.")
         end
         P_scatter = file["P_scatter"]
         Ω_subbeam_relative = file["Ω_subbeam_relative"]
@@ -109,12 +134,6 @@ function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_li
     return filename
 end
 
-"""
-    clear_scattering_cache!(; cache_root=default_cache_root())
-
-Remove generated JLD2 scattering cache files from the scattering cache directory under
-`cache_root`.
-"""
 function clear_scattering_cache!(; cache_root::String = default_cache_root())
     cache_dir = joinpath(cache_root, "e_scattering")
     isdir(cache_dir) || return nothing
@@ -127,31 +146,6 @@ function clear_scattering_cache!(; cache_root::String = default_cache_root())
     return nothing
 end
 
-function load_or_compute_scattering_cache(θ_lims, n_direction=720;
-                                          verbose = true,
-                                          policy::CachePolicy = CachePolicy())
-    file_found, filepath = policy.force_recompute ? (false, "") :
-                           find_scattering_cache_file(θ_lims, n_direction; verbose, policy)
-
-    if file_found
-        try
-            return load_scattering_cache(filepath; verbose)
-        catch err
-            @warn "Failed to load scattering cache $(basename(filepath)); recomputing."
-        end
-    end
-
-    if !file_found && !policy.force_recompute
-        verbose && println("No compatible scattering cache found; computing...")
-    end
-
-    P_scatter, Ω_subbeam_relative, θ₁ = calculate_scattering_matrices(θ_lims, n_direction; verbose)
-
-    if policy.save_cache
-        save_scattering_cache(P_scatter, Ω_subbeam_relative, θ₁, θ_lims, n_direction; verbose, policy)
-    else
-        verbose && println("Scattering cache not saved (save_cache=false).")
-    end
-
-    return P_scatter, Ω_subbeam_relative, θ₁
+function scattering_cache_dir(policy::CachePolicy = CachePolicy())
+    return joinpath(policy.cache_root, "e_scattering")
 end

@@ -37,12 +37,12 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
             cache.ionization_thresholds = cascading_data[4]
             return nothing
         catch err
-            @warn "Failed to load cascading cache $(basename(filepath)); recomputing."
+            @warn "Failed to load cascading cache $(basename(filepath)). Recomputing." exception = err
         end
     end
 
     if !file_found && !policy.force_recompute
-        verbose && println("No compatible cascading cache for $(cache.spec.name); computing...")
+        verbose && println("No compatible cascading cache for $(cache.spec.name). Computing...")
     end
 
     cascading_data = calculate_cascading_matrices(cache.spec, E_edges; verbose)
@@ -60,24 +60,6 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
     end
 
     return nothing
-end
-
-
-"""
-    find_cascading_cache_file(spec, E_edges; policy=CachePolicy())
-
-Search for a pre-computed cascading spectra file with matching energy grid.
-
-# Arguments
-- `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
-- `E_edges`: Energy grid edges to match
-- `policy.cache_root`: parent directory that contains the `e_cascading/` cache subtree
-
-# Returns
-- `(file_found, filepath)`: Tuple of boolean and filepath string
-"""
-function cascading_cache_dir(spec::CascadingSpec, policy::CachePolicy = CachePolicy())
-    return joinpath(policy.cache_root, "e_cascading", spec.name)
 end
 
 function find_cascading_cache_file(spec::CascadingSpec, E_edges;
@@ -124,20 +106,6 @@ function find_cascading_cache_file(spec::CascadingSpec, E_edges;
     return (false, "")
 end
 
-
-"""
-    load_cascading_cache(filepath; verbose=true)
-
-Load pre-computed cascading matrices from a cache file.
-
-# Arguments
-- `filepath`: Path to the `.jld2` file containing cascading data
-- `verbose`: when `true`, print a cache-hit message to stdout
-
-# Returns
-- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
-    Tuple of loaded data
-"""
 function load_cascading_cache(filepath; verbose::Bool = true)
     verbose && println("Loading cascading matrices from file: $(basename(filepath))")
     primary_transfer_matrix = nothing
@@ -147,7 +115,7 @@ function load_cascading_cache(filepath; verbose::Bool = true)
     jldopen(filepath, "r") do file
         version_saved = string(file["version_AURORA"])
         if version_saved != cache_version_string()
-            error("Found incompatible cascading cache file $(basename(filepath)); recomputing.")
+            error("Found incompatible cascading cache file $(basename(filepath)). Recomputing.")
         end
         primary_transfer_matrix = file["Q_primary"]
         secondary_transfer_matrix = file["Q_secondary"]
@@ -159,24 +127,6 @@ function load_cascading_cache(filepath; verbose::Bool = true)
             E_edges, ionization_thresholds)
 end
 
-
-"""
-    save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
-                         E_edges, ionization_thresholds, species_name;
-                         verbose=true, policy=CachePolicy())
-
-Save calculated cascading matrices to a file, located in the species-specific cascading data
-directory.
-
-# Arguments
-- `primary_transfer_matrix`: Transfer matrix to save
-- `secondary_transfer_matrix`: Secondary-electron transfer matrix to save
-- `E_edges`: Energy grid edges used for calculations
-- `ionization_thresholds`: Ionization threshold energies
-- `species_name`: Name of the species (for filename)
-- `verbose`: when `true`, print a cache-save message to stdout
-- `policy.cache_root`: parent directory that contains the `e_cascading/` cache subtree
-"""
 function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
                               E_edges, ionization_thresholds, species_name;
                               verbose::Bool = true,
@@ -199,12 +149,6 @@ function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix
     return filename
 end
 
-"""
-    clear_cascading_cache!(; cache_root=default_cache_root())
-
-Helper to remove generated JLD2 cascading cache files from the species-specific cascading cache
-directories under `cache_root`. All species are removed.
-"""
 function clear_cascading_cache!(; cache_root::String = default_cache_root())
     base_dir = joinpath(cache_root, "e_cascading")
     isdir(base_dir) || return nothing
@@ -217,4 +161,8 @@ function clear_cascading_cache!(; cache_root::String = default_cache_root())
         end
     end
     return nothing
+end
+
+function cascading_cache_dir(spec::CascadingSpec, policy::CachePolicy = CachePolicy())
+    return joinpath(policy.cache_root, "e_cascading", spec.name)
 end
