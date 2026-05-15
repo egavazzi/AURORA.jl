@@ -20,8 +20,10 @@ include("physics/cross_sections/emission_cross_sections.jl")
 include("physics/cross_sections/cross_sections.jl")
 export CrossSectionData
 
+include("physics/cache_policy.jl")
+export CachePolicy
 include("physics/scattering.jl")
-export ScatteringData
+export ScatteringData, clear_scattering_cache!
 include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 
@@ -40,6 +42,7 @@ include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 
 include("physics/cascading.jl")
+export clear_cascading_cache!
 include("physics/energy_degradation.jl")
 
 include("solvers/sparse_indexing.jl")

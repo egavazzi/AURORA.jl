@@ -1,7 +1,7 @@
 using Dates: Dates, now
 using HCubature: hcubature, hcubature_buffer
 using Interpolations: linear_interpolation, Flat
-using MAT: matopen
+using JLD2: jldopen
 
 # ======================================================================================== #
 #           CASCADING SPEC — Species specific cascading physics definition                 #
@@ -82,40 +82,40 @@ Base.getindex(cache::CascadingCache, index::Int) = cache.species[index]
 Base.length(cache::CascadingCache) = length(cache.species)
 Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
-function load_or_compute_cascading!(cache::CascadingCache, energy_grid::EnergyGrid;
-                                    force_recompute::Bool = false)
+function load_or_compute_cascading_cache!(cache::CascadingCache, energy_grid::EnergyGrid;
+                                          policy::CachePolicy = CachePolicy())
     for species_cache in cache
-        load_or_compute_cascading!(species_cache, energy_grid; force_recompute)
+        load_or_compute_cascading_cache!(species_cache, energy_grid; policy)
     end
     return nothing
 end
 
-function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
-                                    force_recompute::Bool = false)
+function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
+                                          policy::CachePolicy = CachePolicy())
     E_edges = energy_grid.E_edges
 
-    file_found, filepath = force_recompute ? (false, "") :
-                           find_cascading_file(cache.spec, E_edges)
+    file_found, filepath = policy.force_recompute ? (false, "") :
+                           find_cascading_cache_file(cache.spec, E_edges; policy)
 
     if file_found
         try
-            cascading_data = load_cascading_matrices(filepath)
+            cascading_data = load_cascading_cache(filepath)
             # Trim them to fit the simulation energy grid
             cache.primary_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
             cache.secondary_transfer_matrix = cascading_data[2][1:length(E_edges)-1, 1:length(E_edges)-1, :]
             cache.E_edges = cascading_data[3][1:length(E_edges)]
             cache.ionization_thresholds = cascading_data[4]
             return nothing
-        catch
-            println("Found incompatible cascading cache file $(basename(filepath)); recomputing.")
+        catch err
+            println("Failed to load cascading cache $(basename(filepath)); recomputing.")
         end
     end
 
-    if force_recompute
+    if policy.force_recompute
         println("Forcing recomputation of cascading-matrices (ignoring cached files on disk).")
     else
         if !file_found
-            println("Could not find a file with matching energy grid.")
+            println("Could not find a compatible cascading cache file for $(cache.spec.name).")
         end
     end
 
@@ -125,9 +125,13 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
     cache.E_edges = cascading_data[3]
     cache.ionization_thresholds = cascading_data[4]
 
-    save_cascading_matrices(cache.primary_transfer_matrix, cache.secondary_transfer_matrix,
-                            cache.E_edges, cache.ionization_thresholds,
-                            cache.spec.name)
+    if policy.save_cache
+        save_cascading_cache(cache.primary_transfer_matrix, cache.secondary_transfer_matrix,
+                             cache.E_edges, cache.ionization_thresholds,
+                             cache.spec.name; policy)
+    else
+        println("Computed cascading cache for $(cache.spec.name) was not saved.")
+    end
 
     return nothing
 end
@@ -408,7 +412,7 @@ end
 
 
 """
-    find_cascading_file(E_edges, species_dir)
+    find_cascading_cache_file(E_edges, species_dir)
 
 Search for a pre-computed cascading spectra file with matching energy grid.
 
@@ -419,12 +423,21 @@ Search for a pre-computed cascading spectra file with matching energy grid.
 # Returns
 - `(file_found, filepath)`: Tuple of boolean and filepath string
 """
-function find_cascading_file(spec::CascadingSpec, E_edges)
-    species_dir = pkgdir(AURORA, "internal_data", "e_cascading", spec.name)
+function cascading_cache_dir(spec::CascadingSpec, policy::CachePolicy = CachePolicy())
+    base_dir = isnothing(policy.cache_root) ?
+               pkgdir(AURORA, "internal_data", "e_cascading") :
+               joinpath(policy.cache_root, "e_cascading")
+    return joinpath(base_dir, spec.name)
+end
+
+function find_cascading_cache_file(spec::CascadingSpec, E_edges;
+                                   policy::CachePolicy = CachePolicy())
+    species_dir = cascading_cache_dir(spec, policy)
+    isdir(species_dir) || return (false, "")
     cascading_files = readdir(species_dir)
 
     for filename in cascading_files
-        if !endswith(filename, ".mat")
+        if !endswith(filename, ".jld2")
             continue
         end
 
@@ -434,18 +447,24 @@ function find_cascading_file(spec::CascadingSpec, E_edges)
 
         filepath = joinpath(species_dir, filename)
         try
-            file = matopen(filepath)
+            result = jldopen(filepath, "r") do file
+                required_keys = ["version_AURORA", "Q_primary", "Q_secondary", "E_edges", "E_ionizations"]
+                if !all(haskey(file, key) for key in required_keys)
+                    return nothing
+                end
 
-            required_keys = ["Q_primary", "Q_secondary", "E_edges", "E_ionizations"]
-            if all(haskey(file, key) for key in required_keys)
-                E_edges_saved = read(file, "E_edges")
+                version_saved = file["version_AURORA"]
+                if string(version_saved) != cache_version_string()
+                    println("Skipping cascading cache $(filename): built with AURORA $version_saved.")
+                    return nothing
+                end
+
+                E_edges_saved = file["E_edges"]
                 if length(E_edges) <= length(E_edges_saved) && E_edges_saved[1:length(E_edges)] == E_edges
-                    close(file)
                     return (true, filepath)
                 end
             end
-
-            close(file)
+            isnothing(result) || return result
         catch
             continue
         end
@@ -456,25 +475,33 @@ end
 
 
 """
-    load_cascading_matrices(filepath)
+    load_cascading_cache(filepath)
 
 Load pre-computed cascading matrices from a file.
 
 # Arguments
-- `filepath`: Path to the .mat file containing cascading data
+- `filepath`: Path to the .jld2 file containing cascading data
 
 # Returns
 - `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
     Tuple of loaded data
 """
-function load_cascading_matrices(filepath)
+function load_cascading_cache(filepath)
     println("Loading cascading-matrices from file: ", basename(filepath))
-    file = matopen(filepath)
-    primary_transfer_matrix = read(file, "Q_primary")
-    secondary_transfer_matrix = read(file, "Q_secondary")
-    ionization_thresholds = read(file, "E_ionizations")
-    E_edges = read(file, "E_edges")
-    close(file)
+    primary_transfer_matrix = nothing
+    secondary_transfer_matrix = nothing
+    ionization_thresholds = nothing
+    E_edges = nothing
+    jldopen(filepath, "r") do file
+        version_saved = string(file["version_AURORA"])
+        if version_saved != cache_version_string()
+            error("Found incompatible cascading cache file $(basename(filepath)); recomputing.")
+        end
+        primary_transfer_matrix = file["Q_primary"]
+        secondary_transfer_matrix = file["Q_secondary"]
+        ionization_thresholds = file["E_ionizations"]
+        E_edges = file["E_edges"]
+    end
 
     return (primary_transfer_matrix, secondary_transfer_matrix,
             E_edges, ionization_thresholds)
@@ -482,8 +509,8 @@ end
 
 
 """
-    save_cascading_matrices(primary_transfer_matrix, secondary_transfer_matrix,
-                            E_edges, ionization_thresholds, species_name)
+    save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
+                         E_edges, ionization_thresholds, species_name)
 
 Save calculated cascading matrices to a file, located in the species-specific cascading data
 directory.
@@ -495,17 +522,38 @@ directory.
 - `ionization_thresholds`: Ionization threshold energies
 - `species_name`: Name of the species (for filename)
 """
-function save_cascading_matrices(primary_transfer_matrix, secondary_transfer_matrix,
-                                 E_edges, ionization_thresholds, species_name)
-    species_dir = pkgdir(AURORA, "internal_data", "e_cascading", "$species_name")
+function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
+                              E_edges, ionization_thresholds, species_name;
+                              policy::CachePolicy = CachePolicy())
+    species_dir = cascading_cache_dir(CascadingSpec(species_name, Float64[], (_, _) -> 0.0),
+                                      policy)
+    mkpath(species_dir)
     filename = joinpath(species_dir,
-                       string("CascadingSpec", species_name, "ionization_",
+                       string("cascading_", species_name, "_",
                              Dates.format(now(), "yyyymmdd-HHMMSS"),
-                             ".mat"))
-    file = matopen(filename, "w")
-    write(file, "Q_primary", primary_transfer_matrix)
-    write(file, "Q_secondary", secondary_transfer_matrix)
-    write(file, "E_edges", E_edges)
-    write(file, "E_ionizations", ionization_thresholds)
-    close(file)
+                             ".jld2"))
+    jldopen(filename, "w") do file
+        file["version_AURORA"] = cache_version_string()
+        file["Q_primary"] = primary_transfer_matrix
+        file["Q_secondary"] = secondary_transfer_matrix
+        file["E_edges"] = E_edges
+        file["E_ionizations"] = ionization_thresholds
+    end
+    return filename
+end
+
+function clear_cascading_cache!(; cache_root::Union{Nothing, String} = nothing)
+    base_dir = isnothing(cache_root) ?
+               pkgdir(AURORA, "internal_data", "e_cascading") :
+               joinpath(cache_root, "e_cascading")
+    isdir(base_dir) || return nothing
+    for species_name in readdir(base_dir)
+        species_dir = joinpath(base_dir, species_name)
+        isdir(species_dir) || continue
+        for filename in readdir(species_dir)
+            endswith(filename, ".jld2") || continue
+            rm(joinpath(species_dir, filename); force = true)
+        end
+    end
+    return nothing
 end
