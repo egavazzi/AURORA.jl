@@ -19,8 +19,8 @@ function ScatteringData(grid::PitchAngleGrid;
                         policy::CachePolicy = CachePolicy())
     θ_lims = grid.θ_lims
     Ω_beam = beam_weight(θ_lims)
-    P_scatter, Ω_subbeam_relative, θ1 = load_or_compute_scattering_cache(θ_lims, n_direction;
-                                                                         verbose, policy)
+    P_scatter, Ω_subbeam_relative, θ1 = load_or_compute_scattering(θ_lims, n_direction;
+                                                                   verbose, policy)
     FT = eltype(P_scatter)
     return ScatteringData{FT, typeof(P_scatter), typeof(Ω_subbeam_relative), typeof(Ω_beam)}(
         P_scatter, Ω_subbeam_relative, Ω_beam, vec(θ1)

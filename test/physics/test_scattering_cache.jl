@@ -30,13 +30,13 @@ end
                                           cache_root=joinpath(cache_root, "skip_save"))
 
     P_scatter, Ω_subbeam_relative, θ_scatter =
-        AURORA.load_or_compute_scattering_cache(θ_lims, n_direction; verbose=false, policy=save_policy)
+        AURORA.load_or_compute_scattering(θ_lims, n_direction; verbose=false, policy=save_policy)
 
     scattering_dir = joinpath(cache_root, "e_scattering")
     @test length(cache_files(scattering_dir)) == 1
 
     P_loaded, Ω_loaded, θ_loaded =
-        AURORA.load_or_compute_scattering_cache(θ_lims, n_direction; verbose=false, policy=load_policy)
+        AURORA.load_or_compute_scattering(θ_lims, n_direction; verbose=false, policy=load_policy)
     @test P_loaded == P_scatter
     @test Ω_loaded == Ω_subbeam_relative
     @test θ_loaded == θ_scatter
@@ -61,10 +61,10 @@ end
         file["n_direction"] = payload.n_direction
     end
 
-    AURORA.load_or_compute_scattering_cache(θ_lims, n_direction; verbose=false, policy=load_policy)
+    AURORA.load_or_compute_scattering(θ_lims, n_direction; verbose=false, policy=load_policy)
     @test compatible_cache_count(scattering_dir) >= 1
 
-    AURORA.load_or_compute_scattering_cache(θ_lims, n_direction; verbose=false, policy=skip_save_policy)
+    AURORA.load_or_compute_scattering(θ_lims, n_direction; verbose=false, policy=skip_save_policy)
     skip_dir = joinpath(cache_root, "skip_save", "e_scattering")
     @test isempty(cache_files(skip_dir))
 

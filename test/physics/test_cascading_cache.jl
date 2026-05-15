@@ -2,7 +2,7 @@
     energy_grid = AURORA.EnergyGrid(100)
     cache = AURORA.CascadingCache()
 
-    AURORA.load_or_compute_cascading_cache!(cache, energy_grid)
+    AURORA.load_or_compute_cascading!(cache, energy_grid)
     i_primary = searchsortedlast(cache[1].E_edges, 40.0)
     secondary = AURORA.secondary_spectrum(cache[1], i_primary, 15.581)
     primary = AURORA.primary_spectrum(cache[1], i_primary, 15.581)
@@ -38,7 +38,7 @@ end
                                           cache_root=joinpath(cache_root, "skip_save"))
 
     cache = AURORA.CascadingCache()
-    AURORA.load_or_compute_cascading_cache!(cache, energy_grid; policy=save_policy)
+    AURORA.load_or_compute_cascading!(cache, energy_grid; policy=save_policy)
 
     n2_dir = joinpath(cache_root, "e_cascading", "N2")
     o2_dir = joinpath(cache_root, "e_cascading", "O2")
@@ -48,7 +48,7 @@ end
     @test length(cache_files(o_dir)) == 1
 
     loaded_cache = AURORA.CascadingCache()
-    AURORA.load_or_compute_cascading_cache!(loaded_cache, energy_grid; policy=load_policy)
+    AURORA.load_or_compute_cascading!(loaded_cache, energy_grid; policy=load_policy)
     @test loaded_cache[1].E_edges == cache[1].E_edges
     @test loaded_cache[1].ionization_thresholds == cache[1].ionization_thresholds
 
@@ -70,10 +70,10 @@ end
         file["E_ionizations"] = payload.E_ionizations
     end
 
-    AURORA.load_or_compute_cascading_cache!(AURORA.CascadingCache(), energy_grid; policy=load_policy)
+    AURORA.load_or_compute_cascading!(AURORA.CascadingCache(), energy_grid; policy=load_policy)
     @test compatible_cache_count(n2_dir) >= 1
 
-    AURORA.load_or_compute_cascading_cache!(AURORA.CascadingCache(), energy_grid; policy=skip_save_policy)
+    AURORA.load_or_compute_cascading!(AURORA.CascadingCache(), energy_grid; policy=skip_save_policy)
     skip_n2_dir = joinpath(cache_root, "skip_save", "e_cascading", "N2")
     @test isempty(cache_files(skip_n2_dir))
 

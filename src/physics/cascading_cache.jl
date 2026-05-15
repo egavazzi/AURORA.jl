@@ -3,7 +3,7 @@ using JLD2: jldopen, @load, @save
 
 
 """
-    load_or_compute_cascading_cache!(cache, energy_grid; verbose=true, policy=CachePolicy())
+    load_or_compute_cascading!(cache, energy_grid; verbose=true, policy=CachePolicy())
 
 Populate the cascading cache for all neutral species.
 
@@ -11,22 +11,22 @@ If compatible (i.e. same grid, same `version_AURORA`, etc) JLD2 cache files are 
 disk, the matrices are loaded from there. If not, they are computed from scratch (and
 possibly saved to disk depending on `CachePolicy` options).
 """
-function load_or_compute_cascading_cache!(cache::CascadingCache, energy_grid::EnergyGrid;
-                                          verbose::Bool = true,
-                                          policy::CachePolicy = CachePolicy())
+function load_or_compute_cascading!(cache::CascadingCache, energy_grid::EnergyGrid;
+                                    verbose::Bool = true,
+                                    policy::CachePolicy = CachePolicy())
     for species_cache in cache
-        load_or_compute_cascading_cache!(species_cache, energy_grid; verbose, policy)
+        load_or_compute_cascading!(species_cache, energy_grid; verbose, policy)
     end
     return nothing
 end
 
-function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
-                                          verbose::Bool = true,
-                                          policy::CachePolicy = CachePolicy())
+function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
+                                    verbose::Bool = true,
+                                    policy::CachePolicy = CachePolicy())
     E_edges = energy_grid.E_edges
 
     file_found, filepath = policy.force_recompute ? (false, "") :
-                           find_cascading_cache_file(cache.spec, E_edges; verbose, policy)
+                           find_cascading_cache(cache.spec, E_edges; verbose, policy)
 
     if file_found
         try
@@ -60,9 +60,9 @@ function load_or_compute_cascading_cache!(cache::SpeciesCascadingCache, energy_g
     return nothing
 end
 
-function find_cascading_cache_file(spec::CascadingSpec, E_edges;
-                                   verbose::Bool = true,
-                                   policy::CachePolicy = CachePolicy())
+function find_cascading_cache(spec::CascadingSpec, E_edges;
+                              verbose::Bool = true,
+                              policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(spec, policy)
     isdir(species_dir) || return (false, "")
     cascading_files = readdir(species_dir)

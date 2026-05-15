@@ -3,15 +3,14 @@ using JLD2: jldopen, @load, @save
 
 
 """
-    load_or_compute_scattering_cache(θ_lims, n_direction=720;
-                                     verbose=true, policy=CachePolicy())
+    load_or_compute_scattering(θ_lims, n_direction=720; verbose=true, policy=CachePolicy())
 
 Look for scattering matrices that match the pitch-angle limits `θ_lims` and the number
 of direction/sub-beams `n_direction`. If a cache file is found, the scattering matrices are
 directly loaded. Otherwise, they are calculated and optionally saved to a file.
 
 # Calling
-`P_scatter, Ω_subbeam_relative, θ₁ = load_or_compute_scattering_cache(θ_lims, n_direction)`
+`P_scatter, Ω_subbeam_relative, θ₁ = load_or_compute_scattering(θ_lims, n_direction)`
 
 # Inputs
 - `θ_lims`: pitch-angle limits of the electron beams (e.g. 180:-10:0), where 180°
@@ -27,11 +26,11 @@ directly loaded. Otherwise, they are calculated and optionally saved to a file.
     summing along the sub-beams gives 1 for each beam. Matrix [n`_`beam x n`_`direction]
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
-function load_or_compute_scattering_cache(θ_lims, n_direction=720;
-                                          verbose = true,
-                                          policy::CachePolicy = CachePolicy())
+function load_or_compute_scattering(θ_lims, n_direction = 720;
+                                    verbose = true,
+                                    policy::CachePolicy = CachePolicy())
     file_found, filepath = policy.force_recompute ? (false, "") :
-                           find_scattering_cache_file(θ_lims, n_direction; verbose, policy)
+                           find_scattering_cache(θ_lims, n_direction; verbose, policy)
 
     if file_found
         try
@@ -56,9 +55,9 @@ function load_or_compute_scattering_cache(θ_lims, n_direction=720;
     return P_scatter, Ω_subbeam_relative, θ₁
 end
 
-function find_scattering_cache_file(θ_lims, n_direction;
-                                    verbose::Bool = true,
-                                    policy::CachePolicy = CachePolicy())
+function find_scattering_cache(θ_lims, n_direction;
+                               verbose::Bool = true,
+                               policy::CachePolicy = CachePolicy())
     cache_dir = scattering_cache_dir(policy)
     isdir(cache_dir) || return (false, "")
     for filename in readdir(cache_dir)

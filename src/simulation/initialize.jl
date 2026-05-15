@@ -84,7 +84,7 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     # Build the cascading cache
     cascading = CascadingCache()
     # Pre-load/calculate the cascading transfer matrices.
-    load_or_compute_cascading_cache!(cascading, model.energy_grid; policy=cache_policy)
+    load_or_compute_cascading!(cascading, model.energy_grid; policy=cache_policy)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
