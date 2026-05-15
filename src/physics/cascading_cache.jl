@@ -1,5 +1,5 @@
 using Dates: Dates, now
-using JLD2: jldopen
+using JLD2: jldopen, @load, @save
 
 
 """
@@ -108,23 +108,8 @@ end
 
 function load_cascading_cache(filepath; verbose::Bool = true)
     verbose && println("Loading cascading matrices from file: $(basename(filepath))")
-    primary_transfer_matrix = nothing
-    secondary_transfer_matrix = nothing
-    ionization_thresholds = nothing
-    E_edges = nothing
-    jldopen(filepath, "r") do file
-        version_saved = string(file["version_AURORA"])
-        if version_saved != cache_version_string()
-            error("Found incompatible cascading cache file $(basename(filepath)). Recomputing.")
-        end
-        primary_transfer_matrix = file["Q_primary"]
-        secondary_transfer_matrix = file["Q_secondary"]
-        ionization_thresholds = file["E_ionizations"]
-        E_edges = file["E_edges"]
-    end
-
-    return (primary_transfer_matrix, secondary_transfer_matrix,
-            E_edges, ionization_thresholds)
+    @load filepath Q_primary Q_secondary E_ionizations E_edges
+    return (Q_primary, Q_secondary, E_edges, E_ionizations)
 end
 
 function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
@@ -138,13 +123,11 @@ function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix
                        string("cascading_", species_name, "_",
                              Dates.format(now(), "yyyymmdd-HHMMSS"),
                              ".jld2"))
-    jldopen(filename, "w") do file
-        file["version_AURORA"] = cache_version_string()
-        file["Q_primary"] = primary_transfer_matrix
-        file["Q_secondary"] = secondary_transfer_matrix
-        file["E_edges"] = E_edges
-        file["E_ionizations"] = ionization_thresholds
-    end
+    version_AURORA = cache_version_string()
+    Q_primary = primary_transfer_matrix
+    Q_secondary = secondary_transfer_matrix
+    E_ionizations = ionization_thresholds
+    @save filename version_AURORA Q_primary Q_secondary E_edges E_ionizations
     verbose && println("Saved cascading matrices to $(basename(filename)).")
     return filename
 end

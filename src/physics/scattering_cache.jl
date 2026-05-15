@@ -1,5 +1,5 @@
 using Dates: Dates, now
-using JLD2: jldopen
+using JLD2: jldopen, @load, @save
 
 
 """
@@ -97,21 +97,8 @@ end
 
 function load_scattering_cache(filepath; verbose = true)
     verbose && println("Loading scattering cache from file: $(basename(filepath))")
-
-    P_scatter = nothing
-    Ω_subbeam_relative = nothing
-    θ_scatter = nothing
-    jldopen(filepath, "r") do file
-        version_saved = string(file["version_AURORA"])
-        if version_saved != cache_version_string()
-            error("Found incompatible scattering cache file $(basename(filepath)). Recomputing.")
-        end
-        P_scatter = file["P_scatter"]
-        Ω_subbeam_relative = file["Ω_subbeam_relative"]
-        θ_scatter = file["theta_scatter"]
-    end
-
-    return P_scatter, Ω_subbeam_relative, θ_scatter
+    @load filepath P_scatter Ω_subbeam_relative theta_scatter
+    return P_scatter, Ω_subbeam_relative, theta_scatter
 end
 
 function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_lims, n_direction;
@@ -122,14 +109,10 @@ function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_li
     filename = joinpath(cache_dir,
                         string("scattering_", length(θ_lims) - 1, "_streams_",
                                Dates.format(now(), "yyyymmdd-HHMMSS"), ".jld2"))
-    jldopen(filename, "w") do file
-        file["version_AURORA"] = cache_version_string()
-        file["P_scatter"] = P_scatter
-        file["Ω_subbeam_relative"] = Ω_subbeam_relative
-        file["theta_scatter"] = θ_scatter
-        file["theta_lims"] = Vector(θ_lims)
-        file["n_direction"] = n_direction
-    end
+    version_AURORA = cache_version_string()
+    theta_scatter = θ_scatter
+    theta_lims = Vector(θ_lims)
+    @save filename version_AURORA P_scatter Ω_subbeam_relative theta_scatter theta_lims n_direction
     verbose && println("Saved scattering cache to $(basename(filename)).")
     return filename
 end
