@@ -22,7 +22,7 @@ SteadyStateMode
 TimeDependentMode
 ```
 
-## Simulation lifecycle
+## Simulation execution
 
 ```@docs; canonical=false
 initialize!
