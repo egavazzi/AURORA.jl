@@ -1,4 +1,4 @@
-# Model
+# Model/Simulation
 
 Core types for setting up and running AURORA simulations.
 
