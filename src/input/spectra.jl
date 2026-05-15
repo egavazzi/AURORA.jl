@@ -213,10 +213,6 @@ function evaluate_spectrum(spec::FlatSpectrum, model::AuroraModel)
     E_centers = model.energy_grid.E_centers
     ΔE = model.energy_grid.ΔE
 
-    if spec.E_min > E_centers[end]
-        error("E_min ($(spec.E_min) eV) is larger than the maximum energy in the grid ($(E_centers[end]) eV).")
-    end
-
     qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
     return _flat_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E_min)

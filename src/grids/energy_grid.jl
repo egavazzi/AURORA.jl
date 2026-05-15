@@ -45,13 +45,17 @@ function make_energy_grid(E_max)
         error("AURORA does not support energies above 1 MeV. Please use a lower value for E_max.")
     end
     E_function(X, dE_initial, dE_final, C, X0) = dE_initial + (1 + tanh(C * (X - X0))) / 2 * dE_final
-    E = cumsum(E_function.(0:100000, 0.15, 11.5, 0.05, 80)) .+ 1.9
-    iE_max = findmin(abs.(E .- E_max))[2]  # find the index for the upper limit of the energy grid
-    E = E[1:iE_max]                        # crop E accordingly
-    ΔE = diff(E)
-    ΔE = [ΔE; ΔE[end]]
-    E_edges = [E; E[end] + ΔE[end]]         # add the last upper edge
+    E_edges = cumsum(E_function.(0:100000, 0.15, 11.5, 0.05, 80)) .+ 1.9
+    ΔE = diff(E_edges)
     E_centers = E_edges[1:end-1] .+ ΔE ./ 2
+
+    # Find the index of the last E_centers that is less than or equal to E_max
+    iE_max = findlast(E_centers .<= E_max)
+    # Crop accordingly
+    E_edges = E_edges[1:(iE_max + 1)]
+    ΔE = ΔE[1:iE_max]
+    E_centers = E_centers[1:iE_max]
+
     return E_edges, E_centers, ΔE
 end
 

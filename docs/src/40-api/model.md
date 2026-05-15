@@ -1,4 +1,4 @@
-# Model
+# Model/Simulation
 
 Core types for setting up and running AURORA simulations.
 
@@ -22,7 +22,7 @@ SteadyStateMode
 TimeDependentMode
 ```
 
-## Simulation lifecycle
+## Simulation execution
 
 ```@docs; canonical=false
 initialize!
