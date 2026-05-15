@@ -18,7 +18,7 @@ end
 
 """
     AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
-                verbose=true)
+                verbose=true, cache_policy=CachePolicy())
 
 Load the atmosphere, the energy grid, and the collision data into an `AuroraModel`.
 
@@ -34,6 +34,7 @@ Load the atmosphere, the energy grid, and the collision data into an `AuroraMode
 - `iri_file`: path to the iri file to use
 - `B_angle_to_zenith`: angle between magnetic field and zenith (degrees)
 - `verbose=true`: print progress messages when loading stuff
+- `cache_policy=CachePolicy()`: controls reuse and persistence of the internal cascading and scattering cache
 
 ## Returns
 An `AuroraModel` with fields:

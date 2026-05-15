@@ -16,7 +16,8 @@ struct ScatteringData{FT, A<:AbstractArray{FT}, M<:AbstractMatrix{FT}, V<:Abstra
     θ_scatter::V
 end
 
-function ScatteringData(grid::PitchAngleGrid; n_direction=720, verbose=true,
+function ScatteringData(grid::PitchAngleGrid;
+                        n_direction = 720, verbose = true,
                         policy::CachePolicy = CachePolicy())
     θ_lims = grid.θ_lims
     Ω_beam = beam_weight(θ_lims)
@@ -45,7 +46,8 @@ end
 
 
 """
-    load_or_compute_scattering_cache(θ_lims, n_direction=720)
+    load_or_compute_scattering_cache(θ_lims, n_direction=720;
+                                     verbose=true, policy=CachePolicy())
 
 Look for scattering matrices that match the pitch-angle limits `θ_lims` and the number
 of direction/sub-beams `n_direction`. If a cache file is found, the scattering matrices are
@@ -59,6 +61,7 @@ directly loaded. Otherwise, they are calculated and optionally saved to a file.
     corresponds to field aligned down, and 0° field aligned up.
 - `n_direction`: number of directions or sub-beams to use for the discretized calculations
     of the scattering matrices. Defaults to 720 when left empty.
+- `policy.cache_root`: parent directory that contains the `e_scattering/` cache subtree
 
 # Outputs
 - `P_scatter`: probabilities for scattering in 3D from beam to beam. Matrix [n`_`direction x
@@ -68,9 +71,7 @@ directly loaded. Otherwise, they are calculated and optionally saved to a file.
 - `θ₁`: scattering angles used in the calculations. Vector [n_direction]
 """
 function scattering_cache_dir(policy::CachePolicy = CachePolicy())
-    return isnothing(policy.cache_root) ?
-           pkgdir(AURORA, "internal_data", "e_scattering") :
-           joinpath(policy.cache_root, "e_scattering")
+    return joinpath(policy.cache_root, "e_scattering")
 end
 
 function find_scattering_cache_file(θ_lims, n_direction;
@@ -145,10 +146,14 @@ function save_scattering_cache(P_scatter, Ω_subbeam_relative, θ_scatter, θ_li
     return filename
 end
 
-function clear_scattering_cache!(; cache_root::Union{Nothing, String} = nothing)
-    cache_dir = isnothing(cache_root) ?
-                pkgdir(AURORA, "internal_data", "e_scattering") :
-                joinpath(cache_root, "e_scattering")
+"""
+    clear_scattering_cache!(; cache_root=default_cache_root())
+
+Remove generated JLD2 scattering cache files from the scattering cache directory under
+`cache_root`.
+"""
+function clear_scattering_cache!(; cache_root::String = default_cache_root())
+    cache_dir = joinpath(cache_root, "e_scattering")
     isdir(cache_dir) || return nothing
 
     for filename in readdir(cache_dir)

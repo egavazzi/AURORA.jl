@@ -1,16 +1,24 @@
 
 """
-    initialize!(sim::AuroraSimulation)
+    initialize!(sim::AuroraSimulation;
+                force_recompute=false,
+                save_cache=true,
+                cache_root=default_cache_root())
 
 Allocate or re-allocate the working cache for `sim`.
 
 This step performs the expensive setup that depends on the model geometry and the
 resolved time grid, but does not write any output files.
+
+# Keywords
+- `force_recompute`: ignore compatible on-disk cascading caches and rebuild them
+- `save_cache`: skip writing newly computed cascading caches when set to `false`
+- `cache_root`: parent directory that contains the cascading and scattering cache folders
 """
 function initialize!(sim::AuroraSimulation;
                      force_recompute::Bool = false,
                      save_cache::Bool = true,
-                     cache_root::Union{Nothing, String} = nothing)
+                     cache_root::String = default_cache_root())
     @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
     sim.cache = build_simulation_cache(sim; cache_policy)

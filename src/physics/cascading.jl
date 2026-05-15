@@ -82,6 +82,15 @@ Base.getindex(cache::CascadingCache, index::Int) = cache.species[index]
 Base.length(cache::CascadingCache) = length(cache.species)
 Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
+"""
+    load_or_compute_cascading_cache!(cache, energy_grid; policy=CachePolicy())
+
+Populate the cascading cache for all neutral species.
+
+If compatible (i.e. same grid, same `version_AURORA`, etc) JLD2 cache files are found on
+disk, the matrices are loaded from there. If not, they are computed from scratch (and possibly saved to disk depending on CachePolicy
+options).
+"""
 function load_or_compute_cascading_cache!(cache::CascadingCache, energy_grid::EnergyGrid;
                                           policy::CachePolicy = CachePolicy())
     for species_cache in cache
@@ -412,22 +421,20 @@ end
 
 
 """
-    find_cascading_cache_file(E_edges, species_dir)
+    find_cascading_cache_file(spec, E_edges; policy=CachePolicy())
 
 Search for a pre-computed cascading spectra file with matching energy grid.
 
 # Arguments
 - `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
 - `E_edges`: Energy grid edges to match
+- `policy.cache_root`: parent directory that contains the `e_cascading/` cache subtree
 
 # Returns
 - `(file_found, filepath)`: Tuple of boolean and filepath string
 """
 function cascading_cache_dir(spec::CascadingSpec, policy::CachePolicy = CachePolicy())
-    base_dir = isnothing(policy.cache_root) ?
-               pkgdir(AURORA, "internal_data", "e_cascading") :
-               joinpath(policy.cache_root, "e_cascading")
-    return joinpath(base_dir, spec.name)
+    return joinpath(policy.cache_root, "e_cascading", spec.name)
 end
 
 function find_cascading_cache_file(spec::CascadingSpec, E_edges;
@@ -477,7 +484,7 @@ end
 """
     load_cascading_cache(filepath)
 
-Load pre-computed cascading matrices from a file.
+Load pre-computed cascading matrices from a cache file.
 
 # Arguments
 - `filepath`: Path to the .jld2 file containing cascading data
@@ -510,7 +517,8 @@ end
 
 """
     save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
-                         E_edges, ionization_thresholds, species_name)
+                         E_edges, ionization_thresholds, species_name;
+                         policy=CachePolicy())
 
 Save calculated cascading matrices to a file, located in the species-specific cascading data
 directory.
@@ -521,6 +529,7 @@ directory.
 - `E_edges`: Energy grid edges used for calculations
 - `ionization_thresholds`: Ionization threshold energies
 - `species_name`: Name of the species (for filename)
+- `policy.cache_root`: parent directory that contains the `e_cascading/` cache subtree
 """
 function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix,
                               E_edges, ionization_thresholds, species_name;
@@ -542,10 +551,14 @@ function save_cascading_cache(primary_transfer_matrix, secondary_transfer_matrix
     return filename
 end
 
-function clear_cascading_cache!(; cache_root::Union{Nothing, String} = nothing)
-    base_dir = isnothing(cache_root) ?
-               pkgdir(AURORA, "internal_data", "e_cascading") :
-               joinpath(cache_root, "e_cascading")
+"""
+    clear_cascading_cache!(; cache_root=default_cache_root())
+
+Helper to remove generated JLD2 cascading cache files from the species-specific cascading cache
+directories under `cache_root`. All species are removed.
+"""
+function clear_cascading_cache!(; cache_root::String = default_cache_root())
+    base_dir = joinpath(cache_root, "e_cascading")
     isdir(base_dir) || return nothing
     for species_name in readdir(base_dir)
         species_dir = joinpath(base_dir, species_name)
