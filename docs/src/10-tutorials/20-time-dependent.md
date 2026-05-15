@@ -41,6 +41,8 @@ The constructor performs several steps automatically:
 - Loads electron densities and temperature from the IRI file.
 - Precomputes electron collision cross sections and scattering data.
 
+See [Discretization](@ref Discretization) to read more about the grids.
+
 ## Step 2: Define the precipitating electron flux
 
 The precipitating electrons are specified by an [`InputFlux`](@ref), which combines an
