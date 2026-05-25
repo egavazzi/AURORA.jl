@@ -7,7 +7,7 @@ include("grids/pitch_angle_grid.jl")
 export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid
 
 include("ionosphere/ionosphere.jl")
-export Ionosphere, n_neutrals
+export Ionosphere
 include("ionosphere/iri/iri.jl")
 include("ionosphere/msis/msis.jl")
 export find_msis_file, find_nrlmsis_file
@@ -18,7 +18,6 @@ include("physics/cross_sections/e_O2_cross_sections.jl")
 include("physics/cross_sections/e_O_cross_sections.jl")
 include("physics/cross_sections/emission_cross_sections.jl")
 include("physics/cross_sections/cross_sections.jl")
-export CrossSectionData
 
 include("physics/cache_policy.jl")
 export CachePolicy
@@ -36,7 +35,7 @@ include("physics/species.jl")
 export NeutralSpecies
 
 include("model.jl")
-export AuroraModel, make_altitude_grid, make_energy_grid
+export AuroraModel, make_altitude_grid, make_energy_grid, n_neutrals
 
 include("input/spectra.jl")
 include("input/modulations.jl")

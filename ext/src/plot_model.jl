@@ -38,7 +38,7 @@ end
 function _plot_atmosphere(model)
     h_km = model.altitude_grid.h ./ 1e3
     iono = model.ionosphere
-    nd = AURORA.n_neutrals(iono)
+    nd = AURORA.n_neutrals(model)
 
     fig = Figure(size = (800, 600))
 
@@ -66,16 +66,15 @@ end
 # Energy levels
 # ======================================================================================== #
 function _plot_energy_levels(model)
-    levels = model.cross_sections.collision_levels
+    titles = Dict(:N2 => "N₂", :O2 => "O₂", :O => "O")
 
     fig = Figure(size = (800, 600))
-    ax1 = Axis(fig[1, 1]; ylabel="Excitation energy (eV)", title="N₂")
-    ax2 = Axis(fig[1, 2]; title="O₂")
-    ax3 = Axis(fig[1, 3]; title="O")
+    axs = [Axis(fig[1, i]; title=titles[sp.name]) for (i, sp) in enumerate(model.species)]
+    axs[1].ylabel = "Excitation energy (eV)"
 
-    for (ax, data) in zip([ax1, ax2, ax3],
-                          [levels.N2_levels, levels.O2_levels, levels.O_levels])
-        for i in axes(data, 1)
+    for (ax, sp) in zip(axs, model.species)
+        data = sp.excitation_levels
+        for i in 1:size(data, 1)
             lines!(ax, [0, 1], data[i, 1] .* [1, 1]; linewidth=2)
         end
         xlims!(ax, 0, 1)
@@ -106,14 +105,14 @@ end
 # ======================================================================================== #
 function _plot_cross_sections(model)
     E = model.energy_grid.E_centers
-    σ = model.cross_sections.σ_neutrals
+    titles = Dict(:N2 => "σ N₂", :O2 => "σ O₂", :O => "σ O")
 
     fig = Figure(size=(1800, 800))
 
-    for (idx, (species, σ_sp, title_str)) in enumerate([
-            ("N2", σ.σ_N2, "σ N₂"),
-            ("O2", σ.σ_O2, "σ O₂"),
-            ("O",  σ.σ_O,  "σ O")])
+    for (idx, sp) in enumerate(model.species)
+        species  = String(sp.name)
+        σ_sp     = sp.cross_sections
+        title_str = titles[sp.name]
 
         names = AURORA.get_level_names(species)
         n_levels = length(names)

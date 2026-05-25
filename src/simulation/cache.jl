@@ -62,16 +62,14 @@ function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
                             secondary_e_spectrum, primary_e_spectrum)
 end
 
-struct SimulationCache{D<:DegradationCache, C<:CascadingCache, TL, P, B}
+struct SimulationCache{D<:DegradationCache, TL, B}
     solver::SolverCache
     degradation::D
-    cascading::C
     matrices::TransportMatrices
     Ie::Array{Float64, 3}
     Ie_save::Array{Float64, 3}
     I0::Matrix{Float64}
     Ie_top::Array{Float64, 3}
     t_loop::TL
-    phase_fcn_neutrals::P
     B2B_fragment::B
 end

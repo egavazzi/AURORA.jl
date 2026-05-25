@@ -23,11 +23,11 @@
         initialize!(sim)
 
         @test sim.cache_initialized
-        @test sim.cache.cascading isa AURORA.CascadingCache
         n_species = 3
         @test sim.cache.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
         @test sim.cache.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
-        @test all(!isempty(species_cache.E_edges) for species_cache in sim.cache.cascading)
+        @test all(sp.cascading_data isa AURORA.SpeciesCascadingCache for sp in sim.model.species)
+        @test all(!isempty(sp.cascading_data.E_edges) for sp in sim.model.species)
         @test size(sim.cache.Ie, 2) == sim.time.n_t_per_loop
         @test size(sim.cache.Ie_top, 2) == length(sim.time.t)
     end

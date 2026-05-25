@@ -156,13 +156,14 @@ end
 
 using MAT: matopen
 function save_neutrals(sim::AuroraSimulation)
-    ionosphere = sim.model.ionosphere
+    model = sim.model
+    ionosphere = model.ionosphere
     savefile = joinpath(sim.savedir, "neutral_atm.mat")
     file = matopen(savefile, "w")
-        write(file, "h_atm", sim.model.altitude_grid.h)
-        write(file, "nN2", n_neutrals(ionosphere).nN2)
-        write(file, "nO2", n_neutrals(ionosphere).nO2)
-        write(file, "nO", n_neutrals(ionosphere).nO)
+        write(file, "h_atm", model.altitude_grid.h)
+        for sp in model.species
+            write(file, "n" * String(sp.name), sp.density)
+        end
         write(file, "ne", ionosphere.ne)
         write(file, "Te", ionosphere.Te)
         write(file, "Tn", ionosphere.Tn)

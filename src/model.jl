@@ -1,10 +1,10 @@
 """
-    AuroraModel{AG, EG, PAG, SD, IO, CS, SP, FT, V}
+    AuroraModel{AG, EG, PAG, SD, IO, SP, FT, V}
 
 Container for the grids, atmosphere, and collision data used by an AURORA simulation.
 """
 struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
-                   SD<:ScatteringData, IO<:Ionosphere, CS<:CrossSectionData,
+                   SD<:ScatteringData, IO<:Ionosphere,
                    SP<:Tuple{Vararg{NeutralSpecies}},
                    FT, V<:AbstractVector{FT}}
     altitude_grid::AG
@@ -12,7 +12,6 @@ struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
     pitch_angle_grid::PAG
     scattering::SD
     ionosphere::IO
-    cross_sections::CS
     species::SP
     B_angle_to_zenith::FT
     s_field::V
@@ -45,7 +44,7 @@ An `AuroraModel` with fields:
 - `pitch_angle_grid::PitchAngleGrid`
 - `scattering::ScatteringData`
 - `ionosphere::Ionosphere`
-- `cross_sections::CrossSectionData`
+- `species::Tuple{NeutralSpecies, ...}`
 - `B_angle_to_zenith::Real`
 - `s_field::Vector`
 """
@@ -56,7 +55,6 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     pitch_angle_grid = PitchAngleGrid(θ_lims)
     scattering = ScatteringData(pitch_angle_grid; verbose, policy=cache_policy)
     ionosphere = Ionosphere(msis_file, iri_file, altitude_grid.h)
-    cross_sections = CrossSectionData(energy_grid)
     species = (
         N2Species(altitude_grid, energy_grid, scattering, msis_file),
         O2Species(altitude_grid, energy_grid, scattering, msis_file),
@@ -67,14 +65,25 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
 
     return AuroraModel{typeof(altitude_grid), typeof(energy_grid), typeof(pitch_angle_grid),
-                       typeof(scattering), typeof(ionosphere), typeof(cross_sections),
+                       typeof(scattering), typeof(ionosphere),
                        typeof(species),
                        FT, typeof(s_field)}(
         altitude_grid, energy_grid, pitch_angle_grid,
-        scattering, ionosphere, cross_sections, species,
+        scattering, ionosphere, species,
         FT(B_angle_to_zenith), s_field
     )
 end
+
+"""
+    n_neutrals(model::AuroraModel)
+
+Return neutral densities as a NamedTuple `(; nN2, nO2, nO)` sourced from the model's species.
+"""
+n_neutrals(model::AuroraModel) = (;
+    nN2 = model.species[1].density,
+    nO2 = model.species[2].density,
+    nO  = model.species[3].density,
+)
 
 function Base.show(io::IO, model::AuroraModel)
     print(io, "AuroraModel($(model.altitude_grid), $(model.energy_grid), $(model.pitch_angle_grid))")
@@ -87,7 +96,6 @@ function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
     println(io, "├── ", model.pitch_angle_grid)
     println(io, "├── ", model.scattering)
     println(io, "├── ", model.ionosphere)
-    println(io, "├── ", model.cross_sections)
     println(io, "├── Species: ", join((String(sp.name) for sp in model.species), ", "))
     print(io, "└── B angle to zenith: $(model.B_angle_to_zenith)°")
 end
