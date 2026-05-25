@@ -32,7 +32,7 @@ include("physics/cascading_cache.jl")
 export clear_cascading_cache!
 
 include("physics/species.jl")
-export NeutralSpecies
+export NeutralSpecies, MSISDensity, VectorDensity
 
 include("model.jl")
 export AuroraModel, make_altitude_grid, make_energy_grid, n_neutrals

@@ -134,3 +134,34 @@ end
     @test time_dependent.duration == 0.04
     @test time_dependent.dt == 0.01
 end
+
+@testitem "NeutralSpecies density_profile types" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+
+    # Default model: all species backed by MSISDensity
+    for sp in model.species
+        @test sp.density_profile isa MSISDensity
+    end
+
+    # Build VectorDensity profiles from the MSIS-sampled densities and verify round-trip
+    ag = model.altitude_grid
+    eg = model.energy_grid
+    sc = model.scattering
+
+    n2_ref  = model.species[1]
+    raw_n2  = AURORA.load_msis_density(msis_file, :N2, ag.h)   # raw, no erf-tail
+    vd      = VectorDensity(ag.h, raw_n2)
+    sp_vd   = AURORA.N2Species(ag, eg, sc, vd)
+
+    @test sp_vd.density_profile isa VectorDensity
+    # PCHIP through the exact sample points reproduces the raw data, then apply_density_boundary!
+    # is applied — so the result must match the MSISDensity path to machine precision
+    @test sp_vd.density ≈ n2_ref.density rtol=1e-6
+
+    # Plain callable also accepted
+    flat_profile = h -> fill(1e15, length(h))
+    sp_fn = AURORA.N2Species(ag, eg, sc, flat_profile)
+    @test all(==(0.0), sp_fn.density[end-2:end])  # erf-tail applied
+end
