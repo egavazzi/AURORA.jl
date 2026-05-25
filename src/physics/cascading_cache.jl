@@ -20,6 +20,7 @@ function load_or_compute_cascading!(cache::CascadingCache, energy_grid::EnergyGr
     return nothing
 end
 
+
 function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
                                     verbose::Bool = true,
                                     policy::CachePolicy = CachePolicy())

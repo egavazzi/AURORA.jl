@@ -27,8 +27,7 @@ function initialize!(sim::AuroraSimulation;
 end
 
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
-    neutral_densities = n_neutrals(model.ionosphere)
-    N_neutrals = length(neutral_densities)
+    N_neutrals = length(model.species)
     _, t_loop = get_time_parameters(time)
 
     solver = SolverCache()
@@ -60,8 +59,7 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     model = sim.model
     z = model.altitude_grid.h
     μ_center = model.pitch_angle_grid.μ_center
-    neutral_densities = n_neutrals(model.ionosphere)
-    N_neutrals = length(neutral_densities)
+    N_neutrals = length(model.species)
     n_E = model.energy_grid.n
 
     # Set up time grid dimensions for working arrays
@@ -85,6 +83,13 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     cascading = CascadingCache()
     # Pre-load/calculate the cascading transfer matrices.
     load_or_compute_cascading!(cascading, model.energy_grid; policy=cache_policy)
+    # Populate per-species cascading data from the loaded cache (commit 2 transition).
+    for (sp, species_cache) in zip(model.species, cascading)
+        sp.cascading_data.primary_transfer_matrix = species_cache.primary_transfer_matrix
+        sp.cascading_data.secondary_transfer_matrix = species_cache.secondary_transfer_matrix
+        sp.cascading_data.E_edges = species_cache.E_edges
+        sp.cascading_data.ionization_thresholds = species_cache.ionization_thresholds
+    end
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
