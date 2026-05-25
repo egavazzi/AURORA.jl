@@ -28,6 +28,13 @@ export ScatteringData, clear_scattering_cache!
 include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 
+include("physics/cascading.jl")
+include("physics/cascading_cache.jl")
+export clear_cascading_cache!
+
+include("physics/species.jl")
+export NeutralSpecies
+
 include("model.jl")
 export AuroraModel, make_altitude_grid, make_energy_grid
 
@@ -42,9 +49,6 @@ export Ie_top_from_file
 include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 
-include("physics/cascading.jl")
-include("physics/cascading_cache.jl")
-export clear_cascading_cache!
 include("physics/energy_degradation.jl")
 
 include("solvers/sparse_indexing.jl")
