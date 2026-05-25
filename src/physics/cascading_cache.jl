@@ -3,24 +3,14 @@ using JLD2: jldopen, @load, @save
 
 
 """
-    load_or_compute_cascading!(cache, energy_grid; verbose=true, policy=CachePolicy())
+    load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid; verbose=true, policy=CachePolicy())
 
-Populate the cascading cache for all neutral species.
+Populate the cascading transfer matrices for one neutral species.
 
-If compatible (i.e. same grid, same `version_AURORA`, etc) JLD2 cache files are found on
-disk, the matrices are loaded from there. If not, they are computed from scratch (and
-possibly saved to disk depending on `CachePolicy` options).
+If a compatible (same grid, same `version_AURORA`) JLD2 cache file is found on disk,
+matrices are loaded from there. Otherwise they are computed from scratch (and optionally
+saved to disk depending on `CachePolicy` options).
 """
-function load_or_compute_cascading!(cache::CascadingCache, energy_grid::EnergyGrid;
-                                    verbose::Bool = true,
-                                    policy::CachePolicy = CachePolicy())
-    for species_cache in cache
-        load_or_compute_cascading!(species_cache, energy_grid; verbose, policy)
-    end
-    return nothing
-end
-
-
 function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
                                     verbose::Bool = true,
                                     policy::CachePolicy = CachePolicy())
