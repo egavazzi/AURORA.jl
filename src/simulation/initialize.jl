@@ -7,8 +7,10 @@
 
 Allocate or re-allocate the working cache for `sim`.
 
-This step performs the expensive setup that depends on the model geometry and the
-resolved time grid, but does not write any output files.
+If the model has not been initialized yet, `initialize!(model)` is called first (scattering
+matrices, species densities, cross sections, cascading data). This step performs the
+expensive setup that depends on the model geometry and the resolved time grid, but does not
+write any output files.
 
 # Keywords
 - `force_recompute`: ignore compatible on-disk cascading caches and rebuild them
@@ -21,6 +23,9 @@ function initialize!(sim::AuroraSimulation;
                      cache_root::String = default_cache_root())
     @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
+    if !sim.model.initialized
+        initialize!(sim.model; verbose=true, policy=cache_policy)
+    end
     sim.cache = build_simulation_cache(sim; cache_policy)
     sim.cache_initialized = true
     return nothing
@@ -37,9 +42,7 @@ function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConf
     Ie_save = zeros(1, 1, 1)
     I0 = zeros(1, 1)
     Ie_top = zeros(1, 1, 1)
-    B2B_fragment = zeros(size(model.scattering.Ω_subbeam_relative, 1),
-                         size(model.scattering.P_scatter, 2),
-                         size(model.scattering.P_scatter, 3))
+    B2B_fragment = zeros(1, 1, 1)
 
     return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
                            Ie_top, t_loop, B2B_fragment)
@@ -68,11 +71,6 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
 
     # Pre-compute input flux data
     Ie_top = compute_input_flux(sim)
-
-    # Load or compute per-species cascading transfer matrices
-    for sp in model.species
-        load_or_compute_cascading!(sp.cascading_data, model.energy_grid; policy=cache_policy)
-    end
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)

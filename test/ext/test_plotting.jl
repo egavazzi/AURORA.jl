@@ -70,6 +70,7 @@
         savedir = "fake_dir"  # won't be used since we're not running the sim
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        initialize!(model)
         flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0); beams = 1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
@@ -112,6 +113,7 @@
         savedir = "fake_dir"  # won't be used since we're not running the sim
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
+        initialize!(model)
         flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.04, dt=0.01))
         @test plot_input(sim) isa Figure

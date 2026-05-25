@@ -23,6 +23,7 @@
         initialize!(sim)
 
         @test sim.cache_initialized
+        @test sim.model.initialized
         n_species = 3
         @test sim.cache.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
         @test sim.cache.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
@@ -140,28 +141,61 @@ end
     iri_file  = find_iri_file()
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-    # Default model: all species backed by MSISDensity
+    # Default model: all species backed by MSISDensity; density is empty before initialize!
     for sp in model.species
         @test sp.density_profile isa MSISDensity
     end
+    @test isempty(model.species[1].density)
 
-    # Build VectorDensity profiles from the MSIS-sampled densities and verify round-trip
+    # After initialize! density is populated
+    initialize!(model)
     ag = model.altitude_grid
-    eg = model.energy_grid
-    sc = model.scattering
+    @test !isempty(model.species[1].density)
 
-    n2_ref  = model.species[1]
-    raw_n2  = AURORA.load_msis_density(msis_file, :N2, ag.h)   # raw, no erf-tail
-    vd      = VectorDensity(ag.h, raw_n2)
-    sp_vd   = AURORA.N2Species(ag, eg, sc, vd)
+    # VectorDensity round-trip: PCHIP through exact sample points → same density as MSISDensity
+    raw_n2 = AURORA.load_msis_density(msis_file, :N2, ag.h)
+    vd = VectorDensity(ag.h, raw_n2)
+    model_vd = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+    model_vd.species[1].density_profile = vd
+    initialize!(model_vd)
+    @test model_vd.species[1].density_profile isa VectorDensity
+    @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
-    @test sp_vd.density_profile isa VectorDensity
-    # PCHIP through the exact sample points reproduces the raw data, then apply_density_boundary!
-    # is applied — so the result must match the MSISDensity path to machine precision
-    @test sp_vd.density ≈ n2_ref.density rtol=1e-6
-
-    # Plain callable also accepted
+    # Plain callable is also accepted as density_profile; density is empty until initialize!
     flat_profile = h -> fill(1e15, length(h))
-    sp_fn = AURORA.N2Species(ag, eg, sc, flat_profile)
-    @test all(==(0.0), sp_fn.density[end-2:end])  # erf-tail applied
+    sp_fn = AURORA.N2Species(flat_profile)
+    @test sp_fn.density_profile === flat_profile
+    @test isempty(sp_fn.density)
+end
+
+@testitem "AuroraModel is uninitialized before initialize!" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+
+    @test !model.initialized
+    @test isnothing(model.scattering)
+    @test isempty(model.species[1].density)
+end
+
+@testitem "initialize!(model) interception window" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+
+        flat_n2 = h -> fill(1e18, length(h))
+        model.species[1].density_profile = flat_n2
+
+        flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+
+        @test !sim.model.initialized
+        run!(sim)
+        @test sim.model.initialized
+
+        n2_density = sim.model.species[1].density
+        @test !isempty(n2_density)
+        @test n2_density[1] ≈ 1e18   # bottom of the grid, unaffected by boundary taper
+    end
 end

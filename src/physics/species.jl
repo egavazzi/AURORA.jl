@@ -54,32 +54,36 @@ end
 # ======================================================================================== #
 
 """
-    NeutralSpecies{D, F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+    NeutralSpecies{F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
 
 All per-species data needed to advance the transport equation through one neutral species.
 
 # Fields
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
-- `density_profile::D`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
+- `density_profile`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
     Can be an [`MSISDensity`](@ref), a [`VectorDensity`](@ref), or any callable.
+    This field is untyped so it can be replaced freely before calling `initialize!(model)`.
 - `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³),
-    with an erf-tail boundary applied at the top
-- `cross_sections::Matrix{Float64}`: collision cross sections, shape `[n_levels × n_E]` (m²)
+    with an erf-tail boundary applied at the top. Empty until `initialize!(model)` is called.
+- `cross_sections::Matrix{Float64}`: collision cross sections, shape `[n_levels × n_E]` (m²).
+    Empty until `initialize!(model)` is called.
 - `excitation_levels::Matrix{Float64}`: excitation thresholds and secondary counts,
     shape `[n_levels × 2]`. First column = threshold energy (eV), second column = number
     of secondaries produced (non-zero only for ionizing channels).
+    Empty until `initialize!(model)` is called.
 - `phase_fcn_generator::F`: callable `(θ, E) -> (phaseE, phaseI)` used to (re)build
     `phase_fcn` whenever the pitch-angle or energy grid changes
 - `phase_fcn::P`: tuple `(phaseE, phaseI)` of `[n_θ × n_E]` matrices materialized from the
-    generator on the model's scattering θ grid and energy centers
+    generator on the model's scattering θ grid and energy centers.
+    Holds 0×0 placeholder matrices until `initialize!(model)` is called.
 - `cascading_spec::S`: ionization thresholds and secondary-distribution law used to
     build the cascading transfer matrices
 - `cascading_data::C`: cascading transfer matrices (populated lazily by
     `load_or_compute_cascading!`)
 """
-mutable struct NeutralSpecies{D, F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+mutable struct NeutralSpecies{F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
     name::Symbol
-    density_profile::D
+    density_profile        # untyped: freely replaceable before initialize!(model)
     density::Vector{Float64}
     cross_sections::Matrix{Float64}
     excitation_levels::Matrix{Float64}
@@ -90,34 +94,25 @@ mutable struct NeutralSpecies{D, F, S<:CascadingSpec, C<:SpeciesCascadingCache, 
 end
 
 """
-    NeutralSpecies(name, density_profile, energy_grid, scattering, h_atm;
-                   cascading_spec, phase_fcn_generator)
+    NeutralSpecies(name, density_profile; cascading_spec, phase_fcn_generator)
 
-Build a `NeutralSpecies` by sampling `density_profile` on `h_atm`. An upper-boundary
-erf-tail is applied to the sampled vector.
-
-The cross sections and excitation levels are loaded from the built-in
-`internal_data/data_neutrals/<name>_levels.{dat,name}` files. The phase function matrices
-are materialized eagerly. The cascading data starts empty and is populated later by
-[`load_or_compute_cascading!`](@ref).
+Build a lightweight `NeutralSpecies`. All grid-dependent fields (`density`, `cross_sections`,
+`excitation_levels`, `phase_fcn`) start empty and are populated by `initialize!(model)`.
 """
-function NeutralSpecies(name::Symbol, density_profile,
-                        energy_grid::EnergyGrid, scattering::ScatteringData,
-                        h_atm::AbstractVector;
-                        cascading_spec::CascadingSpec,
-                        phase_fcn_generator)
-    density = collect(Float64, density_profile(h_atm))
-    apply_density_boundary!(density)
-
-    name_str = String(name)
-    cross_sections    = get_cross_section(name_str, energy_grid.E_centers)
-    excitation_levels = load_excitation_threshold_for(name_str)
-
-    phase_fcn    = phase_fcn_generator(scattering.θ_scatter, energy_grid.E_centers)
-    cascading_data = SpeciesCascadingCache(cascading_spec)
-
-    return NeutralSpecies(name, density_profile, density, cross_sections, excitation_levels,
-                          phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
+function NeutralSpecies(name::Symbol, density_profile;
+                        cascading_spec::CascadingSpec, phase_fcn_generator)
+    empty_mat = Matrix{Float64}(undef, 0, 0)
+    return NeutralSpecies(
+        name,
+        density_profile,
+        Float64[],
+        empty_mat,
+        empty_mat,
+        phase_fcn_generator,
+        (empty_mat, copy(empty_mat)),
+        cascading_spec,
+        SpeciesCascadingCache(cascading_spec),
+    )
 end
 
 """
@@ -151,8 +146,8 @@ end
 # ======================================================================================== #
 
 """
-    N2Species(altitude_grid, energy_grid, scattering, density_profile)
-    N2Species(altitude_grid, energy_grid, scattering, msis_file::AbstractString)
+    N2Species(density_profile)
+    N2Species(msis_file::AbstractString)
 
 Construct the default N₂ species with cross sections from the built-in `e_N2_*` library,
 phase function from [`phase_fcn_N2`](@ref), and cascading described by
@@ -160,49 +155,44 @@ phase function from [`phase_fcn_N2`](@ref), and cascading described by
 
 `density_profile` can be an [`MSISDensity`](@ref), a [`VectorDensity`](@ref), or any
 callable `h_atm (m) → density (m⁻³)`. Passing an MSIS file path string is a shorthand
-for `MSISDensity(msis_file, :N2)`.
+for `MSISDensity(msis_file, :N2)`. Grid-dependent fields are populated later by
+`initialize!(model)`.
 """
-function N2Species(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                   scattering::ScatteringData, msis_file::AbstractString)
-    return N2Species(altitude_grid, energy_grid, scattering, MSISDensity(msis_file, :N2))
+function N2Species(msis_file::AbstractString)
+    return N2Species(MSISDensity(msis_file, :N2))
 end
-function N2Species(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                   scattering::ScatteringData, density_profile)
-    return NeutralSpecies(:N2, density_profile, energy_grid, scattering, altitude_grid.h;
+function N2Species(density_profile)
+    return NeutralSpecies(:N2, density_profile;
                           cascading_spec      = DefaultCascadingSpecN2(),
                           phase_fcn_generator = phase_fcn_N2)
 end
 
 """
-    O2Species(altitude_grid, energy_grid, scattering, density_profile)
-    O2Species(altitude_grid, energy_grid, scattering, msis_file::AbstractString)
+    O2Species(density_profile)
+    O2Species(msis_file::AbstractString)
 
 Default O₂ species, analogous to [`N2Species`](@ref).
 """
-function O2Species(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                   scattering::ScatteringData, msis_file::AbstractString)
-    return O2Species(altitude_grid, energy_grid, scattering, MSISDensity(msis_file, :O2))
+function O2Species(msis_file::AbstractString)
+    return O2Species(MSISDensity(msis_file, :O2))
 end
-function O2Species(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                   scattering::ScatteringData, density_profile)
-    return NeutralSpecies(:O2, density_profile, energy_grid, scattering, altitude_grid.h;
+function O2Species(density_profile)
+    return NeutralSpecies(:O2, density_profile;
                           cascading_spec      = DefaultCascadingSpecO2(),
                           phase_fcn_generator = phase_fcn_O2)
 end
 
 """
-    OSpecies(altitude_grid, energy_grid, scattering, density_profile)
-    OSpecies(altitude_grid, energy_grid, scattering, msis_file::AbstractString)
+    OSpecies(density_profile)
+    OSpecies(msis_file::AbstractString)
 
 Default O species, analogous to [`N2Species`](@ref).
 """
-function OSpecies(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                  scattering::ScatteringData, msis_file::AbstractString)
-    return OSpecies(altitude_grid, energy_grid, scattering, MSISDensity(msis_file, :O))
+function OSpecies(msis_file::AbstractString)
+    return OSpecies(MSISDensity(msis_file, :O))
 end
-function OSpecies(altitude_grid::AltitudeGrid, energy_grid::EnergyGrid,
-                  scattering::ScatteringData, density_profile)
-    return NeutralSpecies(:O, density_profile, energy_grid, scattering, altitude_grid.h;
+function OSpecies(density_profile)
+    return NeutralSpecies(:O, density_profile;
                           cascading_spec      = DefaultCascadingSpecO(),
                           phase_fcn_generator = phase_fcn_O)
 end
@@ -226,11 +216,15 @@ end
 function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
     println(io, "NeutralSpecies(", sp.name, "):")
     println(io, "├── Density profile: ", _profile_label(sp.density_profile))
-    println(io, "├── Altitudes:        ", length(sp.density))
-    println(io, "├── Max density:      ", round(maximum(sp.density), sigdigits=3), " m⁻³")
-    println(io, "├── Cross sections:   ", size(sp.cross_sections, 1), " levels × ",
-                                          size(sp.cross_sections, 2), " energies")
-    println(io, "├── Excitation lvls:  ", size(sp.excitation_levels, 1))
+    if isempty(sp.density)
+        println(io, "├── (not initialized — call initialize!(model))")
+    else
+        println(io, "├── Altitudes:        ", length(sp.density))
+        println(io, "├── Max density:      ", round(maximum(sp.density), sigdigits=3), " m⁻³")
+        println(io, "├── Cross sections:   ", size(sp.cross_sections, 1), " levels × ",
+                                              size(sp.cross_sections, 2), " energies")
+        println(io, "├── Excitation lvls:  ", size(sp.excitation_levels, 1))
+    end
     print(io,   "└── Cascading:        ", sp.cascading_spec.name,
                 " (", length(sp.cascading_spec.ionization_thresholds), " thresholds)")
 end

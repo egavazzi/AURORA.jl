@@ -177,6 +177,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    initialize!(model)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -211,6 +212,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    initialize!(model)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -273,6 +275,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    initialize!(model)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -316,6 +319,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+    initialize!(model)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
