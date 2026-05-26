@@ -21,7 +21,14 @@ iri_file = find_iri_file(year=2005, month=10, day=8, hour=22, minute=0,
                          lat=70, lon=19, height=85:1:700)
 
 model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
+initialize!(model)   # build densities, cross-sections, phase functions, and scattering data
 ```
+
+!!! note
+    `AuroraModel(...)` is lightweight — the densities, cross-sections, phase functions, and
+    scattering matrices are computed by [`initialize!`](@ref). `run!(sim)` does this
+    automatically, but here we call `initialize!(model)` ourselves so the diagnostic data
+    exists before plotting.
 
 Generate all figures at once:
 
