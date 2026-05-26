@@ -2,7 +2,8 @@
     energy_grid = AURORA.EnergyGrid(100)
     cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
 
-    AURORA.load_or_compute_cascading!(cache, energy_grid)
+    AURORA.load_or_compute_cascading!(cache, energy_grid;
+                                      policy=AURORA.CachePolicy(force_recompute=true, save_cache=false))
     i_primary = searchsortedlast(cache.E_edges, 40.0)
     secondary = AURORA.secondary_spectrum(cache, i_primary, 15.581)
     primary = AURORA.primary_spectrum(cache, i_primary, 15.581)
