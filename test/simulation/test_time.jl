@@ -196,20 +196,30 @@ end
     end
 end
 
-@testitem "list_result_files: returns files sorted numerically" setup=[TimeTestModel] begin
+@testitem "list_result_files: returns files sorted numerically" begin
     mktempdir() do savedir
-        flux  = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
-        sim   = AuroraSimulation(TimeTestModel.model, flux, savedir;
-                                 mode=TimeDependentMode(duration=0.11, dt=0.0001,
-                                                        CFL_number=200, n_loop=110))
-        run!(sim)
+        for file in (
+            "IeFlickering-02.mat",
+            "IeFlickering-10.mat",
+            "IeFlickering-01.mat",
+            "IeFlickering-101.mat",
+            "IeFlickering-100.mat",
+            "IeFlickering-110.mat",
+            "IeFlickering-11.mat",
+            "neutral_atm.mat",
+            "Ie_top.mat",
+        )
+            touch(joinpath(savedir, file))
+        end
 
         files = list_result_files(savedir)
-        @test length(files) == 110
+        @test length(files) == 7
         @test endswith(files[1], "IeFlickering-01.mat")
         @test endswith(files[2], "IeFlickering-02.mat")
-        @test endswith(files[100], "IeFlickering-100.mat")
-        @test endswith(files[101], "IeFlickering-101.mat")
+        @test endswith(files[3], "IeFlickering-10.mat")
+        @test endswith(files[4], "IeFlickering-11.mat")
+        @test endswith(files[5], "IeFlickering-100.mat")
+        @test endswith(files[6], "IeFlickering-101.mat")
         @test endswith(files[end], "IeFlickering-110.mat")
     end
 end
