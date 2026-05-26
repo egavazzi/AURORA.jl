@@ -52,15 +52,15 @@ function InputFlux(spectrum::AbstractSpectrum, modulation::AbstractModulation;
               "The file already contains the complete flux. " *
               "Use ConstantModulation() (the default).")
     end
-    beams_vec = _to_beam_vector(beams)
+    beams_vec = to_beam_vector(beams)
     InputFlux{typeof(spectrum), typeof(modulation)}(
         spectrum, modulation, beams_vec, Float64(z_source))
 end
 
 # Internal: convert any beam specification to Vector{Int}
-_to_beam_vector(b::Int) = [b]
-_to_beam_vector(b::AbstractRange{<:Integer}) = collect(Int, b)
-_to_beam_vector(b::AbstractVector{<:Integer}) = convert(Vector{Int}, b)
+to_beam_vector(b::Int) = [b]
+to_beam_vector(b::AbstractRange{<:Integer}) = collect(Int, b)
+to_beam_vector(b::AbstractVector{<:Integer}) = convert(Vector{Int}, b)
 
 
 function Base.show(io::IO, flux::InputFlux)
@@ -215,7 +215,7 @@ end
 ## ====================================================================================== ##
 
 """
-    _flat_spectrum(IeE_tot_eV, E, dE, E_min)
+    flat_spectrum(IeE_tot_eV, E, dE, E_min)
 
 Compute a flat (constant) differential number flux spectrum above E_min, normalized so that
 the total energy flux equals IeE_tot_eV.
@@ -223,7 +223,7 @@ the total energy flux equals IeE_tot_eV.
 Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
 The flux is zero below E_min.
 """
-function _flat_spectrum(IeE_tot_eV, E_centers, ΔE, E_min)
+function flat_spectrum(IeE_tot_eV, E_centers, ΔE, E_min)
     # Find first index where bin lower edge <= E_min
     i_Emin = findlast((E_centers .- ΔE./2) .<= E_min)
     if isnothing(i_Emin)
@@ -242,7 +242,7 @@ end
 
 
 """
-    _gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
+    gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
 
 Compute a Gaussian differential number flux spectrum centered at E₀ with width ΔE,
 normalized so that the total energy flux equals IeE_tot_eV.
@@ -251,7 +251,7 @@ The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
 
 Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
 """
-function _gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, E₀, ΔE_gauss)
+function gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, E₀, ΔE_gauss)
     # Unnormalized Gaussian shape
     Φ_shape = exp.(-(E_centers .- E₀).^2 ./ ΔE_gauss^2)
 

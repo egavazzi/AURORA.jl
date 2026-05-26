@@ -220,7 +220,7 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
     println(io, "NeutralSpecies(", sp.name, "):")
-    println(io, "├── Density profile: ", _profile_label(sp.density_profile))
+    println(io, "├── Density profile: ", profile_label(sp.density_profile))
     if isempty(sp.density)
         println(io, "├── (not initialized — call initialize!(model))")
     else
@@ -234,6 +234,6 @@ function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
                 " (", length(sp.cascading_spec.ionization_thresholds), " thresholds)")
 end
 
-_profile_label(d::MSISDensity)  = "MSISDensity($(basename(d.msis_file)), :$(d.species))"
-_profile_label(d::VectorDensity) = "VectorDensity($(length(d.h)) points)"
-_profile_label(d)               = string(typeof(d))
+profile_label(d::MSISDensity)  = "MSISDensity($(basename(d.msis_file)), :$(d.species))"
+profile_label(d::VectorDensity) = "VectorDensity($(length(d.h)) points)"
+profile_label(d)               = string(typeof(d))

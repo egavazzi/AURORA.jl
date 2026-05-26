@@ -123,7 +123,7 @@ function save_parameters(sim::AuroraSimulation)
         write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
         write(f, "\n")
         write(f, "mode = $mode \n")
-        _write_time_params(f, sim)
+        write_time_params(f, sim)
         write(f, "\n")
         write(f, "flux = $(sim.flux) \n")
         write(f, "\n")
@@ -132,9 +132,9 @@ function save_parameters(sim::AuroraSimulation)
     end
 end
 
-_write_time_params(f::IO, sim::AuroraSimulation) = _write_time_params(f, sim.time)
+write_time_params(f::IO, sim::AuroraSimulation) = write_time_params(f, sim.time)
 
-function _write_time_params(f::IO, time::RefinedTimeGrid)
+function write_time_params(f::IO, time::RefinedTimeGrid)
     write(f, "duration = $(time.duration) \n")
     write(f, "dt = $(time.dt) \n")
     write(f, "dt_internal = $(time.dt_internal) \n")
@@ -142,13 +142,13 @@ function _write_time_params(f::IO, time::RefinedTimeGrid)
     write(f, "n_loop = $(time.n_loop) \n")
     write(f, "CFL_factor = $(time.CFL_factor) \n")
 end
-function _write_time_params(f::IO, time::UniformTimeGrid)
+function write_time_params(f::IO, time::UniformTimeGrid)
     write(f, "duration = $(time.duration) \n")
     write(f, "dt = $(time.dt) \n")
     write(f, "n_steps = $(time.n_steps) \n")
     write(f, "t = $(time.t) \n")
 end
-function _write_time_params(f::IO, ::SingleStepConfig)
+function write_time_params(f::IO, ::SingleStepConfig)
     write(f, "duration = nothing \n")
     write(f, "dt = nothing \n")
 end
@@ -362,7 +362,7 @@ end
 ## ====================================================================================== ##
 
 """
-    _smooth_transition(x, x_start = 0.0, x_end = 1.0)
+    smooth_transition(x, x_start = 0.0, x_end = 1.0)
 
 Create a smooth transition from 0 to 1 over the interval `[x_start, x_end]` using a
 C∞-smooth (infinitely differentiable) function.
@@ -379,7 +379,7 @@ C∞-smooth (infinitely differentiable) function.
 # Returns
 - A value between 0 and 1 representing the smooth transition
 """
-function _smooth_transition(x, x_start = 0.0, x_end = 1.0)
+function smooth_transition(x, x_start = 0.0, x_end = 1.0)
     # If the interval has zero width, return step function
     if iszero(x_end - x_start)
         return x < x_start ? 0.0 : 1.0
