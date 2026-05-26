@@ -206,7 +206,7 @@ end
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
         flat_n2 = h -> fill(1e18, length(h))
-        model.species[1].density_profile = flat_n2
+        model.species[:N2].density_profile = flat_n2
 
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
@@ -215,7 +215,7 @@ end
         run!(sim)
         @test sim.model.initialized
 
-        n2_density = sim.model.species[1].density
+        n2_density = sim.model.species[:N2].density
         @test !isempty(n2_density)
         @test n2_density[1] ≈ 1e18   # bottom of the grid, unaffected by boundary taper
     end
