@@ -1,5 +1,5 @@
 """
-    AuroraModel{AG, EG, PAG, IO, SP, FT, V}
+    AuroraModel{AG, EG, PAG, SD, IO, SP, FT, V}
 
 Container for the grids, atmosphere, and collision data used by an AURORA simulation.
 
@@ -20,13 +20,13 @@ densities, …) available before constructing a simulation. If you do that *afte
 already exists, follow it with `initialize!(sim)` (or just change the grid and call `run!`).
 """
 mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
-                            IO<:Ionosphere,
+                            SD<:ScatteringData, IO<:Ionosphere,
                             SP<:Tuple{Vararg{NeutralSpecies}},
                             FT, V<:AbstractVector{FT}}
     altitude_grid::AG
     energy_grid::EG
     pitch_angle_grid::PAG
-    scattering::Union{Nothing, ScatteringData}   # nothing until initialize!(model)
+    scattering::SD
     ionosphere::IO
     species::SP
     B_angle_to_zenith::FT
@@ -79,15 +79,16 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     pitch_angle_grid = PitchAngleGrid(θ_lims)
     ionosphere       = Ionosphere(msis_file, iri_file, altitude_grid.h)
     species_tuple    = Tuple(species)
+    scattering       = ScatteringData()
     s_field          = altitude_grid.h ./ cosd(B_angle_to_zenith)
 
     FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
 
     return AuroraModel{typeof(altitude_grid), typeof(energy_grid), typeof(pitch_angle_grid),
-                       typeof(ionosphere), typeof(species_tuple),
+                       typeof(scattering), typeof(ionosphere), typeof(species_tuple),
                        FT, typeof(s_field)}(
         altitude_grid, energy_grid, pitch_angle_grid,
-        nothing, ionosphere, species_tuple,
+        scattering, ionosphere, species_tuple,
         FT(B_angle_to_zenith), s_field, false
     )
 end
@@ -166,7 +167,7 @@ function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
     println(io, "├── ", model.altitude_grid)
     println(io, "├── ", model.energy_grid)
     println(io, "├── ", model.pitch_angle_grid)
-    println(io, "├── ", isnothing(model.scattering) ? "ScatteringData: (not initialized)" : model.scattering)
+    println(io, "├── ", model.initialized ? model.scattering : "ScatteringData: (not initialized)")
     println(io, "├── ", model.ionosphere)
     println(io, "├── Species: ", join((String(sp.name) for sp in model.species), ", "))
     print(io, "└── B angle to zenith: $(model.B_angle_to_zenith)°")

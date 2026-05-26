@@ -174,7 +174,8 @@ end
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
     @test !model.initialized
-    @test isnothing(model.scattering)
+    @test model.scattering isa AURORA.ScatteringData
+    @test isempty(model.scattering.θ_scatter)
     @test isempty(model.species[1].density)
 end
 
