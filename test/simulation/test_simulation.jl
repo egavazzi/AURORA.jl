@@ -310,3 +310,67 @@ end
         @test length(sim.model.s_field) == model.altitude_grid.n
     end
 end
+
+@testitem "Reassigning a grid invalidates the model" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+    initialize!(model)
+    @test model.initialized
+
+    # Each geometry reassignment must flip `initialized` back to false.
+    model.altitude_grid = AltitudeGrid(100, 300)
+    @test !model.initialized
+
+    initialize!(model)
+    model.energy_grid = EnergyGrid(200)
+    @test !model.initialized
+
+    initialize!(model)
+    model.B_angle_to_zenith = 20
+    @test !model.initialized
+end
+
+@testitem "Grid change then bare run! auto-reinitializes (no manual init)" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim)
+
+        # Change the grid and call run! directly — no initialize!(model)/initialize!(sim).
+        model.altitude_grid = AltitudeGrid(100, 300)
+        run!(sim)
+
+        @test sim.model.initialized
+        @test length(sim.model.s_field)           == model.altitude_grid.n
+        @test size(sim.cache.Ie, 1) ÷ length(model.pitch_angle_grid.μ_center) == model.altitude_grid.n
+    end
+end
+
+@testitem "Energy grid change rebuilds sim.time and cache (TimeDependent)" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        model = AuroraModel([100, 200], 180:-90:0, 80, msis_file, iri_file, 0)
+        flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim   = AuroraSimulation(model, flux, savedir;
+                                 mode = TimeDependentMode(duration=0.02, dt=0.01,
+                                                          CFL_number=128, n_loop=1))
+        run!(sim)
+        @test size(sim.cache.Ie, 3) == model.energy_grid.n
+
+        # Larger energy grid → more energy bins AND a different CFL-refined time grid.
+        model.energy_grid = EnergyGrid(200)
+        run!(sim)
+
+        @test sim.model.initialized
+        @test size(sim.cache.Ie, 3) == model.energy_grid.n
+        @test sim.time isa AURORA.RefinedTimeGrid
+    end
+end

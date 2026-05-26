@@ -26,10 +26,24 @@ function initialize!(sim::AuroraSimulation;
     if !sim.model.initialized
         initialize!(sim.model; verbose=true, policy=cache_policy)
     end
+    # Rebuild the time configuration from the (possibly changed) model grids. For
+    # TimeDependentMode the CFL-refined grid depends on the altitude and energy grids, so a
+    # grid swap since construction would otherwise leave sim.time (and the cache it sizes) stale.
+    sim.time = build_time_config(sim.model, sim.mode)
     sim.cache = build_simulation_cache(sim; cache_policy)
     sim.cache_initialized = true
     return nothing
 end
+
+"""
+    needs_initialization(sim::AuroraSimulation) -> Bool
+
+Return `true` when `sim` must be (re)initialized before solving: the cache was never built,
+or a grid was changed on the model (which marks it uninitialized via `setproperty!`).
+Used by [`run!`](@ref) to rebuild automatically.
+"""
+needs_initialization(sim::AuroraSimulation) =
+    !sim.cache_initialized || !sim.model.initialized
 
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
     N_neutrals = length(model.species)

@@ -7,13 +7,17 @@ Construct cheaply with `AuroraModel(...)`, then call `initialize!(model)` (or `r
 to perform the heavy setup: scattering matrices, species densities, cross sections, and
 cascading transfer matrices.
 
-The grid fields `altitude_grid` and `energy_grid` can be reassigned on an existing model.
-Call `initialize!(model)` afterwards to rebuild all derived data for the new grid:
+The grid fields (`altitude_grid`, `energy_grid`, `pitch_angle_grid`) and `B_angle_to_zenith`
+can be reassigned on an existing model. Doing so automatically marks the model as
+uninitialized, so the next `run!(sim)` rebuilds all derived data *and* the simulation cache
+for the new grid:
 ```julia
 model.altitude_grid = AltitudeGrid(80, 500)
-initialize!(model)     # recomputes s_field, ionosphere, species data
-initialize!(sim)       # rebuilds simulation cache arrays for the new grid dimensions
+run!(sim)              # detects the change, rebuilds model + cache, then solves
 ```
+You can still call `initialize!(model)` explicitly if you want the rebuilt data (scattering,
+densities, …) available before constructing a simulation. If you do that *after* a simulation
+already exists, follow it with `initialize!(sim)` (or just change the grid and call `run!`).
 """
 mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
                             IO<:Ionosphere,
@@ -88,6 +92,19 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     )
 end
 
+# Reassigning a grid or the B-field geometry invalidates every derived quantity (scattering,
+# densities, cross sections, cascading, and any simulation cache built from this model). We
+# intercept those assignments to mark the model uninitialized, which lets `run!` /
+# `initialize!(sim)` detect the change and rebuild automatically.
+function Base.setproperty!(model::AuroraModel, name::Symbol, value)
+    ty = fieldtype(typeof(model), name)
+    setfield!(model, name, value isa ty ? value : convert(ty, value))
+    if name in (:altitude_grid, :energy_grid, :pitch_angle_grid, :B_angle_to_zenith)
+        setfield!(model, :initialized, false)
+    end
+    return value
+end
+
 """
     initialize!(model::AuroraModel; verbose=true, policy=CachePolicy())
 
@@ -122,9 +139,13 @@ function initialize!(model::AuroraModel;
         sp.density           = collect(Float64, sp.density_profile(h))
         apply_density_boundary!(sp.density)
         name_str             = String(sp.name)
-        if isempty(sp.cross_sections)
+        # Cross sections depend on the energy grid, so (re)load them whenever they are missing
+        # or sized for a different grid. This keeps them correct after an energy-grid swap,
+        # while leaving user-supplied cross sections that already match the current grid intact.
+        if isempty(sp.cross_sections) || size(sp.cross_sections, 2) != length(eg.E_centers)
             sp.cross_sections    = get_cross_section(name_str, eg.E_centers)
         end
+        # Excitation levels are independent of the energy grid; load once if not supplied.
         if isempty(sp.excitation_levels)
             sp.excitation_levels = load_excitation_threshold_for(name_str)
         end

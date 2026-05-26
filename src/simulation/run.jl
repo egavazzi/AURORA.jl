@@ -16,7 +16,7 @@ run!(sim)
 ```
 """
 function run!(sim::AuroraSimulation)
-    if !sim.cache_initialized
+    if needs_initialization(sim)
         initialize!(sim)
     end
     if sim.save_input_flux
