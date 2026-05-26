@@ -1,5 +1,5 @@
 using Dates: Dates, now
-using JLD2: jldopen, @load, @save
+using JLD2: jldopen, @save
 
 
 """
@@ -24,16 +24,17 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
                                     verbose::Bool = true,
                                     policy::CachePolicy = CachePolicy())
     E_edges = energy_grid.E_edges
+    n_E = length(E_edges)
 
     file_found, filepath = policy.force_recompute ? (false, "") :
                            find_cascading_cache(cache.spec, E_edges; verbose, policy)
 
     if file_found
         try
-            cascading_data = load_cascading_cache(filepath; verbose)
-            cache.primary_transfer_matrix = cascading_data[1][1:length(E_edges)-1, 1:length(E_edges)-1, :]
-            cache.secondary_transfer_matrix = cascading_data[2][1:length(E_edges)-1, 1:length(E_edges)-1, :]
-            cache.E_edges = cascading_data[3][1:length(E_edges)]
+            cascading_data = load_cascading_cache(filepath, n_E; verbose)
+            cache.primary_transfer_matrix = cascading_data[1]
+            cache.secondary_transfer_matrix = cascading_data[2]
+            cache.E_edges = cascading_data[3]
             cache.ionization_thresholds = cascading_data[4]
             return nothing
         catch err
@@ -104,10 +105,16 @@ function find_cascading_cache(spec::CascadingSpec, E_edges;
     return (false, "")
 end
 
-function load_cascading_cache(filepath; verbose::Bool = true)
+function load_cascading_cache(filepath, n_E::Int; verbose::Bool = true)
     verbose && println("Loading cascading matrices from file: $(basename(filepath))")
-    @load filepath Q_primary Q_secondary E_ionizations E_edges
-    return (Q_primary, Q_secondary, E_edges, E_ionizations)
+    n_bins = n_E - 1
+    return jldopen(filepath, "r") do file
+        Q_primary     = file["Q_primary"][1:n_bins, 1:n_bins, :]
+        Q_secondary   = file["Q_secondary"][1:n_bins, 1:n_bins, :]
+        E_edges       = file["E_edges"][1:n_E]
+        E_ionizations = file["E_ionizations"]
+        (Q_primary, Q_secondary, E_edges, E_ionizations)
+    end
 end
 
 function save_cascading_cache(cache::SpeciesCascadingCache;
