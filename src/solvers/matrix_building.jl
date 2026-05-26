@@ -123,7 +123,6 @@ function update_A!(A, model::AuroraModel, iE)
 end
 
 function update_B!(B, model::AuroraModel, iE, B2B_fragment)
-    ionosphere = model.ionosphere
     energy_grid = model.energy_grid
     scattering = model.scattering
     ΔE = energy_grid.ΔE

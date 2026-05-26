@@ -21,18 +21,16 @@ end
     z = make_altitude_grid(50, 800)
     msis_file = find_msis_file()
 
-    @test_nowarn n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
-
-    n_neutrals, Tn = AURORA.load_neutral_densities(msis_file, z)
-    for i in eachindex(n_neutrals)
-        @test !any(isnan.(n_neutrals[i]))
-        @test !any(isinf.(n_neutrals[i]))
-        @test !any(n_neutrals[i] .< 0)
+    # Production path: each species samples its MSIS density profile on the grid, then the
+    # top boundary is tapered to zero by apply_density_boundary! (as in initialize!(model)).
+    for species in (:N2, :O2, :O)
+        n = AURORA.load_msis_density(msis_file, species, z)
+        @test_nowarn AURORA.apply_density_boundary!(n)
+        @test !any(isnan.(n))
+        @test !any(isinf.(n))
+        @test !any(n .< 0)
+        @test all(iszero, n[end-2:end])   # tapered to zero at the top
     end
-
-    @test !any(isnan.(Tn))
-    @test !any(isinf.(Tn))
-    @test !any(Tn .< 0)
 end
 
 
