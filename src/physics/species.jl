@@ -120,6 +120,18 @@ function NeutralSpecies(name::Symbol, density_profile;
     )
 end
 
+function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
+    found_index = 0
+    for (i, sp) in pairs(species)
+        if sp.name == name
+            found_index == 0 || throw(ArgumentError("Multiple species are named $(name)"))
+            found_index = i
+        end
+    end
+    found_index == 0 && throw(KeyError(name))
+    return species[found_index]
+end
+
 """
     apply_density_boundary!(n)
 

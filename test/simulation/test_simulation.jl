@@ -168,6 +168,26 @@ end
     @test isempty(sp_fn.density)
 end
 
+@testitem "AuroraModel species support Symbol indexing" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+
+    @test model.species[:N2] === model.species[1]
+    @test model.species[:O2] === model.species[2]
+    @test model.species[:O] === model.species[3]
+    @test_throws KeyError model.species[:NO]
+end
+
+@testitem "Species Symbol indexing rejects duplicate names" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+                        species = (N2Species(msis_file), N2Species(msis_file)))
+
+    @test_throws ArgumentError model.species[:N2]
+end
+
 @testitem "AuroraModel is uninitialized before initialize!" begin
     msis_file = find_msis_file()
     iri_file  = find_iri_file()
