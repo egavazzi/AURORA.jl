@@ -6,6 +6,14 @@ Container for the grids, atmosphere, and collision data used by an AURORA simula
 Construct cheaply with `AuroraModel(...)`, then call `initialize!(model)` (or `run!(sim)`)
 to perform the heavy setup: scattering matrices, species densities, cross sections, and
 cascading transfer matrices.
+
+The grid fields `altitude_grid` and `energy_grid` can be reassigned on an existing model.
+Call `initialize!(model)` afterwards to rebuild all derived data for the new grid:
+```julia
+model.altitude_grid = AltitudeGrid(80, 500)
+initialize!(model)     # recomputes s_field, ionosphere, species data
+initialize!(sim)       # rebuilds simulation cache arrays for the new grid dimensions
+```
 """
 mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
                             IO<:Ionosphere,
@@ -83,17 +91,27 @@ end
 """
     initialize!(model::AuroraModel; verbose=true, policy=CachePolicy())
 
-Perform all heavy one-time setup for `model`:
-1. Compute (or load from cache) the scattering matrices.
-2. For each species: sample the density profile, load cross sections and excitation levels,
-   build phase function matrices, and load/compute cascading transfer matrices.
+Perform all heavy setup for `model`.
+Always rebuilds from the current grid fields, so it can (and should) be called after
+reassigning `model.altitude_grid` or `model.energy_grid`.
+It does the following:
+1. Recompute `s_field` and `ionosphere` from the current altitude grid.
+2. Compute (or load from cache) the scattering matrices.
+3. For each species: sample the density profile, load cross sections and excitation levels
+   (skipped if already pre-populated), build phase functions, and load/compute cascading
+   transfer matrices.
 
 Called automatically by `initialize!(sim)` → `run!(sim)`. Call it directly when you need
-access to `model.scattering` or `model.species[i].density` before constructing a simulation.
+access to `model.scattering` or `model.species[i].density` before constructing a simulation,
+or after changing a grid field.
 """
 function initialize!(model::AuroraModel;
                      verbose::Bool = true,
                      policy::CachePolicy = CachePolicy())
+    model.s_field    = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
+    model.ionosphere = Ionosphere(model.ionosphere.msis_file,
+                                  model.ionosphere.iri_file,
+                                  model.altitude_grid.h)
     model.scattering = ScatteringData(model.pitch_angle_grid; verbose, policy)
 
     h  = model.altitude_grid.h

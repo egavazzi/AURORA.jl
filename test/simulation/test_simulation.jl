@@ -269,3 +269,44 @@ end
         @test model.species[1].phase_fcn_generator === custom_generator
     end
 end
+
+@testitem "Altitude grid swap: initialize!(model) rebuilds s_field and ionosphere" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+    initialize!(model)
+    old_n_z = model.altitude_grid.n
+    @test length(model.s_field)               == old_n_z
+    @test length(model.ionosphere.Tn)         == old_n_z
+    @test length(model.species[1].density)    == old_n_z
+
+    model.altitude_grid = AltitudeGrid(100, 300)
+    initialize!(model)
+
+    new_n_z = model.altitude_grid.n
+    @test new_n_z > old_n_z
+    @test length(model.s_field)               == new_n_z
+    @test length(model.ionosphere.Tn)         == new_n_z
+    @test length(model.species[1].density)    == new_n_z
+end
+
+@testitem "Altitude grid swap: run! after initialize!(model) succeeds" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim)
+
+        model.altitude_grid = AltitudeGrid(100, 300)
+        initialize!(model)   # recomputes s_field, ionosphere, species
+        initialize!(sim)     # rebuilds simulation cache for new grid dimensions
+        run!(sim)
+
+        @test sim.model.initialized
+        @test length(sim.model.s_field) == model.altitude_grid.n
+    end
+end
