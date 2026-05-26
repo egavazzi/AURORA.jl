@@ -36,18 +36,21 @@ end
 # Atmosphere
 # ======================================================================================== #
 function _plot_atmosphere(model)
-    h_km = model.altitude_grid.h ./ 1e3
-    iono = model.ionosphere
-    nd = AURORA.n_neutrals(model)
+    h_km  = model.altitude_grid.h ./ 1e3
+    iono  = model.ionosphere
+    styles = (:solid, :dash, :dashdot, :dot)
 
     fig = Figure(size = (800, 600))
 
     ax1 = Axis(fig[1, 1]; xlabel="(m⁻³)", ylabel="height (km)",
-               title="MSIS neutral density", xscale=log10,
+               title="Neutral density", xscale=log10,
                xticks=LogTicks(LinearTicks(9)))
-    lines!(ax1, nd.nN2, h_km; linewidth=2, label="N₂")
-    lines!(ax1, nd.nO2, h_km; linewidth=2, linestyle=:dash, label="O₂")
-    lines!(ax1, nd.nO, h_km; linewidth=2, linestyle=:dashdot, label="O")
+    for (i, sp) in enumerate(model.species)
+        lines!(ax1, sp.density, h_km;
+               linewidth  = 2,
+               linestyle  = styles[mod1(i, length(styles))],
+               label      = String(sp.name))
+    end
     xlims!(ax1, 1e12, 1e20)
     ylims!(ax1, h_km[1] - 10, h_km[end] + 10)
     axislegend(ax1, "Densities"; position=:rt)

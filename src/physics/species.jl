@@ -54,7 +54,7 @@ end
 # ======================================================================================== #
 
 """
-    NeutralSpecies{F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+    NeutralSpecies{S<:CascadingSpec, C<:SpeciesCascadingCache, P}
 
 All per-species data needed to advance the transport equation through one neutral species.
 
@@ -62,17 +62,22 @@ All per-species data needed to advance the transport equation through one neutra
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
 - `density_profile`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
     Can be an [`MSISDensity`](@ref), a [`VectorDensity`](@ref), or any callable.
-    This field is untyped so it can be replaced freely before calling `initialize!(model)`.
+    Untyped so it can be replaced freely before calling `initialize!(model)`.
 - `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³),
     with an erf-tail boundary applied at the top. Empty until `initialize!(model)` is called.
 - `cross_sections::Matrix{Float64}`: collision cross sections, shape `[n_levels × n_E]` (m²).
+    Auto-loaded from the built-in library when empty; pre-populate before `initialize!(model)`
+    to supply custom data for a non-standard species.
     Empty until `initialize!(model)` is called.
 - `excitation_levels::Matrix{Float64}`: excitation thresholds and secondary counts,
     shape `[n_levels × 2]`. First column = threshold energy (eV), second column = number
     of secondaries produced (non-zero only for ionizing channels).
+    Auto-loaded from the built-in library when empty; pre-populate before `initialize!(model)`
+    to supply custom data for a non-standard species.
     Empty until `initialize!(model)` is called.
-- `phase_fcn_generator::F`: callable `(θ, E) -> (phaseE, phaseI)` used to (re)build
-    `phase_fcn` whenever the pitch-angle or energy grid changes
+- `phase_fcn_generator`: callable `(θ, E) -> (phaseE, phaseI)` used to (re)build
+    `phase_fcn` whenever the pitch-angle or energy grid changes.
+    Untyped so it can be replaced freely before calling `initialize!(model)`.
 - `phase_fcn::P`: tuple `(phaseE, phaseI)` of `[n_θ × n_E]` matrices materialized from the
     generator on the model's scattering θ grid and energy centers.
     Holds 0×0 placeholder matrices until `initialize!(model)` is called.
@@ -81,13 +86,13 @@ All per-species data needed to advance the transport equation through one neutra
 - `cascading_data::C`: cascading transfer matrices (populated lazily by
     `load_or_compute_cascading!`)
 """
-mutable struct NeutralSpecies{F, S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+mutable struct NeutralSpecies{S<:CascadingSpec, C<:SpeciesCascadingCache, P}
     name::Symbol
     density_profile        # untyped: freely replaceable before initialize!(model)
     density::Vector{Float64}
     cross_sections::Matrix{Float64}
     excitation_levels::Matrix{Float64}
-    phase_fcn_generator::F
+    phase_fcn_generator    # untyped: freely replaceable before initialize!(model)
     phase_fcn::P
     cascading_spec::S
     cascading_data::C

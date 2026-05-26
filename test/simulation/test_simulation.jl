@@ -199,3 +199,73 @@ end
         @test n2_density[1] ≈ 1e18   # bottom of the grid, unaffected by boundary taper
     end
 end
+
+@testitem "AuroraModel with 2 species: run! succeeds" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+                            species = (O2Species(msis_file), OSpecies(msis_file)))
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim)
+
+        @test sim.model.initialized
+        @test length(sim.model.species) == 2
+        @test sim.cache.degradation.secondary_e_flux isa NTuple{2, Matrix{Float64}}
+    end
+end
+
+@testitem "Custom 4th species with pre-populated cross sections: run! succeeds" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        custom_law  = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+        custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75], custom_law)
+        custom_sp   = AURORA.NeutralSpecies(:CustomGas, h -> fill(1e18, length(h));
+                                            cascading_spec      = custom_spec,
+                                            phase_fcn_generator = AURORA.phase_fcn_N2)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+                            species = (N2Species(msis_file), O2Species(msis_file),
+                                       OSpecies(msis_file), custom_sp))
+
+        # Interception window: pre-populate cross sections and excitation levels before
+        # initialize!(model) runs (name-based auto-lookup would fail for :CustomGas)
+        # We just reuse the N2 cross sections and levels here
+        eg = model.energy_grid
+        model.species[end].cross_sections    = AURORA.get_cross_section("N2", eg.E_centers)
+        model.species[end].excitation_levels = AURORA.load_excitation_threshold_for("N2")
+
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim)
+
+        @test sim.model.initialized
+        @test length(sim.model.species) == 4
+        @test sim.cache.degradation.secondary_e_flux isa NTuple{4, Matrix{Float64}}
+        @test sim.model.species[end].name == :CustomGas
+        @test !isempty(sim.model.species[end].density)
+    end
+end
+
+@testitem "Custom phase function via interception window: run! succeeds" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file()
+        iri_file  = find_iri_file()
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+
+        custom_generator = (θ, E) -> AURORA.phase_fcn_N2(θ, E)
+        model.species[1].phase_fcn_generator = custom_generator
+
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim)
+
+        @test sim.model.initialized
+        @test model.species[1].phase_fcn_generator === custom_generator
+    end
+end

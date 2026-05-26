@@ -23,18 +23,12 @@ mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid
 end
 
 """
-    AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+    AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
+                species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)))
 
 Build a lightweight `AuroraModel`. Only the grids and ionosphere are set up; the expensive
 computation (scattering matrices, species densities, cross sections, cascading data) is
 deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
-
-Between construction and initialization you can freely mutate species density profiles:
-```julia
-model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-model.species[1].density_profile = VectorDensity(h, my_n2)
-run!(sim)   # initialize!(model) picks up the custom profile here
-```
 
 ## Inputs
 - `altitude_lims`: altitude limits (km) for the bottom and top of the ionosphere
@@ -44,24 +38,44 @@ run!(sim)   # initialize!(model) picks up the custom profile here
 - `iri_file`: path to the IRI ionosphere file
 - `B_angle_to_zenith`: angle between the magnetic field and zenith (degrees, default 0)
 
+## Keyword Arguments
+- `species`: tuple (or any iterable) of [`NeutralSpecies`](@ref) instances that the model
+  should simulate. Defaults to the standard atmosphere: N₂, O₂, O from `msis_file`.
+  Pass a custom tuple to add, remove, or replace species:
+  ```julia
+  # Only two species:
+  model = AuroraModel(...; species = (O2Species(msis_file), OSpecies(msis_file)))
+
+  # Four species — custom 4th gas with pre-populated cross sections:
+  custom_sp = NeutralSpecies(:MyGas, my_density_profile;
+                             cascading_spec = my_spec, phase_fcn_generator = phase_fcn_N2)
+  model = AuroraModel(...; species = (N2Species(msis_file), O2Species(msis_file),
+                                      OSpecies(msis_file),  custom_sp))
+  # Interception window: pre-populate custom cross sections before run!/initialize!
+  model.species[end].cross_sections    = my_sigma_matrix   # [n_levels × n_E]
+  model.species[end].excitation_levels = my_levels_matrix  # [n_levels × 2]
+  run!(sim)
+  ```
+
 ## Returns
 An uninitialized `AuroraModel`. Call `initialize!(model)` or `run!(sim)` to complete setup.
 """
-function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0)
+function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
+                     species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)))
     altitude_grid    = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid      = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
     ionosphere       = Ionosphere(msis_file, iri_file, altitude_grid.h)
-    species          = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file))
+    species_tuple    = Tuple(species)
     s_field          = altitude_grid.h ./ cosd(B_angle_to_zenith)
 
     FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
 
     return AuroraModel{typeof(altitude_grid), typeof(energy_grid), typeof(pitch_angle_grid),
-                       typeof(ionosphere), typeof(species),
+                       typeof(ionosphere), typeof(species_tuple),
                        FT, typeof(s_field)}(
         altitude_grid, energy_grid, pitch_angle_grid,
-        nothing, ionosphere, species,
+        nothing, ionosphere, species_tuple,
         FT(B_angle_to_zenith), s_field, false
     )
 end
@@ -90,8 +104,12 @@ function initialize!(model::AuroraModel;
         sp.density           = collect(Float64, sp.density_profile(h))
         apply_density_boundary!(sp.density)
         name_str             = String(sp.name)
-        sp.cross_sections    = get_cross_section(name_str, eg.E_centers)
-        sp.excitation_levels = load_excitation_threshold_for(name_str)
+        if isempty(sp.cross_sections)
+            sp.cross_sections    = get_cross_section(name_str, eg.E_centers)
+        end
+        if isempty(sp.excitation_levels)
+            sp.excitation_levels = load_excitation_threshold_for(name_str)
+        end
         sp.phase_fcn         = sp.phase_fcn_generator(θ, eg.E_centers)
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)
     end
@@ -99,16 +117,6 @@ function initialize!(model::AuroraModel;
     return nothing
 end
 
-"""
-    n_neutrals(model::AuroraModel)
-
-Return neutral densities as a NamedTuple `(; nN2, nO2, nO)` sourced from the model's species.
-"""
-n_neutrals(model::AuroraModel) = (;
-    nN2 = model.species[1].density,
-    nO2 = model.species[2].density,
-    nO  = model.species[3].density,
-)
 
 function Base.show(io::IO, model::AuroraModel)
     print(io, "AuroraModel($(model.altitude_grid), $(model.energy_grid), $(model.pitch_angle_grid))")
