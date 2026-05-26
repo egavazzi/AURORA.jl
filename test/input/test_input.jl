@@ -173,11 +173,11 @@ end
     ## Setting parameters
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
-    E_max = 100000;                 # (eV) upper limit to the energy grid
+    E_max = 10_000;                 # (eV) upper limit to the energy grid
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model)
+    initialize!(model; policy = CachePolicy(save_cache = false))
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -212,7 +212,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model)
+    initialize!(model; policy = CachePolicy(save_cache = false))
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -275,7 +275,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model)
+    initialize!(model; policy = CachePolicy(save_cache = false))
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -319,7 +319,7 @@ end
     msis_file = find_msis_file();
     iri_file = find_iri_file();
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model)
+    initialize!(model; policy = CachePolicy(save_cache = false))
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
