@@ -51,7 +51,7 @@ in log-space), but any function works.
 # A plain analytic profile for N₂ (altitude in m → density in m⁻³)
 model.species[:N2].density_profile = h -> 1e18 .* exp.(-(h .- 100e3) ./ 30e3)
 initialize!(model)
-model.species[:N2].density[:N2]
+model.species[:N2].density
 ```
 
 ```julia
