@@ -127,7 +127,8 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
 
     # Check for negative values (if it happens we have a problem) and clamp to zero
     if any(Ie .< 0)
-        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        @debug worst = minimum(Ie)
+        @debug "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values, worst = $(worst))"
         Ie[Ie .< 0] .= 0
     end
 
