@@ -127,7 +127,17 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
 
     # Check for negative values (if it happens we have a problem) and clamp to zero
     if any(Ie .< 0)
-        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
+        worst = minimum(Ie)
+        worst_index = argmin(Ie)
+        angle_index = (worst_index[1] - 1) ÷ n_z + 1
+        z_index = mod1(worst_index[1], n_z)
+        time_index = worst_index[2]
+        energy = model.energy_grid.E_centers[iE]
+        height = z[z_index]
+        pitch_angle = acosd(μ[angle_index])
+
+        @debug "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values, worst = $(worst), " *
+        "at [height = $(height) m, time = $(t[time_index]) s, energy = $(energy) eV, pitch_angle = $(pitch_angle) deg])"
         Ie[Ie .< 0] .= 0
     end
 
