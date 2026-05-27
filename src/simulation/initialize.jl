@@ -7,14 +7,9 @@
 
 Allocate or re-allocate the working cache for `sim`.
 
-If the model has not been initialized yet, `initialize!(model)` is called first (scattering
-matrices, species densities, cross sections, cascading data). This step performs the
-expensive setup that depends on the model geometry and the resolved time grid, but does not
-write any output files.
-
 # Keywords
 - `force_recompute`: ignore compatible on-disk cascading caches and rebuild them
-- `save_cache`: skip writing newly computed cascading caches when set to `false`
+- `save_cache`: if `false`, skip writing newly computed cascading caches to disk
 - `cache_root`: parent directory that contains the cascading and scattering cache folders
 """
 function initialize!(sim::AuroraSimulation;
@@ -26,24 +21,14 @@ function initialize!(sim::AuroraSimulation;
     if !sim.model.initialized
         initialize!(sim.model; verbose=true, policy=cache_policy)
     end
-    # Rebuild the time configuration from the (possibly changed) model grids. For
-    # TimeDependentMode the CFL-refined grid depends on the altitude and energy grids, so a
-    # grid swap since construction would otherwise leave sim.time (and the cache it sizes) stale.
+    # Rebuild the time configuration from the (possibly changed) model grids.
     sim.time = build_time_config(sim.model, sim.mode)
     sim.cache = build_simulation_cache(sim; cache_policy)
     sim.cache_initialized = true
     return nothing
 end
 
-"""
-    needs_initialization(sim::AuroraSimulation) -> Bool
-
-Return `true` when `sim` must be (re)initialized before solving: the cache was never built,
-or a grid was changed on the model (which marks it uninitialized via `setproperty!`).
-Used by [`run!`](@ref) to rebuild automatically.
-"""
-needs_initialization(sim::AuroraSimulation) =
-    !sim.cache_initialized || !sim.model.initialized
+needs_initialization(sim::AuroraSimulation) = !sim.cache_initialized || !sim.model.initialized
 
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
     N_neutrals = length(model.species)

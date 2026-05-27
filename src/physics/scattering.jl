@@ -28,8 +28,7 @@ function ScatteringData(grid::PitchAngleGrid;
 end
 
 # Empty placeholder held by an `AuroraModel` before `initialize!(model)` computes the real
-# matrices. It has the same concrete type as a real `ScatteringData` (all dense `Float64`
-# arrays), so `initialize!` can reassign the field in place without changing the model type.
+# matrices.
 ScatteringData() = ScatteringData(zeros(0, 0, 0), zeros(0, 0), Float64[], Float64[])
 
 function Base.show(io::IO, sd::ScatteringData)
