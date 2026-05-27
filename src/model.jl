@@ -2,22 +2,6 @@
     AuroraModel{AG, EG, PAG, SD, IO, SP, FT, V}
 
 Container for the grids, atmosphere, and collision data used by an AURORA simulation.
-
-Construct cheaply with `AuroraModel(...)`, then call `initialize!(model)` (or `run!(sim)`)
-to perform the heavy setup: scattering matrices, species densities, cross sections, and
-cascading transfer matrices.
-
-The grid fields (`altitude_grid`, `energy_grid`, `pitch_angle_grid`) and `B_angle_to_zenith`
-can be reassigned on an existing model. Doing so automatically marks the model as
-uninitialized, so the next `run!(sim)` rebuilds all derived data *and* the simulation cache
-for the new grid:
-```julia
-model.altitude_grid = AltitudeGrid(80, 500)
-run!(sim)              # detects the change, rebuilds model + cache, then solves
-```
-You can still call `initialize!(model)` explicitly if you want the rebuilt data (scattering,
-densities, …) available before constructing a simulation. If you do that *after* a simulation
-already exists, follow it with `initialize!(sim)` (or just change the grid and call `run!`).
 """
 mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid,
                             SD<:ScatteringData, IO<:Ionosphere,
@@ -109,19 +93,14 @@ end
 """
     initialize!(model::AuroraModel; verbose=true, policy=CachePolicy())
 
-Perform all heavy setup for `model`.
-Always rebuilds from the current grid fields, so it can (and should) be called after
-reassigning `model.altitude_grid` or `model.energy_grid`.
-It does the following:
-1. Recompute `s_field` and `ionosphere` from the current altitude grid.
+Perform all heavy setup for `model`:
+1. Compute `s_field` and `ionosphere` from the current altitude grid.
 2. Compute (or load from cache) the scattering matrices.
 3. For each species: sample the density profile, load cross sections and excitation levels
    (skipped if already pre-populated), build phase functions, and load/compute cascading
    transfer matrices.
 
-Called automatically by `initialize!(sim)` → `run!(sim)`. Call it directly when you need
-access to `model.scattering` or `model.species[i].density` before constructing a simulation,
-or after changing a grid field.
+Called internally by `initialize!(sim)` and/or `run!(sim)`.
 """
 function initialize!(model::AuroraModel;
                      verbose::Bool = true,

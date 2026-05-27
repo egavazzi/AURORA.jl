@@ -258,7 +258,7 @@ struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <
     dt::Float64          # save cadence requested by the user
     dt_internal::Float64 # internal step = dt / CFL_factor, exact by construction
     CFL_factor::Int
-    t::TI                # full internal time grid  (length = n_save * CFL_factor + 1)
+    t::TI                # full internal time grid   (length = n_save * CFL_factor + 1)
     t_save::TS           # coarse save grid          (length = n_save + 1)
     n_save::Int          # total number of save intervals = round(Int, duration / dt)
     n_loop::Int
