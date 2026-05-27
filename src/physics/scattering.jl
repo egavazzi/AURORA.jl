@@ -27,6 +27,10 @@ function ScatteringData(grid::PitchAngleGrid;
     )
 end
 
+# Empty placeholder held by an `AuroraModel` before `initialize!(model)` computes the real
+# matrices.
+ScatteringData() = ScatteringData(zeros(0, 0, 0), zeros(0, 0), Float64[], Float64[])
+
 function Base.show(io::IO, sd::ScatteringData)
     n_beams = length(sd.Ω_beam)
     n_dir = length(sd.θ_scatter)

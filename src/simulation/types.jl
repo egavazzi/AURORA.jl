@@ -258,7 +258,7 @@ struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <
     dt::Float64          # save cadence requested by the user
     dt_internal::Float64 # internal step = dt / CFL_factor, exact by construction
     CFL_factor::Int
-    t::TI                # full internal time grid  (length = n_save * CFL_factor + 1)
+    t::TI                # full internal time grid   (length = n_save * CFL_factor + 1)
     t_save::TS           # coarse save grid          (length = n_save + 1)
     n_save::Int          # total number of save intervals = round(Int, duration / dt)
     n_loop::Int
@@ -412,7 +412,7 @@ mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
     const flux::F
     const mode::S
     const savedir::String
-    const time::T
+    time::T               # rebuilt by initialize!(sim) if a grid changed (CFL grid depends on it)
     const save_input_flux::Bool
     cache::C
     cache_initialized::Bool
@@ -421,16 +421,16 @@ end
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
                           mode::AbstractMode=SteadyStateMode(),
                           save_input_flux=true)
-    time = _build_time_config(model, mode)
+    time = build_time_config(model, mode)
     cache = build_dummy_simulation_cache(model, time)
     return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux,
                             cache, false)
 end
 
 # Build the appropriate time configuration based on the mode
-_build_time_config(model::AuroraModel, mode::SteadyStateMode) =
+build_time_config(model::AuroraModel, mode::SteadyStateMode) =
     is_multi_step(mode) ? UniformTimeGrid(mode.duration, mode.dt) : SingleStepConfig()
-_build_time_config(model::AuroraModel, mode::TimeDependentMode) =
+build_time_config(model::AuroraModel, mode::TimeDependentMode) =
     RefinedTimeGrid(model, mode)
 
 function Base.show(io::IO, sim::AuroraSimulation)

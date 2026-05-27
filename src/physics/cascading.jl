@@ -61,25 +61,6 @@ function SpeciesCascadingCache(spec::S) where {S<:CascadingSpec}
     return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), zeros(0, 0, 0), Float64[], Float64[])
 end
 
-# Somewhat temporary container to hold all our three species specific caches
-# TODO: To be removed when we have fully moved towards a fully modular setup with things
-# attached to species inside the model.
-struct CascadingCache{T<:Tuple}
-    species::T
-end
-
-# And its initialization constructor
-function CascadingCache()
-    return CascadingCache((
-        SpeciesCascadingCache(DefaultCascadingSpecN2()),
-        SpeciesCascadingCache(DefaultCascadingSpecO2()),
-        SpeciesCascadingCache(DefaultCascadingSpecO()),
-    ))
-end
-
-Base.getindex(cache::CascadingCache, index::Int) = cache.species[index]
-Base.length(cache::CascadingCache) = length(cache.species)
-Base.iterate(cache::CascadingCache, state...) = iterate(cache.species, state...)
 
 
 

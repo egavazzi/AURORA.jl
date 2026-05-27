@@ -204,11 +204,11 @@ Square-wave modulation: alternates between `(1 - amplitude)` and `1`.
 """
 function apply_modulation(mod::SquareFlickering, t_shifted)
     # Square wave helper function
-    function _square(x)
+    function square_wave(x)
         ifelse(mod2pi(x) < π, 1.0, -1.0)
     end
     # Base pattern: (1 + square(...))/2 goes from 0 to 1
-    base_modulation = (1.0 .+ _square.(2π * mod.f .* t_shifted .- π/2)) ./ 2
+    base_modulation = (1.0 .+ square_wave.(2π * mod.f .* t_shifted .- π/2)) ./ 2
     # Scale by amplitude and shift
     modulated = (1.0 - mod.amplitude) .+ mod.amplitude .* base_modulation
     # Apply onset (Heaviside at t=0)
@@ -222,5 +222,5 @@ end
 Smooth onset using a C∞-smooth transition function over `[t_start, t_end]`.
 """
 function apply_modulation(mod::SmoothOnset, t_shifted)
-    return _smooth_transition.(t_shifted, mod.t_start, mod.t_end)
+    return smooth_transition.(t_shifted, mod.t_start, mod.t_end)
 end

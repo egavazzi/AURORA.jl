@@ -7,12 +7,9 @@
 
 Allocate or re-allocate the working cache for `sim`.
 
-This step performs the expensive setup that depends on the model geometry and the
-resolved time grid, but does not write any output files.
-
 # Keywords
 - `force_recompute`: ignore compatible on-disk cascading caches and rebuild them
-- `save_cache`: skip writing newly computed cascading caches when set to `false`
+- `save_cache`: if `false`, skip writing newly computed cascading caches to disk
 - `cache_root`: parent directory that contains the cascading and scattering cache folders
 """
 function initialize!(sim::AuroraSimulation;
@@ -21,38 +18,33 @@ function initialize!(sim::AuroraSimulation;
                      cache_root::String = default_cache_root())
     @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
+    if !sim.model.initialized
+        initialize!(sim.model; verbose=true, policy=cache_policy)
+    end
+    # Rebuild the time configuration from the (possibly changed) model grids.
+    sim.time = build_time_config(sim.model, sim.mode)
     sim.cache = build_simulation_cache(sim; cache_policy)
     sim.cache_initialized = true
     return nothing
 end
 
+needs_initialization(sim::AuroraSimulation) = !sim.cache_initialized || !sim.model.initialized
+
 function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
-    neutral_densities = n_neutrals(model.ionosphere)
-    N_neutrals = length(neutral_densities)
+    N_neutrals = length(model.species)
     _, t_loop = get_time_parameters(time)
 
     solver = SolverCache()
     degradation = DegradationCache{N_neutrals}(1, 1, 1, 1)
-    cascading = CascadingCache()
     matrices = TransportMatrices(1, 1, 1, 1)
     Ie = zeros(1, 1, 1)
     Ie_save = zeros(1, 1, 1)
     I0 = zeros(1, 1)
     Ie_top = zeros(1, 1, 1)
-    phase_fcn_neutrals = build_dummy_phase_functions(model)
-    B2B_fragment = zeros(size(model.scattering.Ω_subbeam_relative, 1),
-                         size(model.scattering.P_scatter, 2),
-                         size(model.scattering.P_scatter, 3))
+    B2B_fragment = zeros(1, 1, 1)
 
-    return SimulationCache(solver, degradation, cascading, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, phase_fcn_neutrals, B2B_fragment)
-end
-
-function build_dummy_phase_functions(model::AuroraModel)
-    n_theta = length(model.scattering.θ_scatter)
-    n_energy = model.energy_grid.n
-    empty_phase_pair() = (zeros(n_theta, n_energy), zeros(n_theta, n_energy))
-    return (empty_phase_pair(), empty_phase_pair(), empty_phase_pair())
+    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
+                           Ie_top, t_loop, B2B_fragment)
 end
 
 function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy = CachePolicy())
@@ -60,8 +52,7 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     model = sim.model
     z = model.altitude_grid.h
     μ_center = model.pitch_angle_grid.μ_center
-    neutral_densities = n_neutrals(model.ionosphere)
-    N_neutrals = length(neutral_densities)
+    N_neutrals = length(model.species)
     n_E = model.energy_grid.n
 
     # Set up time grid dimensions for working arrays
@@ -74,17 +65,11 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)
 
-    # Pre-compute scattering
-    phase_fcn_neutrals = compute_phase_functions(model)
+    # Pre-compute beam-to-beam scattering fragment
     B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
 
     # Pre-compute input flux data
     Ie_top = compute_input_flux(sim)
-
-    # Build the cascading cache
-    cascading = CascadingCache()
-    # Pre-load/calculate the cascading transfer matrices.
-    load_or_compute_cascading!(cascading, model.energy_grid; policy=cache_policy)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
@@ -92,8 +77,8 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     n_t_save = n_steps_to_save(sim, t_loop)
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
-    return SimulationCache(solver, degradation, cascading, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, phase_fcn_neutrals, B2B_fragment)
+    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
+                           Ie_top, t_loop, B2B_fragment)
 end
 
 # Time parameters for working arrays: (n_t, t_loop)
@@ -124,19 +109,3 @@ n_steps_to_save(::SingleStepConfig, t_loop) = 1
 n_steps_to_save(time::UniformTimeGrid, t_loop) = time.n_steps
 # n_save_per_loop + 1 to include the boundary/I0 column at the start of each loop
 n_steps_to_save(time::RefinedTimeGrid, t_loop) = time.n_save_per_loop + 1
-
-# Compute phase functions for electron and ion scattering off neutral molecules (N2, O2, O).
-# These phase functions describe the angular distribution of particles after collisions.
-function compute_phase_functions(model::AuroraModel)
-    E_centers = model.energy_grid.E_centers
-    θ_scatter = model.scattering.θ_scatter
-
-    print("Calculating the phase functions...")
-    phaseN2e, phaseN2i = phase_fcn_N2(θ_scatter, E_centers)
-    phaseO2e, phaseO2i = phase_fcn_O2(θ_scatter, E_centers)
-    phaseOe, phaseOi = phase_fcn_O(θ_scatter, E_centers)
-    println(" done ✅")
-
-    phase_fcn_neutrals = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi))
-    return phase_fcn_neutrals
-end

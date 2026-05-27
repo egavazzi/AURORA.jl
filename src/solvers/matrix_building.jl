@@ -97,25 +97,22 @@ end
 
 function update_A!(A, model::AuroraModel, iE)
     ionosphere = model.ionosphere
-    cross_sections = model.cross_sections
     energy_grid = model.energy_grid
-    n_neutrals_data = n_neutrals(ionosphere)
-    σ_neutrals = cross_sections.σ_neutrals
     E_centers = energy_grid.E_centers
     ΔE = energy_grid.ΔE
 
     fill!(A, 0.0)
     # Loop over the neutral species
-    for i1 in 1:length(n_neutrals_data)
-        n = n_neutrals_data[i1];  # Neutral density
-        σ = σ_neutrals[i1];  # Array with collision cross sections
+    for sp in model.species
+        n = sp.density
+        σ = sp.cross_sections
 
         # add elastic collisions
         A .+= n .* σ[1, iE];
 
         # add inelastic and ionization collisions
-        for i2 in 2:size(σ, 1)      # Loop over the different collisions, because
-            A .+= n .* σ[i2, iE];  # they have different cross sections
+        for i2 in 2:size(σ, 1)
+            A .+= n .* σ[i2, iE];
         end
     end
 
@@ -125,27 +122,21 @@ function update_A!(A, model::AuroraModel, iE)
     return nothing
 end
 
-function update_B!(B, model::AuroraModel, phase_fcn_neutrals, iE, B2B_fragment)
-    ionosphere = model.ionosphere
-    cross_sections = model.cross_sections
+function update_B!(B, model::AuroraModel, iE, B2B_fragment)
     energy_grid = model.energy_grid
     scattering = model.scattering
-    n_neutrals_data = n_neutrals(ionosphere)
-    σ_neutrals = cross_sections.σ_neutrals
-    collision_levels = cross_sections.collision_levels
     ΔE = energy_grid.ΔE
     finer_θ = scattering.θ_scatter
 
     # Zero out B in place
     fill!(B, 0.0)
-    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(n_neutrals_data));
+    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(model.species));
     # Loop over the neutral species
-    for i in 1:length(n_neutrals_data)
-        n = n_neutrals_data[i];                  # Neutral density
-        σ = σ_neutrals[i];                  # Array with collision cross sections
-        E_levels = collision_levels[i];    # Array with collision enery levels and number of secondary e-
-        phase_fcn = phase_fcn_neutrals[i];   # Tuple with two phase function arrays, the first for elastic collisions
-                                                    # and the second for inelastic collisions
+    for (i, sp) in enumerate(model.species)
+        n = sp.density
+        σ = sp.cross_sections
+        E_levels = sp.excitation_levels
+        phase_fcn = sp.phase_fcn
 
         # Convert to 3D the scattering probabilities that are in 1D
         phase_fcn_e = convert_phase_fcn_to_3D(phase_fcn[1][:, iE], finer_θ);
@@ -257,24 +248,22 @@ function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
 end
 
 """
-    update_matrices!(matrices, model, phase_fcn_neutrals, iE, B2B_fragment)
+    update_matrices!(matrices, model, iE, B2B_fragment)
 
 Update the A and B matrices in place for a given energy level iE.
 
 # Arguments
 - `matrices::TransportMatrices`: Container to update
 - `model`: `AuroraModel` (grids + atmosphere + physics)
-- `phase_fcn_neutrals`: Phase functions for all species
 - `iE`: Current energy index
 - `B2B_fragment`: Pre-computed beam-to-beam fragments
 
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, model::AuroraModel, phase_fcn_neutrals,
-                          iE, B2B_fragment)
+function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
     update_A!(matrices.A, model, iE)
-    return update_B!(matrices.B, model, phase_fcn_neutrals, iE, B2B_fragment)
+    return update_B!(matrices.B, model, iE, B2B_fragment)
 end
 
 

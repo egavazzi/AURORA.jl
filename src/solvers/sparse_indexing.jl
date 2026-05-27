@@ -98,17 +98,17 @@ Returns `Mlhs` or `(Mlhs, Mrhs)`.
 """
 function create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion; include_rhs::Bool = false)
     max_nnz = n_angle * n_angle * 3 * n_z
-    row_l, col_l, val_l = _alloc_coo(max_nnz)
-    row_r, col_r, val_r = include_rhs ? _alloc_coo(max_nnz) : (Int[], Int[], Float64[])
+    row_l, col_l, val_l = alloc_coo(max_nnz)
+    row_r, col_r, val_r = include_rhs ? alloc_coo(max_nnz) : (Int[], Int[], Float64[])
 
     for i1 in 1:n_angle
         for i2 in 1:n_angle
             if i1 != i2
-                _add_offdiagonal_block!(row_l, col_l, val_l, i1, i2, n_z)
-                include_rhs && _add_offdiagonal_block!(row_r, col_r, val_r, i1, i2, n_z)
+                add_offdiagonal_block!(row_l, col_l, val_l, i1, i2, n_z)
+                include_rhs && add_offdiagonal_block!(row_r, col_r, val_r, i1, i2, n_z)
             else
-                _add_diagonal_block_lhs!(row_l, col_l, val_l, i1, n_z, μ, D, Ddiffusion)
-                include_rhs && _add_diagonal_block_rhs!(row_r, col_r, val_r, i1, n_z, μ, D, Ddiffusion)
+                add_diagonal_block_lhs!(row_l, col_l, val_l, i1, n_z, μ, D, Ddiffusion)
+                include_rhs && add_diagonal_block_rhs!(row_r, col_r, val_r, i1, n_z, μ, D, Ddiffusion)
             end
         end
     end
@@ -122,14 +122,14 @@ function create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion; incl
     return Mlhs
 end
 
-function _alloc_coo(max_nnz)
+function alloc_coo(max_nnz)
     rows = Vector{Int}();  sizehint!(rows, max_nnz)
     cols = Vector{Int}();  sizehint!(cols, max_nnz)
     vals = Vector{Float64}(); sizehint!(vals, max_nnz)
     return rows, cols, vals
 end
 
-function _add_offdiagonal_block!(rows, cols, vals, i1, i2, n_z)
+function add_offdiagonal_block!(rows, cols, vals, i1, i2, n_z)
     offset_row = (i1 - 1) * n_z
     offset_col = (i2 - 1) * n_z
     for i in 2:(n_z - 1)
@@ -139,7 +139,7 @@ function _add_offdiagonal_block!(rows, cols, vals, i1, i2, n_z)
     end
 end
 
-function _add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
+function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
     offset = (i1 - 1) * n_z
 
     # First row boundary condition
@@ -169,7 +169,7 @@ function _add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
     end
 end
 
-function _add_diagonal_block_rhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
+function add_diagonal_block_rhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
     offset = (i1 - 1) * n_z
     # No boundary rows in Mrhs
 
@@ -227,13 +227,13 @@ function extract_nzval_indices(M::SparseMatrixCSC, n_z::Int, n_angle::Int)
 
             if i1 != i2
                 # Off-diagonal: only main diagonal entries
-                d = _collect_indices(nz_lookup, offset_row, offset_col, 0, n_z)
+                d = collect_indices(nz_lookup, offset_row, offset_col, 0, n_z)
                 indices[i1, i2] = BlockIndices(d, Int[], Int[], 0, 0, 0)
             else
                 offset = (i1 - 1) * n_z
-                d     = _collect_indices(nz_lookup, offset, offset,  0, n_z)
-                sup   = _collect_indices(nz_lookup, offset, offset, +1, n_z)
-                sub   = _collect_indices(nz_lookup, offset, offset, -1, n_z)
+                d     = collect_indices(nz_lookup, offset, offset,  0, n_z)
+                sup   = collect_indices(nz_lookup, offset, offset, +1, n_z)
+                sub   = collect_indices(nz_lookup, offset, offset, -1, n_z)
 
                 bc_first   = get(nz_lookup, (offset + 1,    offset + 1),        0)
                 bc_last    = get(nz_lookup, (offset + n_z,  offset + n_z),      0)
@@ -251,7 +251,7 @@ end
 Collect nzval indices for a given diagonal offset within the interior rows 2:(n_z-1).
 `offset` is 0 for main diagonal, +1 for super, -1 for sub.
 """
-function _collect_indices(nz_lookup, offset_row, offset_col, diag_offset, n_z)
+function collect_indices(nz_lookup, offset_row, offset_col, diag_offset, n_z)
     out = Int[]
     sizehint!(out, n_z - 2)
     for i in 2:(n_z - 1)

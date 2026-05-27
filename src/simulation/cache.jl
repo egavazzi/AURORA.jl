@@ -34,18 +34,6 @@ mutable struct DegradationCache{N}
     primary_e_spectrum::NTuple{N, Vector{Float64}}   # energy spectrum weighting for primaries per species   (shape: n_E)
 end
 
-function DegradationCache()
-    ionization_source_sum = zeros(1, 1)
-    thermal_e_loss = zeros(1)
-    Ie_scatter = zeros(1, 1)
-    secondary_e_flux     = ntuple(_ -> zeros(1, 1), Val(3))
-    primary_e_flux       = ntuple(_ -> zeros(1, 1), Val(3))
-    secondary_e_spectrum = ntuple(_ -> zeros(1), Val(3))
-    primary_e_spectrum   = ntuple(_ -> zeros(1), Val(3))
-    return DegradationCache(ionization_source_sum, thermal_e_loss, Ie_scatter,
-                            secondary_e_flux, primary_e_flux,
-                            secondary_e_spectrum, primary_e_spectrum)
-end
 
 function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
     ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
@@ -62,16 +50,14 @@ function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
                             secondary_e_spectrum, primary_e_spectrum)
 end
 
-struct SimulationCache{D<:DegradationCache, C<:CascadingCache, TL, P, B}
+struct SimulationCache{D<:DegradationCache, TL, B}
     solver::SolverCache
     degradation::D
-    cascading::C
     matrices::TransportMatrices
     Ie::Array{Float64, 3}
     Ie_save::Array{Float64, 3}
     I0::Matrix{Float64}
     Ie_top::Array{Float64, 3}
     t_loop::TL
-    phase_fcn_neutrals::P
     B2B_fragment::B
 end

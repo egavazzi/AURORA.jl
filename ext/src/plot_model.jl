@@ -12,17 +12,17 @@ function AURORA.plot_model(model::AURORA.AuroraModel; panels=[:all])
 
     for panel in panels
         if panel === :atmosphere
-            figs[:atmosphere] = _plot_atmosphere(model)
+            figs[:atmosphere] = plot_atmosphere(model)
         elseif panel === :energy_levels
-            figs[:energy_levels] = _plot_energy_levels(model)
+            figs[:energy_levels] = plot_energy_levels(model)
         elseif panel === :energy_grid
-            figs[:energy_grid] = _plot_energy_grid(model)
+            figs[:energy_grid] = plot_energy_grid(model)
         elseif panel === :cross_sections
-            figs[:cross_sections] = _plot_cross_sections(model)
+            figs[:cross_sections] = plot_cross_sections(model)
         elseif panel === :phase_functions
-            figs[:phase_functions] = _plot_phase_functions(model)
+            figs[:phase_functions] = plot_phase_functions(model)
         elseif panel === :scattering
-            figs[:scattering] = _plot_scattering(model)
+            figs[:scattering] = plot_scattering(model)
         else
             @warn "Unknown panel: $panel. Available panels: $ALL_PANELS"
         end
@@ -35,19 +35,22 @@ end
 # ======================================================================================== #
 # Atmosphere
 # ======================================================================================== #
-function _plot_atmosphere(model)
-    h_km = model.altitude_grid.h ./ 1e3
-    iono = model.ionosphere
-    nd = AURORA.n_neutrals(iono)
+function plot_atmosphere(model)
+    h_km  = model.altitude_grid.h ./ 1e3
+    iono  = model.ionosphere
+    styles = (:solid, :dash, :dashdot, :dot)
 
     fig = Figure(size = (800, 600))
 
     ax1 = Axis(fig[1, 1]; xlabel="(m⁻³)", ylabel="height (km)",
-               title="MSIS neutral density", xscale=log10,
+               title="Neutral density", xscale=log10,
                xticks=LogTicks(LinearTicks(9)))
-    lines!(ax1, nd.nN2, h_km; linewidth=2, label="N₂")
-    lines!(ax1, nd.nO2, h_km; linewidth=2, linestyle=:dash, label="O₂")
-    lines!(ax1, nd.nO, h_km; linewidth=2, linestyle=:dashdot, label="O")
+    for (i, sp) in enumerate(model.species)
+        lines!(ax1, sp.density, h_km;
+               linewidth  = 2,
+               linestyle  = styles[mod1(i, length(styles))],
+               label      = String(sp.name))
+    end
     xlims!(ax1, 1e12, 1e20)
     ylims!(ax1, h_km[1] - 10, h_km[end] + 10)
     axislegend(ax1, "Densities"; position=:rt)
@@ -65,17 +68,16 @@ end
 # ======================================================================================== #
 # Energy levels
 # ======================================================================================== #
-function _plot_energy_levels(model)
-    levels = model.cross_sections.collision_levels
+function plot_energy_levels(model)
+    titles = Dict(:N2 => "N₂", :O2 => "O₂", :O => "O")
 
     fig = Figure(size = (800, 600))
-    ax1 = Axis(fig[1, 1]; ylabel="Excitation energy (eV)", title="N₂")
-    ax2 = Axis(fig[1, 2]; title="O₂")
-    ax3 = Axis(fig[1, 3]; title="O")
+    axs = [Axis(fig[1, i]; title=titles[sp.name]) for (i, sp) in enumerate(model.species)]
+    axs[1].ylabel = "Excitation energy (eV)"
 
-    for (ax, data) in zip([ax1, ax2, ax3],
-                          [levels.N2_levels, levels.O2_levels, levels.O_levels])
-        for i in axes(data, 1)
+    for (ax, sp) in zip(axs, model.species)
+        data = sp.excitation_levels
+        for i in 1:size(data, 1)
             lines!(ax, [0, 1], data[i, 1] .* [1, 1]; linewidth=2)
         end
         xlims!(ax, 0, 1)
@@ -88,7 +90,7 @@ end
 # ======================================================================================== #
 # Energy grid
 # ======================================================================================== #
-function _plot_energy_grid(model)
+function plot_energy_grid(model)
     E_centers = model.energy_grid.E_centers
     ΔE = model.energy_grid.ΔE
 
@@ -104,16 +106,16 @@ end
 # ======================================================================================== #
 # Cross-sections
 # ======================================================================================== #
-function _plot_cross_sections(model)
+function plot_cross_sections(model)
     E = model.energy_grid.E_centers
-    σ = model.cross_sections.σ_neutrals
+    titles = Dict(:N2 => "σ N₂", :O2 => "σ O₂", :O => "σ O")
 
     fig = Figure(size=(1800, 800))
 
-    for (idx, (species, σ_sp, title_str)) in enumerate([
-            ("N2", σ.σ_N2, "σ N₂"),
-            ("O2", σ.σ_O2, "σ O₂"),
-            ("O",  σ.σ_O,  "σ O")])
+    for (idx, sp) in enumerate(model.species)
+        species  = String(sp.name)
+        σ_sp     = sp.cross_sections
+        title_str = titles[sp.name]
 
         names = AURORA.get_level_names(species)
         n_levels = length(names)
@@ -219,7 +221,7 @@ end
 # ======================================================================================== #
 # Phase functions
 # ======================================================================================== #
-function _plot_phase_functions(model)
+function plot_phase_functions(model)
     E = model.energy_grid.E_centers
     θ = deg2rad.(0:180)
 
@@ -271,7 +273,7 @@ end
 # ======================================================================================== #
 # Scattering matrices
 # ======================================================================================== #
-function _plot_scattering(model)
+function plot_scattering(model)
     P_scatter = model.scattering.P_scatter
     θ_lims = model.pitch_angle_grid.θ_lims
     n_beams = model.pitch_angle_grid.n_beams

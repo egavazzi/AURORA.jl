@@ -5,14 +5,11 @@ using LoopVectorization: @tturbo
 #################################################################################
 
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
-                   B2B_inelastic_neutrals, cascading_cache, iE, cache)
+                   B2B_inelastic_neutrals, iE, cache)
 
     z = model.altitude_grid.h
     ne = model.ionosphere.ne
     Te = model.ionosphere.Te
-    n_neutrals_data = n_neutrals(model.ionosphere)
-    σ_neutrals = model.cross_sections.σ_neutrals
-    collision_levels = model.cross_sections.collision_levels
     energy_grid = model.energy_grid
     E_edges = energy_grid.E_edges
     E_centers = energy_grid.E_centers
@@ -39,12 +36,12 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     primary_e_spectrum   = cache.primary_e_spectrum
 
     # Loop over the neutral species
-    for i in 1:length(n_neutrals_data)
-        n = n_neutrals_data[i]                          # Neutral density
-        σ = σ_neutrals[i]                          # Array with collision cross sections
-        E_levels = collision_levels[i]            # Array with collision energy levels and number of secondary e-
-        B2B_inelastic = B2B_inelastic_neutrals[i]  # Array with the probabilities of scattering from beam to beam
-        species_cascading = cascading_cache[i]
+    for (i, sp) in enumerate(model.species)
+        n = sp.density
+        σ = sp.cross_sections
+        E_levels = sp.excitation_levels
+        B2B_inelastic = B2B_inelastic_neutrals[i]
+        species_cascading = sp.cascading_data
 
         add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
 

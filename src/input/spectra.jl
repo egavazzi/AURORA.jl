@@ -215,7 +215,7 @@ function evaluate_spectrum(spec::FlatSpectrum, model::AuroraModel)
 
     qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
-    return _flat_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E_min)
+    return flat_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E_min)
 end
 
 
@@ -230,7 +230,7 @@ function evaluate_spectrum(spec::GaussianSpectrum, model::AuroraModel)
 
     qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
-    return _gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E₀, spec.ΔE)
+    return gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E₀, spec.ΔE)
 end
 
 
