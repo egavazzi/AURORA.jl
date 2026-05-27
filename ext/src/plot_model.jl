@@ -12,17 +12,17 @@ function AURORA.plot_model(model::AURORA.AuroraModel; panels=[:all])
 
     for panel in panels
         if panel === :atmosphere
-            figs[:atmosphere] = _plot_atmosphere(model)
+            figs[:atmosphere] = plot_atmosphere(model)
         elseif panel === :energy_levels
-            figs[:energy_levels] = _plot_energy_levels(model)
+            figs[:energy_levels] = plot_energy_levels(model)
         elseif panel === :energy_grid
-            figs[:energy_grid] = _plot_energy_grid(model)
+            figs[:energy_grid] = plot_energy_grid(model)
         elseif panel === :cross_sections
-            figs[:cross_sections] = _plot_cross_sections(model)
+            figs[:cross_sections] = plot_cross_sections(model)
         elseif panel === :phase_functions
-            figs[:phase_functions] = _plot_phase_functions(model)
+            figs[:phase_functions] = plot_phase_functions(model)
         elseif panel === :scattering
-            figs[:scattering] = _plot_scattering(model)
+            figs[:scattering] = plot_scattering(model)
         else
             @warn "Unknown panel: $panel. Available panels: $ALL_PANELS"
         end
@@ -35,7 +35,7 @@ end
 # ======================================================================================== #
 # Atmosphere
 # ======================================================================================== #
-function _plot_atmosphere(model)
+function plot_atmosphere(model)
     h_km  = model.altitude_grid.h ./ 1e3
     iono  = model.ionosphere
     styles = (:solid, :dash, :dashdot, :dot)
@@ -68,7 +68,7 @@ end
 # ======================================================================================== #
 # Energy levels
 # ======================================================================================== #
-function _plot_energy_levels(model)
+function plot_energy_levels(model)
     titles = Dict(:N2 => "N₂", :O2 => "O₂", :O => "O")
 
     fig = Figure(size = (800, 600))
@@ -90,7 +90,7 @@ end
 # ======================================================================================== #
 # Energy grid
 # ======================================================================================== #
-function _plot_energy_grid(model)
+function plot_energy_grid(model)
     E_centers = model.energy_grid.E_centers
     ΔE = model.energy_grid.ΔE
 
@@ -106,7 +106,7 @@ end
 # ======================================================================================== #
 # Cross-sections
 # ======================================================================================== #
-function _plot_cross_sections(model)
+function plot_cross_sections(model)
     E = model.energy_grid.E_centers
     titles = Dict(:N2 => "σ N₂", :O2 => "σ O₂", :O => "σ O")
 
@@ -221,7 +221,7 @@ end
 # ======================================================================================== #
 # Phase functions
 # ======================================================================================== #
-function _plot_phase_functions(model)
+function plot_phase_functions(model)
     E = model.energy_grid.E_centers
     θ = deg2rad.(0:180)
 
@@ -273,7 +273,7 @@ end
 # ======================================================================================== #
 # Scattering matrices
 # ======================================================================================== #
-function _plot_scattering(model)
+function plot_scattering(model)
     P_scatter = model.scattering.P_scatter
     θ_lims = model.pitch_angle_grid.θ_lims
     n_beams = model.pitch_angle_grid.n_beams

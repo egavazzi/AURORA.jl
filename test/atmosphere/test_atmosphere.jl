@@ -5,11 +5,10 @@
     iono = Ionosphere(msis_file, iri_file, z)
 
     @test iono isa Ionosphere
-    @test length(iono.Tn) == length(z)
     @test length(iono.Te) == length(z)
     @test length(iono.ne) == length(z)
 
-    for field in (iono.Tn, iono.Te, iono.ne)
+    for field in (iono.Te, iono.ne)
         @test !any(isnan.(field))
         @test !any(isinf.(field))
         @test !any(field .< 0)

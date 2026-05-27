@@ -166,7 +166,6 @@ function save_neutrals(sim::AuroraSimulation)
         end
         write(file, "ne", ionosphere.ne)
         write(file, "Te", ionosphere.Te)
-        write(file, "Tn", ionosphere.Tn)
     close(file)
 end
 

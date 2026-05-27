@@ -299,7 +299,7 @@ end
     initialize!(model)
     old_n_z = model.altitude_grid.n
     @test length(model.s_field)               == old_n_z
-    @test length(model.ionosphere.Tn)         == old_n_z
+    @test length(model.ionosphere.ne)         == old_n_z
     @test length(model.species[1].density)    == old_n_z
 
     model.altitude_grid = AltitudeGrid(100, 300)
@@ -308,7 +308,7 @@ end
     new_n_z = model.altitude_grid.n
     @test new_n_z > old_n_z
     @test length(model.s_field)               == new_n_z
-    @test length(model.ionosphere.Tn)         == new_n_z
+    @test length(model.ionosphere.ne)         == new_n_z
     @test length(model.species[1].density)    == new_n_z
 end
 
