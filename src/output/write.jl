@@ -175,12 +175,14 @@ function create_simulation_nc(sim::AuroraSimulation)
                            "long_name" => "pitch-angle cosine bin boundaries"])
     ml_v[:] = collect(Float64, μ_lims)
 
-    # Main output variable — chunked and compressed
+    # Main output variable — chunked and compressed.
+    # NOTE: Ie is the electron *number* flux, already integrated over each energy bin and
+    # over each beam's solid angle (not a differential flux). Units are m-2 s-1.
     defVar(ds, "Ie", Float32, ("altitude", "pitch_angle", "time", "energy");
            deflatelevel=dl,
            chunksizes=(n_z, n_μ, 1, n_E),
-           attrib=["units"     => "eV-1 m-2 s-1 sr-1",
-                    "long_name" => "differential electron flux"])
+           attrib=["units"     => "m-2 s-1",
+                    "long_name" => "electron number flux"])
 
     # Input flux — optional, written once at startup before any solver loop
     if out.save_input_flux
@@ -196,8 +198,8 @@ function create_simulation_nc(sim::AuroraSimulation)
         Ietop_v = defVar(ds, "Ie_top", Float32, ("pitch_angle", "time_top", "energy");
                          deflatelevel=dl,
                          chunksizes=(n_μ, 1, n_E),
-                         attrib=["units"     => "eV-1 m-2 s-1 sr-1",
-                                  "long_name" => "input boundary electron flux (top of atmosphere)"])
+                         attrib=["units"     => "m-2 s-1",
+                                  "long_name" => "input boundary number flux (top of atmosphere)"])
         Ietop_v[:, :, :] = Float32.(Ie_top_3D)
         sync(ds)
     end

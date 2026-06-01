@@ -12,7 +12,7 @@ simulation output arrays.
 
 # Returns
 Named tuple with fields:
-- `Ie`        : electron flux `[n_z, n_μ, n_t, n_E]` (eV⁻¹ m⁻² s⁻¹ sr⁻¹ as Float64)
+- `Ie`        : electron number flux `[n_z, n_μ, n_t, n_E]` (m⁻² s⁻¹)
 - `t`         : time axis `[n_t]` (seconds)
 - `h_atm`     : altitude grid `[n_z]` (metres)
 - `E_centers` : energy bin centres `[n_E]` (eV)
