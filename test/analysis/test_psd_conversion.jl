@@ -51,54 +51,72 @@ end
 
 @testitem "make_psd_file writes f and F" begin
     using AURORA
-    using MAT: matopen, matread
+    using NCDatasets
 
     tmpdir = mktempdir()
-    filepath = joinpath(tmpdir, "IeFlickering-01.mat")
+    nc_path = joinpath(tmpdir, "simulation_data.nc")
 
-    E_edges = [10.0, 20.0, 40.0, 80.0]
+    E_edges   = [10.0, 20.0, 40.0, 80.0]
     E_centers = [15.0, 30.0, 60.0]
-    ΔE = diff(E_edges)  # [10.0, 20.0, 40.0]
-    μ_lims = [-1.0, 0.0, 1.0]
-    t_run = [0.0, 1.0]
-    h_atm = [100e3, 110e3]
+    μ_lims    = [-1.0, 0.0, 1.0]
+    t_run     = [0.0, 1.0]
+    h_atm     = [100e3, 110e3]
 
     Nz = length(h_atm)
     nμ = length(μ_lims) - 1
     Nt = length(t_run)
     nE = length(E_centers)
 
-    Ie = zeros(Float64, nμ * Nz, Nt, nE)
+    # Ie [Nz, nμ, Nt, nE]
+    Ie = zeros(Float32, Nz, nμ, Nt, nE)
     for i_E in 1:nE, i_t in 1:Nt, i_μ in 1:nμ, i_z in 1:Nz
-        Ie[(i_μ - 1) * Nz + i_z, i_t, i_E] = 1.0 + i_z + i_μ + i_t + i_E
+        Ie[i_z, i_μ, i_t, i_E] = Float32(1.0 + i_z + i_μ + i_t + i_E)
     end
 
-    matopen(filepath, "w") do io
-        write(io, "Ie_ztE", Ie)
-        write(io, "E_edges", E_edges)
-        write(io, "E_centers", E_centers)
-        write(io, "dE", ΔE)
-        write(io, "mu_lims", μ_lims)
-        write(io, "t_run", t_run)
-        write(io, "h_atm", h_atm)
+    # Write minimal simulation_data.nc
+    # Note: unlimited dimension requires indexed writes, not t_v[:] = ...
+    NCDataset(nc_path, "c") do ds
+        defDim(ds, "altitude",           Nz)
+        defDim(ds, "pitch_angle",        nμ)
+        defDim(ds, "energy",             nE)
+        defDim(ds, "energy_bounds",      nE + 1)
+        defDim(ds, "pitch_angle_bounds", nμ + 1)
+        defDim(ds, "time",               Inf)
+
+        alt_v = defVar(ds, "altitude",      Float64, ("altitude",))
+        alt_v[:] = h_atm
+        en_v  = defVar(ds, "energy",        Float64, ("energy",))
+        en_v[:] = E_centers
+        ee_v  = defVar(ds, "energy_edges",  Float64, ("energy_bounds",))
+        ee_v[:] = E_edges
+        ml_v  = defVar(ds, "mu_lims",       Float64, ("pitch_angle_bounds",))
+        ml_v[:] = μ_lims
+        defVar(ds, "time", Float64, ("time",))
+        defVar(ds, "Ie",   Float32, ("altitude", "pitch_angle", "time", "energy"))
+        ds["time"][1:Nt]              = t_run
+        ds["Ie"][:, :, 1:Nt, :]      = Ie
     end
 
     AURORA.make_psd_file(tmpdir; compute = :both)
 
-    outpath = joinpath(tmpdir, "psd", "psd-01.mat")
+    outpath = joinpath(tmpdir, "analysis", "psd.nc")
     @test isfile(outpath)
 
-    out = matread(outpath)
-    @test haskey(out, "f")
-    @test haskey(out, "F")
-    @test haskey(out, "dvpar")
-    @test size(out["f"]) == (Nz, nμ, Nt, nE)
-    @test size(out["F"], 2) == Nz
-    @test size(out["F"], 3) == Nt
+    NCDataset(outpath, "r") do ds
+        @test haskey(ds, "f")
+        @test haskey(ds, "F")
+        @test haskey(ds, "dvpar")
+        @test size(ds["f"]) == (Nz, nμ, Nt, nE)
+        @test size(ds["F"], 2) == Nz   # (vpar, altitude, time)
+        @test size(ds["F"], 3) == Nt
 
-    Ie_reshaped = reshape(Ie, Nz, nμ, Nt, nE)
-    v = out["v"]
-    conserved_density = dropdims(sum(Ie_reshaped ./ reshape(v, 1, 1, 1, :); dims = (2, 4)), dims = (2, 4))
-    reduced_density = dropdims(sum(out["F"] .* reshape(out["dvpar"], :, 1, 1); dims = 1), dims = 1)
-    @test conserved_density ≈ reduced_density rtol = 1e-10 atol = 1e-10
+        # Check density conservation
+        v = Array(ds["v"])   # [nE]
+        Ie_f64 = Float64.(Ie)
+        conserved_density = dropdims(sum(Ie_f64 ./ reshape(v, 1, 1, 1, :); dims = (2, 4)), dims = (2, 4))
+        dvpar = Array(ds["dvpar"])
+        F = Float64.(Array(ds["F"]))
+        reduced_density = dropdims(sum(F .* reshape(dvpar, :, 1, 1); dims = 1), dims = 1)
+        @test conserved_density ≈ reduced_density rtol = 1e-5 atol = 1e-5
+    end
 end

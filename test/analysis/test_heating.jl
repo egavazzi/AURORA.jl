@@ -1,17 +1,17 @@
 @testitem "make_heating_rate_file produces correct output" setup=[FluxTestSetup] begin
     using AURORA
-    using MAT: matread
+    using NCDatasets
 
     AURORA.make_heating_rate_file(FluxTestSetup.savedir)
 
-    outfile = joinpath(FluxTestSetup.savedir, "heating_rate.mat")
+    outfile = joinpath(FluxTestSetup.savedir, "analysis", "heating_rate.nc")
     @test isfile(outfile)
 
-    out = matread(outfile)
-    @test haskey(out, "heating_rate")
-    @test haskey(out, "h_atm")
-    @test haskey(out, "t")
-
-    @test size(out["heating_rate"]) == (FluxTestSetup.n_z, FluxTestSetup.n_t)
-    @test all(out["heating_rate"] .>= 0)
+    NCDataset(outfile, "r") do ds
+        @test haskey(ds, "heating_rate")
+        @test haskey(ds, "altitude")
+        @test haskey(ds, "time")
+        @test size(ds["heating_rate"]) == (FluxTestSetup.n_z, FluxTestSetup.n_t)
+        @test all(Array(ds["heating_rate"]) .>= 0)
+    end
 end

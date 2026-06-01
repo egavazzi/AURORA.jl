@@ -56,7 +56,7 @@ end
 end
 
 @testitem "Multi-step SS: saved t_run matches time grid" begin
-    using MAT
+    using NCDatasets
     mktempdir() do savedir
         altitude_lims = [100, 200]
         θ_lims = 180:-90:0
@@ -72,16 +72,17 @@ end
 
         run!(sim)
 
-        data = matread(joinpath(savedir, "IeFlickering-01.mat"))
-        t_run = vec(data["t_run"])
-        expected_t = collect(sim.time.t)
+        NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+            t_run = Array(ds["time"])
+            expected_t = collect(sim.time.t)
 
-        # t_run must span the full time axis, not be a scalar 1
-        @test length(t_run) == length(expected_t)
-        @test t_run ≈ expected_t
+            # t_run must span the full time axis, not be a scalar 1
+            @test length(t_run) == length(expected_t)
+            @test t_run ≈ expected_t
 
-        # Ie_ztE time dimension must also match
-        @test size(data["Ie_ztE"], 2) == length(expected_t)
+            # Ie time dimension must also match
+            @test size(ds["Ie"], 3) == length(expected_t)
+        end
     end
 end
 
@@ -319,7 +320,7 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode(), overwrite=true)
         run!(sim)
 
         model.altitude_grid = AltitudeGrid(100, 300)
@@ -360,7 +361,7 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode(), overwrite=true)
         run!(sim)
 
         # Change the grid and call run! directly — no initialize!(model)/initialize!(sim).
@@ -382,7 +383,8 @@ end
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim   = AuroraSimulation(model, flux, savedir;
                                  mode = TimeDependentMode(duration=0.02, dt=0.01,
-                                                          CFL_number=128, n_loop=1))
+                                                          CFL_number=128, n_loop=1),
+                                 overwrite=true)
         run!(sim)
         @test size(sim.cache.Ie, 3) == model.energy_grid.n
 

@@ -56,12 +56,15 @@ include("solvers/steady_state.jl")
 include("solvers/crank_nicolson.jl")
 
 include("simulation/cache.jl")
+include("simulation/output_manager.jl")
+export AuroraOutputManager
 include("simulation/types.jl")
 export AuroraSimulation
 export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent
 export AbstractTimeConfig, SingleStepConfig, UniformTimeGrid, RefinedTimeGrid
 include("simulation/initialize.jl")
 export initialize!
+include("simulation/io.jl")
 include("simulation/run.jl")
 export run!
 
@@ -72,7 +75,6 @@ include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
        load_volume_excitation, load_column_excitation, load_input
 include("analysis/utilities.jl")
-export list_result_files, read_result
 include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")
@@ -148,7 +150,7 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
                          `animation_with_precipitation.mp4` when `plot_input = true`) inside
                          `directory_to_process`.
 - `plot_input = false`: if `true`, also plots the precipitating electron flux at the top of
-                        the ionosphere by loading it from the `Ie_incoming_*.mat` file.
+                        the ionosphere by loading it from `simulation_data.nc`.
 - `input_angle_cone = [170, 180]`: pitch-angle cone (degrees) used to select and sum beams
                                    for the precipitation overlay. Only used when `plot_input = true`.
 - `dt_steps = 1`: plot one frame every `dt_steps` timesteps. Increase to speed up rendering.

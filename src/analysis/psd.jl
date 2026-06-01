@@ -1,41 +1,34 @@
-using MAT: matopen, matread
+using NCDatasets: NCDataset, defDim, defVar
 using LoopVectorization
 
 const m_e = 9.10938356e-31
 const e_charge = 1.602176634e-19
 
 """
-    load_Ie(path)
+    load_Ie(sim_dir)
 
-Load a `IeFlickering-NN.mat` result file produced by AURORA.
+Load the simulation result from `simulation_data.nc` in `sim_dir`.
 
 Returns a named tuple with fields:
-- `Ie`      : `[Nz, n_mu, Nt, nE]` number flux [m^-2 s^-1], integrated over ΔE and ΔΩ
-- `E_edges` : energy bin edges [eV], length `nE + 1`
+- `Ie`       : `[Nz, n_mu, Nt, nE]` number flux [m⁻² s⁻¹], as Float64
+- `E_edges`  : energy bin edges [eV], length `nE + 1`
 - `E_centers`: energy bin centers [eV], length `nE`
-- `dE`      : energy bin widths [eV], length `nE`
-- `μ_lims`  : cosine pitch-angle bin limits, length `n_mu + 1`
-- `t_run`   : time vector [s], length `Nt`
-- `h_atm`   : altitude grid [m], length `Nz`
+- `dE`       : energy bin widths [eV], length `nE`
+- `μ_lims`   : cosine pitch-angle bin limits, length `n_mu + 1`
+- `t_run`    : time vector [s], length `Nt`
+- `h_atm`    : altitude grid [m], length `Nz`
 """
-function load_Ie(path::AbstractString)
-    file = matopen(path)
-    Ie_raw = read(file, "Ie_ztE")
-    E_edges = vec(read(file, "E_edges"))
-    E_centers = vec(read(file, "E_centers"))
-    ΔE = vec(read(file, "dE"))
-    μ_lims = vec(read(file, "mu_lims"))
-    t_run = vec(read(file, "t_run"))
-    h_atm = vec(read(file, "h_atm"))
-    close(file)
-
-    nE = size(Ie_raw, 3)
-    Nz = length(h_atm)
-    nμ = length(μ_lims) - 1
-
-    Ie = reshape(Ie_raw, Nz, nμ, length(t_run), nE)
-
-    return (Ie = Ie, E_edges = E_edges, E_centers = E_centers, ΔE = ΔE, μ_lims = μ_lims, t_run = t_run, h_atm = h_atm)
+function load_Ie(sim_dir::AbstractString)
+    result = read_simulation_nc(sim_dir)
+    return (
+        Ie       = result.Ie,
+        E_edges  = result.E_edges,
+        E_centers = result.E_centers,
+        ΔE       = result.dE,
+        μ_lims   = result.mu_lims,
+        t_run    = result.t,
+        h_atm    = result.h_atm,
+    )
 end
 
 """
@@ -154,9 +147,6 @@ function compute_F(
 
     Nvpar = length(Δvpar)
     vpar_centers = @. 0.5 * (vpar_edges[1:(end - 1)] + vpar_edges[2:end])
-    # Use a [Nz, Nvpar, Nt] intermediate layout for the computation.
-    # This ensures iz is the innermost dimension for both arrays, which enables much more
-    # efficient SIMD optimizations from @tturbo compared to the original [Nvpar, Nz, Nt] layout.
     F_local = zeros(Float64, Nz, Nvpar, Nt)
 
     for i in 1:nE
@@ -192,27 +182,26 @@ function compute_F(
         end
     end
 
-    # Permute [Nz, Nvpar, Nt] → [Nvpar, Nz, Nt]
     F = permutedims(F_local, (2, 1, 3))
 
     return (F = F, vpar_edges = vpar_edges, vpar_centers = vpar_centers, Δvpar = Δvpar)
 end
 
 """
-    make_psd_from_AURORA(path_to_file; compute=:f_only, vpar_edges=nothing)
+    make_psd_from_AURORA(sim_dir; compute=:f_only, vpar_edges=nothing)
 
-Load an AURORA result file and compute full phase-space density `f`, the reduced
-distribution `F(v_parallel)`, or both.
+Load the AURORA simulation result from `sim_dir` and compute full phase-space
+density `f`, the reduced distribution `F(v_parallel)`, or both.
 
 If `vpar_edges` is `nothing` and `F` is requested, the function uses an
 automatic symmetric uniform interval grid.
 """
 function make_psd_from_AURORA(
-    path_to_file::AbstractString;
+    sim_dir::AbstractString;
     compute::Symbol = :f_only,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
 )
-    data = load_Ie(path_to_file)
+    data = load_Ie(sim_dir)
     grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
 
     if compute ∉ (:f_only, :F_only, :both)
@@ -254,97 +243,124 @@ end
 # ======================================================================================== #
 
 """
-    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, output_prefix="psd")
+    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing)
 
-Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
-loads particle flux files `IeFlickering-NN.mat`, converts them into phase-space density, and
-writes one output file per input as `psd/psd-NN.mat`.
-
-# Calling
-`make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, output_prefix="psd")`
-
-# Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process.
+Read `simulation_data.nc` from `directory_to_process`, convert electron flux to
+phase-space density, and write results to `analysis/psd.nc`.
 
 # Keyword Arguments
 - `compute`: one of `:f_only`, `:F_only`, or `:both`.
-- `vpar_edges`: custom `v_parallel` bin edges [m/s] used when computing `F`.
-    If `nothing`, an automatic symmetric uniform interval grid is used, spanning
-    `[-maximum(v), maximum(v)]` with an edge at `v_parallel = 0`.
-- `output_prefix`: output filename prefix used as `<output_prefix>-NN.mat`.
+- `vpar_edges`: custom `v_parallel` bin edges [m/s]. If `nothing`, an automatic
+  symmetric uniform grid is used spanning `[-maximum(v), maximum(v)]`.
 """
 function make_psd_file(
     directory_to_process;
     compute::Symbol = :both,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
-    output_prefix::AbstractString = "psd",
 )
     println("Converting Ie to PSD.")
-    files = readdir(directory_to_process, join = true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    sort!(
-        files_to_process,
-        by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]),
-    )
 
-    if isempty(files_to_process)
-        @warn "No simulation results found in $directory_to_process. Skipping phase-space density calculations."
-        return nothing
-    end
+    result = make_psd_from_AURORA(directory_to_process; compute, vpar_edges)
 
-    n_files = length(files_to_process)
-    psd_dir = joinpath(directory_to_process, "psd")
-    mkpath(psd_dir)
-
-    for (i_file, file) in enumerate(files_to_process)
-        match_result = match(r"IeFlickering-(\d+)\.mat", basename(file))
-        @assert !isnothing(match_result) "Unexpected input filename: $file"
-        file_id = match_result[1]
-
-        print("\rProcessing PSD: $(i_file)/$(n_files)")
-        flush(stdout)
-
-        result = make_psd_from_AURORA(file; compute = compute, vpar_edges = vpar_edges)
-        outfile = joinpath(psd_dir, "$(output_prefix)-$(file_id).mat")
-        write_psd_result(outfile, result)
-    end
-
-    println()
+    analysis_dir = joinpath(directory_to_process, "analysis")
+    mkpath(analysis_dir)
+    savefile = joinpath(analysis_dir, "psd.nc")
+    write_psd_result(savefile, result)
 
     return nothing
 end
 
 
-function write_psd_result(outfile::AbstractString, res)
-    matopen(outfile, "w") do io
+function write_psd_result(savefile::AbstractString, res)
+    h_atm = res.h_atm
+    t_run = res.t_run
+    Nz    = length(h_atm)
+    Nt    = length(t_run)
+    nE    = length(res.E_centers)
+    nμ    = length(res.μ_lims) - 1
+
+    NCDataset(savefile, "c") do ds
+        defDim(ds, "altitude",          Nz)
+        defDim(ds, "time",              Nt)
+        defDim(ds, "energy",            nE)
+        defDim(ds, "pitch_angle",       nμ)
+        defDim(ds, "pitch_angle_bounds", nμ + 1)
+        defDim(ds, "energy_bounds",     nE + 1)
+
+        alt_v = defVar(ds, "altitude", Float64, ("altitude",);
+                       attrib=["units" => "m", "long_name" => "altitude"])
+        alt_v[:] = h_atm
+
+        t_v = defVar(ds, "time", Float64, ("time",);
+                     attrib=["units" => "s", "long_name" => "simulation time"])
+        t_v[:] = t_run
+
+        en_v = defVar(ds, "energy", Float64, ("energy",);
+                      attrib=["units" => "eV", "long_name" => "energy bin center"])
+        en_v[:] = res.E_centers
+
+        ee_v = defVar(ds, "energy_edges", Float64, ("energy_bounds",);
+                      attrib=["units" => "eV", "long_name" => "energy bin edges"])
+        ee_v[:] = res.E_edges
+
+        pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
+                      attrib=["units" => "1", "long_name" => "cosine of pitch angle (beam center)"])
+        pa_v[:] = res.μ_center
+
+        ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
+                      attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
+        ml_v[:] = res.μ_lims
+
+        v_v = defVar(ds, "v", Float64, ("energy",);
+                     attrib=["units" => "m s-1", "long_name" => "electron speed"])
+        v_v[:] = res.v
+
+        bw_v = defVar(ds, "beam_weight", Float64, ("pitch_angle",);
+                      attrib=["units" => "sr", "long_name" => "solid-angle beam weight"])
+        bw_v[:] = res.BeamWeight
+
+        dE_v = defVar(ds, "dE_J", Float64, ("energy",);
+                      attrib=["units" => "J", "long_name" => "energy bin width in Joules"])
+        dE_v[:] = res.ΔE_J
+
         if hasproperty(res, :f)
-            write(io, "f", res.f)
+            f_v = defVar(ds, "f", Float32, ("altitude", "pitch_angle", "time", "energy");
+                         deflatelevel=4,
+                         chunksizes=(Nz, nμ, 1, nE),
+                         attrib=["units"     => "s3 m-6",
+                                  "long_name" => "phase-space density"])
+            f_v[:, :, :, :] = Float32.(res.f)
         end
 
         if hasproperty(res, :F)
-            write(io, "F", res.F)
-            write(io, "vpar_edges", res.vpar_edges)
-            write(io, "vpar_centers", res.vpar_centers)
-            write(io, "dvpar", res.Δvpar)
-        end
+            Nvpar = length(res.vpar_centers)
+            defDim(ds, "vpar",       Nvpar)
+            defDim(ds, "vpar_bounds", Nvpar + 1)
 
-        write(io, "v", res.v)
-        write(io, "v_par", res.v_par)
-        write(io, "v_perp", res.v_perp)
-        write(io, "dE_J", res.ΔE_J)
-        write(io, "BeamWeight", res.BeamWeight)
-        write(io, "mu_center", res.μ_center)
-        write(io, "E_edges", res.E_edges)
-        write(io, "E_centers", res.E_centers)
-        write(io, "t_run", res.t_run)
-        write(io, "h_atm", res.h_atm)
-        write(io, "mu_lims", res.μ_lims)
+            vpc_v = defVar(ds, "vpar_centers", Float64, ("vpar",);
+                           attrib=["units" => "m s-1", "long_name" => "v_parallel bin centers"])
+            vpc_v[:] = res.vpar_centers
+
+            vpe_v = defVar(ds, "vpar_edges", Float64, ("vpar_bounds",);
+                           attrib=["units" => "m s-1", "long_name" => "v_parallel bin edges"])
+            vpe_v[:] = res.vpar_edges
+
+            dv_v = defVar(ds, "dvpar", Float64, ("vpar",);
+                          attrib=["units" => "m s-1", "long_name" => "v_parallel bin widths"])
+            dv_v[:] = res.Δvpar
+
+            F_v = defVar(ds, "F", Float32, ("vpar", "altitude", "time");
+                         deflatelevel=4,
+                         attrib=["units"     => "s m-4",
+                                  "long_name" => "reduced distribution function F(v_parallel)"])
+            F_v[:, :, :] = Float32.(res.F)
+        end
     end
 end
 
 """
     make_psd_file(sim::AuroraSimulation; kwargs...)
 
-Convenience wrapper that calls [`make_psd_file`](@ref) on `sim.savedir`.
+Convenience wrapper that calls [`make_psd_file`](@ref) on `sim.output.savedir`.
 """
-make_psd_file(sim::AuroraSimulation; kwargs...) = make_psd_file(sim.savedir; kwargs...)
+make_psd_file(sim::AuroraSimulation; kwargs...) = make_psd_file(sim.output.savedir; kwargs...)

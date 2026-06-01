@@ -22,6 +22,7 @@ using TestItems
     end
     make_volume_excitation_file(ss_dir)
     make_column_excitation_file(ss_dir)
+    make_Ie_top_file(ss_dir)
 
     # --- Multi-step steady-state simulation ---
     ms_ss_dir = mktempdir()
@@ -31,6 +32,7 @@ using TestItems
     end
     make_volume_excitation_file(ms_ss_dir)
     make_column_excitation_file(ms_ss_dir)
+    make_Ie_top_file(ms_ss_dir)
 
     # --- Time-dependent simulation (2 loops) ---
     td_dir = mktempdir()
@@ -42,10 +44,11 @@ using TestItems
     end
     make_volume_excitation_file(td_dir)
     make_column_excitation_file(td_dir)
+    make_Ie_top_file(td_dir)
 end
 
 # Run all tests
 @run_package_tests verbose=true
 
 # Run only specific tests based on their filename
-# @run_package_tests verbose=true filter=ti->(endswith(ti.filename, "conservation.jl") )
+# @run_package_tests verbose=true filter=ti->(endswith(ti.filename, "test_plotting.jl"))

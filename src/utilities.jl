@@ -103,128 +103,6 @@ end
 
 ## ====================================================================================== ##
 
-import LibGit2
-import Pkg
-function save_parameters(sim::AuroraSimulation)
-    model = sim.model
-    mode = sim.mode
-
-	savefile = joinpath(sim.savedir, "parameters.txt")
-    commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
-        LibGit2.head(pkgdir(AURORA))
-    else
-        "Not available"
-    end
-    version_AURORA = pkgversion(AURORA)
-    open(savefile, "w") do f
-        write(f, "altitude_lims = [$(model.altitude_grid.h[1]/1e3), $(model.altitude_grid.h[end]/1e3)] \n")
-        write(f, "θ_lims = $(model.pitch_angle_grid.θ_lims) \n")
-        write(f, "E_max = $(model.energy_grid.E_max) \n")
-        write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
-        write(f, "\n")
-        write(f, "mode = $mode \n")
-        write_time_params(f, sim)
-        write(f, "\n")
-        write(f, "flux = $(sim.flux) \n")
-        write(f, "\n")
-        write(f, "commit_hash = $commit_hash \n")
-        write(f, "version_AURORA = $version_AURORA")
-    end
-end
-
-write_time_params(f::IO, sim::AuroraSimulation) = write_time_params(f, sim.time)
-
-function write_time_params(f::IO, time::RefinedTimeGrid)
-    write(f, "duration = $(time.duration) \n")
-    write(f, "dt = $(time.dt) \n")
-    write(f, "dt_internal = $(time.dt_internal) \n")
-    write(f, "t_internal = $(time.t) \n")
-    write(f, "n_loop = $(time.n_loop) \n")
-    write(f, "CFL_factor = $(time.CFL_factor) \n")
-end
-function write_time_params(f::IO, time::UniformTimeGrid)
-    write(f, "duration = $(time.duration) \n")
-    write(f, "dt = $(time.dt) \n")
-    write(f, "n_steps = $(time.n_steps) \n")
-    write(f, "t = $(time.t) \n")
-end
-function write_time_params(f::IO, ::SingleStepConfig)
-    write(f, "duration = nothing \n")
-    write(f, "dt = nothing \n")
-end
-
-
-using MAT: matopen
-function save_neutrals(sim::AuroraSimulation)
-    model = sim.model
-    ionosphere = model.ionosphere
-    savefile = joinpath(sim.savedir, "neutral_atm.mat")
-    file = matopen(savefile, "w")
-        write(file, "h_atm", model.altitude_grid.h)
-        for sp in model.species
-            write(file, "n" * String(sp.name), sp.density)
-        end
-        write(file, "ne", ionosphere.ne)
-        write(file, "Te", ionosphere.Te)
-    close(file)
-end
-
-
-using MAT: matopen
-function save_Ie_top(sim::AuroraSimulation, Ie_top, t)
-    energy_grid = sim.model.energy_grid
-    μ_lims = sim.model.pitch_angle_grid.μ_lims
-    savefile = joinpath(sim.savedir, "Ie_incoming.mat")
-    file = matopen(savefile, "w")
-        write(file, "Ie_total", Ie_top)
-        write(file, "E_centers", energy_grid.E_centers)
-        write(file, "E_edges", energy_grid.E_edges)
-        write(file, "dE", energy_grid.ΔE)
-        write(file, "mu_lims", collect(μ_lims))
-        write(file, "t_top", collect(Float64, t))
-    close(file)
-end
-
-mode_type_tag(::RefinedTimeGrid)  = "time_dependent"
-mode_type_tag(::UniformTimeGrid)  = "steady_state_multi_step"
-mode_type_tag(::SingleStepConfig) = "steady_state_single_step"
-
-solver_type_tag(::TimeDependentMode) = "time_dependent"
-solver_type_tag(::SteadyStateMode)   = "steady_state"
-
-using MAT: matopen
-using Printf: @sprintf
-function save_results(sim::AuroraSimulation, Ie_save, t_run, I0, i)
-    energy_grid = sim.model.energy_grid
-    μ_lims = sim.model.pitch_angle_grid.μ_lims
-    z = sim.model.altitude_grid.h
-    scattering = sim.model.scattering
-
-    # Mode type tags for downstream analysis
-    mode_type = mode_type_tag(sim.time)
-    solver_type = solver_type_tag(sim.mode)
-
-    savefile = joinpath(sim.savedir, (@sprintf "IeFlickering-%02d.mat" i))
-	file = matopen(savefile, "w")
-		write(file, "Ie_ztE", Ie_save)
-		write(file, "E_centers", energy_grid.E_centers)
-		write(file, "E_edges", energy_grid.E_edges)
-		write(file, "dE", energy_grid.ΔE)
-		write(file, "t_run", collect(Float64, t_run))
-		write(file, "mu_lims", collect(μ_lims))
-		write(file, "h_atm", z)
-		write(file, "I0", I0)
-        write(file, "solver_type", solver_type)
-        write(file, "mode_type", mode_type)
-		write(file, "mu_scatterings", Dict(
-			"P_scatter" => scattering.P_scatter,
-            "BeamWeight_relative" => scattering.Ω_subbeam_relative,
-			"BeamWeight" => scattering.Ω_beam,
-			"theta_scatter" => scattering.θ_scatter))
-	close(file)
-end
-
-
 """
     rename_if_exists(savefile)
 
@@ -268,40 +146,12 @@ end
 
 
 """
-    find_input_file(path_to_directory)
-
-Look for Ie\\_incoming file present in the directory given by `path_to_directory`. If several
-files are starting with the name "Ie\\_incoming", return an error. If only one file is found,
-return a string with the path to that file.
-
-# Calling
-`input_file = find_input_file(path_to_directory)`
-
-# Inputs
-- `path_to_directory`: path to a directory
-
-# Returns
-- `input_file`: path to the Ie\\_incoming file, in the form "path_to_directory/Ie_incoming_*.mat"
-"""
-function find_input_file(path_to_directory)
-    incoming_files = filter(file -> startswith(file, "Ie_incoming"), readdir(path_to_directory))
-    if isempty(incoming_files)
-        error("No Ie_incoming*.mat file found in $path_to_directory.")
-    elseif length(incoming_files) > 1
-        error("More than one file contains incoming flux. This is not normal")
-    else
-        return input_file = joinpath(path_to_directory, incoming_files[1])
-    end
-end
-
-
-"""
     make_savedir(root_savedir, name_savedir; behavior = "default")
 
 Return the path to the directory where the results will be saved. If the directory does not
 already exist, create it.
 
-If the constructed `savedir` already exists and contains files starting with `"IeFlickering-"`,
+If the constructed `savedir` already exists and contains a `simulation_data.nc` file,
 a new directory is created to avoid accidental overwriting of results (e.g., `savedir(1)`, `savedir(2)`, etc.).
 
 # Calling
@@ -312,7 +162,7 @@ a new directory is created to avoid accidental overwriting of results (e.g., `sa
 - `root_savedir::String`: The root directory where the data will be saved. If empty or
     contains only spaces, it defaults to `"backup"`.
 - `name_savedir::String`: The name of the subdirectory to be created within `root_savedir`.
-    If empty or contains only spaces, it defaults to the current date and time in the
+    If empty or contains only "space" characters, it defaults to the current date and time in the
     format `"yyyymmdd-HHMM"`.
 - `behavior::String` (optional): Determines how the full path is constructed.
     - `"default"`: The path will be built starting under the `data/` folder of the AURORA installation
@@ -344,9 +194,9 @@ function make_savedir(root_savedir, name_savedir; behavior = "default")
         savedir = joinpath(root_savedir, name_savedir)
     end
 
-    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
+    # Rename `savedir` to `savedir(1)` if it exists and already contains results. If
     # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
+    if isdir(savedir) && isfile(joinpath(savedir, "simulation_data.nc"))
         savedir = rename_if_exists(savedir)
     end
 

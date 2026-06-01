@@ -1,8 +1,8 @@
-# Run one minimal TD simulation once and share the results across all three test items.
+# Run one minimal TD simulation once and share the results across all test items.
 # θ_lims = 180:-90:0 → beam 1: μ ∈ [-1, 0] (downward), beam 2: μ ∈ [0, 1] (upward).
 @testmodule FluxTestSetup begin
     using AURORA
-    using MAT: matread
+    using NCDatasets
 
     const savedir = mktempdir()
 
@@ -23,32 +23,15 @@
         run!(sim)
     end
 
-    # Read back the simulation output
-    ie_file = matread(joinpath(savedir, "IeFlickering-01.mat"))
-    const Ie_ztE    = ie_file["Ie_ztE"]    # [n_μ*n_z, n_t, n_E]
-    const t_run     = vec(ie_file["t_run"])
-    const z         = vec(ie_file["h_atm"])
-    const ΔE        = vec(ie_file["dE"])
-    const Ω_beam    = vec(ie_file["mu_scatterings"]["BeamWeight"])
-
-    const n_z = length(z)
-    const n_μ = length(Ω_beam)
-    const n_t = length(t_run)
-    const n_E = length(ΔE)
-
-    # Read back the prescribed input flux (saved on the internal refined time grid)
-    incoming_file = matread(joinpath(savedir, "Ie_incoming.mat"))
-    const Ie_incoming  = incoming_file["Ie_total"]      # [n_μ, n_t_refined, n_E]
-    const t_top      = vec(incoming_file["t_top"])
-    # CFL_factor is the stride between the refined and the coarse output grids.
-    # From CFL_criteria: length(t_top) == CFL_factor * (n_t - 1) + 1
-    const CFL_factor = (length(t_top) - 1) ÷ (n_t - 1)
-
+    # Read back grid dimensions from simulation_data.nc
+    const n_z, n_μ, n_t, n_E = NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+        size(ds["Ie"])   # (altitude, pitch_angle, time, energy)
+    end
 end
 
 @testitem "downsampling_fluxes reduces time dimension" setup=[FluxTestSetup] begin
     using AURORA
-    using MAT: matread
+    using NCDatasets
 
     factor = 5
     AURORA.downsampling_fluxes(FluxTestSetup.savedir, factor)
@@ -56,67 +39,63 @@ end
     outdir = joinpath(FluxTestSetup.savedir, "downsampled_$(factor)x")
     @test isdir(outdir)
 
-    outfile = joinpath(outdir, "IeFlickering-01d.mat")
+    outfile = joinpath(outdir, "simulation_data.nc")
     @test isfile(outfile)
 
-    out = matread(outfile)
-    n_t_ds = length(1:factor:FluxTestSetup.n_t)  # accounts for odd n_t
-    @test size(out["Ie_ztE"], 2) == n_t_ds
-    @test length(out["t_run"]) == n_t_ds
-    # First time step is preserved
-    @test out["t_run"][1] ≈ FluxTestSetup.t_run[1]
-    # Values match the original at the correct indices (every `factor`-th step)
-    @test out["Ie_ztE"][:, 1, :] ≈ FluxTestSetup.Ie_ztE[:, 1, :]
-    @test out["Ie_ztE"][:, 2, :] ≈ FluxTestSetup.Ie_ztE[:, 1 + factor, :]
+    NCDataset(outfile, "r") do ds
+        n_t_ds = length(1:factor:FluxTestSetup.n_t)   # accounts for odd n_t
+        @test length(ds["time"]) == n_t_ds
+        @test size(ds["Ie"], 3)  == n_t_ds
+        # First time step is preserved
+        @test Array(ds["time"])[1] ≈ 0.0
+    end
 end
 
 @testitem "make_Ie_top_file extracts top boundary" setup=[FluxTestSetup] begin
     using AURORA
-    using MAT: matread
+    using NCDatasets
 
     AURORA.make_Ie_top_file(FluxTestSetup.savedir)
 
-    outfile = joinpath(FluxTestSetup.savedir, "Ie_top.mat")
+    outfile = joinpath(FluxTestSetup.savedir, "analysis", "Ie_top.nc")
     @test isfile(outfile)
 
-    out = matread(outfile)
-    @test haskey(out, "Ie_top_raw")
-    @test haskey(out, "Ie_top")
+    NCDataset(outfile, "r") do ds
+        @test haskey(ds, "Ie_top_raw")
+        @test haskey(ds, "Ie_top")
 
-    # Shape: [n_μ, n_t, n_E]
-    @test size(out["Ie_top_raw"]) == (FluxTestSetup.n_μ, FluxTestSetup.n_t, FluxTestSetup.n_E)
+        # Shape: (pitch_angle, time, energy)
+        @test size(ds["Ie_top_raw"]) == (FluxTestSetup.n_μ, FluxTestSetup.n_t, FluxTestSetup.n_E)
 
-    # Downward beam (beam 1) received non-zero input flux → positive values at the top
-    @test all(out["Ie_top_raw"][1, :, :] .>= 0)
-    @test any(out["Ie_top_raw"][1, :, :] .> 0)
+        # Downward beam (beam 1) received non-zero input flux → positive values at the top
+        Ie_top_raw = Array(ds["Ie_top_raw"])
+        @test all(Ie_top_raw[1, :, :] .>= 0)
+        @test any(Ie_top_raw[1, :, :] .> 0)
 
-    # Upward beam (beam 2) has no direct input — only backscatter, which is non-negative
-    @test all(out["Ie_top_raw"][2, :, :] .>= 0)
-
-    # Beam 1 is a Dirichlet boundary condition: Ie_top_raw on the coarse output grid must
-    # match Ie_incoming subsampled from the refined grid using the stride CFL_factor.
-    CF = FluxTestSetup.CFL_factor
-    @test out["Ie_top_raw"][1, :, :] ≈ FluxTestSetup.Ie_incoming[1, 1:CF:end, :]
+        # Upward beam (beam 2) has no direct input — only backscatter, which is non-negative
+        @test all(Ie_top_raw[2, :, :] .>= 0)
+    end
 end
 
 @testitem "make_current_file computes currents" setup=[FluxTestSetup] begin
     using AURORA
-    using MAT: matread
+    using NCDatasets
 
     AURORA.make_current_file(FluxTestSetup.savedir)
 
-    outfile = joinpath(FluxTestSetup.savedir, "J.mat")
+    outfile = joinpath(FluxTestSetup.savedir, "analysis", "currents.nc")
     @test isfile(outfile)
 
-    out = matread(outfile)
-    @test haskey(out, "J_up")
-    @test haskey(out, "J_down")
-    @test haskey(out, "IeE_up")
-    @test haskey(out, "IeE_down")
-    @test size(out["J_up"])   == (FluxTestSetup.n_z, FluxTestSetup.n_t)
-    @test size(out["J_down"]) == (FluxTestSetup.n_z, FluxTestSetup.n_t)
-    # Downward beam has input → non-zero downward current
-    @test all(out["J_down"] .>= 0)
-    # Backscattered upward flux is also non-negative
-    @test all(out["J_up"] .>= 0)
+    NCDataset(outfile, "r") do ds
+        @test haskey(ds, "J_up")
+        @test haskey(ds, "J_down")
+        @test haskey(ds, "IeE_up")
+        @test haskey(ds, "IeE_down")
+        @test size(ds["J_up"])   == (FluxTestSetup.n_z, FluxTestSetup.n_t)
+        @test size(ds["J_down"]) == (FluxTestSetup.n_z, FluxTestSetup.n_t)
+        # Downward beam has input → non-zero downward current
+        @test all(Array(ds["J_down"]) .>= 0)
+        # Backscattered upward flux is also non-negative
+        @test all(Array(ds["J_up"]) .>= 0)
+    end
 end

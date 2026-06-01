@@ -7,7 +7,7 @@ So far we have
 
 =#
 using Makie
-using MAT: matread
+using NCDatasets: NCDataset
 using Printf: @sprintf
 using StyledStrings: @styled_str
 using Dates
@@ -83,11 +83,6 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         error("`dt_steps` must be an integer greater than or equal to 1.")
     end
 
-    ## Find the files to process
-    files = readdir(full_path_to_directory, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    n_files = length(files_to_process)
-
     ## Create file name
     if save_to_file
         video_filename = plot_input ? "animation_with_precipitation.mp4" : "animation.mp4"
@@ -95,16 +90,16 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         println(styled"{bold:The animation will be saved at $video_filename.}")
     end
 
-    ## Load data from the first file
-    print("(1/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-    data = matread(files_to_process[1])
-    Ie_raw = data["Ie_ztE"]  # size of [n_mu x nz, nt, nE]
-    μ_lims = vec(data["mu_lims"])
-    t_run = data["t_run"]
-    E_centers = data["E_centers"]
-    z = data["h_atm"]
+    ## Load simulation data
+    print("(1/1) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
+    result = AURORA.read_simulation_nc(full_path_to_directory)
+    Ie       = result.Ie          # [n_z, n_μ, n_t, n_E]
+    μ_lims   = result.mu_lims
+    t_run    = result.t
+    E_centers = result.E_centers
+    z        = result.h_atm
+    ΔE       = result.dE
 
-    ΔE = data["dE"]
     θ_lims = round.(acosd.(μ_lims))
 
     # Use default angles_to_plot if not provided
@@ -124,28 +119,18 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         scale_μ[i_μ] = 1 ./ beam_weight([θ1, θ2])[1]
     end
 
-    Ie_plot_buffer = Ref{Union{Nothing, Array{Float64, 4}}}(nothing)
+    # Subsample the time axis
+    t_indices = 1:dt_steps:length(t_run)
+    t_sub     = t_run[t_indices]
+    Ie_sub    = Ie[:, :, t_indices, :]
 
-    # Helper function to process Ie data
-    function process_Ie(Ie_raw, t_run)
-        Ie = AURORA.restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, z, t_run, E_centers)
-        buffer_size = (size(Ie, 1), length(angles_to_plot), size(Ie, 3), size(Ie, 4))
-        if isnothing(Ie_plot_buffer[]) || size(Ie_plot_buffer[]) != buffer_size
-            Ie_plot_buffer[] = Array{Float64, 4}(undef, buffer_size...)
-        end
-
-        Ie_plot = AURORA.restructure_streams_of_Ie!(Ie_plot_buffer[], Ie, θ_lims, angles_to_plot)
-        # Convert from #e-/m²/s to #e-/m²/s/eV/ster
-        for i_μ in eachindex(angles_to_plot_vert)
-            isnothing(angles_to_plot_vert[i_μ]) && continue  # skip empty panels
-            @tturbo for i_E in eachindex(E_centers), i_t in eachindex(t_run), i_z in eachindex(z)
-                Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
-            end
-        end
-        return Ie_plot
+    # Restructure and normalise beams
+    Ie_plot = AURORA.restructure_streams_of_Ie(Ie_sub, θ_lims, angles_to_plot)
+    # Ie_plot is [n_z, n_panels, n_t, n_E] — convert to #e-/m²/s/eV/ster
+    n_z, n_panels, n_t_sub, n_E = size(Ie_plot)
+    @tturbo for i_E in 1:n_E, i_t in 1:n_t_sub, i_μ in 1:n_panels, i_z in 1:n_z
+        Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
     end
-
-    Ie_plot = process_Ie(Ie_raw, t_run)
 
     # Compute default colorrange if not provided
     if isnothing(colorrange)
@@ -153,24 +138,31 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     end
 
     # Load input flux if requested
-    if plot_input
-        input_file = AURORA.find_input_file(full_path_to_directory)
-        data = matread(input_file)
-        Ietop = data["Ie_total"]
-        t_top = data["t_top"]; t_top = [t_top; t_top[end] + diff(t_top)[end]] .- t_top[1]
-        idx_θ = vec(input_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= input_angle_cone[2])
-        Ω_beam = beam_weight([input_angle_cone[1], input_angle_cone[2]])
-        data_input = dropdims(sum(Ietop[idx_θ, :, :]; dims=1); dims=1) ./ Ω_beam ./ ΔE' .* E_centers' # in eV/m²/s/eV/ster
-        input_struct = (; bool = plot_input, t_top, data_input, input_angle_cone)
+    input_struct = if plot_input
+        nc_path = joinpath(full_path_to_directory, "simulation_data.nc")
+        NCDataset(nc_path, "r") do ds
+            if !haskey(ds, "Ie_top")
+                error("Input flux not found in simulation_data.nc. " *
+                      "Re-run the simulation with save_input_flux=true.")
+            end
+            Ietop_raw = Array(ds["Ie_top"])  # [n_μ, n_t_top, n_E]
+            t_top_raw = Array(ds["time_top"])
+            t_top = [t_top_raw; t_top_raw[end] + diff(t_top_raw)[end]] .- t_top_raw[1]
+            idx_θ = vec(input_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= input_angle_cone[2])
+            Ω_beam = beam_weight([input_angle_cone[1], input_angle_cone[2]])
+            data_input = dropdims(sum(Ietop_raw[idx_θ, :, :]; dims=1); dims=1) ./
+                         Ω_beam ./ ΔE' .* E_centers'
+            (; bool = plot_input, t_top, data_input, input_angle_cone)
+        end
     else
-        input_struct = (; bool = false, t_top = nothing, data_input = nothing, input_angle_cone = nothing)
+        (; bool = false, t_top = nothing, data_input = nothing, input_angle_cone = nothing)
     end
 
     # Create the figure
     print("create figure... ")
     Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
-    time = Observable("$(t_run[1]) s")
-    fig = make_Ie_in_time_plot(Ie_timeslice, time, z, E_centers, angles_to_plot, colorrange, input_struct)
+    time_obs = Observable("$(t_sub[1]) s")
+    fig = make_Ie_in_time_plot(Ie_timeslice, time_obs, z, E_centers, angles_to_plot, colorrange, input_struct)
     display(fig)
 
     # Animate
@@ -178,28 +170,14 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         io = VideoStream(fig; framerate=framerate, visible=true)
     end
 
-    for i_file in 1:n_files
-        # Load data (first file already loaded)
-        if i_file > 1
-            print("($i_file/$n_files) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-            data = matread(files_to_process[i_file])
-            Ie_raw = data["Ie_ztE"]
-            t_run = data["t_run"]
-            Ie_plot = process_Ie(Ie_raw, t_run)
+    println("animate.")
+    for i_t in eachindex(t_sub)
+        Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
+        time_obs[] = @sprintf("%.3f s", t_sub[i_t])
+        if save_to_file
+            recordframe!(io)
         end
-
-        # Animate (skip first timestep for files after the first, as it duplicates the
-        # previous file's last frame)
-        i_t_start = i_file == 1 ? 1 : 2
-        println("animate.")
-        for i_t in i_t_start:dt_steps:length(t_run)
-            Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
-            time[] = @sprintf("%.3f s", t_run[i_t])
-            if save_to_file
-                recordframe!(io)
-            end
-            sleep(0.01)
-        end
+        sleep(0.01)
     end
 
     if save_to_file

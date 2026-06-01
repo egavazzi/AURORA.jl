@@ -1,5 +1,4 @@
-using MAT: matopen, matread
-using ProgressMeter: Progress, next!
+using NCDatasets: NCDataset, defDim, defVar
 
 
 # ======================================================================================== #
@@ -9,91 +8,61 @@ using ProgressMeter: Progress, next!
 """
     make_heating_rate_file(directory_to_process)
 
-Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
-loads the particle flux `Ie` (#e⁻/m²/s), and calculates the heating rate of thermal electrons
-by superthermal electrons.
-
-The heating rate is the rate at which energy is transferred from superthermal electrons to
-thermal electrons through Coulomb collisions. It is saved as a function of altitude and time.
+Read `simulation_data.nc` and `inputs/atmosphere.nc` from `directory_to_process`,
+compute the thermal-electron heating rate by superthermal electrons, and write
+results to `analysis/heating_rate.nc`.
 
 # Calling
 `make_heating_rate_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process.
+- `directory_to_process`: absolute or relative path to the simulation directory.
 """
 function make_heating_rate_file(directory_to_process)
-    ## Find the files to process
-    files = readdir(directory_to_process, join=true)
-    files_to_process = files[contains.(files, r"IeFlickering\-[0-9]+\.mat")]
-    # The files are sorted in lexicographical order, so IeFlickering-100.mat will be loaded
-    # before "IeFlickering-11.mat. We fix that with the following line which sorts them by
-    # the number in the filename.
-    sort!(files_to_process, by = x -> parse(Int, match(r"IeFlickering-(\d+)\.mat", basename(x))[1]))
-
-    if isempty(files_to_process)
-        @warn "No simulation results found in $directory_to_process. Skipping heating rate calculations."
-        return nothing
-    end
-
-    ## Load simulation grid
-    f = matopen(files_to_process[1])
-        z = read(f, "h_atm")
-        E_centers = read(f, "E_centers")
-    close(f)
+    ## Load simulation results
+    result    = read_simulation_nc(directory_to_process)
+    Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
+    t         = result.t
+    z         = result.h_atm
+    E_centers = result.E_centers
 
     ## Load thermal electron density and temperature
-    data = matread(joinpath(directory_to_process, "neutral_atm.mat"))
-    ne = data["ne"]
-    Te = data["Te"]
+    atm = read_atmosphere_nc(directory_to_process)
+    ne  = atm.ne
+    Te  = atm.Te
 
-    ## Initialize arrays to store the results for each time-slice
-    heating_rate = Vector{Matrix{Float64}}()
-    t = Float64[]
+    ## Sum Ie over pitch-angle beams → omnidirectional flux [n_z, n_t, n_E]
+    Ie_omni = dropdims(sum(Ie, dims=2), dims=2)
 
-    n_files = length(files_to_process)
-    p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
-    ## Loop over the files
-    for file in files_to_process
-        ## Load simulation results for current file.
-        f = matopen(file)
-            Ie_ztE = read(f, "Ie_ztE")
-            t_local = read(f, "t_run")
-        close(f)
+    ## Calculate heating rate
+    heating_rate = calculate_heating_rate(z, t, Ie_omni, E_centers, ne, Te)
 
-        ## Sum Ie over the beams
+    ## Write to analysis/heating_rate.nc
+    analysis_dir = joinpath(directory_to_process, "analysis")
+    mkpath(analysis_dir)
+    savefile = joinpath(analysis_dir, "heating_rate.nc")
+
+    NCDataset(savefile, "c") do ds
         n_z = length(z)
-        n_μ = size(Ie_ztE, 1) ÷ n_z # (÷ returns an Int)
-        n_t = size(Ie_ztE, 2)
-        n_E = size(Ie_ztE, 3)
-        Ie_ztE_omni = zeros(n_z, n_t, n_E)
-        @views for i_μ in 1:n_μ
-            Ie_ztE_omni .+= Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :]
-        end
+        n_t = length(t)
+        defDim(ds, "altitude", n_z)
+        defDim(ds, "time",     n_t)
 
-        ## Calculate heating rate
-        heating_rate_local = calculate_heating_rate(z, t_local, Ie_ztE_omni, E_centers, ne, Te)
+        alt_v = defVar(ds, "altitude", Float64, ("altitude",);
+                       attrib=["units" => "m", "long_name" => "altitude"])
+        alt_v[:] = z
+        t_v = defVar(ds, "time", Float64, ("time",);
+                     attrib=["units" => "s", "long_name" => "simulation time"])
+        t_v[:] = t
 
-        ## Push the heating rate of the current time-slice into a vector
-        push!(heating_rate, heating_rate_local)
-        append!(t, t_local)
-
-        next!(p)
+        hr_v = defVar(ds, "heating_rate", Float64, ("altitude", "time");
+                      deflatelevel=4,
+                      attrib=["units"     => "eV m-3 s-1",
+                               "long_name" => "thermal electron heating rate by superthermal electrons"])
+        hr_v[:, :] = heating_rate
     end
 
-    ## Concatenate along time
-    heating_rate = reduce(hcat, heating_rate)
-
-    ## Save results
-    savefile = joinpath(directory_to_process, "heating_rate.mat")
-    f = matopen(savefile, "w")
-        write(f, "h_atm", z)
-        write(f, "t", t)
-        write(f, "heating_rate", heating_rate)
-    close(f)
-
     println("Heating rates saved in $savefile")
-
     return nothing
 end
 
@@ -120,21 +89,16 @@ electrons to thermal electrons.
 - `heating_rate`: heating rate (eV/m³/s). 2D array [n\\_z, n\\_t]
 """
 function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
-    # Initialize
     n_z = length(z)
     n_t = length(t)
     n_E = length(E_centers)
     heating_rate = zeros(n_z, n_t)
 
-    # Calculate the energy loss rate to thermal electrons for each energy
-    # loss_to_thermal_electrons returns the energy loss rate in eV/m
     L_th = zeros(n_z, n_E)
     for i_E in eachindex(E_centers)
         L_th[:, i_E] .= loss_to_thermal_electrons(E_centers[i_E], ne, Te)
     end
 
-    # Calculate heating rate for each time step
-    # The heating rate is the product of the flux and the energy loss rate, integrated over energy
     @views for i_t in eachindex(t)
         heating_rate[:, i_t] .= dropdims(sum(Ie_ztE_omni[:, i_t, :] .* L_th, dims=2); dims=2)
     end
@@ -150,6 +114,6 @@ end
 """
     make_heating_rate_file(sim::AuroraSimulation)
 
-Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.savedir`.
+Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.output.savedir`.
 """
-make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.savedir)
+make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.output.savedir)

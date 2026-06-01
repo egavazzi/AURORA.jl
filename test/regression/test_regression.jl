@@ -1,5 +1,5 @@
 @testitem "AURORA steady-state results" begin
-    using MAT
+    using NCDatasets
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
@@ -23,26 +23,26 @@
     run!(sim)
 
     ## Analyze the results
-    make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
-    make_column_excitation_file(savedir)
-    make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "SS", "Qzt_all_L.mat")
-    data_ref = matread(reference_file)
-    data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
+    reference_file = joinpath(@__DIR__, "reference_results", "SS", "volume_excitation.nc")
+    NCDataset(reference_file, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
+            QO1S_ref = Array(ds_ref["QO1S"])
+            QO1S_new = Array(ds_new["QO1S"])
+            @test all(isapprox.(QO1S_new, QO1S_ref, rtol = 1e-4))
 
-    ## Print the actual maximum relative difference
-    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
-    println("Maximum relative difference: ", maximum(rel_diff))
+            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
+                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
+            println("Maximum relative difference: ", maximum(rel_diff))
+        end
+    end
 end
 
 
 @testitem "AURORA time-dependent results" begin
-    using MAT
+    using NCDatasets
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
@@ -69,19 +69,19 @@ end
     run!(sim)
 
     ## Analyze the results
-    make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
-    make_column_excitation_file(savedir)
-    make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "TD", "Qzt_all_L.mat")
-    data_ref = matread(reference_file)
-    data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
+    reference_file = joinpath(@__DIR__, "reference_results", "TD", "volume_excitation.nc")
+    NCDataset(reference_file, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
+            QO1S_ref = Array(ds_ref["QO1S"])
+            QO1S_new = Array(ds_new["QO1S"])
+            @test all(isapprox.(QO1S_new, QO1S_ref, rtol = 1e-4))
 
-    ## Print the actual maximum relative difference
-    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
-    println("Maximum relative difference: ", maximum(rel_diff))
+            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
+                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
+            println("Maximum relative difference: ", maximum(rel_diff))
+        end
+    end
 end

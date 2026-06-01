@@ -388,7 +388,7 @@ end
     AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
 
 A complete simulation configuration, bundling the physical model, input flux,
-mode strategy, output directory, resolved time configuration, and lazy simulation cache.
+mode strategy, output configuration, resolved time configuration, and lazy simulation cache.
 
 Use [`initialize!`](@ref) to allocate the workspace explicitly, or call [`run!`](@ref)
 directly to auto-initialize and execute the simulation.
@@ -396,14 +396,18 @@ directly to auto-initialize and execute the simulation.
 # Examples
 ```julia
 # Single-step steady-state
-sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+sim = AuroraSimulation(model, flux, "my_run"; mode=SteadyStateMode())
 
 # Multi-step steady-state
-sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.5, dt=0.01))
+sim = AuroraSimulation(model, flux, "my_run"; mode=SteadyStateMode(duration=0.5, dt=0.01))
 
 # Time-dependent
-sim = AuroraSimulation(model, flux, savedir;
+sim = AuroraSimulation(model, flux, "my_run";
                        mode=TimeDependentMode(duration=0.5, dt=0.001, CFL_number=128))
+
+# Full output control via AuroraOutputManager
+out = AuroraOutputManager("my_run"; overwrite=true, compress=false)
+sim = AuroraSimulation(model, flux, out; mode=SteadyStateMode())
 ```
 """
 mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
@@ -411,20 +415,27 @@ mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
     const model::M
     const flux::F
     const mode::S
-    const savedir::String
+    const output::AuroraOutputManager
     time::T               # rebuilt by initialize!(sim) if a grid changed (CFL grid depends on it)
-    const save_input_flux::Bool
     cache::C
     cache_initialized::Bool
 end
 
-function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir;
-                          mode::AbstractMode=SteadyStateMode(),
-                          save_input_flux=true)
+function AuroraSimulation(model::AuroraModel, flux::InputFlux, output::AuroraOutputManager;
+                          mode::AbstractMode=SteadyStateMode())
     time = build_time_config(model, mode)
     cache = build_dummy_simulation_cache(model, time)
-    return AuroraSimulation(model, flux, mode, String(savedir), time, save_input_flux,
-                            cache, false)
+    return AuroraSimulation(model, flux, mode, output, time, cache, false)
+end
+
+# Convenience: accept a plain String and wrap it in an AuroraOutputManager with defaults
+function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::AbstractString;
+                          mode::AbstractMode=SteadyStateMode(),
+                          save_input_flux=true,
+                          overwrite=false,
+                          compress=true)
+    output = AuroraOutputManager(savedir; overwrite, compress, save_input_flux)
+    return AuroraSimulation(model, flux, output; mode)
 end
 
 # Build the appropriate time configuration based on the mode
@@ -444,10 +455,10 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Model:       ", sim.model)
     println(io, "├── Flux:        ", sim.flux)
     println(io, "├── Mode:        ", sim.mode)
-    println(io, "├── Savedir:     ", sim.savedir)
+    println(io, "├── Savedir:     ", sim.output.savedir)
     show_time_fields(io, sim.time)
     println(io, "├── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
-    print(io,   "└── Save flux:   ", sim.save_input_flux)
+    print(io,   "└── Save flux:   ", sim.output.save_input_flux)
 end
 
 function show_time_fields(io::IO, time::RefinedTimeGrid)

@@ -47,17 +47,3 @@ end
     @test size(inp_ss.Ietop, 1) == 2   # 2 beams
     @test size(inp_ss.Ietop, 2) == 1   # 1 time step
 end
-
-@testitem "find_input_file error cases" begin
-    # No Ie_incoming file
-    mktempdir() do emptydir
-        @test_throws Exception find_input_file(emptydir)
-    end
-
-    # Multiple Ie_incoming files
-    mktempdir() do twodir
-        touch(joinpath(twodir, "Ie_incoming_a.mat"))
-        touch(joinpath(twodir, "Ie_incoming_b.mat"))
-        @test_throws Exception find_input_file(twodir)
-    end
-end

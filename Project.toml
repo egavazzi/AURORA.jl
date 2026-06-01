@@ -20,6 +20,7 @@ LibGit2 = "76f85450-5226-5b5a-8eaa-529ad045b433"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 MAT = "23992714-dd62-5051-b70f-ba57cb901cac"
+NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -31,6 +32,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
@@ -56,6 +58,8 @@ LinearAlgebra = "1.10"
 LoopVectorization = "0.12.173"
 MAT = "0.11, 0.12"
 Makie = "0.22 - 0.24"
+NCDatasets = "0.14"
+TOML = "1"
 Pkg = "1.10"
 PrecompileTools = "1.2.1"
 Printf = "1.10"
@@ -68,13 +72,12 @@ SpecialFunctions = "2.6"
 Statistics = "1.10"
 StyledStrings = "1"
 julia = "1.10"
-# This is to run tests without needed a test/Project.toml (had some issues with it)
+
 [extras]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [targets]
-test = ["CairoMakie", "Test", "TestItemRunner", "TestItems", "TOML"]
+test = ["CairoMakie", "Test", "TestItemRunner", "TestItems"]
