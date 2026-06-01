@@ -29,28 +29,6 @@
     end
 end
 
-@testitem "downsampling_fluxes reduces time dimension" setup=[FluxTestSetup] begin
-    using AURORA
-    using NCDatasets
-
-    factor = 5
-    AURORA.downsampling_fluxes(FluxTestSetup.savedir, factor)
-
-    outdir = joinpath(FluxTestSetup.savedir, "downsampled_$(factor)x")
-    @test isdir(outdir)
-
-    outfile = joinpath(outdir, "simulation_data.nc")
-    @test isfile(outfile)
-
-    NCDataset(outfile, "r") do ds
-        n_t_ds = length(1:factor:FluxTestSetup.n_t)   # accounts for odd n_t
-        @test length(ds["time"]) == n_t_ds
-        @test size(ds["Ie"], 3)  == n_t_ds
-        # First time step is preserved
-        @test Array(ds["time"])[1] ≈ 0.0
-    end
-end
-
 @testitem "make_Ie_top_file extracts top boundary" setup=[FluxTestSetup] begin
     using AURORA
     using NCDatasets

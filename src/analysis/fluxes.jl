@@ -90,85 +90,6 @@ function make_Ie_top_file(directory_to_process)
 end
 
 
-"""
-    downsampling_fluxes(directory_to_process, downsampling_factor)
-
-Read `simulation_data.nc` from `directory_to_process` and write a downsampled
-copy to `downsampled_Nx/simulation_data.nc`, where `N` is `downsampling_factor`.
-
-For example, if `Ie` has time step 1 ms and `downsampling_factor=10`, the output
-will have time step 10 ms.
-
-# Calling
-`downsampling_fluxes(directory_to_process, downsampling_factor)`
-"""
-function downsampling_fluxes(directory_to_process, downsampling_factor)
-    result = read_simulation_nc(directory_to_process)
-    Ie     = result.Ie          # [n_z, n_μ, n_t, n_E]
-    t      = result.t
-    h_atm  = result.h_atm
-    E_centers = result.E_centers
-    E_edges   = result.E_edges
-    dE        = result.dE
-    mu_lims   = result.mu_lims
-
-    dt = diff(t)[1]
-    println("The time-step from simulation is $(dt)s.")
-    new_dt = dt * downsampling_factor
-    println("The time-step of the new file will be $(new_dt)s.")
-
-    Ie_ds = Ie[:, :, 1:downsampling_factor:end, :]
-    t_ds  = t[1:downsampling_factor:end]
-
-    new_subdir = joinpath(directory_to_process, "downsampled_$(downsampling_factor)x")
-    mkpath(new_subdir)
-    savefile = joinpath(new_subdir, "simulation_data.nc")
-
-    n_z, n_μ, n_t_ds, n_E = size(Ie_ds)
-    NCDataset(savefile, "c") do ds
-        defDim(ds, "altitude",          n_z)
-        defDim(ds, "pitch_angle",       n_μ)
-        defDim(ds, "energy",            n_E)
-        defDim(ds, "energy_bounds",     n_E + 1)
-        defDim(ds, "pitch_angle_bounds", n_μ + 1)
-        defDim(ds, "time",              n_t_ds)
-
-        alt_v = defVar(ds, "altitude", Float64, ("altitude",);
-                       attrib=["units" => "m", "long_name" => "altitude"])
-        alt_v[:] = h_atm
-
-        pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
-                      attrib=["units" => "1", "long_name" => "cosine of pitch angle"])
-        pa_v[:] = mu_avg(acosd.(mu_lims))
-
-        en_v = defVar(ds, "energy", Float64, ("energy",);
-                      attrib=["units" => "eV", "long_name" => "energy bin center"])
-        en_v[:] = E_centers
-
-        t_v = defVar(ds, "time", Float64, ("time",);
-                     attrib=["units" => "s", "long_name" => "simulation time"])
-        t_v[:] = t_ds
-
-        ee_v = defVar(ds, "energy_edges", Float64, ("energy_bounds",);
-                      attrib=["units" => "eV", "long_name" => "energy bin edges"])
-        ee_v[:] = E_edges
-
-        ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
-                      attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
-        ml_v[:] = mu_lims
-
-        Ie_v = defVar(ds, "Ie", Float32, ("altitude", "pitch_angle", "time", "energy");
-                      deflatelevel=4,
-                      chunksizes=(n_z, n_μ, 1, n_E),
-                      attrib=["units"     => "eV-1 m-2 s-1 sr-1",
-                               "long_name" => "differential electron flux"])
-        Ie_v[:, :, :, :] = Float32.(Ie_ds)
-    end
-
-    return nothing
-end
-
-
 # ======================================================================================== #
 #                                  FIELD-ALIGNED CURRENTS                                #
 # ======================================================================================== #
@@ -266,11 +187,3 @@ make_Ie_top_file(sim::AuroraSimulation) = make_Ie_top_file(sim.output.savedir)
 Convenience wrapper that calls [`make_current_file`](@ref) on `sim.output.savedir`.
 """
 make_current_file(sim::AuroraSimulation) = make_current_file(sim.output.savedir)
-
-"""
-    downsampling_fluxes(sim::AuroraSimulation, downsampling_factor)
-
-Convenience wrapper that calls [`downsampling_fluxes`](@ref) on `sim.output.savedir`.
-"""
-downsampling_fluxes(sim::AuroraSimulation, downsampling_factor) =
-    downsampling_fluxes(sim.output.savedir, downsampling_factor)
