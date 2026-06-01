@@ -56,7 +56,7 @@ include("solvers/steady_state.jl")
 include("solvers/crank_nicolson.jl")
 
 include("simulation/cache.jl")
-include("simulation/output_manager.jl")
+include("output/output_manager.jl")
 export AuroraOutputManager
 include("simulation/types.jl")
 export AuroraSimulation
@@ -64,7 +64,8 @@ export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDepend
 export AbstractTimeConfig, SingleStepConfig, UniformTimeGrid, RefinedTimeGrid
 include("simulation/initialize.jl")
 export initialize!
-include("simulation/io.jl")
+include("output/write.jl")
+include("output/read.jl")
 include("simulation/run.jl")
 export run!
 
@@ -74,13 +75,12 @@ export v_of_E, mu_avg, beam_weight, make_savedir
 include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
        load_volume_excitation, load_column_excitation, load_input
-include("analysis/utilities.jl")
 include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")
 include("analysis/heating.jl")
 export make_volume_excitation_file, make_column_excitation_file,
-       downsampling_fluxes, make_Ie_top_file, make_current_file,
+       make_Ie_top_file, make_current_file,
        make_heating_rate_file, make_psd_file
 
 # Define and export functions to be extended by the AURORA_viz module
