@@ -1,5 +1,6 @@
 using NCDatasets: NCDataset, defDim, defVar, sync
 using JLD2: @save
+using Dates: now
 import TOML
 import LibGit2
 
@@ -135,7 +136,7 @@ function create_simulation_nc(sim::AuroraSimulation)
     ds = NCDataset(nc_path, "c",
                    attrib=["aurora_version" => string(pkgversion(AURORA)),
                             "commit_hash"   => commit_hash,
-                            "creation_time" => string(Dates.now())])
+                            "creation_time" => string(now())])
 
     # Dimensions
     defDim(ds, "altitude",          n_z)

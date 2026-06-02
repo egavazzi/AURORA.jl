@@ -70,7 +70,7 @@ include("simulation/run.jl")
 export run!
 
 include("utilities.jl")
-export v_of_E, mu_avg, beam_weight, make_savedir
+export v_of_E, mu_avg, beam_weight
 
 include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,

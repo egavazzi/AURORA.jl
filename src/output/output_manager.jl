@@ -1,10 +1,14 @@
+using Dates: now, Dates
+
 """
     AuroraOutputManager(savedir; overwrite=false, compress=true, save_input_flux=true)
 
 Configuration struct that controls where and how simulation output is written.
 
 # Arguments
-- `savedir::String`: directory where output files will be written (created if absent).
+- `savedir`: directory where output files will be written (created by `run!` if absent).
+  May be a relative or absolute path. If empty (or only whitespace), output goes to
+  `backup/<yyyymmdd-HHMM>/` in the current working directory.
 
 # Keyword arguments
 - `overwrite::Bool=false`: if `false` (the default), `run!()` errors when
@@ -42,7 +46,22 @@ struct AuroraOutputManager
 end
 
 AuroraOutputManager(savedir; overwrite=false, compress=true, save_input_flux=true) =
-    AuroraOutputManager(String(savedir), overwrite, compress, save_input_flux)
+    AuroraOutputManager(resolve_savedir(savedir), overwrite, compress, save_input_flux)
+
+"""
+    resolve_savedir(savedir) -> String
+
+Normalise a user-supplied `savedir`. A non-empty path (relative or absolute) is returned
+unchanged; an empty or whitespace-only path falls back to `backup/<yyyymmdd-HHMM>` in the
+current working directory.
+"""
+function resolve_savedir(savedir)
+    s = String(savedir)
+    if isempty(s) || !occursin(r"[^ ]", s)
+        return joinpath("backup", Dates.format(now(), "yyyymmdd-HHMM"))
+    end
+    return s
+end
 
 function Base.show(io::IO, out::AuroraOutputManager)
     print(io, "AuroraOutputManager(\"", out.savedir, "\")")
