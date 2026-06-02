@@ -7,8 +7,6 @@ organized, the main types involved, and the execution flow from `run!` to the so
 
 ```
 AURORA.jl/
-├── data/                    # Simulation output (one subfolder per run)
-│
 ├── docs/                    # Documentation (Documenter.jl)
 │
 ├── ext/
@@ -30,6 +28,10 @@ AURORA.jl/
 │
 └── test/                    # Unit tests
 ```
+
+Simulation output is **not** written inside the package. `run!` writes everything to the
+user-specified `savedir` (relative or absolute), in the current working directory by default —
+see [Output & data](@ref Output).
 
 ## Source code organization
 
@@ -75,11 +77,15 @@ src/
 │   ├── initialize.jl            # initialize! — allocates cache
 │   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
 │
+├── output/
+│   ├── output_manager.jl        # AuroraOutputManager (output options)
+│   ├── write.jl                 # config.toml, atmosphere.nc, physics_state.jld2, simulation_data.nc
+│   └── read.jl                  # read_simulation_nc, read_atmosphere_nc
+│
 ├── analysis/
 │   ├── analysis_types.jl        # Result types (VolumeExcitationResult, ColumnExcitationResult, IeTopResult)
-│   ├── utilities.jl             # Helpers
 │   ├── emissions.jl             # Volume and column excitation rates
-│   ├── fluxes.jl                # Electron flux post-processing and downsampling
+│   ├── fluxes.jl                # Electron flux post-processing (top flux, currents)
 │   ├── heating.jl               # Electron heating rate
 │   └── psd.jl                   # Phase space density analysis
 │
@@ -118,7 +124,8 @@ run!(sim::AuroraSimulation)
 │   │   └── Load/compute cascading transfer matrices
 │   └── Compute input flux → Ie_top array
 │
-├── Save parameters, neutral densities, Ie_top to disk
+├── Write config.toml, inputs/ (atmosphere.nc + physics_state.jld2), and create
+│   simulation_data.nc (writing Ie_input if save_input_flux)
 │
 └── solve!(sim)
     │
