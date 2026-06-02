@@ -10,8 +10,8 @@ Configuration struct that controls where and how simulation output is written.
 - `overwrite::Bool=false`: if `false` (the default), `run!()` errors when
   `simulation_data.nc` already exists in `savedir`; set to `true` to allow overwriting.
 - `compress::Bool=true`: enable zlib compression (`deflatelevel=4`) on all NetCDF variables.
-- `save_input_flux::Bool=true`: write the top-of-atmosphere boundary condition `Ie_top`
-  as initial time slices (`t ≤ 0`) in `simulation_data.nc`.
+- `save_input_flux::Bool=true`: write the top-of-atmosphere input flux (precipitation) as a
+  separate `Ie_input` variable (on its own `time_input` axis) in `simulation_data.nc`.
 
 # Output layout
 ```

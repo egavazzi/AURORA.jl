@@ -141,12 +141,12 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     input_struct = if plot_input
         nc_path = joinpath(full_path_to_directory, "simulation_data.nc")
         NCDataset(nc_path, "r") do ds
-            if !haskey(ds, "Ie_top")
+            if !haskey(ds, "Ie_input")
                 error("Input flux not found in simulation_data.nc. " *
                       "Re-run the simulation with save_input_flux=true.")
             end
-            Ietop_raw = Array(ds["Ie_top"])  # [n_μ, n_t_top, n_E]
-            t_top_raw = Array(ds["time_top"])
+            Ietop_raw = Array(ds["Ie_input"])  # [n_μ, n_t_input, n_E]
+            t_top_raw = Array(ds["time_input"])
             t_top = [t_top_raw; t_top_raw[end] + diff(t_top_raw)[end]] .- t_top_raw[1]
             idx_θ = vec(input_angle_cone[1] .<= abs.(acosd.(mu_avg(θ_lims))) .<= input_angle_cone[2])
             Ω_beam = beam_weight([input_angle_cone[1], input_angle_cone[2]])

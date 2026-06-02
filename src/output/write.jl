@@ -105,10 +105,11 @@ end
 Create `<savedir>/simulation_data.nc` with all dimensions and static variables.
 Returns the open dataset; the caller is responsible for calling `close(ds)`.
 
-If `sim.output.save_input_flux` is `true`, the input boundary flux `Ie_top` is
-written immediately into the file (before any solver loops run), using a fixed
-`time_top` dimension.  The unlimited `time` dimension is left empty at creation
-time and is populated by subsequent [`append_chunk_nc!`](@ref) calls.
+If `sim.output.save_input_flux` is `true`, the input boundary flux is written
+immediately into the file (before any solver loops run) as a separate `Ie_input`
+variable on its own fixed `time_input` dimension.  The unlimited `time` dimension
+is left empty at creation time and is populated by subsequent
+[`append_chunk_nc!`](@ref) calls.
 """
 function create_simulation_nc(sim::AuroraSimulation)
     out   = sim.output
@@ -189,17 +190,17 @@ function create_simulation_nc(sim::AuroraSimulation)
         t_top, Ie_top_3D = input_flux_at_save_cadence(sim)
         n_t_top = length(t_top)
 
-        defDim(ds, "time_top", n_t_top)
-        t_top_v = defVar(ds, "time_top", Float64, ("time_top",); deflatelevel=dl,
+        defDim(ds, "time_input", n_t_top)
+        t_top_v = defVar(ds, "time_input", Float64, ("time_input",); deflatelevel=dl,
                          attrib=["units"     => "s",
                                   "long_name" => "input flux time"])
         t_top_v[:] = t_top
 
-        Ietop_v = defVar(ds, "Ie_top", Float32, ("pitch_angle", "time_top", "energy");
+        Ietop_v = defVar(ds, "Ie_input", Float32, ("pitch_angle", "time_input", "energy");
                          deflatelevel=dl,
                          chunksizes=(n_μ, 1, n_E),
                          attrib=["units"     => "m-2 s-1",
-                                  "long_name" => "input boundary number flux (top of atmosphere)"])
+                                  "long_name" => "input boundary number flux (precipitation, top of atmosphere)"])
         Ietop_v[:, :, :] = Float32.(Ie_top_3D)
         sync(ds)
     end

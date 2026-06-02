@@ -132,7 +132,10 @@ load_column_excitation(sim::AuroraSimulation) = load_column_excitation(sim.outpu
 """
     IeTopResult
 
-Incoming electron flux at the top of the ionosphere, as saved in `analysis/Ie_top.nc`.
+Electron flux at the top altitude of the model, as saved in `analysis/Ie_top.nc` by
+[`make_Ie_top_file`](@ref). For the downward beams this is the precipitation. It is derived
+from the simulation *output* and is therefore distinct from the `Ie_input` boundary
+condition optionally stored in `simulation_data.nc` (see `save_input_flux`).
 
 # Fields
 - `Ietop`: flux array of size (n_beams x n_t x n_E), units: eV⁻¹ m⁻² s⁻¹ sr⁻¹
@@ -154,8 +157,8 @@ end
 """
     load_input(directory::String)
 
-Load the incoming electron flux at the top of the ionosphere from `analysis/Ie_top.nc`
-in `directory`. Returns an [`IeTopResult`](@ref).
+Load the electron flux at the top altitude of the model from `analysis/Ie_top.nc`
+in `directory` (the precipitation for downward beams). Returns an [`IeTopResult`](@ref).
 """
 function load_input(directory::String)
     filepath = joinpath(directory, "analysis", "Ie_top.nc")
