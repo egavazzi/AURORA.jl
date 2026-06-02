@@ -133,9 +133,10 @@ load_column_excitation(sim::AuroraSimulation) = load_column_excitation(sim.outpu
     IeTopResult
 
 Electron flux at the top altitude of the model, as saved in `analysis/Ie_top.nc` by
-[`make_Ie_top_file`](@ref). For the downward beams this is the precipitation. It is derived
-from the simulation *output* and is therefore distinct from the `Ie_input` boundary
-condition optionally stored in `simulation_data.nc` (see `save_input_flux`).
+[`make_Ie_top_file`](@ref). It contains all beams — both downward (precipitation) and
+upward (backscattered) — and is derived from the simulation *output*, so it is distinct
+from the `Ie_input` boundary condition optionally stored in `simulation_data.nc`
+(see `save_input_flux`).
 
 # Fields
 - `Ietop`: flux array of size (n_beams x n_t x n_E), units: eV⁻¹ m⁻² s⁻¹ sr⁻¹
@@ -155,12 +156,13 @@ struct IeTopResult
 end
 
 """
-    load_input(directory::String)
+    load_Ie_top(directory::String)
 
 Load the electron flux at the top altitude of the model from `analysis/Ie_top.nc`
-in `directory` (the precipitation for downward beams). Returns an [`IeTopResult`](@ref).
+in `directory`. Contains all beams (downward precipitation and upward backscatter).
+Returns an [`IeTopResult`](@ref).
 """
-function load_input(directory::String)
+function load_Ie_top(directory::String)
     filepath = joinpath(directory, "analysis", "Ie_top.nc")
     NCDataset(filepath, "r") do ds
         t = Vector{Float64}(ds["time"][:])

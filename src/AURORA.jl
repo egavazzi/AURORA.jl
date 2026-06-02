@@ -74,7 +74,7 @@ export v_of_E, mu_avg, beam_weight
 
 include("analysis/analysis_types.jl")
 export VolumeExcitationResult, ColumnExcitationResult, IeTopResult,
-       load_volume_excitation, load_column_excitation, load_input
+       load_volume_excitation, load_column_excitation, load_Ie_top
 include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")

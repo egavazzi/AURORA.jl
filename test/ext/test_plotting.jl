@@ -7,7 +7,7 @@
 
     vol = load_volume_excitation(SharedSimResults.td_dir)
     col = load_column_excitation(SharedSimResults.td_dir)
-    inp = load_input(SharedSimResults.td_dir)
+    inp = load_Ie_top(SharedSimResults.td_dir)
 
     @testset "plot_excitation! smoke" begin
         # default call → heatmap
@@ -80,7 +80,7 @@
     @testset "multi-step SS smoke" begin
         vol_ms = load_volume_excitation(SharedSimResults.ms_ss_dir)
         col_ms = load_column_excitation(SharedSimResults.ms_ss_dir)
-        inp_ms = load_input(SharedSimResults.ms_ss_dir)
+        inp_ms = load_Ie_top(SharedSimResults.ms_ss_dir)
 
         # plot_excitation! heatmap over time
         fig1 = Figure()

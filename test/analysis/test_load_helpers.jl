@@ -33,15 +33,15 @@ end
     @test length(col_td.t) > length(col_ss.t)
 end
 
-@testitem "load_input" setup=[SharedSimResults] begin
+@testitem "load_Ie_top" setup=[SharedSimResults] begin
     # Time-dependent
-    inp_td = load_input(SharedSimResults.td_dir)
+    inp_td = load_Ie_top(SharedSimResults.td_dir)
     @test inp_td isa IeTopResult
     @test inp_td.Ietop isa Array{Float64, 3}
     @test size(inp_td.Ietop, 1) == 2   # 2 beams
 
     # Steady-state
-    inp_ss = load_input(SharedSimResults.ss_dir)
+    inp_ss = load_Ie_top(SharedSimResults.ss_dir)
     @test inp_ss isa IeTopResult
     @test inp_ss.Ietop isa Array{Float64, 3}
     @test size(inp_ss.Ietop, 1) == 2   # 2 beams
