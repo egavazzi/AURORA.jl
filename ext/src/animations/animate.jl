@@ -142,8 +142,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         nc_path = joinpath(full_path_to_directory, "simulation_data.nc")
         NCDataset(nc_path, "r") do ds
             if !haskey(ds, "Ie_input")
-                error("Input flux not found in simulation_data.nc. " *
-                      "Re-run the simulation with save_input_flux=true.")
+                error("Input flux (`Ie_input`) not found in simulation_data.nc. " *
+                      "This file may have been produced by an older version of AURORA.")
             end
             Ietop_raw = Array(ds["Ie_input"])  # [n_μ, n_t_input, n_E]
             t_top_raw = Array(ds["time_input"])

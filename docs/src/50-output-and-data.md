@@ -49,7 +49,7 @@ flushed to disk, so a file from an interrupted run is readable up to the last co
 | `energy_edges` | `(energy_bounds,)` | eV | energy bin edges |
 | `mu_lims` | `(pitch_angle_bounds,)` | 1 | μ bin boundaries |
 | `Ie` | `(altitude, pitch_angle, time, energy)` | m⁻² s⁻¹ | electron **number** flux |
-| `Ie_input` | `(pitch_angle, time_input, energy)` | m⁻² s⁻¹ | input precipitation, if `save_input_flux = true` |
+| `Ie_input` | `(pitch_angle, time_input, energy)` | m⁻² s⁻¹ | input precipitation (boundary condition) |
 | `time_input` | `(time_input,)` | s | time axis for `Ie_input` |
 
 Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
@@ -80,7 +80,7 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
 all output options:
 
 ```julia
-out = AuroraOutputManager("my_run"; overwrite = false, compress = true, save_input_flux = true)
+out = AuroraOutputManager("my_run"; overwrite = false, compress = true)
 sim = AuroraSimulation(model, flux, out; mode = TimeDependentMode(duration = 0.5, dt = 0.001))
 
 # Convenience: passing a plain String wraps it in an AuroraOutputManager with the defaults
@@ -90,7 +90,6 @@ sim = AuroraSimulation(model, flux, "my_run"; mode = SteadyStateMode())
 - `overwrite = false` — `run!` errors if `simulation_data.nc` already exists in `savedir`
   (pass `overwrite = true` to allow replacing it).
 - `compress = true` — zlib compression (`deflatelevel = 4`) on all NetCDF variables.
-- `save_input_flux = true` — also write the boundary flux as `Ie_input` (see above).
 - `savedir` may be a relative or absolute path and is created by `run!`. An empty or
   whitespace `savedir` falls back to `backup/<yyyymmdd-HHMM>/` in the current working directory.
 

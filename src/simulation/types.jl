@@ -431,10 +431,9 @@ end
 # Convenience: accept a plain String and wrap it in an AuroraOutputManager with defaults
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::AbstractString;
                           mode::AbstractMode=SteadyStateMode(),
-                          save_input_flux=true,
                           overwrite=false,
                           compress=true)
-    output = AuroraOutputManager(savedir; overwrite, compress, save_input_flux)
+    output = AuroraOutputManager(savedir; overwrite, compress)
     return AuroraSimulation(model, flux, output; mode)
 end
 
@@ -457,8 +456,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.output.savedir)
     show_time_fields(io, sim.time)
-    println(io, "├── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
-    print(io,   "└── Save flux:   ", sim.output.save_input_flux)
+    print(io,   "└── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
 end
 
 function show_time_fields(io::IO, time::RefinedTimeGrid)

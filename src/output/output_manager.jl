@@ -1,7 +1,7 @@
 using Dates: now, Dates
 
 """
-    AuroraOutputManager(savedir; overwrite=false, compress=true, save_input_flux=true)
+    AuroraOutputManager(savedir; overwrite=false, compress=true)
 
 Configuration struct that controls where and how simulation output is written.
 
@@ -14,8 +14,6 @@ Configuration struct that controls where and how simulation output is written.
 - `overwrite::Bool=false`: if `false` (the default), `run!()` errors when
   `simulation_data.nc` already exists in `savedir`; set to `true` to allow overwriting.
 - `compress::Bool=true`: enable zlib compression (`deflatelevel=4`) on all NetCDF variables.
-- `save_input_flux::Bool=true`: write the top-of-atmosphere input flux (precipitation) as a
-  separate `Ie_input` variable (on its own `time_input` axis) in `simulation_data.nc`.
 
 # Output layout
 ```
@@ -31,7 +29,7 @@ savedir/
 # Examples
 ```julia
 # Full control:
-out = AuroraOutputManager("my_run"; compress=false, save_input_flux=false)
+out = AuroraOutputManager("my_run"; compress=false)
 sim = AuroraSimulation(model, flux, out; mode=TimeDependentMode(duration=0.5, dt=0.001))
 
 # Convenience — pass a plain String and defaults apply:
@@ -42,11 +40,10 @@ struct AuroraOutputManager
     savedir::String
     overwrite::Bool
     compress::Bool
-    save_input_flux::Bool
 end
 
-AuroraOutputManager(savedir; overwrite=false, compress=true, save_input_flux=true) =
-    AuroraOutputManager(resolve_savedir(savedir), overwrite, compress, save_input_flux)
+AuroraOutputManager(savedir; overwrite=false, compress=true) =
+    AuroraOutputManager(resolve_savedir(savedir), overwrite, compress)
 
 """
     resolve_savedir(savedir) -> String
@@ -69,8 +66,7 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", out::AuroraOutputManager)
     println(io, "AuroraOutputManager:")
-    println(io, "├── savedir:          ", out.savedir)
-    println(io, "├── overwrite:        ", out.overwrite)
-    println(io, "├── compress:         ", out.compress)
-    print(io,   "└── save_input_flux:  ", out.save_input_flux)
+    println(io, "├── savedir:    ", out.savedir)
+    println(io, "├── overwrite:  ", out.overwrite)
+    print(io,   "└── compress:   ", out.compress)
 end

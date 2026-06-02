@@ -125,7 +125,7 @@ run!(sim::AuroraSimulation)
 │   └── Compute input flux → Ie_top array
 │
 ├── Write config.toml, inputs/ (atmosphere.nc + physics_state.jld2), and create
-│   simulation_data.nc (writing Ie_input if save_input_flux)
+│   simulation_data.nc (writing the Ie_input boundary flux)
 │
 └── solve!(sim)
     │

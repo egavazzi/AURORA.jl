@@ -135,8 +135,7 @@ load_column_excitation(sim::AuroraSimulation) = load_column_excitation(sim.outpu
 Electron flux at the top altitude of the model, as saved in `analysis/Ie_top.nc` by
 [`make_Ie_top_file`](@ref). It contains all beams — both downward (precipitation) and
 upward (backscattered) — and is derived from the simulation *output*, so it is distinct
-from the `Ie_input` boundary condition optionally stored in `simulation_data.nc`
-(see `save_input_flux`).
+from the `Ie_input` boundary condition stored in `simulation_data.nc`.
 
 # Fields
 - `Ietop`: flux array of size (n_beams x n_t x n_E), units: eV⁻¹ m⁻² s⁻¹ sr⁻¹
