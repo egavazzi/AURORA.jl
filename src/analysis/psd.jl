@@ -175,7 +175,7 @@ function make_psd_from_AURORA(
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
 )
     data = load_results(sim_dir)
-    grids = psd_grids(data.E_centers, data.dE, data.mu_lims)
+    grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
 
     if compute ∉ (:f_only, :F_only, :both)
         throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
@@ -188,7 +188,7 @@ function make_psd_from_AURORA(
 
     F_result =
         compute in (:F_only, :both) ?
-        compute_F(data.Ie, data.mu_lims, grids.v; vpar_edges = vpar_edges) :
+        compute_F(data.Ie, data.μ_lims, grids.v; vpar_edges = vpar_edges) :
         NamedTuple()
 
     return merge(
@@ -205,7 +205,7 @@ function make_psd_from_AURORA(
             E_centers = data.E_centers,
             t_run = data.t,
             h_atm = data.h_atm,
-            μ_lims = data.mu_lims,
+            μ_lims = data.μ_lims,
         ),
     )
 end
@@ -258,7 +258,7 @@ function write_psd_result(savefile::AbstractString, res)
         defDim(ds, "energy",            nE)
         defDim(ds, "pitch_angle",       nμ)
         defDim(ds, "pitch_angle_bounds", nμ + 1)
-        defDim(ds, "energy_bounds",     nE + 1)
+        defDim(ds, "energy_bounds",      nE + 1)
 
         alt_v = defVar(ds, "altitude", Float64, ("altitude",);
                        attrib=["units" => "m", "long_name" => "altitude"])

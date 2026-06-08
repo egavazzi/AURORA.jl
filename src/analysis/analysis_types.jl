@@ -143,7 +143,7 @@ from the `Ie_input` boundary condition stored in `simulation_data.nc`.
 - `E_edges`: energy bin edges (eV), length n_E + 1
 - `E_centers`: energy bin centres (eV), length n_E
 - `ΔE`: energy bin widths (eV), length n_E
-- `mu_lims`: cosine-of-pitch-angle limits, length n_beams + 1
+- `μ_lims`: cosine-of-pitch-angle limits, length n_beams + 1
 """
 struct IeTopResult
     Ietop::Array{Float64, 3}
@@ -151,7 +151,7 @@ struct IeTopResult
     E_edges::Vector{Float64}
     E_centers::Vector{Float64}
     ΔE::Vector{Float64}
-    mu_lims::Vector{Float64}
+    μ_lims::Vector{Float64}
 end
 
 """
@@ -170,7 +170,7 @@ function load_Ie_top(directory::String)
         E_centers = Vector{Float64}(ds["energy"][:])
         ΔE = diff(E_edges)
         Ietop = Array{Float64, 3}(ds["Ie_top"][:, :, :])
-        mu_lims = Vector{Float64}(ds["mu_lims"][:])
-        return IeTopResult(Ietop, t, E_edges, E_centers, ΔE, mu_lims)
+        μ_lims = Vector{Float64}(ds["mu_lims"][:])
+        return IeTopResult(Ietop, t, E_edges, E_centers, ΔE, μ_lims)
     end
 end

@@ -24,11 +24,11 @@ function make_Ie_top_file(directory_to_process)
     Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
     t         = result.t
     E_centers = result.E_centers
-    ΔE        = result.dE
-    mu_lims   = result.mu_lims
+    ΔE      = result.ΔE
+    μ_lims  = result.μ_lims
 
     ## Beam weights
-    θ_lims = acosd.(mu_lims)
+    θ_lims = acosd.(μ_lims)
     Ω_beam = beam_weight(θ_lims)   # [n_μ]
 
     ## Extract top altitude slice: Ie[end, :, :, :] → [n_μ, n_t, n_E]
@@ -45,7 +45,7 @@ function make_Ie_top_file(directory_to_process)
         defDim(ds, "pitch_angle",   n_μ)
         defDim(ds, "time",          n_t)
         defDim(ds, "energy",        n_E)
-        defDim(ds, "energy_bounds", n_E + 1)
+        defDim(ds, "energy_bounds",      n_E + 1)
         defDim(ds, "pitch_angle_bounds", n_μ + 1)
 
         pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
@@ -66,7 +66,7 @@ function make_Ie_top_file(directory_to_process)
 
         ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
                       attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
-        ml_v[:] = mu_lims
+        ml_v[:] = μ_lims
 
         bw_v = defVar(ds, "beam_weight", Float64, ("pitch_angle",);
                       attrib=["units" => "sr", "long_name" => "solid-angle beam weight"])
@@ -110,9 +110,9 @@ function make_current_file(directory_to_process)
     t         = result.t
     z         = result.h_atm
     E_centers = result.E_centers
-    mu_lims   = result.mu_lims
+    μ_lims    = result.μ_lims
 
-    θ_lims   = acosd.(mu_lims)
+    θ_lims   = acosd.(μ_lims)
     μ_center = mu_avg(θ_lims)
 
     ## Elementary charge

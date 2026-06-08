@@ -143,7 +143,7 @@ function create_simulation_nc(sim::AuroraSimulation)
     defDim(ds, "altitude",          n_z)
     defDim(ds, "pitch_angle",       n_μ)
     defDim(ds, "energy",            n_E)
-    defDim(ds, "energy_bounds",     n_E + 1)
+    defDim(ds, "energy_bounds",      n_E + 1)
     defDim(ds, "pitch_angle_bounds", n_μ + 1)
     defDim(ds, "time",              Inf)   # unlimited — appended per loop
 

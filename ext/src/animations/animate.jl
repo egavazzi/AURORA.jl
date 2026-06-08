@@ -94,11 +94,11 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     print("(1/1) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
     result = AURORA.load_results(full_path_to_directory)
     Ie       = result.Ie          # [n_z, n_μ, n_t, n_E]
-    μ_lims   = result.mu_lims
+    μ_lims   = result.μ_lims
     t_run    = result.t
     E_centers = result.E_centers
     z        = result.h_atm
-    ΔE       = result.dE
+    ΔE       = result.ΔE
 
     θ_lims = round.(acosd.(μ_lims))
 

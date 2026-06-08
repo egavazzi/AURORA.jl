@@ -5,7 +5,7 @@ function AURORA.plot_input!(ax, data::AURORA.IeTopResult;
                             colorrange = nothing,
                             colormap = :inferno,
                             kwargs...)
-    all_weights = AURORA.beam_weight(acosd.(data.mu_lims))
+    all_weights = AURORA.beam_weight(acosd.(data.μ_lims))
     beams = beams isa Int ? [beams] : beams # always treat as array for indexing
     BeamW = sum(all_weights[beams])
     data_heatmap = dropdims(sum(data.Ietop[beams, :, :]; dims=1); dims=1) ./ BeamW ./ data.ΔE' .* data.E_centers'

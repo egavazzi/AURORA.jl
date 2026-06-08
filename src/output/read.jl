@@ -18,9 +18,10 @@ The raw electron-flux output of a simulation, as loaded from `simulation_data.nc
 - `h_atm`     : altitude grid `[n_z]` (m)
 - `E_centers` : energy bin centres `[n_E]` (eV)
 - `E_edges`   : energy bin edges `[n_E+1]` (eV)
-- `dE`        : energy bin widths `[n_E]` (eV) (= `diff(E_edges)`)
-- `mu_lims`   : pitch-angle cosine bin boundaries `[n_μ+1]`
-- `savedir`   : directory the result was loaded from, or `nothing`
+- `ΔE`          : energy bin widths `[n_E]` (eV) (= `diff(E_edges)`)
+- `μ_lims`      : pitch-angle cosine bin boundaries `[n_μ+1]`
+- `beam_weights`: solid-angle beam weights `[n_μ]` (sr)
+- `savedir`     : directory the result was loaded from, or `nothing`
 """
 struct SimulationResult
     Ie::Array{Float64, 4}
@@ -28,8 +29,9 @@ struct SimulationResult
     h_atm::Vector{Float64}
     E_centers::Vector{Float64}
     E_edges::Vector{Float64}
-    dE::Vector{Float64}
-    mu_lims::Vector{Float64}
+    ΔE::Vector{Float64}
+    μ_lims::Vector{Float64}
+    beam_weights::Vector{Float64}
     savedir::Union{String, Nothing}
 end
 
@@ -60,10 +62,11 @@ function load_results(sim_dir::AbstractString)
         t         = Vector{Float64}(ds["time"][:])
         h_atm     = Vector{Float64}(ds["altitude"][:])
         E_centers = Vector{Float64}(ds["energy"][:])
-        E_edges   = Vector{Float64}(ds["energy_edges"][:])
-        dE        = diff(E_edges)
-        mu_lims   = Vector{Float64}(ds["mu_lims"][:])
-        return SimulationResult(Ie, t, h_atm, E_centers, E_edges, dE, mu_lims, sim_dir)
+        E_edges      = Vector{Float64}(ds["energy_edges"][:])
+        ΔE           = diff(E_edges)
+        μ_lims       = Vector{Float64}(ds["mu_lims"][:])
+        beam_weights = Vector{Float64}(ds["beam_weight"][:])
+        return SimulationResult(Ie, t, h_atm, E_centers, E_edges, ΔE, μ_lims, beam_weights, sim_dir)
     end
 end
 
