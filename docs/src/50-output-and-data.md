@@ -5,8 +5,8 @@ CurrentModule = AURORA
 ```
 
 [`run!(sim)`](@ref run!) writes all of a simulation's output into its save directory
-(`sim.output.savedir`). Nothing is written during construction or [`initialize!`](@ref) — a
-single `run!` produces exactly one set of files. The format is deliberately split by job:
+(`sim.output.savedir`). Nothing is written during construction or [`initialize!`](@ref). 
+The format is split by job:
 
 | Format | Used for |
 |--------|----------|
@@ -37,8 +37,7 @@ files are written separately by the post-processing functions (see [Analysis](@r
 
 ## `simulation_data.nc`
 
-The main output. The unlimited `time` dimension is appended to after each solver loop and
-flushed to disk, so a file from an interrupted run is readable up to the last completed loop.
+The main output. The unlimited `time` dimension is appended to after each solver loop.
 
 | Variable | Dims | Units | Notes |
 |----------|------|-------|-------|
@@ -48,6 +47,8 @@ flushed to disk, so a file from an interrupted run is readable up to the last co
 | `time` | `(time,)` *unlimited* | s | save-cadence time axis |
 | `energy_edges` | `(energy_bounds,)` | eV | energy bin edges |
 | `mu_lims` | `(pitch_angle_bounds,)` | 1 | μ bin boundaries |
+| `dE` | `(energy,)` | eV | energy bin width |
+| `beam_weight` | `(pitch_angle,)` | sr | solid-angle beam weight |
 | `Ie` | `(altitude, pitch_angle, time, energy)` | m⁻² s⁻¹ | electron **number** flux |
 | `Ie_input` | `(pitch_angle, time_input, energy)` | m⁻² s⁻¹ | input precipitation (boundary condition) |
 | `time_input` | `(time_input,)` | s | time axis for `Ie_input` |
@@ -57,8 +58,8 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
 !!! warning "`Ie` is a number flux, not a differential flux"
     `Ie` is already integrated over each energy bin **and** over each beam's solid angle, so
     its units are m⁻² s⁻¹ (electrons per m² per second, per bin, per beam) — *not*
-    eV⁻¹ m⁻² s⁻¹ sr⁻¹. To obtain a differential flux, divide by the bin width `diff(energy_edges)`
-    and by the beam solid angle.
+    eV⁻¹ m⁻² s⁻¹ sr⁻¹. To obtain a differential flux, divide by `dE` and
+    `beam_weight` (both saved in the file).
 
 !!! note "`Ie_input` vs `analysis/Ie_top.nc`"
     `Ie_input` (here) is the **boundary condition** fed into the simulation. `analysis/Ie_top.nc`

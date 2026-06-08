@@ -120,9 +120,11 @@ function create_simulation_nc(sim::AuroraSimulation)
     μ_lims    = model.pitch_angle_grid.μ_lims
     n_μ       = length(μ_lims) - 1
     μ_center  = model.pitch_angle_grid.μ_center
+    Ω_beam    = beam_weight(model.pitch_angle_grid.θ_lims)
     n_E       = model.energy_grid.n
     E_centers = model.energy_grid.E_centers
     E_edges   = model.energy_grid.E_edges
+    ΔE        = model.energy_grid.ΔE
     h         = model.altitude_grid.h
 
     commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
@@ -175,6 +177,18 @@ function create_simulation_nc(sim::AuroraSimulation)
                   attrib=["units"     => "1",
                            "long_name" => "pitch-angle cosine bin boundaries"])
     ml_v[:] = collect(Float64, μ_lims)
+
+    # Bin width and beam solid angle — saved so analysts need not recompute them.
+    # `Ie` can be turned into a differential flux by dividing by `dE` and `beam_weight`.
+    de_v = defVar(ds, "dE", Float64, ("energy",); deflatelevel=dl,
+                  attrib=["units"     => "eV",
+                           "long_name" => "energy bin width"])
+    de_v[:] = ΔE
+
+    bw_v = defVar(ds, "beam_weight", Float64, ("pitch_angle",); deflatelevel=dl,
+                  attrib=["units"     => "sr",
+                           "long_name" => "solid-angle beam weight"])
+    bw_v[:] = Ω_beam
 
     # Main output variable — chunked and compressed.
     # NOTE: Ie is the electron *number* flux, already integrated over each energy bin and
