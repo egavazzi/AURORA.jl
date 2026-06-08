@@ -29,10 +29,6 @@ AURORA.jl/
 └── test/                    # Unit tests
 ```
 
-Simulation output is **not** written inside the package. `run!` writes everything to the
-user-specified `savedir` (relative or absolute), in the current working directory by default —
-see [Output & data](@ref Output).
-
 ## Source code organization
 
 ```

@@ -41,7 +41,7 @@ make_column_excitation_file(sim)
 
 [`make_Ie_top_file`](@ref) extracts the electron flux at the top of the ionosphere
 (maximum simulation altitude), for each pitch-angle beam. This contains *all* beams,
-including the upward (backscattered) flux — so it differs from the `Ie_input` boundary
+including the upward (backscattered) flux, so it differs from the `Ie_input` boundary
 condition stored in `simulation_data.nc`. It is useful for comparing with satellite or rocket
 observations. Results are saved as `analysis/Ie_top.nc` (load with [`load_Ie_top`](@ref)).
 
