@@ -13,7 +13,10 @@ Configuration struct that controls where and how simulation output is written.
 # Keyword arguments
 - `overwrite::Bool=false`: if `false` (the default), construction errors when
   `simulation_data.nc` already exists in `savedir`; set to `true` to allow overwriting.
-- `compress::Bool=true`: enable zlib compression (`deflatelevel=4`) on all NetCDF variables.
+- `compress`: zlib compression level for all NetCDF variables.
+  - `true` (default): level 4
+  - `false` or `0`: no compression
+  - `1`–`9`: exact deflate level
 
 # Output layout
 ```
@@ -30,6 +33,7 @@ savedir/
 ```julia
 # Full control:
 out = AuroraOutputManager("my_run"; compress=false)
+out = AuroraOutputManager("my_run"; compress=6)   # deflate level 6
 sim = AuroraSimulation(model, flux, out; mode=TimeDependentMode(duration=0.5, dt=0.001))
 
 # Convenience — pass a plain String and defaults apply:
@@ -39,17 +43,21 @@ sim = AuroraSimulation(model, flux, "my_run"; mode=SteadyStateMode())
 struct AuroraOutputManager
     savedir::String
     overwrite::Bool
-    compress::Bool
+    deflatelevel::Int
 end
 
 function AuroraOutputManager(savedir; overwrite=false, compress=true)
+    dl = compress === true  ? 4 :
+         compress === false ? 0 :
+         Int(compress)
+    0 <= dl <= 9 || throw(ArgumentError("compress must be true/false or an integer 0–9, got $compress"))
     dir = resolve_savedir(savedir)
     nc_path = joinpath(dir, "simulation_data.nc")
     if isfile(nc_path) && !overwrite
         error("simulation_data.nc already exists in \"$dir\". " *
               "Pass overwrite=true to AuroraOutputManager to allow overwriting.")
     end
-    return AuroraOutputManager(dir, overwrite, compress)
+    return AuroraOutputManager(dir, overwrite, dl)
 end
 
 """
@@ -75,5 +83,5 @@ function Base.show(io::IO, ::MIME"text/plain", out::AuroraOutputManager)
     println(io, "AuroraOutputManager:")
     println(io, "├── savedir:    ", out.savedir)
     println(io, "├── overwrite:  ", out.overwrite)
-    print(io,   "└── compress:   ", out.compress)
+    print(io,   "└── deflatelevel: ", out.deflatelevel)
 end

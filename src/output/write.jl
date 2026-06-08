@@ -58,7 +58,7 @@ function write_atmosphere_nc(sim::AuroraSimulation)
     model = sim.model
     ionosphere = model.ionosphere
     savefile = joinpath(sim.output.savedir, "inputs", "atmosphere.nc")
-    dl = sim.output.compress ? 4 : 0
+    dl = sim.output.deflatelevel
 
     NCDataset(savefile, "c") do ds
         defDim(ds, "altitude", length(model.altitude_grid.h))
@@ -114,7 +114,7 @@ dimension is left empty at creation time and is populated by subsequent
 function create_simulation_nc(sim::AuroraSimulation)
     out   = sim.output
     model = sim.model
-    dl    = out.compress ? 4 : 0
+    dl    = out.deflatelevel
 
     n_z       = length(model.altitude_grid.h)
     μ_lims    = model.pitch_angle_grid.μ_lims

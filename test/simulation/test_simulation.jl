@@ -374,6 +374,39 @@ end
     end
 end
 
+@testitem "AuroraOutputManager compress kwarg" begin
+    # true/false/integer conversion and out-of-range guard
+    @test AuroraOutputManager("x"; compress=true).deflatelevel  == 4
+    @test AuroraOutputManager("x"; compress=false).deflatelevel == 0
+    @test AuroraOutputManager("x"; compress=6).deflatelevel     == 6
+    @test AuroraOutputManager("x"; compress=0).deflatelevel     == 0
+    @test_throws ArgumentError AuroraOutputManager("x"; compress=10)
+    @test_throws ArgumentError AuroraOutputManager("x"; compress=-1)
+end
+
+@testitem "Higher compress level produces smaller simulation_data.nc" begin
+    msis_file = find_msis_file()
+    iri_file  = find_iri_file()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
+    flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+
+    size_lo = mktempdir() do dir
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=false);
+                               mode=SteadyStateMode())
+        run!(sim)
+        filesize(joinpath(dir, "simulation_data.nc"))
+    end
+
+    size_hi = mktempdir() do dir
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=9);
+                               mode=SteadyStateMode())
+        run!(sim)
+        filesize(joinpath(dir, "simulation_data.nc"))
+    end
+
+    @test size_hi < size_lo
+end
+
 @testitem "Energy grid change rebuilds sim.time and cache (TimeDependent)" begin
     mktempdir() do savedir
         msis_file = find_msis_file()
