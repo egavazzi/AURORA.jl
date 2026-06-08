@@ -91,9 +91,11 @@ end
         ee_v[:] = E_edges
         ml_v  = defVar(ds, "mu_lims",       Float64, ("pitch_angle_bounds",))
         ml_v[:] = μ_lims
+        bw_v  = defVar(ds, "beam_weight",   Float64, ("pitch_angle",))
+        bw_v[:] = beam_weight(μ_lims)
         defVar(ds, "time", Float64, ("time",))
         defVar(ds, "Ie",   Float32, ("altitude", "pitch_angle", "time", "energy"))
-        ds["time"][1:Nt]              = t_run
+        ds["time"][1:Nt]             = t_run
         ds["Ie"][:, :, 1:Nt, :]      = Ie
     end
 
