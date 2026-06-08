@@ -41,7 +41,7 @@ function make_volume_excitation_file(directory_to_process)
     ## Load ionization cross-sections
     σ_N2, σ_O2, σ_O = load_cross_sections(E_centers)
     N2_levels, O2_levels, O_levels = load_excitation_threshold()
-    σ_Oi  = σ_O'  * O_levels[:, 2]
+    σ_Oi  = σ_O'  * O_levels[:, 2]  # equivalent to sum(σ_for_each_reaction * N_ionizations_per_reaction)
     σ_O2i = σ_O2' * O2_levels[:, 2]
     σ_N2i = σ_N2' * N2_levels[:, 2]
 
@@ -57,8 +57,8 @@ function make_volume_excitation_file(directory_to_process)
     Q8446_O  = calculate_volume_excitation(z, t, Ie_omni, σ_8446_O,  nO)
     Q8446_O2 = calculate_volume_excitation(z, t, Ie_omni, σ_8446_O2, nO2)
     Q8446    = Q8446_O .+ Q8446_O2
-    QO1D     = calculate_volume_excitation(z, t, Ie_omni, σ_O1D,     nO)
-    QO1S     = calculate_volume_excitation(z, t, Ie_omni, σ_O1S,     nO)
+    QO1D     = calculate_volume_excitation(z, t, Ie_omni, σ_O1D,     nO)  # quenching is not taken into account
+    QO1S     = calculate_volume_excitation(z, t, Ie_omni, σ_O1S,     nO)  # quenching is not taken into account
     QOi      = calculate_volume_excitation(z, t, Ie_omni, σ_Oi,      nO)
     QO2i     = calculate_volume_excitation(z, t, Ie_omni, σ_O2i,     nO2)
     QN2i     = calculate_volume_excitation(z, t, Ie_omni, σ_N2i,     nN2)
@@ -261,10 +261,31 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     if length(t) == 1
         return solve(SampledIntegralProblem(Q, z; dim=1), TrapezoidalRule()).u
     end
+    # Create a 2D interpolator over (altitude, time). For each grid point (z[i], t[j]) we
+    # will query it at the shifted time `t[j] - (z[i] - z[1]) / c`, which accounts for the
+    # finite travel time of photons from altitude z[i] to the bottom of the column. Values
+    # outside the interpolation domain are clamped to 0 (photons not yet arrived).
+    #
+    # Example (c = 1 for illustration):
+    #   Q[z, t] (rows = altitude, cols = time):
+    #     0.657  0.065  0.313  0.408  0.812
+    #     0.780  0.531  0.546  0.575  0.708
+    #     0.573  0.556  0.568  0.888  0.728
+    #     0.865  0.142  0.085  0.051  0.657
+    #     0.708  0.646  0.960  0.932  0.957
+    #   After time-shifting → I[z, t]:
+    #     0.657  0.065  0.313  0.408  0.812
+    #     0.0    0.780  0.531  0.546  0.575   ← z=2 delayed by 1 unit
+    #     0.0    0.0    0.573  0.556  0.568   ← z=3 delayed by 2 units
+    #     0.0    0.0    0.0    0.865  0.142
+    #     0.0    0.0    0.0    0.0    0.708
+    # A single 2D interpolator is used (rather than one 1D interpolator per altitude) for
+    # convenience and to match the approach from the legacy Matlab code.
     nodes = (z, t)
     itp = interpolate(nodes, Q, Gridded(Linear()))
-    itp = extrapolate(itp, 0.0)
+    itp = extrapolate(itp, 0.0)  # extrapolated values (before arrival) → 0
     I = [itp(z[i], (t[j] - (z[i] - z[1]) / c)) for i in eachindex(z), j in eachindex(t)]
+    # Integrate over altitude to get the column-integrated rate
     problem = SampledIntegralProblem(I, z; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)

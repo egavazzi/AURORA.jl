@@ -94,11 +94,13 @@ function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
     n_E = length(E_centers)
     heating_rate = zeros(n_z, n_t)
 
+    # Energy loss rate to thermal electrons per unit path length (eV/m), for each energy bin
     L_th = zeros(n_z, n_E)
     for i_E in eachindex(E_centers)
         L_th[:, i_E] .= loss_to_thermal_electrons(E_centers[i_E], ne, Te)
     end
 
+    # Heating rate = flux x energy-loss-rate, integrated over energy
     @views for i_t in eachindex(t)
         heating_rate[:, i_t] .= dropdims(sum(Ie_ztE_omni[:, i_t, :] .* L_th, dims=2); dims=2)
     end
