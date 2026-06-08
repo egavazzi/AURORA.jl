@@ -20,7 +20,7 @@ results to `analysis/heating_rate.nc`.
 """
 function make_heating_rate_file(directory_to_process)
     ## Load simulation results
-    result    = read_simulation_nc(directory_to_process)
+    result    = load_results(directory_to_process)
     Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
     t         = result.t
     z         = result.h_atm

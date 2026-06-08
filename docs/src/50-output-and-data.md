@@ -99,7 +99,7 @@ sim = AuroraSimulation(model, flux, "my_run"; mode = SteadyStateMode())
 In Julia, use the loader helpers (see [Analysis](@ref) for the result types):
 
 ```julia
-result = AURORA.read_simulation_nc("my_run")   # NamedTuple: Ie, t, h_atm, E_centers, E_edges, dE, mu_lims
+result = load_results("my_run")                # SimulationResult: Ie, t, h_atm, E_centers, E_edges, dE, mu_lims
 vol    = load_volume_excitation("my_run")      # after make_volume_excitation_file
 top    = load_Ie_top("my_run")                 # after make_Ie_top_file
 ```

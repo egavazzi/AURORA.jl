@@ -92,7 +92,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
 
     ## Load simulation data
     print("(1/1) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-    result = AURORA.read_simulation_nc(full_path_to_directory)
+    result = AURORA.load_results(full_path_to_directory)
     Ie       = result.Ie          # [n_z, n_μ, n_t, n_E]
     μ_lims   = result.mu_lims
     t_run    = result.t

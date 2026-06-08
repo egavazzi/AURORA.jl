@@ -20,7 +20,7 @@ at the top of the ionosphere (highest altitude), and write results to
 """
 function make_Ie_top_file(directory_to_process)
     ## Load simulation results
-    result    = read_simulation_nc(directory_to_process)
+    result    = load_results(directory_to_process)
     Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
     t         = result.t
     E_centers = result.E_centers
@@ -105,7 +105,7 @@ current density and energy flux, and write results to `analysis/currents.nc`.
 """
 function make_current_file(directory_to_process)
     ## Load simulation results
-    result    = read_simulation_nc(directory_to_process)
+    result    = load_results(directory_to_process)
     Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
     t         = result.t
     z         = result.h_atm

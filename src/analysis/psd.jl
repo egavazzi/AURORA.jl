@@ -5,33 +5,6 @@ const m_e = 9.10938356e-31
 const e_charge = 1.602176634e-19
 
 """
-    load_Ie(sim_dir)
-
-Load the simulation result from `simulation_data.nc` in `sim_dir`.
-
-Returns a named tuple with fields:
-- `Ie`       : `[Nz, n_mu, Nt, nE]` number flux [m⁻² s⁻¹], as Float64
-- `E_edges`  : energy bin edges [eV], length `nE + 1`
-- `E_centers`: energy bin centers [eV], length `nE`
-- `dE`       : energy bin widths [eV], length `nE`
-- `μ_lims`   : cosine pitch-angle bin limits, length `n_mu + 1`
-- `t_run`    : time vector [s], length `Nt`
-- `h_atm`    : altitude grid [m], length `Nz`
-"""
-function load_Ie(sim_dir::AbstractString)
-    result = read_simulation_nc(sim_dir)
-    return (
-        Ie       = result.Ie,
-        E_edges  = result.E_edges,
-        E_centers = result.E_centers,
-        ΔE       = result.dE,
-        μ_lims   = result.mu_lims,
-        t_run    = result.t,
-        h_atm    = result.h_atm,
-    )
-end
-
-"""
     psd_grids(E_centers, ΔE, μ_lims_cosine)
 
 Compute velocity and pitch-angle grids needed by `compute_f` and `compute_F`.
@@ -201,8 +174,8 @@ function make_psd_from_AURORA(
     compute::Symbol = :f_only,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
 )
-    data = load_Ie(sim_dir)
-    grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
+    data = load_results(sim_dir)
+    grids = psd_grids(data.E_centers, data.dE, data.mu_lims)
 
     if compute ∉ (:f_only, :F_only, :both)
         throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
@@ -215,7 +188,7 @@ function make_psd_from_AURORA(
 
     F_result =
         compute in (:F_only, :both) ?
-        compute_F(data.Ie, data.μ_lims, grids.v; vpar_edges = vpar_edges) :
+        compute_F(data.Ie, data.mu_lims, grids.v; vpar_edges = vpar_edges) :
         NamedTuple()
 
     return merge(
@@ -230,9 +203,9 @@ function make_psd_from_AURORA(
             μ_center = grids.μ_center,
             E_edges = data.E_edges,
             E_centers = data.E_centers,
-            t_run = data.t_run,
+            t_run = data.t,
             h_atm = data.h_atm,
-            μ_lims = data.μ_lims,
+            μ_lims = data.mu_lims,
         ),
     )
 end

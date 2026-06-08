@@ -5,41 +5,69 @@ using NCDatasets: NCDataset
 # ======================================================================================== #
 
 """
-    read_simulation_nc(sim_dir) → NamedTuple
+    SimulationResult
 
-Read `simulation_data.nc` from `sim_dir` and return a named tuple with all
-simulation output arrays.
+The raw electron-flux output of a simulation, as loaded from `simulation_data.nc` by
+[`load_results`](@ref).
 
-# Returns
-Named tuple with fields:
-- `Ie`        : electron number flux `[n_z, n_μ, n_t, n_E]` (m⁻² s⁻¹)
-- `t`         : time axis `[n_t]` (seconds)
-- `h_atm`     : altitude grid `[n_z]` (metres)
+# Fields
+- `Ie`        : electron number flux `[n_z, n_μ, n_t, n_E]` (m⁻² s⁻¹). See the note on
+                [Output & data](@ref Output): this is a *number* flux, already integrated over
+                each energy bin and beam solid angle.
+- `t`         : time axis `[n_t]` (s)
+- `h_atm`     : altitude grid `[n_z]` (m)
 - `E_centers` : energy bin centres `[n_E]` (eV)
 - `E_edges`   : energy bin edges `[n_E+1]` (eV)
-- `dE`        : energy bin widths `[n_E]` (eV) (= diff of E_edges)
+- `dE`        : energy bin widths `[n_E]` (eV) (= `diff(E_edges)`)
 - `mu_lims`   : pitch-angle cosine bin boundaries `[n_μ+1]`
+- `savedir`   : directory the result was loaded from, or `nothing`
+"""
+struct SimulationResult
+    Ie::Array{Float64, 4}
+    t::Vector{Float64}
+    h_atm::Vector{Float64}
+    E_centers::Vector{Float64}
+    E_edges::Vector{Float64}
+    dE::Vector{Float64}
+    mu_lims::Vector{Float64}
+    savedir::Union{String, Nothing}
+end
+
+function Base.show(io::IO, r::SimulationResult)
+    n_z, n_μ, n_t, n_E = size(r.Ie)
+    print(io, "SimulationResult(Ie ", n_z, "×", n_μ, "×", n_t, "×", n_E,
+          ", ", n_t, " time steps)")
+end
+
+"""
+    load_results(sim_dir::AbstractString) → SimulationResult
+    load_results(sim::AuroraSimulation)   → SimulationResult
+
+Load the raw electron-flux output from `simulation_data.nc` in `sim_dir` (or in the
+simulation's save directory). Returns a [`SimulationResult`](@ref).
 
 # Example
 ```julia
-result = read_simulation_nc("my_run/")
-result.t       # time axis (s)
-result.Ie      # flux [n_z, n_μ, n_t, n_E]
+res = load_results("my_run")
+res.Ie     # flux [n_z, n_μ, n_t, n_E]
+res.t      # time axis (s)
 ```
 """
-function read_simulation_nc(sim_dir::AbstractString)
+function load_results(sim_dir::AbstractString)
     nc_path = joinpath(sim_dir, "simulation_data.nc")
     NCDataset(nc_path, "r") do ds
-        Ie        = Float64.(Array(ds["Ie"]))    # [n_z, n_μ, n_t, n_E]
-        t         = Array(ds["time"])
-        h_atm     = Array(ds["altitude"])
-        E_centers = Array(ds["energy"])
-        E_edges   = Array(ds["energy_edges"])
+        Ie        = Array{Float64, 4}(ds["Ie"][:, :, :, :])   # [n_z, n_μ, n_t, n_E]
+        t         = Vector{Float64}(ds["time"][:])
+        h_atm     = Vector{Float64}(ds["altitude"][:])
+        E_centers = Vector{Float64}(ds["energy"][:])
+        E_edges   = Vector{Float64}(ds["energy_edges"][:])
         dE        = diff(E_edges)
-        mu_lims   = Array(ds["mu_lims"])
-        return (; Ie, t, h_atm, E_centers, E_edges, dE, mu_lims)
+        mu_lims   = Vector{Float64}(ds["mu_lims"][:])
+        return SimulationResult(Ie, t, h_atm, E_centers, E_edges, dE, mu_lims, sim_dir)
     end
 end
+
+load_results(sim::AuroraSimulation) = load_results(sim.output.savedir)
 
 
 """
