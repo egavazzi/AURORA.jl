@@ -23,12 +23,6 @@ function run!(sim::AuroraSimulation)
 
     out     = sim.output
     savedir = out.savedir
-    nc_path = joinpath(savedir, "simulation_data.nc")
-
-    if isfile(nc_path) && !out.overwrite
-        error("simulation_data.nc already exists in \"$savedir\". " *
-              "Pass overwrite=true to AuroraOutputManager to allow overwriting.")
-    end
 
     mkpath(savedir)
     mkpath(joinpath(savedir, "inputs"))
