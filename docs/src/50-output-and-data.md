@@ -37,14 +37,14 @@ files are written separately by the post-processing functions (see [Analysis](@r
 
 ## `simulation_data.nc`
 
-The main output. The unlimited `time` dimension is appended to after each solver loop.
+The main output. The `time` dimension is appended to after each solver loop.
 
 | Variable | Dims | Units | Notes |
 |----------|------|-------|-------|
 | `altitude` | `(altitude,)` | m | altitude grid centers |
 | `pitch_angle` | `(pitch_angle,)` | 1 | cosine of pitch angle, beam center (μ) |
 | `energy` | `(energy,)` | eV | energy bin centers |
-| `time` | `(time,)` *unlimited* | s | save-cadence time axis |
+| `time` | `(time,)` | s | save-cadence time axis |
 | `energy_edges` | `(energy_bounds,)` | eV | energy bin edges |
 | `mu_lims` | `(pitch_angle_bounds,)` | 1 | μ bin boundaries |
 | `dE` | `(energy,)` | eV | energy bin width |
