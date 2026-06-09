@@ -19,23 +19,24 @@ results to `analysis/heating_rate.nc`.
 - `directory_to_process`: absolute or relative path to the simulation directory.
 """
 function make_heating_rate_file(directory_to_process)
-    ## Load simulation results
-    result    = load_results(directory_to_process)
-    Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
-    t         = result.t
-    z         = result.h_atm
-    E_centers = result.E_centers
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    z         = coord.h_atm
+    E_centers = coord.E_centers
 
     ## Load thermal electron density and temperature
     atm = read_atmosphere_nc(directory_to_process)
     ne  = atm.ne
     Te  = atm.Te
 
-    ## Sum Ie over pitch-angle beams → omnidirectional flux [n_z, n_t, n_E]
-    Ie_omni = dropdims(sum(Ie, dims=2), dims=2)
-
-    ## Calculate heating rate
-    heating_rate = calculate_heating_rate(z, t, Ie_omni, E_centers, ne, Te)
+    ## Calculate the heating rate, streaming Ie over time chunks to keep memory bounded.
+    ## Each chunk is summed over pitch-angle beams → omnidirectional flux [n_z, n_t_chunk, n_E].
+    heating_rate = zeros(length(z), length(t))
+    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+        Ie_omni = dropdims(sum(Ie_chunk, dims=2), dims=2)
+        heating_rate[:, t_range] .= calculate_heating_rate(z, t[t_range], Ie_omni, E_centers, ne, Te)
+    end
 
     ## Write to analysis/heating_rate.nc
     analysis_dir = joinpath(directory_to_process, "analysis")

@@ -193,7 +193,7 @@ function create_simulation_nc(sim::AuroraSimulation)
     # Main output variable — chunked and compressed.
     # NOTE: Ie is the electron *number* flux, already integrated over each energy bin and
     # over each beam's solid angle (not a differential flux). Units are m-2 s-1.
-    defVar(ds, "Ie", Float32, ("altitude", "pitch_angle", "time", "energy");
+    defVar(ds, "Ie", Float64, ("altitude", "pitch_angle", "time", "energy");
            deflatelevel=dl,
            chunksizes=(n_z, n_μ, 1, n_E),
            attrib=["units"     => "m-2 s-1",
@@ -209,12 +209,12 @@ function create_simulation_nc(sim::AuroraSimulation)
                               "long_name" => "input flux time"])
     t_top_v[:] = t_top
 
-    Ietop_v = defVar(ds, "Ie_input", Float32, ("pitch_angle", "time_input", "energy");
+    Ietop_v = defVar(ds, "Ie_input", Float64, ("pitch_angle", "time_input", "energy");
                      deflatelevel=dl,
                      chunksizes=(n_μ, 1, n_E),
                      attrib=["units"     => "m-2 s-1",
                               "long_name" => "input boundary number flux (precipitation, top of atmosphere)"])
-    Ietop_v[:, :, :] = Float32.(Ie_top_3D)
+    Ietop_v[:, :, :] = Ie_top_3D
     sync(ds)
 
     return ds
@@ -274,6 +274,6 @@ function append_chunk_nc!(ds::NCDataset, Ie_chunk, t_chunk, sim::AuroraSimulatio
     idx = n_existing+1 : n_existing+n_new
 
     ds["time"][idx]              = t_vec
-    ds["Ie"][:, :, idx, :]      = Float32.(Ie_4D)
+    ds["Ie"][:, :, idx, :]      = Ie_4D
     sync(ds)
 end

@@ -160,175 +160,133 @@ function compute_F(
     return (F = F, vpar_edges = vpar_edges, vpar_centers = vpar_centers, Δvpar = Δvpar)
 end
 
-"""
-    make_psd_from_AURORA(sim_dir; compute=:f_only, vpar_edges=nothing)
-
-Load the AURORA simulation result from `sim_dir` and compute full phase-space
-density `f`, the reduced distribution `F(v_parallel)`, or both.
-
-If `vpar_edges` is `nothing` and `F` is requested, the function uses an
-automatic symmetric uniform interval grid.
-"""
-function make_psd_from_AURORA(
-    sim_dir::AbstractString;
-    compute::Symbol = :f_only,
-    vpar_edges::Union{Nothing, AbstractVector} = nothing,
-)
-    data = load_results(sim_dir)
-    grids = psd_grids(data.E_centers, data.ΔE, data.μ_lims)
-
-    if compute ∉ (:f_only, :F_only, :both)
-        throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
-    end
-
-    f_result =
-        compute in (:f_only, :both) ?
-        (f = compute_f(data.Ie, grids.ΔE_J, grids.ΔΩ, grids.v),) :
-        NamedTuple()
-
-    F_result =
-        compute in (:F_only, :both) ?
-        compute_F(data.Ie, data.μ_lims, grids.v; vpar_edges = vpar_edges) :
-        NamedTuple()
-
-    return merge(
-        f_result,
-        F_result,
-        (
-            v = grids.v,
-            v_par = grids.v_par,
-            v_perp = grids.v_perp,
-            ΔE_J = grids.ΔE_J,
-            BeamWeight = grids.ΔΩ,
-            μ_center = grids.μ_center,
-            E_edges = data.E_edges,
-            E_centers = data.E_centers,
-            t_run = data.t,
-            h_atm = data.h_atm,
-            μ_lims = data.μ_lims,
-        ),
-    )
-end
-
 
 # ======================================================================================== #
 #                                  I/O AND WRAPPERS                                      #
 # ======================================================================================== #
 
 """
-    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing)
+    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, max_bytes=512*1024^2)
 
 Read `simulation_data.nc` from `directory_to_process`, convert electron flux to
 phase-space density, and write results to `analysis/psd.nc`.
+
+The flux is streamed over time-chunks and the phase-space density is written to disk chunk
+by chunk, so peak memory stays bounded even for large runs.
 
 # Keyword Arguments
 - `compute`: one of `:f_only`, `:F_only`, or `:both`.
 - `vpar_edges`: custom `v_parallel` bin edges [m/s]. If `nothing`, an automatic
   symmetric uniform grid is used spanning `[-maximum(v), maximum(v)]`.
+- `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
 """
 function make_psd_file(
     directory_to_process;
     compute::Symbol = :both,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
+    max_bytes::Real = 512 * 1024^2,
 )
+    if compute ∉ (:f_only, :F_only, :both)
+        throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
+    end
     println("Converting Ie to PSD.")
 
-    result = make_psd_from_AURORA(directory_to_process; compute, vpar_edges)
+    coord  = load_coordinates(directory_to_process)
+    grids = psd_grids(coord.E_centers, coord.ΔE, coord.μ_lims)
+
+    Nz, nμ, Nt, nE = coord.n_z, coord.n_μ, coord.n_t, coord.n_E
+    want_f = compute in (:f_only, :both)
+    want_F = compute in (:F_only, :both)
+
+    # Fix the v_parallel grid up front so every time-chunk maps onto the same bins.
+    vpe = want_F ?
+          (isnothing(vpar_edges) ? default_vpar_edges(grids.v) : collect(Float64, vpar_edges)) :
+          nothing
 
     analysis_dir = joinpath(directory_to_process, "analysis")
     mkpath(analysis_dir)
     savefile = joinpath(analysis_dir, "psd.nc")
-    write_psd_result(savefile, result)
-
-    return nothing
-end
-
-
-function write_psd_result(savefile::AbstractString, res)
-    h_atm = res.h_atm
-    t_run = res.t_run
-    Nz    = length(h_atm)
-    Nt    = length(t_run)
-    nE    = length(res.E_centers)
-    nμ    = length(res.μ_lims) - 1
 
     NCDataset(savefile, "c") do ds
-        defDim(ds, "altitude",          Nz)
-        defDim(ds, "time",              Nt)
-        defDim(ds, "energy",            nE)
-        defDim(ds, "pitch_angle",       nμ)
+        # Dimensions
+        defDim(ds, "altitude",           Nz)
+        defDim(ds, "time",               Nt)
+        defDim(ds, "energy",             nE)
+        defDim(ds, "pitch_angle",        nμ)
         defDim(ds, "pitch_angle_bounds", nμ + 1)
         defDim(ds, "energy_bounds",      nE + 1)
 
+        # Coordinate variables
         alt_v = defVar(ds, "altitude", Float64, ("altitude",);
                        attrib=["units" => "m", "long_name" => "altitude"])
-        alt_v[:] = h_atm
-
+        alt_v[:] = coord.h_atm
         t_v = defVar(ds, "time", Float64, ("time",);
                      attrib=["units" => "s", "long_name" => "simulation time"])
-        t_v[:] = t_run
-
+        t_v[:] = coord.t
         en_v = defVar(ds, "energy", Float64, ("energy",);
                       attrib=["units" => "eV", "long_name" => "energy bin center"])
-        en_v[:] = res.E_centers
-
+        en_v[:] = coord.E_centers
         ee_v = defVar(ds, "energy_edges", Float64, ("energy_bounds",);
                       attrib=["units" => "eV", "long_name" => "energy bin edges"])
-        ee_v[:] = res.E_edges
-
+        ee_v[:] = coord.E_edges
         pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
                       attrib=["units" => "1", "long_name" => "cosine of pitch angle (beam center)"])
-        pa_v[:] = res.μ_center
-
+        pa_v[:] = grids.μ_center
         ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
                       attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
-        ml_v[:] = res.μ_lims
-
+        ml_v[:] = coord.μ_lims
         v_v = defVar(ds, "v", Float64, ("energy",);
                      attrib=["units" => "m s-1", "long_name" => "electron speed"])
-        v_v[:] = res.v
-
+        v_v[:] = grids.v
         bw_v = defVar(ds, "beam_weight", Float64, ("pitch_angle",);
                       attrib=["units" => "sr", "long_name" => "solid-angle beam weight"])
-        bw_v[:] = res.BeamWeight
-
+        bw_v[:] = grids.ΔΩ
         dE_v = defVar(ds, "dE_J", Float64, ("energy",);
                       attrib=["units" => "J", "long_name" => "energy bin width in Joules"])
-        dE_v[:] = res.ΔE_J
+        dE_v[:] = grids.ΔE_J
 
-        if hasproperty(res, :f)
-            f_v = defVar(ds, "f", Float32, ("altitude", "pitch_angle", "time", "energy");
+        # Data variables, filled by streaming below
+        f_v = nothing
+        if want_f
+            f_v = defVar(ds, "f", Float64, ("altitude", "pitch_angle", "time", "energy");
                          deflatelevel=4,
                          chunksizes=(Nz, nμ, 1, nE),
-                         attrib=["units"     => "s3 m-6",
-                                  "long_name" => "phase-space density"])
-            f_v[:, :, :, :] = Float32.(res.f)
+                         attrib=["units" => "s3 m-6", "long_name" => "phase-space density"])
         end
 
-        if hasproperty(res, :F)
-            Nvpar = length(res.vpar_centers)
-            defDim(ds, "vpar",       Nvpar)
+        F_v = nothing
+        if want_F
+            Nvpar = length(vpe) - 1
+            defDim(ds, "vpar",        Nvpar)
             defDim(ds, "vpar_bounds", Nvpar + 1)
-
             vpc_v = defVar(ds, "vpar_centers", Float64, ("vpar",);
                            attrib=["units" => "m s-1", "long_name" => "v_parallel bin centers"])
-            vpc_v[:] = res.vpar_centers
-
+            vpc_v[:] = @. 0.5 * (vpe[1:(end - 1)] + vpe[2:end])
             vpe_v = defVar(ds, "vpar_edges", Float64, ("vpar_bounds",);
                            attrib=["units" => "m s-1", "long_name" => "v_parallel bin edges"])
-            vpe_v[:] = res.vpar_edges
-
+            vpe_v[:] = vpe
             dv_v = defVar(ds, "dvpar", Float64, ("vpar",);
                           attrib=["units" => "m s-1", "long_name" => "v_parallel bin widths"])
-            dv_v[:] = res.Δvpar
-
-            F_v = defVar(ds, "F", Float32, ("vpar", "altitude", "time");
+            dv_v[:] = diff(vpe)
+            F_v = defVar(ds, "F", Float64, ("vpar", "altitude", "time");
                          deflatelevel=4,
-                         attrib=["units"     => "s m-4",
+                         attrib=["units" => "s m-4",
                                   "long_name" => "reduced distribution function F(v_parallel)"])
-            F_v[:, :, :] = Float32.(res.F)
+        end
+
+        # Stream the flux and fill the data variables chunk by chunk
+        foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
+            if want_f
+                f_v[:, :, t_range, :] = compute_f(Ie_chunk, grids.ΔE_J, grids.ΔΩ, grids.v)
+            end
+            if want_F
+                F_v[:, :, t_range] = compute_F(Ie_chunk, coord.μ_lims, grids.v; vpar_edges = vpe).F
+            end
         end
     end
+
+    println("PSD saved in $savefile")
+    return nothing
 end
 
 """

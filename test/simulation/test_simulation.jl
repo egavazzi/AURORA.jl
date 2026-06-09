@@ -390,16 +390,17 @@ end
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
     flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
 
+    # Use a multi-step run so the Ie array is big enough for the compression to have an effect
+    mode = SteadyStateMode(duration=0.5, dt=0.01)
+
     size_lo = mktempdir() do dir
-        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=false);
-                               mode=SteadyStateMode())
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=false); mode)
         run!(sim)
         filesize(joinpath(dir, "simulation_data.nc"))
     end
 
     size_hi = mktempdir() do dir
-        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=9);
-                               mode=SteadyStateMode())
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=9); mode)
         run!(sim)
         filesize(joinpath(dir, "simulation_data.nc"))
     end

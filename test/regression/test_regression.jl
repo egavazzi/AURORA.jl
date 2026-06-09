@@ -31,7 +31,7 @@
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
             QO1S_ref = Array(ds_ref["QO1S"])
             QO1S_new = Array(ds_new["QO1S"])
-            @test all(isapprox.(QO1S_new, QO1S_ref, rtol = 1e-4))
+            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
 
             rel_diff = abs.(QO1S_new .- QO1S_ref) ./
                        max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
@@ -77,7 +77,7 @@ end
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
             QO1S_ref = Array(ds_ref["QO1S"])
             QO1S_new = Array(ds_new["QO1S"])
-            @test all(isapprox.(QO1S_new, QO1S_ref, rtol = 1e-4))
+            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
 
             rel_diff = abs.(QO1S_new .- QO1S_ref) ./
                        max.(abs.(QO1S_new), abs.(QO1S_ref), eps())

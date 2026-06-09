@@ -15,12 +15,11 @@ and write results to `analysis/volume_excitation.nc`.
 Returns a [`VolumeExcitationResult`](@ref).
 """
 function make_volume_excitation_file(directory_to_process)
-    ## Load simulation results
-    result    = load_results(directory_to_process)
-    Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
-    t         = result.t
-    z         = result.h_atm
-    E_centers = result.E_centers
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    z         = coord.h_atm
+    E_centers = coord.E_centers
 
     ## Load neutral densities
     atm = read_atmosphere_nc(directory_to_process)
@@ -45,23 +44,40 @@ function make_volume_excitation_file(directory_to_process)
     σ_O2i = σ_O2' * O2_levels[:, 2]
     σ_N2i = σ_N2' * N2_levels[:, 2]
 
-    ## Sum Ie over pitch-angle beams → omnidirectional flux [n_z, n_t, n_E]
-    Ie_omni = dropdims(sum(Ie, dims=2), dims=2)
+    ## Allocate volume-excitation-rate arrays [n_z, n_t]
+    n_z = length(z)
+    n_t = length(t)
+    Q4278    = zeros(n_z, n_t)
+    Q6730    = zeros(n_z, n_t)
+    Q7774_O  = zeros(n_z, n_t)
+    Q7774_O2 = zeros(n_z, n_t)
+    Q8446_O  = zeros(n_z, n_t)
+    Q8446_O2 = zeros(n_z, n_t)
+    QO1D     = zeros(n_z, n_t)  # quenching is not taken into account
+    QO1S     = zeros(n_z, n_t)  # quenching is not taken into account
+    QOi      = zeros(n_z, n_t)
+    QO2i     = zeros(n_z, n_t)
+    QN2i     = zeros(n_z, n_t)
 
-    ## Calculate volume-excitation-rates for optical emissions
-    Q4278    = calculate_volume_excitation(z, t, Ie_omni, σ_4278,    nN2)
-    Q6730    = calculate_volume_excitation(z, t, Ie_omni, σ_6730,    nN2)
-    Q7774_O  = calculate_volume_excitation(z, t, Ie_omni, σ_7774_O,  nO)
-    Q7774_O2 = calculate_volume_excitation(z, t, Ie_omni, σ_7774_O2, nO2)
-    Q7774    = Q7774_O .+ Q7774_O2
-    Q8446_O  = calculate_volume_excitation(z, t, Ie_omni, σ_8446_O,  nO)
-    Q8446_O2 = calculate_volume_excitation(z, t, Ie_omni, σ_8446_O2, nO2)
-    Q8446    = Q8446_O .+ Q8446_O2
-    QO1D     = calculate_volume_excitation(z, t, Ie_omni, σ_O1D,     nO)  # quenching is not taken into account
-    QO1S     = calculate_volume_excitation(z, t, Ie_omni, σ_O1S,     nO)  # quenching is not taken into account
-    QOi      = calculate_volume_excitation(z, t, Ie_omni, σ_Oi,      nO)
-    QO2i     = calculate_volume_excitation(z, t, Ie_omni, σ_O2i,     nO2)
-    QN2i     = calculate_volume_excitation(z, t, Ie_omni, σ_N2i,     nN2)
+    ## Stream Ie over time chunks; each chunk is summed over pitch-angle beams →
+    ## omnidirectional flux [n_z, n_t_chunk, n_E] before integrating over energy.
+    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+        Ie_omni = dropdims(sum(Ie_chunk, dims=2), dims=2)
+        tc = t[t_range]
+        Q4278[:, t_range]    .= calculate_volume_excitation(z, tc, Ie_omni, σ_4278,    nN2)
+        Q6730[:, t_range]    .= calculate_volume_excitation(z, tc, Ie_omni, σ_6730,    nN2)
+        Q7774_O[:, t_range]  .= calculate_volume_excitation(z, tc, Ie_omni, σ_7774_O,  nO)
+        Q7774_O2[:, t_range] .= calculate_volume_excitation(z, tc, Ie_omni, σ_7774_O2, nO2)
+        Q8446_O[:, t_range]  .= calculate_volume_excitation(z, tc, Ie_omni, σ_8446_O,  nO)
+        Q8446_O2[:, t_range] .= calculate_volume_excitation(z, tc, Ie_omni, σ_8446_O2, nO2)
+        QO1D[:, t_range]     .= calculate_volume_excitation(z, tc, Ie_omni, σ_O1D,     nO)
+        QO1S[:, t_range]     .= calculate_volume_excitation(z, tc, Ie_omni, σ_O1S,     nO)
+        QOi[:, t_range]      .= calculate_volume_excitation(z, tc, Ie_omni, σ_Oi,      nO)
+        QO2i[:, t_range]     .= calculate_volume_excitation(z, tc, Ie_omni, σ_O2i,     nO2)
+        QN2i[:, t_range]     .= calculate_volume_excitation(z, tc, Ie_omni, σ_N2i,     nN2)
+    end
+    Q7774 = Q7774_O .+ Q7774_O2
+    Q8446 = Q8446_O .+ Q8446_O2
 
     ## Write results to analysis/volume_excitation.nc
     analysis_dir = joinpath(directory_to_process, "analysis")

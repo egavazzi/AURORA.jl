@@ -18,29 +18,29 @@ at the top of the ionosphere (highest altitude), and write results to
 # Inputs
 - `directory_to_process`: absolute or relative path to the simulation directory.
 """
-function make_Ie_top_file(directory_to_process)
-    ## Load simulation results
-    result    = load_results(directory_to_process)
-    Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
-    t         = result.t
-    E_centers = result.E_centers
-    ΔE      = result.ΔE
-    μ_lims  = result.μ_lims
+function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    E_centers = coord.E_centers
+    ΔE        = coord.ΔE
+    μ_lims    = coord.μ_lims
 
     ## Beam weights
     θ_lims = acosd.(μ_lims)
     Ω_beam = beam_weight(θ_lims)   # [n_μ]
 
-    ## Extract top altitude slice: Ie[end, :, :, :] → [n_μ, n_t, n_E]
-    Ie_top_raw = Ie[end, :, :, :]      # in #e⁻/m²/s
-    Ie_top = Ie_top_raw ./ reshape(ΔE, (1, 1, :)) ./ reshape(Ω_beam, (:, 1, 1))  # eV⁻¹ m⁻² s⁻¹ sr⁻¹
+    n_z, n_μ, n_t, n_E = coord.n_z, coord.n_μ, coord.n_t, coord.n_E
+
+    ## Differential-flux conversion factors (eV⁻¹ m⁻² s⁻¹ sr⁻¹ from #e⁻/m²/s)
+    invΔE = reshape(1.0 ./ ΔE, (1, 1, :))
+    invΩ  = reshape(1.0 ./ Ω_beam, (:, 1, 1))
 
     ## Write to analysis/Ie_top.nc
     analysis_dir = joinpath(directory_to_process, "analysis")
     mkpath(analysis_dir)
     savefile = joinpath(analysis_dir, "Ie_top.nc")
 
-    n_μ, n_t, n_E = size(Ie_top)
     NCDataset(savefile, "c") do ds
         defDim(ds, "pitch_angle",   n_μ)
         defDim(ds, "time",          n_t)
@@ -72,17 +72,27 @@ function make_Ie_top_file(directory_to_process)
                       attrib=["units" => "sr", "long_name" => "solid-angle beam weight"])
         bw_v[:] = Ω_beam
 
-        Ie_top_raw_v = defVar(ds, "Ie_top_raw", Float32, ("pitch_angle", "time", "energy");
+        Ie_top_raw_v = defVar(ds, "Ie_top_raw", Float64, ("pitch_angle", "time", "energy");
                               deflatelevel=4,
                               attrib=["units"     => "m-2 s-1",
                                        "long_name" => "electron flux at top of ionosphere"])
-        Ie_top_raw_v[:, :, :] = Float32.(Ie_top_raw)
-
-        Ie_top_v = defVar(ds, "Ie_top", Float32, ("pitch_angle", "time", "energy");
+        Ie_top_v = defVar(ds, "Ie_top", Float64, ("pitch_angle", "time", "energy");
                           deflatelevel=4,
                           attrib=["units"     => "eV-1 m-2 s-1 sr-1",
                                    "long_name" => "differential electron flux at top of ionosphere"])
-        Ie_top_v[:, :, :] = Float32.(Ie_top)
+
+        ## Stream the top-altitude slice over time chunks (reads only 1 i_z of Ie).
+        nc_in = joinpath(directory_to_process, "simulation_data.nc")
+        NCDataset(nc_in, "r") do dsin
+            slice_bytes = n_μ * n_E * sizeof(Float64)
+            nt_chunk = time_chunk_length(slice_bytes, max_bytes, n_t)
+            for t0 in 1:nt_chunk:n_t
+                tr  = t0:min(t0 + nt_chunk - 1, n_t)
+                raw = Array{Float64, 3}(dsin["Ie"][n_z, :, tr, :])   # [n_μ, length(tr), n_E]
+                Ie_top_raw_v[:, tr, :] = raw
+                Ie_top_v[:, tr, :]     = raw .* invΔE .* invΩ
+            end
+        end
     end
 
     println("Top flux saved in $savefile")
@@ -104,13 +114,12 @@ current density and energy flux, and write results to `analysis/currents.nc`.
 `make_current_file(directory_to_process)`
 """
 function make_current_file(directory_to_process)
-    ## Load simulation results
-    result    = load_results(directory_to_process)
-    Ie        = result.Ie          # [n_z, n_μ, n_t, n_E]
-    t         = result.t
-    z         = result.h_atm
-    E_centers = result.E_centers
-    μ_lims    = result.μ_lims
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    z         = coord.h_atm
+    E_centers = coord.E_centers
+    μ_lims    = coord.μ_lims
 
     θ_lims   = acosd.(μ_lims)
     μ_center = mu_avg(θ_lims)
@@ -118,19 +127,24 @@ function make_current_file(directory_to_process)
     ## Elementary charge
     q_e = 1.602176620898e-19  # C
 
-    n_z, n_μ, n_t, n_E = size(Ie)
+    n_z, n_μ, n_t = coord.n_z, coord.n_μ, coord.n_t
     J_up      = zeros(n_z, n_t)
     J_down    = zeros(n_z, n_t)
     IeE_up    = zeros(n_z, n_t)
     IeE_down  = zeros(n_z, n_t)
 
-    @views for i_μ in 1:n_μ
-        if μ_center[i_μ] > 0
-            J_up    .+= q_e * abs(μ_center[i_μ]) .* dropdims(sum(Ie[:, i_μ, :, :], dims=3), dims=3)
-            IeE_up  .+= abs(μ_center[i_μ]) .* dropdims(sum(Ie[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
-        else
-            J_down   .+= q_e * abs(μ_center[i_μ]) .* dropdims(sum(Ie[:, i_μ, :, :], dims=3), dims=3)
-            IeE_down .+= abs(μ_center[i_μ]) .* dropdims(sum(Ie[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
+    ## Stream Ie over time chunks; accumulate per pitch-angle beam into the [n_z, n_t] outputs.
+    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+        @views for i_μ in 1:n_μ
+            flux_block   = dropdims(sum(Ie_chunk[:, i_μ, :, :], dims=3), dims=3)   # [n_z, n_t_chunk]
+            energy_block = dropdims(sum(Ie_chunk[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
+            if μ_center[i_μ] > 0
+                J_up[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                IeE_up[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
+            else
+                J_down[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                IeE_down[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
+            end
         end
     end
 
@@ -179,7 +193,7 @@ end
 
 Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.output.savedir`.
 """
-make_Ie_top_file(sim::AuroraSimulation) = make_Ie_top_file(sim.output.savedir)
+make_Ie_top_file(sim::AuroraSimulation; kwargs...) = make_Ie_top_file(sim.output.savedir; kwargs...)
 
 """
     make_current_file(sim::AuroraSimulation)

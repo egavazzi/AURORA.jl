@@ -68,9 +68,9 @@ end
     nE = length(E_centers)
 
     # Ie [Nz, nμ, Nt, nE]
-    Ie = zeros(Float32, Nz, nμ, Nt, nE)
+    Ie = zeros(Float64, Nz, nμ, Nt, nE)
     for i_E in 1:nE, i_t in 1:Nt, i_μ in 1:nμ, i_z in 1:Nz
-        Ie[i_z, i_μ, i_t, i_E] = Float32(1.0 + i_z + i_μ + i_t + i_E)
+        Ie[i_z, i_μ, i_t, i_E] = 1.0 + i_z + i_μ + i_t + i_E
     end
 
     # Write minimal simulation_data.nc
@@ -94,7 +94,7 @@ end
         bw_v  = defVar(ds, "beam_weight",   Float64, ("pitch_angle",))
         bw_v[:] = beam_weight(μ_lims)
         defVar(ds, "time", Float64, ("time",))
-        defVar(ds, "Ie",   Float32, ("altitude", "pitch_angle", "time", "energy"))
+        defVar(ds, "Ie",   Float64, ("altitude", "pitch_angle", "time", "energy"))
         ds["time"][1:Nt]             = t_run
         ds["Ie"][:, :, 1:Nt, :]      = Ie
     end
