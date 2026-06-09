@@ -185,8 +185,6 @@ const DCSO2 = build_DCSO2()
 const DCSO = build_DCSO()
 
 
-## ----------------------------------------------------- ##
-
 function phase_fcn_N2(θ, Energy)
     DCS = zeros(length(θ), length(Energy))
     for iE = length(Energy):-1:1
