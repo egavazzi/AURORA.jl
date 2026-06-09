@@ -430,10 +430,8 @@ end
 
 # Convenience: accept a plain String and wrap it in an AuroraOutputManager with defaults
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::AbstractString;
-                          mode::AbstractMode=SteadyStateMode(),
-                          overwrite=false,
-                          compress=true)
-    output = AuroraOutputManager(savedir; overwrite, compress)
+                          mode::AbstractMode=SteadyStateMode())
+    output = AuroraOutputManager(savedir)
     return AuroraSimulation(model, flux, output; mode)
 end
 
