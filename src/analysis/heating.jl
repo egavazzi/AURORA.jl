@@ -67,6 +67,13 @@ function make_heating_rate_file(directory_to_process)
     return nothing
 end
 
+"""
+    make_heating_rate_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.output.savedir`.
+"""
+make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.output.savedir)
+
 
 """
     calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
@@ -108,15 +115,3 @@ function calculate_heating_rate(z, t, Ie_ztE_omni, E_centers, ne, Te)
 
     return heating_rate
 end
-
-
-# ======================================================================================== #
-#                         AuroraSimulation convenience wrapper                           #
-# ======================================================================================== #
-
-"""
-    make_heating_rate_file(sim::AuroraSimulation)
-
-Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.output.savedir`.
-"""
-make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.output.savedir)

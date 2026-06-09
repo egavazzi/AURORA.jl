@@ -41,32 +41,6 @@ function Base.show(io::IO, r::SimulationResult)
           ", ", n_t, " time steps)")
 end
 
-# Resolve a user selector (`:` or a contiguous integer range) into a concrete range,
-# validating bounds. Non-contiguous indexing is rejected so the edge-derived quantities
-# (`E_edges`, `μ_lims`, `ΔE`) stay well-defined; drop to the `NCDataset` directly for that.
-function resolve_selector(sel, n::Integer, name::AbstractString)
-    sel === Colon() && return 1:n
-    if sel isa AbstractUnitRange{<:Integer}
-        (!isempty(sel) && first(sel) >= 1 && last(sel) <= n) ||
-            throw(ArgumentError("$name = $sel is out of bounds for dimension of length $n"))
-        return sel
-    end
-    throw(ArgumentError(
-        "$name must be a Colon (:) or a contiguous integer range (e.g. 1:10); got " *
-        "$(typeof(sel)). For non-contiguous indexing, read the NCDataset directly."))
-end
-
-# Slice an (n+1)-length bounds vector (energy edges, μ limits) to match a contiguous
-# selection of the n-length centered dimension.
-bounds_for(bounds, sel::AbstractUnitRange) = bounds[first(sel):(last(sel) + 1)]
-
-# Number of time slices per streaming chunk: the largest count whose `slice_bytes` stays
-# under `max_bytes`, clamped to `[1, n_t]`. Handles `max_bytes = Inf` (→ all `n_t` at once).
-function time_chunk_length(slice_bytes::Real, max_bytes::Real, n_t::Integer)
-    per_chunk = max_bytes / slice_bytes
-    return per_chunk >= n_t ? Int(n_t) : max(1, floor(Int, per_chunk))
-end
-
 
 """
     load_coordinates(sim_dir) → NamedTuple
@@ -200,4 +174,31 @@ function read_atmosphere_nc(sim_dir::AbstractString)
                       Array(ds[k]) for k in species_vars)
         return merge((; h_atm, ne, Te), species)
     end
+end
+
+
+# Resolve a user selector (`:` or a contiguous integer range) into a concrete range,
+# validating bounds. Non-contiguous indexing is rejected so the edge-derived quantities
+# (`E_edges`, `μ_lims`, `ΔE`) stay well-defined; drop to the `NCDataset` directly for that.
+function resolve_selector(sel, n::Integer, name::AbstractString)
+    sel === Colon() && return 1:n
+    if sel isa AbstractUnitRange{<:Integer}
+        (!isempty(sel) && first(sel) >= 1 && last(sel) <= n) ||
+            throw(ArgumentError("$name = $sel is out of bounds for dimension of length $n"))
+        return sel
+    end
+    throw(ArgumentError(
+        "$name must be a Colon (:) or a contiguous integer range (e.g. 1:10); got " *
+        "$(typeof(sel)). For non-contiguous indexing, read the NCDataset directly."))
+end
+
+# Slice an (n+1)-length bounds vector (energy edges, μ limits) to match a contiguous
+# selection of the n-length centered dimension.
+bounds_for(bounds, sel::AbstractUnitRange) = bounds[first(sel):(last(sel) + 1)]
+
+# Number of time slices per streaming chunk: the largest count whose `slice_bytes` stays
+# under `max_bytes`, clamped to `[1, n_t]`. Handles `max_bytes = Inf` (→ all `n_t` at once).
+function time_chunk_length(slice_bytes::Real, max_bytes::Real, n_t::Integer)
+    per_chunk = max_bytes / slice_bytes
+    return per_chunk >= n_t ? Int(n_t) : max(1, floor(Int, per_chunk))
 end

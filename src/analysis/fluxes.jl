@@ -99,6 +99,13 @@ function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     return nothing
 end
 
+"""
+    make_Ie_top_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.output.savedir`.
+"""
+make_Ie_top_file(sim::AuroraSimulation; kwargs...) = make_Ie_top_file(sim.output.savedir; kwargs...)
+
 
 # ======================================================================================== #
 #                                  FIELD-ALIGNED CURRENTS                                #
@@ -182,18 +189,6 @@ function make_current_file(directory_to_process)
     println("Currents saved in $savefile")
     return nothing
 end
-
-
-# ======================================================================================== #
-#                         AuroraSimulation convenience wrappers                          #
-# ======================================================================================== #
-
-"""
-    make_Ie_top_file(sim::AuroraSimulation)
-
-Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.output.savedir`.
-"""
-make_Ie_top_file(sim::AuroraSimulation; kwargs...) = make_Ie_top_file(sim.output.savedir; kwargs...)
 
 """
     make_current_file(sim::AuroraSimulation)

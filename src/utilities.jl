@@ -2,9 +2,6 @@ using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using LoopVectorization: @tturbo
 
 
-## ====================================================================================== ##
-
-
 """
     v_of_E(E)
 
@@ -25,28 +22,6 @@ function v_of_E(E)
 
 	v = (2 * qₑ * abs(E) / mₑ) .^ (1/2) .* sign(E);
 	return v
-end
-
-function CFL_criteria(duration, dt, z, v, CFL_number=64)
-    # The Courant-Freidrichs-Lewy (CFL) number normally has to be small (<4) to ensure numerical
-    # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
-    # should be careful about numerical accuracy though.
-    # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
-    # on the results, while reducing computational time tremendously
-    dz = z[2] - z[1]
-    # Maximum dt that satisfies the CFL condition
-    dt_max = CFL_number * dz / v
-    # Refinement factor: how many internal steps per save interval.
-    # dt_internal = dt / CFL_factor, which is exact by construction.
-    CFL_factor = ceil(Int, dt / dt_max)
-    # Number of save intervals (validated upstream to be an exact integer multiple of dt)
-    n_save = round(Int, duration / dt)
-    # Coarse save grid: the time points we want to write to disk.
-    t_save = range(0.0, n_save * dt; length = n_save + 1)
-    # Fine internal grid: CFL_factor sub-steps per save interval.
-    t_internal = range(0.0, n_save * dt; length = n_save * CFL_factor + 1)
-
-    return t_internal, t_save, CFL_factor
 end
 
 
@@ -100,7 +75,28 @@ function beam_weight(θ_lims)
 end
 
 
-## ====================================================================================== ##
+function CFL_criteria(duration, dt, z, v, CFL_number=64)
+    # The Courant-Freidrichs-Lewy (CFL) number normally has to be small (<4) to ensure numerical
+    # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
+    # should be careful about numerical accuracy though.
+    # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
+    # on the results, while reducing computational time tremendously
+    dz = z[2] - z[1]
+    # Maximum dt that satisfies the CFL condition
+    dt_max = CFL_number * dz / v
+    # Refinement factor: how many internal steps per save interval.
+    # dt_internal = dt / CFL_factor, which is exact by construction.
+    CFL_factor = ceil(Int, dt / dt_max)
+    # Number of save intervals (validated upstream to be an exact integer multiple of dt)
+    n_save = round(Int, duration / dt)
+    # Coarse save grid: the time points we want to write to disk.
+    t_save = range(0.0, n_save * dt; length = n_save + 1)
+    # Fine internal grid: CFL_factor sub-steps per save interval.
+    t_internal = range(0.0, n_save * dt; length = n_save * CFL_factor + 1)
+
+    return t_internal, t_save, CFL_factor
+end
+
 
 """
     rename_if_exists(savefile)
@@ -144,10 +140,6 @@ function rename_if_exists(savefile)
 end
 
 
-
-
-## ====================================================================================== ##
-
 """
     smooth_transition(x, x_start = 0.0, x_end = 1.0)
 
@@ -186,7 +178,6 @@ function smooth_transition(x, x_start = 0.0, x_end = 1.0)
     return transition_value
 end
 
-## ====================================================================================== ##
 
 # Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [nz, n_mu, nt, nE]
 function restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, z, t_run, E_centers)
@@ -299,7 +290,6 @@ function restructure_streams_of_Ie!(Ie_plot, Ie, θ_lims, new_θ_lims)
     return Ie_plot
 end
 
-
 function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     # Input Ie has shape [n_z, n_μ, n_t, n_E]
     n_μ_new = length(new_θ_lims)
@@ -311,8 +301,6 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
 end
 
 
-
-## ====================================================================================== ##
 """
     interpolate_profile(data_values, data_altitude_km, target_altitude_m;
                        log_interpolation=true)
@@ -361,10 +349,9 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
 end
 
 
-
-## ====================================================================================== ##
-## Memory estimation and automatic n_loop calculation
-## ====================================================================================== ##
+# ======================================================================================== #
+#                       Memory estimation and automatic n_loop calculation                #
+# ======================================================================================== #
 
 
 """

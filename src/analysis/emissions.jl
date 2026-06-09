@@ -130,36 +130,12 @@ function make_volume_excitation_file(directory_to_process)
     )
 end
 
-
 """
-    calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
+    make_volume_excitation_file(sim::AuroraSimulation)
 
-Calculate the volume-excitation-rate for an excitation of interest, produced by the electron
-flux `Ie_ztE_omni` that is summed over the beams (omnidirectional).
-
-The excitation of interest is chosen through the cross-section `σ` given to the function.
-Note that the neutral density `n` should match the excitation of interest (e.g. use nN2 when
-calculating the volume-excitation-rate of the 4278Å optical emission).
-
-# Calling
-`Q = calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)`
-
-# Inputs
-- `z`: altitude (m). Vector [n\\_z]
-- `t`: time (s). Vector [n\\_t]
-- `Ie_ztE_omni`: omnidirectional electron flux (#e⁻/m²/s). 3D array [n\\_z, n\\_t, n\\_E]
-- `σ`: excitation cross-section (m⁻²). Vector [n\\_E]
-- `n`: density of exciteable atmospheric specie (m⁻³). Vector [n\\_z]
+Convenience wrapper that calls [`make_volume_excitation_file`](@ref) on `sim.output.savedir`.
 """
-function calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
-    n_z = length(z)
-    n_t = length(t)
-    Q = zeros(n_z, n_t)
-    @views for i_t in eachindex(t)
-        Q[:, i_t] .= (Ie_ztE_omni[:, i_t, :] * σ) .* n
-    end
-    return Q
-end
+make_volume_excitation_file(sim::AuroraSimulation) = make_volume_excitation_file(sim.output.savedir)
 
 
 """
@@ -239,6 +215,44 @@ function make_column_excitation_file(directory_to_process)
         vec(I_8446), vec(I_8446_O), vec(I_8446_O2),
         vec(I_O1D), vec(I_O1S), Vector{Float64}(t),
     )
+end
+
+"""
+    make_column_excitation_file(sim::AuroraSimulation)
+
+Convenience wrapper that calls [`make_column_excitation_file`](@ref) on `sim.output.savedir`.
+"""
+make_column_excitation_file(sim::AuroraSimulation) = make_column_excitation_file(sim.output.savedir)
+
+
+"""
+    calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
+
+Calculate the volume-excitation-rate for an excitation of interest, produced by the electron
+flux `Ie_ztE_omni` that is summed over the beams (omnidirectional).
+
+The excitation of interest is chosen through the cross-section `σ` given to the function.
+Note that the neutral density `n` should match the excitation of interest (e.g. use nN2 when
+calculating the volume-excitation-rate of the 4278Å optical emission).
+
+# Calling
+`Q = calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)`
+
+# Inputs
+- `z`: altitude (m). Vector [n\\_z]
+- `t`: time (s). Vector [n\\_t]
+- `Ie_ztE_omni`: omnidirectional electron flux (#e⁻/m²/s). 3D array [n\\_z, n\\_t, n\\_E]
+- `σ`: excitation cross-section (m⁻²). Vector [n\\_E]
+- `n`: density of exciteable atmospheric specie (m⁻³). Vector [n\\_z]
+"""
+function calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
+    n_z = length(z)
+    n_t = length(t)
+    Q = zeros(n_z, n_t)
+    @views for i_t in eachindex(t)
+        Q[:, i_t] .= (Ie_ztE_omni[:, i_t, :] * σ) .* n
+    end
+    return Q
 end
 
 
@@ -321,21 +335,3 @@ function q2colem(t::Real, z, Q, A = 1, τ = ones(length(z)))
     return I_lambda.u
 end
 
-
-# ======================================================================================== #
-#                         AuroraSimulation convenience wrappers                          #
-# ======================================================================================== #
-
-"""
-    make_volume_excitation_file(sim::AuroraSimulation)
-
-Convenience wrapper that calls [`make_volume_excitation_file`](@ref) on `sim.output.savedir`.
-"""
-make_volume_excitation_file(sim::AuroraSimulation) = make_volume_excitation_file(sim.output.savedir)
-
-"""
-    make_column_excitation_file(sim::AuroraSimulation)
-
-Convenience wrapper that calls [`make_column_excitation_file`](@ref) on `sim.output.savedir`.
-"""
-make_column_excitation_file(sim::AuroraSimulation) = make_column_excitation_file(sim.output.savedir)

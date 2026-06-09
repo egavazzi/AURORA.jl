@@ -5,46 +5,6 @@ const m_e = 9.10938356e-31
 const e_charge = 1.602176634e-19
 
 """
-    psd_grids(E_centers, ΔE, μ_lims_cosine)
-
-Compute velocity and pitch-angle grids needed by `compute_f` and `compute_F`.
-
-- `E_centers` is the energy bin centers (eV). Vector [nE]
-- `ΔE` is the energy bin widths (eV). Vector [nE]
-"""
-function psd_grids(E_centers::AbstractVector, ΔE::AbstractVector, μ_lims_cosine::AbstractVector)
-    nE = length(E_centers)
-    nμ = length(μ_lims_cosine) - 1
-    @assert length(ΔE) == nE "ΔE length must match E_centers length"
-
-    ΔE_J = ΔE .* e_charge
-    E_center_J = E_centers .* e_charge
-    v = sqrt.(2 .* E_center_J ./ m_e)
-
-    ΔΩ = Vector{Float64}(undef, nμ)
-    for j in 1:nμ
-        ΔΩ[j] = 2pi * abs(μ_lims_cosine[j] - μ_lims_cosine[j + 1])
-    end
-
-    theta_lims_deg = acosd.(μ_lims_cosine)
-    μ_center = mu_avg(theta_lims_deg)
-    α_center = acos.(clamp.(μ_center, -1.0, 1.0))
-
-    v_par = [μ_center[j] * v[i] for j in 1:nμ, i in 1:nE]
-    v_perp = [sin(α_center[j]) * v[i] for j in 1:nμ, i in 1:nE]
-
-    return (
-        v = v,
-        ΔE_J = ΔE_J,
-        ΔΩ = ΔΩ,
-        μ_center = μ_center,
-        α_center = α_center,
-        v_par = v_par,
-        v_perp = v_perp,
-    )
-end
-
-"""
     compute_f(Ie, ΔE_J, ΔΩ, v) -> f
 
 Convert AURORA electron flux `Ie` to full phase-space density `f` on the same
@@ -72,18 +32,6 @@ function compute_f(
         end
     end
     return f
-end
-
-"""
-    default_vpar_edges(v) -> vpar_edges
-
-Construct a symmetric, uniformly spaced `v_parallel` grid spanning
-`[-maximum(v), maximum(v)]` with an exact edge at `v_parallel = 0`.
-"""
-function default_vpar_edges(v::AbstractVector; n_edges::Int = 75)
-    vmax = maximum(v)
-    positive_edges = collect(range(0.0, vmax; length = n_edges))
-    return vcat(-reverse(positive_edges[2:end]), positive_edges)
 end
 
 """
@@ -295,3 +243,56 @@ end
 Convenience wrapper that calls [`make_psd_file`](@ref) on `sim.output.savedir`.
 """
 make_psd_file(sim::AuroraSimulation; kwargs...) = make_psd_file(sim.output.savedir; kwargs...)
+
+
+"""
+    psd_grids(E_centers, ΔE, μ_lims_cosine)
+
+Compute velocity and pitch-angle grids needed by `compute_f` and `compute_F`.
+
+- `E_centers` is the energy bin centers (eV). Vector [nE]
+- `ΔE` is the energy bin widths (eV). Vector [nE]
+"""
+function psd_grids(E_centers::AbstractVector, ΔE::AbstractVector, μ_lims_cosine::AbstractVector)
+    nE = length(E_centers)
+    nμ = length(μ_lims_cosine) - 1
+    @assert length(ΔE) == nE "ΔE length must match E_centers length"
+
+    ΔE_J = ΔE .* e_charge
+    E_center_J = E_centers .* e_charge
+    v = sqrt.(2 .* E_center_J ./ m_e)
+
+    ΔΩ = Vector{Float64}(undef, nμ)
+    for j in 1:nμ
+        ΔΩ[j] = 2pi * abs(μ_lims_cosine[j] - μ_lims_cosine[j + 1])
+    end
+
+    theta_lims_deg = acosd.(μ_lims_cosine)
+    μ_center = mu_avg(theta_lims_deg)
+    α_center = acos.(clamp.(μ_center, -1.0, 1.0))
+
+    v_par = [μ_center[j] * v[i] for j in 1:nμ, i in 1:nE]
+    v_perp = [sin(α_center[j]) * v[i] for j in 1:nμ, i in 1:nE]
+
+    return (
+        v = v,
+        ΔE_J = ΔE_J,
+        ΔΩ = ΔΩ,
+        μ_center = μ_center,
+        α_center = α_center,
+        v_par = v_par,
+        v_perp = v_perp,
+    )
+end
+
+"""
+    default_vpar_edges(v) -> vpar_edges
+
+Construct a symmetric, uniformly spaced `v_parallel` grid spanning
+`[-maximum(v), maximum(v)]` with an exact edge at `v_parallel = 0`.
+"""
+function default_vpar_edges(v::AbstractVector; n_edges::Int = 75)
+    vmax = maximum(v)
+    positive_edges = collect(range(0.0, vmax; length = n_edges))
+    return vcat(-reverse(positive_edges[2:end]), positive_edges)
+end
