@@ -1,7 +1,7 @@
 @testitem "Ionosphere construction" begin
     z = make_altitude_grid(50, 800)
-    msis_file = find_msis_file()
-    iri_file = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file = find_iri_file(; verbose=false)
     iono = Ionosphere(msis_file, iri_file, z)
 
     @test iono isa Ionosphere
@@ -18,7 +18,7 @@ end
 
 @testitem "Neutral densities" begin
     z = make_altitude_grid(50, 800)
-    msis_file = find_msis_file()
+    msis_file = find_msis_file(; verbose=false)
 
     # Production path: each species samples its MSIS density profile on the grid, then the
     # top boundary is tapered to zero by apply_density_boundary! (as in initialize!(model)).
@@ -35,7 +35,7 @@ end
 
 @testitem "Electron densities" begin
     z = make_altitude_grid(50, 800)
-    iri_file = find_iri_file()
+    iri_file = find_iri_file(; verbose=false)
     ne, Te = AURORA.load_electron_densities(iri_file, z)
 
     @test !any(isnan.(ne))
@@ -54,7 +54,7 @@ end
     past = today() - Year(1)
     z = make_altitude_grid(50, 800)
     iri_file = find_iri_file(; year = year(past), month = month(past), day = day(past),
-                              hour = 12, minute = 0)
+                              hour = 12, minute = 0, verbose = false)
     ne, Te = AURORA.load_electron_densities(iri_file, z)
 
     @test !any(isnan.(ne))

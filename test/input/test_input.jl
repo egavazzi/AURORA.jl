@@ -174,10 +174,10 @@ end
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 10_000;                 # (eV) upper limit to the energy grid
-    msis_file = find_msis_file();
-    iri_file = find_iri_file();
+    msis_file = find_msis_file(; verbose=false);
+    iri_file = find_iri_file(; verbose=false);
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model; policy = CachePolicy(save_cache = false))
+    initialize!(model; policy = CachePolicy(save_cache = false), verbose=false)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -209,10 +209,10 @@ end
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 5000;                 # (eV) upper limit to the energy grid
-    msis_file = find_msis_file();
-    iri_file = find_iri_file();
+    msis_file = find_msis_file(; verbose=false);
+    iri_file = find_iri_file(; verbose=false);
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model; policy = CachePolicy(save_cache = false))
+    initialize!(model; policy = CachePolicy(save_cache = false), verbose=false)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -272,10 +272,10 @@ end
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 10000;                  # (eV) upper limit to the energy grid
-    msis_file = find_msis_file();
-    iri_file = find_iri_file();
+    msis_file = find_msis_file(; verbose=false);
+    iri_file = find_iri_file(; verbose=false);
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model; policy = CachePolicy(save_cache = false))
+    initialize!(model; policy = CachePolicy(save_cache = false), verbose=false)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -316,10 +316,10 @@ end
     altitude_lims = [100, 600];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-10:0              # (°) angle-limits for the electron beams
     E_max = 5000;                   # (eV) upper limit to the energy grid
-    msis_file = find_msis_file();
-    iri_file = find_iri_file();
+    msis_file = find_msis_file(; verbose=false);
+    iri_file = find_iri_file(; verbose=false);
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file)
-    initialize!(model; policy = CachePolicy(save_cache = false))
+    initialize!(model; policy = CachePolicy(save_cache = false), verbose=false)
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
@@ -372,14 +372,14 @@ end
         θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
         E_max = 100;                   # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        msis_file = find_msis_file();
-        iri_file = find_iri_file();
+        msis_file = find_msis_file(; verbose=false);
+        iri_file = find_iri_file(; verbose=false);
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         # Define input flux
         flux = InputFlux(MaxwellianSpectrum(1e-3, 50); beams=1)
         # Run simulation
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
-        run!(sim)
+        run!(sim; verbose=false)
         @test true
     end
 end
@@ -391,14 +391,14 @@ end
         θ_lims = 180:-45:0;            # (°) angle-limits for the electron beams
         E_max = 100;                 # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        msis_file = find_msis_file();
-        iri_file = find_iri_file();
+        msis_file = find_msis_file(; verbose=false);
+        iri_file = find_iri_file(; verbose=false);
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         # Define input flux
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         # Run simulation
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
-        run!(sim)
+        run!(sim; verbose=false)
         @test true
     end
 end
@@ -410,8 +410,8 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        msis_file = find_msis_file();
-        iri_file = find_iri_file();
+        msis_file = find_msis_file(; verbose=false);
+        iri_file = find_iri_file(; verbose=false);
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         # Define input flux
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
@@ -420,7 +420,7 @@ end
         sim = AuroraSimulation(model, flux, savedir;
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 2))
-        run!(sim)
+        run!(sim; verbose=false)
         @test true
     end
 end
@@ -432,8 +432,8 @@ end
         θ_lims = 180:-45:0;             # (°) angle-limits for the electron beams
         E_max = 100;                    # (eV) upper limit to the energy grid
         B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
-        msis_file = find_msis_file();
-        iri_file = find_iri_file();
+        msis_file = find_msis_file(; verbose=false);
+        iri_file = find_iri_file(; verbose=false);
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         # Define input flux
         flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SinusoidalFlickering(5.0);
@@ -442,7 +442,7 @@ end
         sim = AuroraSimulation(model, flux, savedir;
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 2))
-        run!(sim)
+        run!(sim; verbose=false)
         @test true
     end
 end
