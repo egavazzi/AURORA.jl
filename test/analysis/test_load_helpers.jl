@@ -80,7 +80,7 @@ end
     # A tiny budget forces multiple chunks.
     reassembled = zeros(n_z, n_μ, n_t, n_E)
     n_chunks = Ref(0)
-    foreach_Ie_time_chunk(SharedSimResults.td_dir; max_bytes = 1) do Ie_chunk, t_range
+    AURORA.foreach_Ie_time_chunk(SharedSimResults.td_dir; max_bytes = 1) do Ie_chunk, t_range
         reassembled[:, :, t_range, :] .= Ie_chunk
         n_chunks[] += 1
     end
@@ -90,7 +90,7 @@ end
     # An unbounded budget streams everything in a single chunk, same data.
     once = zeros(n_z, n_μ, n_t, n_E)
     n_once = Ref(0)
-    foreach_Ie_time_chunk(SharedSimResults.td_dir; max_bytes = Inf) do Ie_chunk, t_range
+    AURORA.foreach_Ie_time_chunk(SharedSimResults.td_dir; max_bytes = Inf) do Ie_chunk, t_range
         once[:, :, t_range, :] .= Ie_chunk
         n_once[] += 1
     end
