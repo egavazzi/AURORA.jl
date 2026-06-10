@@ -35,7 +35,10 @@
 
             rel_diff = abs.(QO1S_new .- QO1S_ref) ./
                        max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
-            println("Maximum relative difference: ", maximum(rel_diff))
+            idx = argmax(rel_diff)
+            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
+            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
+            println("  QO1S_new[idx] = ", QO1S_new[idx])
         end
     end
 end
@@ -81,7 +84,10 @@ end
 
             rel_diff = abs.(QO1S_new .- QO1S_ref) ./
                        max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
-            println("Maximum relative difference: ", maximum(rel_diff))
+            idx = argmax(rel_diff)
+            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
+            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
+            println("  QO1S_new[idx] = ", QO1S_new[idx])
         end
     end
 end
