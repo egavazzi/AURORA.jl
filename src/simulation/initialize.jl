@@ -15,12 +15,11 @@ Allocate or re-allocate the working cache for `sim`.
 function initialize!(sim::AuroraSimulation;
                      force_recompute::Bool = false,
                      save_cache::Bool = true,
-                     cache_root::String = default_cache_root(),
-                     verbose::Bool = true)
+                     cache_root::String = default_cache_root())
     @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
     if !sim.model.initialized
-        initialize!(sim.model; policy=cache_policy, verbose)
+        initialize!(sim.model; verbose=true, policy=cache_policy)
     end
     # Rebuild the time configuration from the (possibly changed) model grids.
     sim.time = build_time_config(sim.model, sim.mode)

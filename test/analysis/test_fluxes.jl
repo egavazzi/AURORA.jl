@@ -13,14 +13,14 @@
         B_angle_to_zenith = 13
 
         model = AuroraModel(altitude_lims, θ_lims, E_max,
-                            find_msis_file(; verbose=false), find_iri_file(; verbose=false),
+                            find_msis_file(), find_iri_file(),
                             B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), ConstantModulation();
                          beams=1, z_source=500.0)
         sim = AuroraSimulation(model, flux, savedir;
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 1))
-        run!(sim; verbose=false)
+        run!(sim)
     end
 
     # Read back grid dimensions from simulation_data.nc

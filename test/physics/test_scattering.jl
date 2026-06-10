@@ -2,7 +2,8 @@
     # Define some parameters for the tests
     θ_lims = 180:-10:0
     n_dirs = 720
-    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs; verbose=false);
+    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
+    BeamW = beam_weight(θ_lims);
 
     # check if θ_lims is symmetric
     check = false
@@ -32,7 +33,7 @@ end
     # Define some parameters for the tests
     θ_lims = 180:-10:0
     n_dirs = 720
-    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs; verbose=false);
+    P_scatter, Ω_subbeam_relative, θ₁ = AURORA.calculate_scattering_matrices(θ_lims, n_dirs);
 
     # check if θ_lims is symmetric
     check = false
