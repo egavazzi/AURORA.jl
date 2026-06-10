@@ -117,7 +117,6 @@ function initialize!(model::AuroraModel;
 
     for sp in model.species
         sp.density           = collect(Float64, sp.density_profile(h))
-        apply_density_boundary!(sp.density)
         name_str             = String(sp.name)
         # Cross sections depend on the energy grid, so (re)load them whenever they are missing
         # or sized for a different grid. This keeps them correct after an energy-grid swap,
