@@ -1,7 +1,7 @@
 @testmodule TimeTestModel begin
     using AURORA
-    const msis_file = find_msis_file()
-    const iri_file  = find_iri_file()
+    const msis_file = find_msis_file(; verbose=false)
+    const iri_file  = find_iri_file(; verbose=false)
     const model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
 end
 
@@ -110,7 +110,7 @@ end
         sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                       CFL_number=128, n_loop=2))
-        run!(sim)
+        run!(sim; verbose=false)
 
         NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
             t_all = Array(ds["time"])
@@ -132,7 +132,7 @@ end
         sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.05, dt=0.01,
                                                       CFL_number=128, n_loop=3))
-        run!(sim)
+        run!(sim; verbose=false)
 
         NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
             t_all = Array(ds["time"])
@@ -154,7 +154,7 @@ end
         sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
                                mode=TimeDependentMode(duration=0.06, dt=0.01,
                                                       CFL_number=128, n_loop=3))
-        run!(sim)
+        run!(sim; verbose=false)
 
         NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
             t_all = Array(ds["time"])

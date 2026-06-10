@@ -16,9 +16,9 @@ sim = AuroraSimulation(model, flux, savedir;
 run!(sim)
 ```
 """
-function run!(sim::AuroraSimulation)
+function run!(sim::AuroraSimulation; verbose::Bool = true)
     if needs_initialization(sim)
-        initialize!(sim)
+        initialize!(sim; verbose)
     end
 
     out     = sim.output
