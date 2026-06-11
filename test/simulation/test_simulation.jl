@@ -162,11 +162,15 @@ end
     @test model_vd.species[1].density_profile isa VectorDensity
     @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
-    # Plain callable is also accepted as density_profile; density is empty until initialize!
-    flat_profile = h -> fill(1e15, length(h))
+    # A @law profile is accepted as density_profile, and density remains empty until initialize!
+    flat_profile = @law h -> fill(1e15, length(h))
     sp_fn = AURORA.N2Species(flat_profile)
+    @test sp_fn.density_profile isa ExprLaw
     @test sp_fn.density_profile === flat_profile
     @test isempty(sp_fn.density)
+
+    # A bare anonymous law is rejected to ensure reproducibility
+    @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
 end
 
 @testitem "AuroraModel species support Symbol indexing" begin
@@ -206,7 +210,7 @@ end
         iri_file  = find_iri_file(; verbose=false)
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-        flat_n2 = h -> fill(1e18, length(h))
+        flat_n2 = @law h -> fill(1e18, length(h))
         model.species[:N2].density_profile = flat_n2
 
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
@@ -244,9 +248,9 @@ end
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
 
-        custom_law  = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+        custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
         custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75], custom_law)
-        custom_sp   = AURORA.NeutralSpecies(:CustomGas, h -> fill(1e18, length(h));
+        custom_sp   = AURORA.NeutralSpecies(:CustomGas, @law(h -> fill(1e18, length(h)));
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)
 
@@ -280,7 +284,7 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-        custom_generator = (θ, E) -> AURORA.phase_fcn_N2(θ, E)
+        custom_generator = @law (θ, E) -> AURORA.phase_fcn_N2(θ, E)
         model.species[1].phase_fcn_generator = custom_generator
 
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
@@ -428,5 +432,84 @@ end
         @test sim.model.initialized
         @test size(sim.cache.Ie, 3) == model.energy_grid.n
         @test sim.time isa AURORA.RefinedTimeGrid
+    end
+end
+
+@testitem "Law enforcement: bare lambdas and captured locals rejected" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    # Bare anonymous functions are rejected
+    @test_throws ArgumentError AURORA.CascadingSpec("X", [1.0], (a, b) -> a)
+    @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
+    @test_throws ArgumentError AURORA.NeutralSpecies(:G, MSISDensity(msis_file, :N2);
+                                   cascading_spec      = AURORA.DefaultCascadingSpecN2(),
+                                   phase_fcn_generator = (θ, E) -> θ)
+
+    # A @law that closes over a local variable is rejected (its source can't be rebuilt)
+    @test_throws ArgumentError (let n0 = 1e18
+        @law h -> fill(n0, length(h))
+    end)
+
+    # @law, functors and named functions are all accepted
+    @test (@law h -> fill(1e15, length(h))) isa ExprLaw
+    sp = AURORA.N2Species(MSISDensity(msis_file, :N2))
+    @test sp.density_profile isa MSISDensity        # functor
+    @test sp.phase_fcn_generator === phase_fcn_N2   # named function
+end
+
+@testitem "@law density round-trips through physics_state.jld2" begin
+    using JLD2
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        model.species[:N2].density_profile = @law h -> fill(1e18, length(h))
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+
+        savefile = joinpath(savedir, "inputs", "physics_state.jld2")
+        model2 = JLD2.load(savefile, "model")
+
+        prof = model2.species[:N2].density_profile
+        @test prof isa ExprLaw
+        @test prof.src == model.species[:N2].density_profile.src
+        # Reconstructed law is callable in this same scope (relies on invokelatest)
+        h = model2.altitude_grid.h
+        @test prof(h) == fill(1e18, length(h))
+        # Reloaded model re-initializes from the reconstructed law
+        initialize!(model2; verbose=false)
+        @test model2.species[:N2].density[1] ≈ 1e18
+    end
+end
+
+@testitem "Default model laws round-trip through physics_state.jld2" begin
+    using JLD2, NCDatasets
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+        Ie1 = NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+            Array(ds["Ie"])
+        end
+
+        model2 = JLD2.load(joinpath(savedir, "inputs", "physics_state.jld2"), "model")
+
+        # Prove laws round-tripped by running a full simulation from the reloaded model
+        # and checking that results are identical
+        mktempdir() do savedir2
+            sim2 = AuroraSimulation(model2, flux, savedir2; mode = SteadyStateMode())
+            run!(sim2; verbose=false)
+            Ie2 = NCDataset(joinpath(savedir2, "simulation_data.nc"), "r") do ds
+                Array(ds["Ie"])
+            end
+            @test all(Ie2 .≈ Ie1)
+        end
     end
 end

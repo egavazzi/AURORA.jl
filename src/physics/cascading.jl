@@ -1,5 +1,4 @@
 using HCubature: hcubature, hcubature_buffer
-using Interpolations: linear_interpolation, Flat
 
 # ======================================================================================== #
 #           CASCADING SPEC — Species specific cascading physics definition                 #
@@ -10,35 +9,54 @@ struct CascadingSpec{F}
     name::String
     ionization_thresholds::Vector{Float64}
     secondary_law::F   # callable (E_secondary, E_primary) -> Float64
+    function CascadingSpec(name::AbstractString, thresholds::AbstractVector, law)
+        require_reproducible(law, "cascading secondary_law")
+        return new{typeof(law)}(String(name), collect(Float64, thresholds), law)
+    end
+end
+
+# Secondary-electron distribution for atomic O. It needs external parameters (A and B) so we
+# cannot just wrap it in @law. Instead we build a custom callable struct that contains the
+# parameters in its fields.
+struct OSecondaryLaw
+    energy_params::Vector{Float64}
+    A_params::Vector{Float64}
+    B_params::Vector{Float64}
+end
+
+function (law::OSecondaryLaw)(E_s, E_p)
+    A_factor = interp_flat(law.energy_params, law.A_params, E_p) * 1.25  # empirical correction
+    B_factor = interp_flat(law.energy_params, law.B_params, E_p)
+    return B_factor / (1 + (E_s / A_factor)^(5 / 3))
+end
+
+# Small custom linear interpolator, with flat extrapolation beyond the x range.
+function interp_flat(x::AbstractVector, y::AbstractVector, xq)
+    xq <= x[1]   && return float(y[1])
+    xq >= x[end] && return float(y[end])
+    i = searchsortedlast(x, xq)
+    t = (xq - x[i]) / (x[i + 1] - x[i])
+    return y[i] + t * (y[i + 1] - y[i])
 end
 
 function DefaultCascadingSpecN2()
     ionization_thresholds = [15.581, 16.73, 18.75, 24.0, 42.0]
-    law = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+    law = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
     return CascadingSpec("N2", ionization_thresholds, law)
 end
 
 function DefaultCascadingSpecO2()
     ionization_thresholds = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
-    law = (E_s, E_p) -> 1.0 / (15.2^2 + E_s^2)
+    law = @law (E_s, E_p) -> 1.0 / (15.2^2 + E_s^2)
     return CascadingSpec("O2", ionization_thresholds, law)
 end
 
 function DefaultCascadingSpecO()
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
-    energy_params = [100, 200, 500, 1000, 2000]  # eV
-    B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
+    energy_params = [100.0, 200, 500, 1000, 2000]  # eV
     A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
-    A_interp = linear_interpolation(energy_params, A_params, extrapolation_bc = Flat())
-    B_interp = linear_interpolation(energy_params, B_params, extrapolation_bc = Flat())
-
-    interpolate_O_parameters = E_primary -> (A_interp(E_primary), B_interp(E_primary))
-
-    law = function (E_s, E_p)
-        A_factor, B_factor = interpolate_O_parameters(E_p)
-        A_factor *= 1.25  # Empirical correction factor
-        return B_factor / (1 + (E_s / A_factor)^(5 / 3))
-    end
+    B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
+    law = OSecondaryLaw(energy_params, A_params, B_params)
     return CascadingSpec("O", ionization_thresholds, law)
 end
 

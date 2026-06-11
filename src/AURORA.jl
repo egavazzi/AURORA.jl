@@ -27,6 +27,9 @@ export ScatteringData, clear_scattering_cache!
 include("physics/phase_functions.jl")
 export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 
+include("physics/laws.jl")
+export ExprLaw, @law
+
 include("physics/cascading.jl")
 include("physics/cascading_cache.jl")
 export clear_cascading_cache!

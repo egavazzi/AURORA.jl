@@ -91,7 +91,7 @@ end
 end
 
 @testitem "Custom CascadingSpec produces valid transfer matrices" begin
-    flat_law = (E_s, E_p) -> 1.0
+    flat_law = @law (E_s, E_p) -> 1.0
     custom_spec = AURORA.CascadingSpec("FlatTest", [15.0, 25.0], flat_law)
     cache = AURORA.SpeciesCascadingCache(custom_spec)
     energy_grid = AURORA.EnergyGrid(100)
@@ -117,7 +117,7 @@ end
 @testitem "Custom NeutralSpecies with custom CascadingSpec: spectra are accessible" begin
     msis_file = find_msis_file(; verbose=false)
 
-    custom_law  = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+    custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
     custom_spec = AURORA.CascadingSpec("N2variant", [15.581, 16.73, 18.75], custom_law)
 
     sp = AURORA.NeutralSpecies(:N2, AURORA.MSISDensity(msis_file, :N2);

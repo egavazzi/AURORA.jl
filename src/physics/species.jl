@@ -105,6 +105,8 @@ Build a lightweight `NeutralSpecies`. All grid-dependent fields (`density`, `cro
 """
 function NeutralSpecies(name::Symbol, density_profile;
                         cascading_spec::CascadingSpec, phase_fcn_generator)
+    require_reproducible(density_profile, "density_profile")
+    require_reproducible(phase_fcn_generator, "phase_fcn_generator")
     empty_mat = Matrix{Float64}(undef, 0, 0)
     return NeutralSpecies(
         name,
@@ -117,6 +119,17 @@ function NeutralSpecies(name::Symbol, density_profile;
         cascading_spec,
         SpeciesCascadingCache(cascading_spec),
     )
+end
+
+# Density profiles and phase-function generators are commonly swapped in via direct field
+# assignment (the interception window before initialize!), which bypasses the constructor.
+# Intercept those assignments to enforce the reproducibility rule there too.
+function Base.setproperty!(sp::NeutralSpecies, name::Symbol, value)
+    if name === :density_profile || name === :phase_fcn_generator
+        require_reproducible(value, String(name))
+    end
+    ty = fieldtype(typeof(sp), name)
+    return setfield!(sp, name, value isa ty ? value : convert(ty, value))
 end
 
 function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
@@ -228,4 +241,5 @@ end
 
 profile_label(d::MSISDensity)  = "MSISDensity($(basename(d.msis_file)), :$(d.species))"
 profile_label(d::VectorDensity) = "VectorDensity($(length(d.h)) points)"
+profile_label(l::ExprLaw)      = "@law $(l.src)"
 profile_label(d)               = string(typeof(d))
