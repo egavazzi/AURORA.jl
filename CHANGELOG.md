@@ -4,14 +4,15 @@
   - Simulations are now set up by building an `AuroraModel`, creating an `InputFlux`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.
   - Visit the updated online [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
-- Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
-- Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
-- Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
+- **Breaking** Saved files do no longer repeat the last/first time step of each loop across files [#134](https://github.com/egavazzi/AURORA.jl/pull/134)
 - **Numerical Breaking (small)** Minor correction of the Crank-Nicolson top boundary indexing/timing [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking (small)** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
 - **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
-- **Breaking** Saved files do no longer repeat the last/first time step of each loop across files [#134](https://github.com/egavazzi/AURORA.jl/pull/134)
-- **Breaking** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
+- **Numerical Breaking (small)** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
+- **Numerical Breaking (small)** Remove the erf taper of density profiles at the top of the ionosphere [#141](https://github.com/egavazzi/AURORA.jl/pull/141)
+- Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
+- Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
+- Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
 
 ## v0.7.0 - 2026-03-25

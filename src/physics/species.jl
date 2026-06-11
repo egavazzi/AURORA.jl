@@ -1,4 +1,3 @@
-using SpecialFunctions: erf
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 
 # ======================================================================================== #
@@ -63,8 +62,8 @@ All per-species data needed to advance the transport equation through one neutra
 - `density_profile`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
     Can be an [`MSISDensity`](@ref), a [`VectorDensity`](@ref), or any callable.
     Untyped so it can be replaced freely before calling `initialize!(model)`.
-- `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³),
-    with an erf-tail boundary applied at the top. Empty until `initialize!(model)` is called.
+- `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³).
+    Empty until `initialize!(model)` is called.
 - `cross_sections::Matrix{Float64}`: collision cross sections, shape `[n_levels × n_E]` (m²).
     Auto-loaded from the built-in library when empty; pre-populate before `initialize!(model)`
     to supply custom data for a non-standard species.
@@ -130,25 +129,6 @@ function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
     end
     found_index == 0 && throw(KeyError(name))
     return species[found_index]
-end
-
-"""
-    apply_density_boundary!(n)
-
-Smoothly drive the top of a density profile to zero so the solver does not see a hard cut.
-The last 3 grid points are zeroed and the 3 points below are tapered by an error-function
-factor. Negative values (if any sneak in from log-space extrapolation) are clamped to 0.
-"""
-function apply_density_boundary!(n::AbstractVector)
-    n[end-2:end] .= 0
-    erf_factor = (erf.((1:-1:-1) / 2) .+ 1) / 2
-    n[end-5:end-3] .= erf_factor .* n[end-5:end-3]
-    if any(<(0), n)
-        @warn "Negative densities found. They were set to 0, but you might want to check " *
-              "why that happened"
-        n[n .< 0] .= 0
-    end
-    return n
 end
 
 # Per-species variant of load_excitation_threshold (which loads all three species).
