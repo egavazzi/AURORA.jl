@@ -47,8 +47,8 @@ using TestItems
     make_Ie_top_file(td_dir)
 end
 
-# Run all tests
-@run_package_tests verbose=true
+# Run all tests (restricted to the current test directory to exclude worktrees)
+@run_package_tests verbose=true filter=ti->(startswith(ti.filename, @__DIR__))
 
 # Run only specific tests based on their filename
-# @run_package_tests verbose=true filter=ti->(endswith(ti.filename, "test_plotting.jl"))
+# @run_package_tests verbose=true filter=ti->(startswith(ti.filename, @__DIR__) && endswith(ti.filename, "test_plotting.jl"))
