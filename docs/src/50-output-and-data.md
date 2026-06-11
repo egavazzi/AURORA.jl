@@ -96,7 +96,7 @@ sim = AuroraSimulation(model, flux, "my_run"; mode = SteadyStateMode())
 
 ## Reading results
 
-In Julia, use the loader helpers (see [Analysis](@ref) for the result types):
+In Julia, you can use the following loader helpers (see [Analysis](@ref) for the result types):
 
 ```julia
 result = load_results("my_run")                # SimulationResult: Ie, t, h_atm, E_centers, E_edges, dE, mu_lims
@@ -104,21 +104,41 @@ vol    = load_volume_excitation("my_run")      # after make_volume_excitation_fi
 top    = load_Ie_top("my_run")                 # after make_Ie_top_file
 ```
 
-Because the files are self-describing, no AURORA-specific code is needed elsewhere. In Python:
+`load_results` loads `Ie` eagerly, which would result in out of memory issues for very
+large simulation results. To prevent this, it will error if the allocation would exceed `max_bytes`
+(default 2 GiB). You can raise the limit or disable it entirely by passing the keyword argument `max_bytes = Inf`. 
 
-```python
-import xarray as xr
-ds = xr.open_dataset("my_run/simulation_data.nc")
-Ie = ds["Ie"]                                  # dims: altitude, pitch_angle, time, energy
-profile = Ie.sel(time=0.1, method="nearest").sum("pitch_angle")
+Because `simulation_data.nc` is saved as a NetCDF, you can read only the
+subset you are interested in without loading the full file into memory. 
+You can do this manually, but for simple cases you can also use the 
+`tidx`/`zidx`/`μidx`/`eidx` keyword arguments of `load_results` to pick a subset:
+
+```julia
+# Load only the first 100 time steps and the first 3 energy bins
+res = load_results("my_run"; tidx = 1:100, eidx = 1:3)
+res.Ie   # [n_z, n_μ, 100, 3]
+res.t    # time axis for those steps (s)
 ```
 
-In MATLAB:
+If what you want to process is still too large to fit in memory even with selectors, you can
+stream `Ie` chunk by chunk. This is actually the approach used internally by the analysis
+functions. You can use `load_coordinates` (which reads everything *except* `Ie`) together with
+`AURORA.foreach_Ie_time_chunk`:
 
-```matlab
-Ie  = ncread("my_run/simulation_data.nc", "Ie");
-alt = ncread("my_run/simulation_data.nc", "altitude");
+```julia
+# Load only the coordinate vectors (cheap — does not read Ie)
+coords = load_coordinates("my_run")
+
+# Stream Ie in time chunks that each stay under 512 MiB
+# Note: foreach_Ie_time_chunk is an internal helper and may change in future releases.
+AURORA.foreach_Ie_time_chunk("my_run"; max_bytes = 512 * 1024^2) do Ie_chunk, t_range
+    # Ie_chunk is [n_z, n_μ, length(t_range), n_E]
+    process(Ie_chunk, coords.t[t_range])
+end
 ```
+
+Because the output files are standard NetCDF, they are also readable from Python (`xarray`,
+`netCDF4`), MATLAB, or any other NetCDF-capable tool.
 
 ## Analysis outputs
 
