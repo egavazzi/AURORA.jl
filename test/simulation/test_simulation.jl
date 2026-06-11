@@ -369,7 +369,7 @@ end
         run!(sim; verbose=false)
 
         @test sim.model.initialized
-        @test length(sim.model.s_field)           == model.altitude_grid.n
+        @test length(sim.model.s_field) == model.altitude_grid.n
         @test size(sim.cache.Ie, 1) ÷ length(model.pitch_angle_grid.μ_center) == model.altitude_grid.n
     end
 end

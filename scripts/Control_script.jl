@@ -17,9 +17,7 @@ iri_file = find_iri_file(
 model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
 ## Define where to save the results
-root_savedir = ""   # name of the root folder
-name_savedir = ""   # name of the experiment folder
-savedir = make_savedir(root_savedir, name_savedir)
+output = AuroraOutputManager("")
 
 ## Define input flux
 # Flickering with flat spectrum and sinusoidal modulation at 5 Hz,
@@ -35,7 +33,7 @@ mode = TimeDependent(duration = 0.5,            # (s) total simulation time
                      # max_memory_gb = 8.0,     # (optional) or determine n_loop based on limit memory usage
                      )
 
-sim = AuroraSimulation(model, flux, savedir; mode)
+sim = AuroraSimulation(model, flux, output; mode)
 run!(sim)
 
 ## Run the analysis

@@ -17,21 +17,15 @@ iri_file = find_iri_file(
 model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
 
 ## Define where to save the results
-root_savedir = ""   # name of the root folder
-name_savedir = ""   # name of the experiment folder
-savedir = make_savedir(root_savedir, name_savedir)
+output = AuroraOutputManager("")
 
 ## Define input flux
 flux = InputFlux(FlatSpectrum(1e-2; E_min=E_max - 100); beams=1:2)
 
 ## Create and run the simulation
-## Create and run the simulation
 # Single-step steady-state:
-sim = AuroraSimulation(model, flux, savedir; mode=SteadyState())
+sim = AuroraSimulation(model, flux, output; mode=SteadyState())
 run!(sim)
-# Multi-step steady-state (each step solved independently):
-# sim = AuroraSimulation(model, flux, savedir; mode=SteadyState(duration=0.5, dt=0.05))
-# run!(sim)
 
 ## Analyze the results
 make_Ie_top_file(sim)
