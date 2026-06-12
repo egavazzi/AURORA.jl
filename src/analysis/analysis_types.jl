@@ -138,7 +138,7 @@ upward (backscattered) — and is derived from the simulation *output*, so it is
 from the `Ie_input` boundary condition stored in `simulation_data.nc`.
 
 # Fields
-- `Ietop`: flux array of size (n_beams x n_t x n_E), units: eV⁻¹ m⁻² s⁻¹ sr⁻¹
+- `Ietop`: flux array of size (n_beams x n_t x n_E), units: m⁻² s⁻¹
 - `t`: time grid (s), relative so always start at 0
 - `E_edges`: energy bin edges (eV), length n_E + 1
 - `E_centers`: energy bin centres (eV), length n_E
@@ -169,7 +169,7 @@ function load_Ie_top(directory::String)
         E_edges   = Vector{Float64}(ds["energy_edges"][:])
         E_centers = Vector{Float64}(ds["energy"][:])
         ΔE = diff(E_edges)
-        Ietop = Array{Float64, 3}(ds["Ie_top"][:, :, :])
+        Ietop = Array{Float64, 3}(ds["Ie_top_raw"][:, :, :])
         μ_lims = Vector{Float64}(ds["mu_lims"][:])
         return IeTopResult(Ietop, t, E_edges, E_centers, ΔE, μ_lims)
     end
