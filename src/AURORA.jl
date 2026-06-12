@@ -132,7 +132,7 @@ export plot_input, plot_input!
     animate_Ie_in_time(directory_to_process;
                        angles_to_plot=nothing, colorrange=nothing, save_to_file=true,
                        plot_input=false, input_angle_cone=[170, 180], dt_steps=1,
-                       framerate=30)
+                       framerate=30, max_bytes=512*1024^2)
 
 Plot a heatmap of Ie over height and energy, and animate it in time. The animation is saved
 as a .mp4 file under the `directory_to_process` if `save_to_file = true`.
@@ -159,6 +159,8 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
                                    for the precipitation overlay. Only used when `plot_input = true`.
 - `dt_steps = 1`: plot one frame every `dt_steps` timesteps. Increase to speed up rendering.
 - `framerate = 30`: framerate of the animation in frames per second.
+- `max_bytes = 512 * 1024^2`: per-chunk memory budget for streaming the flux from
+                              `simulation_data.nc`.
 
 # Example
 ```julia-repl

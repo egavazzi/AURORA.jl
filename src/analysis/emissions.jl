@@ -13,8 +13,11 @@ compute volume-excitation-rates for all tracked optical emissions and ionization
 and write results to `analysis/volume_excitation.nc`.
 
 Returns a [`VolumeExcitationResult`](@ref).
+
+# Keyword arguments
+- `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
 """
-function make_volume_excitation_file(directory_to_process)
+function make_volume_excitation_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     ## Load coordinates
     coord     = load_coordinates(directory_to_process)
     t         = coord.t
@@ -61,7 +64,7 @@ function make_volume_excitation_file(directory_to_process)
 
     ## Stream Ie over time chunks; each chunk is summed over pitch-angle beams →
     ## omnidirectional flux [n_z, n_t_chunk, n_E] before integrating over energy.
-    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+    foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
         Ie_omni = dropdims(sum(Ie_chunk, dims=2), dims=2)
         tc = t[t_range]
         Q4278[:, t_range]    .= calculate_volume_excitation(z, tc, Ie_omni, σ_4278,    nN2)
@@ -135,7 +138,7 @@ end
 
 Convenience wrapper that calls [`make_volume_excitation_file`](@ref) on `sim.output.savedir`.
 """
-make_volume_excitation_file(sim::AuroraSimulation) = make_volume_excitation_file(sim.output.savedir)
+make_volume_excitation_file(sim::AuroraSimulation; kwargs...) = make_volume_excitation_file(sim.output.savedir; kwargs...)
 
 
 """

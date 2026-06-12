@@ -119,8 +119,11 @@ current density and energy flux, and write results to `analysis/currents.nc`.
 
 # Calling
 `make_current_file(directory_to_process)`
+
+# Keyword arguments
+- `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
 """
-function make_current_file(directory_to_process)
+function make_current_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     ## Load coordinates
     coord     = load_coordinates(directory_to_process)
     t         = coord.t
@@ -141,7 +144,7 @@ function make_current_file(directory_to_process)
     IeE_down  = zeros(n_z, n_t)
 
     ## Stream Ie over time chunks; accumulate per pitch-angle beam into the [n_z, n_t] outputs.
-    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+    foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
         @views for i_μ in 1:n_μ
             flux_block   = dropdims(sum(Ie_chunk[:, i_μ, :, :], dims=3), dims=3)   # [n_z, n_t_chunk]
             energy_block = dropdims(sum(Ie_chunk[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
@@ -195,4 +198,4 @@ end
 
 Convenience wrapper that calls [`make_current_file`](@ref) on `sim.output.savedir`.
 """
-make_current_file(sim::AuroraSimulation) = make_current_file(sim.output.savedir)
+make_current_file(sim::AuroraSimulation; kwargs...) = make_current_file(sim.output.savedir; kwargs...)

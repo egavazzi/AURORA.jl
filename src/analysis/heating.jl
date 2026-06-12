@@ -17,8 +17,11 @@ results to `analysis/heating_rate.nc`.
 
 # Inputs
 - `directory_to_process`: absolute or relative path to the simulation directory.
+
+# Keyword arguments
+- `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
 """
-function make_heating_rate_file(directory_to_process)
+function make_heating_rate_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     ## Load coordinates
     coord     = load_coordinates(directory_to_process)
     t         = coord.t
@@ -33,7 +36,7 @@ function make_heating_rate_file(directory_to_process)
     ## Calculate the heating rate, streaming Ie over time chunks to keep memory bounded.
     ## Each chunk is summed over pitch-angle beams → omnidirectional flux [n_z, n_t_chunk, n_E].
     heating_rate = zeros(length(z), length(t))
-    foreach_Ie_time_chunk(directory_to_process) do Ie_chunk, t_range
+    foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
         Ie_omni = dropdims(sum(Ie_chunk, dims=2), dims=2)
         heating_rate[:, t_range] .= calculate_heating_rate(z, t[t_range], Ie_omni, E_centers, ne, Te)
     end
@@ -72,7 +75,7 @@ end
 
 Convenience wrapper that calls [`make_heating_rate_file`](@ref) on `sim.output.savedir`.
 """
-make_heating_rate_file(sim::AuroraSimulation) = make_heating_rate_file(sim.output.savedir)
+make_heating_rate_file(sim::AuroraSimulation; kwargs...) = make_heating_rate_file(sim.output.savedir; kwargs...)
 
 
 """

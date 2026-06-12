@@ -61,7 +61,8 @@ function AURORA.animate_Ie_in_time(directory_to_process;
                                    plot_input = false,
                                    input_angle_cone = [170, 180],
                                    dt_steps = 1,
-                                   framerate = 30)
+                                   framerate = 30,
+                                   max_bytes = 512 * 1024^2)
     ## Resolve the directory path
     full_path_to_directory = abspath(directory_to_process)
     if !isdir(full_path_to_directory)
@@ -114,7 +115,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     if isnothing(colorrange)
         print("scan colorrange... ")
         max_val = -Inf
-        AURORA.foreach_Ie_time_chunk(full_path_to_directory) do Ie_chunk, t_range
+        AURORA.foreach_Ie_time_chunk(full_path_to_directory; max_bytes) do Ie_chunk, t_range
             Ie_block, g = process_animation_chunk(Ie_chunk, t_range, dt_steps,
                                                   θ_lims, angles_to_plot, scale_μ, ΔE)
             isempty(g) && return
@@ -164,7 +165,7 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     println("animate.")
     # Stream the flux again, recording one frame per subsampled time step. Only one
     # processed time-chunk is held in memory at a time.
-    AURORA.foreach_Ie_time_chunk(full_path_to_directory) do Ie_chunk, t_range
+    AURORA.foreach_Ie_time_chunk(full_path_to_directory; max_bytes) do Ie_chunk, t_range
         Ie_block, g = process_animation_chunk(Ie_chunk, t_range, dt_steps,
                                               θ_lims, angles_to_plot, scale_μ, ΔE)
         for (k, gk) in enumerate(g)
