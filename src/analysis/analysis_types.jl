@@ -68,6 +68,7 @@ Returns a [`VolumeExcitationResult`](@ref).
 """
 function load_volume_excitation(directory::String)
     filepath = joinpath(directory, "analysis", "volume_excitation.nc")
+    check_analysis_freshness(filepath, directory)
     NCDataset(filepath, "r") do ds
         return VolumeExcitationResult(
             Matrix{Float64}(ds["Q4278"][:, :]),
@@ -105,6 +106,7 @@ in the given directory. Returns a [`ColumnExcitationResult`](@ref).
 """
 function load_column_excitation(directory::String)
     filepath = joinpath(directory, "analysis", "column_excitation.nc")
+    check_analysis_freshness(filepath, directory)
     NCDataset(filepath, "r") do ds
         return ColumnExcitationResult(
             Vector{Float64}(ds["I_4278"][:]),
@@ -163,6 +165,7 @@ Returns an [`IeTopResult`](@ref).
 """
 function load_Ie_top(directory::String)
     filepath = joinpath(directory, "analysis", "Ie_top.nc")
+    check_analysis_freshness(filepath, directory)
     NCDataset(filepath, "r") do ds
         t = Vector{Float64}(ds["time"][:])
         t = t .- t[1]   # make relative (start at 0)
@@ -172,5 +175,13 @@ function load_Ie_top(directory::String)
         Ietop = Array{Float64, 3}(ds["Ie_top_raw"][:, :, :])
         μ_lims = Vector{Float64}(ds["mu_lims"][:])
         return IeTopResult(Ietop, t, E_edges, E_centers, ΔE, μ_lims)
+    end
+end
+
+function check_analysis_freshness(analysis_file, sim_dir)
+    sim_data = joinpath(sim_dir, "simulation_data.nc")
+    if isfile(sim_data) && isfile(analysis_file) && mtime(analysis_file) < mtime(sim_data)
+        @warn "$(basename(analysis_file)) predates simulation_data.nc, which means " *
+              "results may be stale. Re-run the corresponding make_* function to update." sim_dir
     end
 end

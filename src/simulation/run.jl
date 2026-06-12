@@ -26,6 +26,11 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
               "Pass overwrite=true to AuroraOutputManager to allow overwriting.")
     end
 
+    analysis_dir = joinpath(savedir, "analysis")
+    if isfile(nc_path) && out.overwrite && isdir(analysis_dir)
+        rm(analysis_dir; recursive=true)
+    end
+
     if needs_initialization(sim)
         initialize!(sim; verbose)
     end
