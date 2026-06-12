@@ -11,7 +11,7 @@ Configuration struct that controls where and how simulation output is written.
   `backup/<yyyymmdd-HHMM>/` in the current working directory.
 
 # Keyword arguments
-- `overwrite::Bool=false`: if `false` (the default), construction errors when
+- `overwrite::Bool=false`: if `false` (the default), `run!` errors when
   `simulation_data.nc` already exists in `savedir`; set to `true` to allow overwriting.
 - `compress`: zlib compression level for all NetCDF variables.
   - `true` (default): level 4
@@ -52,11 +52,6 @@ function AuroraOutputManager(savedir; overwrite=false, compress=true)
          Int(compress)
     0 <= dl <= 9 || throw(ArgumentError("compress must be true/false or an integer 0–9, got $compress"))
     dir = resolve_savedir(savedir)
-    nc_path = joinpath(dir, "simulation_data.nc")
-    if isfile(nc_path) && !overwrite
-        error("simulation_data.nc already exists in \"$dir\". " *
-              "Pass overwrite=true to AuroraOutputManager to allow overwriting.")
-    end
     return AuroraOutputManager(dir, overwrite, dl)
 end
 
