@@ -325,16 +325,3 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     return I_lambda.u
 end
 
-"""
-    q2colem(t::Real, z, Q, A = 1, τ = ones(length(z)))
-
-Same as above, except time is now a scalar (steady-state results). Simple integration in height.
-"""
-function q2colem(t::Real, z, Q, A = 1, τ = ones(length(z)))
-    Q = Q .* τ .* A
-    problem = SampledIntegralProblem(Q, z; dim=1)
-    method = TrapezoidalRule()
-    I_lambda = solve(problem, method)
-    return I_lambda.u
-end
-

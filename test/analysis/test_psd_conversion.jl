@@ -92,7 +92,7 @@ end
         ml_v  = defVar(ds, "mu_lims",       Float64, ("pitch_angle_bounds",))
         ml_v[:] = μ_lims
         bw_v  = defVar(ds, "beam_weight",   Float64, ("pitch_angle",))
-        bw_v[:] = beam_weight(μ_lims)
+        bw_v[:] = beam_weight(acosd.(μ_lims))
         defVar(ds, "time", Float64, ("time",))
         defVar(ds, "Ie",   Float64, ("altitude", "pitch_angle", "time", "energy"))
         ds["time"][1:Nt]             = t_run
@@ -119,6 +119,6 @@ end
         dvpar = Array(ds["dvpar"])
         F = Float64.(Array(ds["F"]))
         reduced_density = dropdims(sum(F .* reshape(dvpar, :, 1, 1); dims = 1), dims = 1)
-        @test conserved_density ≈ reduced_density rtol = 1e-5 atol = 1e-5
+        @test conserved_density ≈ reduced_density rtol = 1e-10 atol = 1e-10
     end
 end

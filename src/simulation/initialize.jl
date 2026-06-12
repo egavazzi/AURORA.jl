@@ -17,7 +17,7 @@ function initialize!(sim::AuroraSimulation;
                      save_cache::Bool = true,
                      cache_root::String = default_cache_root(),
                      verbose::Bool = true)
-    @info "Initializing simulation..."
+    verbose && @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
     if !sim.model.initialized
         initialize!(sim.model; policy=cache_policy, verbose)

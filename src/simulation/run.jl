@@ -44,17 +44,18 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
 
     ds = create_simulation_nc(sim)
     try
-        solve!(sim, ds)
+        solve!(sim, ds; verbose)
     finally
         close(ds)
     end
     return sim
 end
 
-solve!(sim::AuroraSimulation, ds::NCDataset) = solve!(sim, sim.mode, ds)
+solve!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true) =
+    solve!(sim, sim.mode, ds; verbose)
 
-function solve!(sim::AuroraSimulation, ::TimeDependentMode, ds::NCDataset)
-    @info "Starting time-dependent simulation..."
+function solve!(sim::AuroraSimulation, ::TimeDependentMode, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting time-dependent simulation..."
     cache = get_cache(sim)
     time = sim.time::RefinedTimeGrid
     n_E = sim.model.energy_grid.n
@@ -111,12 +112,15 @@ function solve!(sim::AuroraSimulation, ::TimeDependentMode, ds::NCDataset)
     return sim
 end
 
-solve!(sim::AuroraSimulation, ::SteadyStateMode, ds::NCDataset) = solve!(sim, sim.time, ds)
-solve!(sim::AuroraSimulation, ::SingleStepConfig, ds::NCDataset)  = solve_single_step_steady_state!(sim, ds)
-solve!(sim::AuroraSimulation, ::UniformTimeGrid, ds::NCDataset)   = solve_multi_step_steady_state!(sim, ds)
+solve!(sim::AuroraSimulation, ::SteadyStateMode, ds::NCDataset; verbose::Bool = true) =
+    solve!(sim, sim.time, ds; verbose)
+solve!(sim::AuroraSimulation, ::SingleStepConfig, ds::NCDataset; verbose::Bool = true) =
+    solve_single_step_steady_state!(sim, ds; verbose)
+solve!(sim::AuroraSimulation, ::UniformTimeGrid, ds::NCDataset; verbose::Bool = true) =
+    solve_multi_step_steady_state!(sim, ds; verbose)
 
-function solve_single_step_steady_state!(sim::AuroraSimulation, ds::NCDataset)
-    @info "Starting single-step steady-state simulation..."
+function solve_single_step_steady_state!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting single-step steady-state simulation..."
     cache = get_cache(sim)
     n_E = sim.model.energy_grid.n
 
@@ -132,8 +136,8 @@ function solve_single_step_steady_state!(sim::AuroraSimulation, ds::NCDataset)
     return sim
 end
 
-function solve_multi_step_steady_state!(sim::AuroraSimulation, ds::NCDataset)
-    @info "Starting multi-step steady-state simulation..."
+function solve_multi_step_steady_state!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting multi-step steady-state simulation..."
     cache = get_cache(sim)
     time = sim.time::UniformTimeGrid
     n_E = sim.model.energy_grid.n

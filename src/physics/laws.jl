@@ -17,8 +17,12 @@ secondary_e_law = @law (E_s, E_p) -> 1 / (11.4^2 + E_s^2)
 
 To ensure reproducibility, laws must be self-contained: closed-form expressions referencing
 only their arguments and names available in `AURORA`/`Base`. A law that needs to carry e.g.
-parameters should be cosntructed as a functor struct instead. To ensure this, trying to build
+parameters should be constructed as a functor struct instead. To ensure this, trying to build
 a `@law` that captures local variables will throw an error.
+
+!!! warning "Loading evaluates code"
+    Reloading a saved model evaluates the stored law source, so a `physics_state.jld2` file
+    from an untrusted source can execute arbitrary code. Only load files you trust.
 """
 struct ExprLaw
     src::String

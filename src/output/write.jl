@@ -4,10 +4,6 @@ using Dates: now
 import TOML
 import LibGit2
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TOML config
-# ──────────────────────────────────────────────────────────────────────────────
-
 function write_config_toml(sim::AuroraSimulation)
     model = sim.model
     mode = sim.mode
@@ -50,10 +46,6 @@ function write_config_toml(sim::AuroraSimulation)
 end
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Atmosphere NetCDF
-# ──────────────────────────────────────────────────────────────────────────────
-
 function write_atmosphere_nc(sim::AuroraSimulation)
     model = sim.model
     ionosphere = model.ionosphere
@@ -85,9 +77,6 @@ function write_atmosphere_nc(sim::AuroraSimulation)
 end
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Physics state JLD2
-# ──────────────────────────────────────────────────────────────────────────────
 
 function write_physics_jld2(sim::AuroraSimulation)
     savefile = joinpath(sim.output.savedir, "inputs", "physics_state.jld2")
@@ -95,10 +84,6 @@ function write_physics_jld2(sim::AuroraSimulation)
     @save savefile model
 end
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# simulation_data.nc — create, append, write input flux
-# ──────────────────────────────────────────────────────────────────────────────
 
 """
     create_simulation_nc(sim) → NCDataset
@@ -215,7 +200,7 @@ function create_simulation_nc(sim::AuroraSimulation)
                      deflatelevel=dl, shuffle=(dl > 0),
                      chunksizes=(n_μ, 1, n_E),
                      attrib=["units"     => "m-2 s-1",
-                              "long_name" => "input boundary number flux (precipitation, top of atmosphere)"])
+                              "long_name" => "input boundary number flux (precipitation, top of the ionosphere)"])
     Ietop_v[:, :, :] = Ie_top_3D
     sync(ds)
 

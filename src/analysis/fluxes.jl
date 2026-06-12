@@ -62,7 +62,7 @@ function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
 
         ee_v = defVar(ds, "energy_edges", Float64, ("energy_bounds",);
                       attrib=["units" => "eV", "long_name" => "energy bin edges"])
-        ee_v[:] = vcat(E_centers[1] - ΔE[1]/2, E_centers .+ ΔE./2)
+        ee_v[:] = coord.E_edges
 
         ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
                       attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
