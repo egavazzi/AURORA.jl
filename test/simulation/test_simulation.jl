@@ -55,6 +55,23 @@ end
     end
 end
 
+@testitem "run! warns when the bottom boundary clips the solution" begin
+    mktempdir() do savedir
+        # 100 eV electrons stop near 200 km; a grid starting at 250 km absorbs most of
+        # the precipitation at its bottom boundary and must trigger the warning
+        θ_lims = 180:-45:0
+        E_max = 100
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
+
+        model = AuroraModel([250, 500], θ_lims, E_max, msis_file, iri_file, 13)
+        flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+
+        @test_logs (:warn, r"bottom of the altitude grid") match_mode=:any run!(sim; verbose=false)
+    end
+end
+
 @testitem "Multi-step SS: saved t_run matches time grid" begin
     using NCDatasets
     mktempdir() do savedir

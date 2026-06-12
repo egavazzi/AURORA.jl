@@ -7,6 +7,7 @@ Discretization grids for altitude, energy, and pitch angle.
 ```@docs; canonical=false
 AltitudeGrid
 make_altitude_grid
+suggest_bottom_altitude
 ```
 
 ## Energy

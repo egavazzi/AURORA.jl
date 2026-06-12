@@ -5,6 +5,7 @@ include("grids/altitude_grid.jl")
 include("grids/energy_grid.jl")
 include("grids/pitch_angle_grid.jl")
 export AbstractGrid, AltitudeGrid, EnergyGrid, PitchAngleGrid
+export suggest_bottom_altitude
 
 include("ionosphere/ionosphere.jl")
 export Ionosphere
