@@ -324,7 +324,8 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output; mode = SteadyStateMode())
         run!(sim; verbose=false)
 
         model.altitude_grid = AltitudeGrid(100, 300)
@@ -365,7 +366,8 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output; mode = SteadyStateMode())
         run!(sim; verbose=false)
 
         # Change the grid and call run! directly — no initialize!(model)/initialize!(sim).
@@ -419,7 +421,8 @@ end
 
         model = AuroraModel([100, 200], 180:-90:0, 80, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir;
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output;
                                  mode = TimeDependentMode(duration=0.02, dt=0.01,
                                                           CFL_number=128, n_loop=1))
         run!(sim; verbose=false)
