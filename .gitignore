@@ -18,11 +18,8 @@ internal_data/data_electron/iri*
 internal_data/e_cascading/*
 # ignore scattering files
 internal_data/e_scattering/*
-# ignore the data folders and data
+# ignore the data folders
 data/*
-*.jld2
-*.nc
-*.toml
 # ignore the control scripts
 scripts/Control*.jl
 # except the following ones
