@@ -93,8 +93,6 @@ function beams2beams(phase_fcn, B2B_fragment)
     return B2B
 end
 
-## ----------------------------------------------------- ##
-
 function update_A!(A, model::AuroraModel, iE)
     ionosphere = model.ionosphere
     energy_grid = model.energy_grid

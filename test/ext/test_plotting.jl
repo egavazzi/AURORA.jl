@@ -3,11 +3,11 @@
     using AURORA
     using CairoMakie
 
-    CairoMakie.activate!()
+    CairoMakie.activate!(visible = false) # ensure we render but don't pop up windows during tests
 
     vol = load_volume_excitation(SharedSimResults.td_dir)
     col = load_column_excitation(SharedSimResults.td_dir)
-    inp = load_input(SharedSimResults.td_dir)
+    inp = load_Ie_top(SharedSimResults.td_dir)
 
     @testset "plot_excitation! smoke" begin
         # default call → heatmap
@@ -65,12 +65,12 @@
         θ_lims = 180:-45:0
         E_max = 100
         B_angle_to_zenith = 13
-        msis_file = find_msis_file()
-        iri_file = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
         savedir = "fake_dir"  # won't be used since we're not running the sim
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-        initialize!(model)
+        initialize!(model, verbose=false)
         flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0); beams = 1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
@@ -80,7 +80,7 @@
     @testset "multi-step SS smoke" begin
         vol_ms = load_volume_excitation(SharedSimResults.ms_ss_dir)
         col_ms = load_column_excitation(SharedSimResults.ms_ss_dir)
-        inp_ms = load_input(SharedSimResults.ms_ss_dir)
+        inp_ms = load_Ie_top(SharedSimResults.ms_ss_dir)
 
         # plot_excitation! heatmap over time
         fig1 = Figure()
@@ -108,12 +108,12 @@
         θ_lims = 180:-45:0
         E_max = 100
         B_angle_to_zenith = 13
-        msis_file = find_msis_file()
-        iri_file = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
         savedir = "fake_dir"  # won't be used since we're not running the sim
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
-        initialize!(model)
+        initialize!(model, verbose=false)
         flux = InputFlux(FlatSpectrum(1.0; E_min = 50.0), SinusoidalFlickering(5.0); beams = 1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration=0.04, dt=0.01))
         @test plot_input(sim) isa Figure

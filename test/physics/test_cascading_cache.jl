@@ -3,7 +3,8 @@
     cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
 
     AURORA.load_or_compute_cascading!(cache, energy_grid;
-                                      policy=AURORA.CachePolicy(force_recompute=true, save_cache=false))
+                                      policy=AURORA.CachePolicy(force_recompute=true, save_cache=false),
+                                      verbose=false)
     i_primary = searchsortedlast(cache.E_edges, 40.0)
     secondary = AURORA.secondary_spectrum(cache, i_primary, 15.581)
     primary = AURORA.primary_spectrum(cache, i_primary, 15.581)
@@ -40,9 +41,9 @@ end
     n2_cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
     o2_cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecO2())
     o_cache  = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecO())
-    AURORA.load_or_compute_cascading!(n2_cache, energy_grid; policy=save_policy)
-    AURORA.load_or_compute_cascading!(o2_cache, energy_grid; policy=save_policy)
-    AURORA.load_or_compute_cascading!(o_cache,  energy_grid; policy=save_policy)
+    AURORA.load_or_compute_cascading!(n2_cache, energy_grid; policy=save_policy, verbose=false)
+    AURORA.load_or_compute_cascading!(o2_cache, energy_grid; policy=save_policy, verbose=false)
+    AURORA.load_or_compute_cascading!(o_cache,  energy_grid; policy=save_policy, verbose=false)
 
     n2_dir = joinpath(cache_root, "e_cascading", "N2")
     o2_dir = joinpath(cache_root, "e_cascading", "O2")
@@ -52,7 +53,7 @@ end
     @test length(cache_files(o_dir))  == 1
 
     loaded_cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
-    AURORA.load_or_compute_cascading!(loaded_cache, energy_grid; policy=load_policy)
+    AURORA.load_or_compute_cascading!(loaded_cache, energy_grid; policy=load_policy, verbose=false)
     @test loaded_cache.E_edges == n2_cache.E_edges
     @test loaded_cache.ionization_thresholds == n2_cache.ionization_thresholds
 
@@ -75,11 +76,11 @@ end
     end
 
     stale_cache = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
-    AURORA.load_or_compute_cascading!(stale_cache, energy_grid; policy=load_policy)
+    AURORA.load_or_compute_cascading!(stale_cache, energy_grid; policy=load_policy, verbose=false)
     @test compatible_cache_count(n2_dir) >= 1
 
     AURORA.load_or_compute_cascading!(AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2()),
-                                      energy_grid; policy=skip_save_policy)
+                                      energy_grid; policy=skip_save_policy, verbose=false)
     skip_n2_dir = joinpath(cache_root, "skip_save", "e_cascading", "N2")
     @test isempty(cache_files(skip_n2_dir))
 
@@ -90,13 +91,14 @@ end
 end
 
 @testitem "Custom CascadingSpec produces valid transfer matrices" begin
-    flat_law = (E_s, E_p) -> 1.0
+    flat_law = @law (E_s, E_p) -> 1.0
     custom_spec = AURORA.CascadingSpec("FlatTest", [15.0, 25.0], flat_law)
     cache = AURORA.SpeciesCascadingCache(custom_spec)
     energy_grid = AURORA.EnergyGrid(100)
 
     AURORA.load_or_compute_cascading!(cache, energy_grid;
-                                      policy=AURORA.CachePolicy(save_cache=false))
+                                      policy=AURORA.CachePolicy(save_cache=false),
+                                      verbose=false)
 
     n_E = energy_grid.n
     @test !isempty(cache.E_edges)
@@ -113,9 +115,9 @@ end
 end
 
 @testitem "Custom NeutralSpecies with custom CascadingSpec: spectra are accessible" begin
-    msis_file = find_msis_file()
+    msis_file = find_msis_file(; verbose=false)
 
-    custom_law  = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+    custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
     custom_spec = AURORA.CascadingSpec("N2variant", [15.581, 16.73, 18.75], custom_law)
 
     sp = AURORA.NeutralSpecies(:N2, AURORA.MSISDensity(msis_file, :N2);
@@ -127,7 +129,8 @@ end
 
     energy_grid = AURORA.EnergyGrid(100)
     AURORA.load_or_compute_cascading!(sp.cascading_data, energy_grid;
-                                      policy=AURORA.CachePolicy(save_cache=false))
+                                      policy=AURORA.CachePolicy(save_cache=false),
+                                      verbose=false)
 
     n_E = energy_grid.n
     i_primary = searchsortedlast(sp.cascading_data.E_edges, 40.0)

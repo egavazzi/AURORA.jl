@@ -39,11 +39,13 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
   should simulate. Defaults to the standard atmosphere: N₂, O₂, O from `msis_file`.
   Pass a custom tuple to add, remove, or replace species:
   ```julia
-  # Only two species:
+  # Two species example:
   model = AuroraModel(...; species = (O2Species(msis_file), OSpecies(msis_file)))
 
-  # Four species — custom 4th gas with pre-populated cross sections:
-  custom_sp = NeutralSpecies(:MyGas, my_density_profile;
+  # Four species example, with a custom 4th gas
+  # Laws (density, cascading, phase) must be @law-wrapped, a functor, or a named function to
+  # ensure reproducibility when saved to physics_state.jld2:
+  custom_sp = NeutralSpecies(:MyGas, @law(z -> 1e18 .* exp.(-z ./ 30e3));
                              cascading_spec = my_spec, phase_fcn_generator = phase_fcn_N2)
   model = AuroraModel(...; species = (N2Species(msis_file), O2Species(msis_file),
                                       OSpecies(msis_file),  custom_sp))

@@ -42,14 +42,17 @@ change and rebuilds the model and its cache before solving.
 
 ## Changing a species' density profile
 
-Each species carries a `density_profile`: any callable mapping altitude (m) to density (m⁻³).
+Each species carries a `density_profile`: a callable mapping altitude (m) to density (m⁻³).
 `initialize!` samples it onto the altitude grid. Built-in options are [`MSISDensity`](@ref) and
-[`VectorDensity`](@ref) (your own altitude/density vectors, that will get pchip interpolated
-in log-space), but any function works.
+[`VectorDensity`](@ref) (your own altitude/density vectors, that will get pchip-interpolated in log-space).
+
+For a custom analytic profile, wrap it in the [`@law`](@ref) macro. `@law` captures the law's
+source text so that it can be saved in `physics_state.jld2`. **Bare anonymous functions are rejected** 
+as their source cannot be reconstructed when a saved model is reloaded.
 
 ```@example modular
-# A plain analytic profile for N₂ (altitude in m → density in m⁻³)
-model.species[:N2].density_profile = h -> 1e18 .* exp.(-(h .- 100e3) ./ 30e3)
+# An analytic profile for N₂ (altitude in m → density in m⁻³)
+model.species[:N2].density_profile = @law h -> 1e18 .* exp.(-(h .- 100e3) ./ 30e3)
 initialize!(model)
 model.species[:N2].density
 ```
@@ -62,6 +65,29 @@ model.species[:N2].density_profile = VectorDensity(altitude_m, density_m3)
 model.species[:N2].density_profile = MSISDensity(msis_file, :N2)
 ```
 
+### When a law needs parameters, use a functor
+
+`@law` is for **self-contained, closed-form** laws: the expression may reference only its
+arguments and standard functions. A `@law` that closes over a local variable will be rejected
+(because the captured value can't be saved as source). When a law must carry parameters or tabulated
+data, define a small **functor** `struct` instead. Its fields are saved and can be reloaded with the
+model. Here is an example:
+
+```julia
+struct ExponentialDensity      # parameters live in fields → can round-trip through JLD2
+    n0::Float64                # density at z_ref (m⁻³)
+    z_ref::Float64             # reference altitude (m)
+    H::Float64                 # scale height (m)
+end
+(d::ExponentialDensity)(z) = d.n0 .* exp.(-(z .- d.z_ref) ./ d.H)
+
+model.species[:N2].density_profile = ExponentialDensity(1e18, 100e3, 30e3)
+```
+
+The same pattern applies to a parameterized cascading law or phase-function generator.
+(If you dig into the source code you might find out that this is how the default 
+atomic-oxygen cascading law is built in order to carry some tabulated coefficients)
+
 ## Overriding cross-sections, phase functions, or cascading
 
 The same interception window lets you replace other per-species physics before `initialize!`.
@@ -69,11 +95,13 @@ Set the *generator* (re-evaluated on every `initialize!`, so it tracks grid chan
 the materialized array where possible:
 
 ```julia
-# Phase-function generator: (θ, E) -> (elastic, inelastic) matrices
-model.species[:N2].phase_fcn_generator = my_phase_function
+# Phase-function generator: (θ, E) -> (elastic, inelastic) matrices.
+# Can be a named function, functor, or @law, but not an anonymous function.
+model.species[:N2].phase_fcn_generator = my_custom_phase_function
 
 # Cascading: ionization thresholds + a secondary-electron distribution law f(E_s, E_p)
-model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], (E_s, E_p) -> 1/(15.2^2 + E_s^2))
+law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
+model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], law)
 
 # Cross-sections can be pre-populated directly for a non-standard species (see below)
 ```
@@ -95,7 +123,7 @@ built-in cross-section library only knows N₂/O₂/O, pre-populate the cross-se
 excitation levels for a new gas in the interception window:
 
 ```julia
-law  = (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
+law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
 spec = AURORA.CascadingSpec("Ar", [15.76, 27.63], law)
 argon = NeutralSpecies(:Ar, MSISDensity(msis_file, :Ar);
                        cascading_spec = spec, phase_fcn_generator = phase_fcn_N2)
@@ -111,7 +139,8 @@ run!(AuroraSimulation(model, flux, savedir; mode))
 ```
 
 !!! tip
-    Define custom profiles, phase functions, and cascading laws as small `struct`s (functors) or
-    named functions rather than anonymous closures. In-line functions do work, but only 
-    proper structs/named functions can be cleanly saved to file. To be fair we do not save
-    them to file right now, but this is in the plans for improved reproducibility.
+    Laws (density profiles, phase-function generators, cascading laws) must be reproducible so
+    the model can be saved and reloaded. Use [`@law`](@ref) for closed-form laws, a functor
+    `struct` when the law carries parameters, or a named function. **Bare anonymous functions
+    are rejected**. The chosen law will be stored in `inputs/physics_state.jld2` and possible
+    to restore on load.

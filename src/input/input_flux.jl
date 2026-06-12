@@ -2,10 +2,6 @@ using MAT: matopen
 using DataInterpolations: ConstantInterpolation, LinearInterpolation
 
 
-## ====================================================================================== ##
-## InputFlux struct
-## ====================================================================================== ##
-
 """
     InputFlux{S<:AbstractSpectrum, M<:AbstractModulation}
 
@@ -76,11 +72,6 @@ function Base.show(io::IO, ::MIME"text/plain", flux::InputFlux)
     print(io,   "└── Source altitude: ", z_str)
 end
 
-
-
-## ====================================================================================== ##
-## Ie_top_from_file (used by compute_flux with FileSpectrum)
-## ====================================================================================== ##
 
 """
     Ie_top_from_file(t, E, μ_center, filename; interpolation=:constant)
@@ -208,66 +199,6 @@ function Ie_top_from_file(t, E_centers, μ_center, filename; interpolation=:cons
     return Ie_top
 end
 
-
-
-## ====================================================================================== ##
-## Helper functions for spectrum evaluation
-## ====================================================================================== ##
-
-"""
-    flat_spectrum(IeE_tot_eV, E, dE, E_min)
-
-Compute a flat (constant) differential number flux spectrum above E_min, normalized so that
-the total energy flux equals IeE_tot_eV.
-
-Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
-The flux is zero below E_min.
-"""
-function flat_spectrum(IeE_tot_eV, E_centers, ΔE, E_min)
-    # Find first index where bin lower edge <= E_min
-    i_Emin = findlast((E_centers .- ΔE./2) .<= E_min)
-    if isnothing(i_Emin)
-        i_Emin = 1
-    end
-
-    # Calculate normalization: ∑ E_centers[i] * ΔE[i] for i >= i_Emin
-    energy_integral = sum(E_centers[i_Emin:end] .* ΔE[i_Emin:end])
-
-    # Differential number flux (constant above E_min)
-    Φ = zeros(length(E_centers))
-    Φ[i_Emin:end] .= IeE_tot_eV / energy_integral
-
-    return Φ  # #e⁻/m²/s/eV
-end
-
-
-"""
-    gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
-
-Compute a Gaussian differential number flux spectrum centered at E₀ with width ΔE,
-normalized so that the total energy flux equals IeE_tot_eV.
-
-The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
-
-Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
-"""
-function gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, E₀, ΔE_gauss)
-    # Unnormalized Gaussian shape
-    Φ_shape = exp.(-(E_centers .- E₀).^2 ./ ΔE_gauss^2)
-
-    # Calculate normalization: we want ∑ Φ[i] * E_centers[i] * ΔE[i] = IeE_tot_eV
-    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_centers[i] * ΔE[i])
-    energy_integral = sum(Φ_shape .* E_centers .* ΔE)
-
-    # Normalized differential number flux
-    Φ = Φ_shape .* (IeE_tot_eV / energy_integral)
-
-    return Φ  # #e⁻/m²/s/eV
-end
-
-## ====================================================================================== ##
-## compute_flux — unified interface
-## ====================================================================================== ##
 
 """
     compute_flux(flux::InputFlux, model::AuroraModel, t)
@@ -406,4 +337,56 @@ function compute_flux(flux::InputFlux{<:AbstractSpectrum, <:AbstractModulation},
     error("Steady-state compute_flux does not support $(typeof(flux.modulation)). " *
           "Use ConstantModulation() for steady-state simulations, " *
           "or provide a time grid for time-dependent simulations: compute_flux(flux, model, t).")
+end
+
+
+"""
+    flat_spectrum(IeE_tot_eV, E, dE, E_min)
+
+Compute a flat (constant) differential number flux spectrum above E_min, normalized so that
+the total energy flux equals IeE_tot_eV.
+
+Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
+The flux is zero below E_min.
+"""
+function flat_spectrum(IeE_tot_eV, E_centers, ΔE, E_min)
+    # Find first index where bin lower edge <= E_min
+    i_Emin = findlast((E_centers .- ΔE./2) .<= E_min)
+    if isnothing(i_Emin)
+        i_Emin = 1
+    end
+
+    # Calculate normalization: ∑ E_centers[i] * ΔE[i] for i >= i_Emin
+    energy_integral = sum(E_centers[i_Emin:end] .* ΔE[i_Emin:end])
+
+    # Differential number flux (constant above E_min)
+    Φ = zeros(length(E_centers))
+    Φ[i_Emin:end] .= IeE_tot_eV / energy_integral
+
+    return Φ  # #e⁻/m²/s/eV
+end
+
+
+"""
+    gaussian_spectrum(IeE_tot_eV, E, dE, E₀, ΔE)
+
+Compute a Gaussian differential number flux spectrum centered at E₀ with width ΔE,
+normalized so that the total energy flux equals IeE_tot_eV.
+
+The Gaussian shape is: Φ(E) ∝ exp(-(E - E₀)² / ΔE²)
+
+Returns a vector of differential number flux per eV (#e⁻/m²/s/eV) for each energy bin.
+"""
+function gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, E₀, ΔE_gauss)
+    # Unnormalized Gaussian shape
+    Φ_shape = exp.(-(E_centers .- E₀).^2 ./ ΔE_gauss^2)
+
+    # Calculate normalization: we want ∑ Φ[i] * E_centers[i] * ΔE[i] = IeE_tot_eV
+    # So: normalization = IeE_tot_eV / ∑(Φ_shape[i] * E_centers[i] * ΔE[i])
+    energy_integral = sum(Φ_shape .* E_centers .* ΔE)
+
+    # Normalized differential number flux
+    Φ = Φ_shape .* (IeE_tot_eV / energy_integral)
+
+    return Φ  # #e⁻/m²/s/eV
 end

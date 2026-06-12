@@ -33,10 +33,10 @@ end
 
     # Constant Q = 1.0 at all altitudes → integral should equal the total height span
     z = collect(range(100e3, 200e3; length = 50))
-    Q = ones(length(z))
-    t_scalar = 0.0
+    Q = ones(length(z), 1)
+    t = [0.0]
 
-    I = AURORA.q2colem(t_scalar, z, Q)
+    I = AURORA.q2colem(t, z, Q)
 
     @test length(I) == 1
     # Trapezoidal integration of constant 1.0 over [100e3, 200e3] = 100e3

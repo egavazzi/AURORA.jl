@@ -1,5 +1,4 @@
-using MAT: matopen
-using ProgressMeter: Progress, next!
+using NCDatasets: NCDataset, defDim, defVar
 
 
 # ======================================================================================== #
@@ -9,148 +8,103 @@ using ProgressMeter: Progress, next!
 """
     make_Ie_top_file(directory_to_process)
 
-Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation
-and extracts the particle flux `Ie` (#e⁻/m²/s) at the top of the ionosphere (i.e. at the
-max altitude used in the simulation).
+Read `simulation_data.nc` from `directory_to_process`, extract the electron flux
+at the top of the ionosphere (highest altitude), and write results to
+`analysis/Ie_top.nc`.
 
 # Calling
 `make_Ie_top_file(directory_to_process)`
 
 # Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process.
+- `directory_to_process`: absolute or relative path to the simulation directory.
 """
-function make_Ie_top_file(directory_to_process)
-    ## Find the files to process
-    files_to_process = list_result_files(directory_to_process)
+function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    E_centers = coord.E_centers
+    ΔE        = coord.ΔE
+    μ_lims    = coord.μ_lims
 
-    if isempty(files_to_process)
-        @warn "No simulation results found in $directory_to_process. Skipping top flux extraction."
-        return nothing
+    ## Beam weights
+    θ_lims = acosd.(μ_lims)
+    Ω_beam = beam_weight(θ_lims)   # [n_μ]
+
+    n_z, n_μ, n_t, n_E = coord.n_z, coord.n_μ, coord.n_t, coord.n_E
+
+    ## Differential-flux conversion factors (eV⁻¹ m⁻² s⁻¹ sr⁻¹ from #e⁻/m²/s)
+    invΔE = reshape(1.0 ./ ΔE, (1, 1, :))
+    invΩ  = reshape(1.0 ./ Ω_beam, (:, 1, 1))
+
+    ## Write to analysis/Ie_top.nc
+    analysis_dir = joinpath(directory_to_process, "analysis")
+    mkpath(analysis_dir)
+    savefile = joinpath(analysis_dir, "Ie_top.nc")
+
+    NCDataset(savefile, "c") do ds
+        defDim(ds, "pitch_angle",   n_μ)
+        defDim(ds, "time",          n_t)
+        defDim(ds, "energy",        n_E)
+        defDim(ds, "energy_bounds",      n_E + 1)
+        defDim(ds, "pitch_angle_bounds", n_μ + 1)
+
+        pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
+                      attrib=["units" => "1", "long_name" => "cosine of pitch angle"])
+        pa_v[:] = mu_avg(θ_lims)
+
+        t_v = defVar(ds, "time", Float64, ("time",);
+                     attrib=["units" => "s", "long_name" => "simulation time"])
+        t_v[:] = t
+
+        en_v = defVar(ds, "energy", Float64, ("energy",);
+                      attrib=["units" => "eV", "long_name" => "energy bin center"])
+        en_v[:] = E_centers
+
+        ee_v = defVar(ds, "energy_edges", Float64, ("energy_bounds",);
+                      attrib=["units" => "eV", "long_name" => "energy bin edges"])
+        ee_v[:] = coord.E_edges
+
+        ml_v = defVar(ds, "mu_lims", Float64, ("pitch_angle_bounds",);
+                      attrib=["units" => "1", "long_name" => "pitch-angle cosine bin boundaries"])
+        ml_v[:] = μ_lims
+
+        bw_v = defVar(ds, "beam_weight", Float64, ("pitch_angle",);
+                      attrib=["units" => "sr", "long_name" => "solid-angle beam weight"])
+        bw_v[:] = Ω_beam
+
+        Ie_top_raw_v = defVar(ds, "Ie_top_raw", Float64, ("pitch_angle", "time", "energy");
+                              deflatelevel=4,
+                              attrib=["units"     => "m-2 s-1",
+                                       "long_name" => "electron flux at top of ionosphere"])
+        Ie_top_v = defVar(ds, "Ie_top", Float64, ("pitch_angle", "time", "energy");
+                          deflatelevel=4,
+                          attrib=["units"     => "eV-1 m-2 s-1 sr-1",
+                                   "long_name" => "differential electron flux at top of ionosphere"])
+
+        ## Stream the top-altitude slice over time chunks (reads only 1 i_z of Ie).
+        nc_in = joinpath(directory_to_process, "simulation_data.nc")
+        NCDataset(nc_in, "r") do dsin
+            slice_bytes = n_μ * n_E * sizeof(Float64)
+            nt_chunk = time_chunk_length(slice_bytes, max_bytes, n_t)
+            for t0 in 1:nt_chunk:n_t
+                tr  = t0:min(t0 + nt_chunk - 1, n_t)
+                raw = dsin["Ie"].var[n_z, :, tr, :]   # [n_μ, length(tr), n_E]
+                Ie_top_raw_v[:, tr, :] = raw
+                Ie_top_v[:, tr, :]     = raw .* invΔE .* invΩ
+            end
+        end
     end
-
-    ## Load simulation grid
-    first_result    = read_result(files_to_process[1])
-    z               = first_result.h_atm
-    E_centers       = first_result.E_centers
-    ΔE              = first_result.dE
-    scattering_data = first_result.mu_scatterings
-    n_z = length(z)
-    Ω_beam = scattering_data["BeamWeight"]
-
-    ## Initialize arrays to store the results for each time-slice
-    Ie_top = Vector{Array{Float64, 3}}()
-    t = Float64[]
-
-    n_files = length(files_to_process)
-    p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
-    ## Loop over the files
-    for file in files_to_process
-        ## Load simulation results for current file.
-        result  = read_result(file)
-        Ie_ztE  = result.Ie_ztE
-        t_local = result.t_run
-
-        ## Extract Ie at the top for each beam
-        Ie_top_local = Ie_ztE[n_z:n_z:end, :, :]
-
-        ## Push the Ie_top of the current time-slice into a vector
-        # We get Ie_top = [[n_μ, n_t1, n_E], [n_μ, n_t2, n_E], ...]
-        push!(Ie_top, Ie_top_local)
-        append!(t, t_local)
-
-        next!(p)
-    end
-
-    ## Concatenate along time
-    # We get Ie_top = [n_μ, n_t, n_E]
-    Ie_top = reduce(hcat, Ie_top)
-
-    ## Play with the units
-    Ie_top_raw = copy(Ie_top) # in #e-/m²/s
-    Ie_top = Ie_top ./ reshape(ΔE, (1, 1, :)) ./ Ω_beam # in #e-/m²/s/eV/ster
-
-    ## Save results
-    savefile = joinpath(directory_to_process, "Ie_top.mat")
-    f = matopen(savefile, "w")
-        write(f, "E_centers", E_centers)
-        write(f, "dE", ΔE)
-        write(f, "BeamW", Ω_beam)
-        write(f, "t", t)
-        write(f, "Ie_top_raw", Ie_top_raw)
-        write(f, "Ie_top", Ie_top)
-    close(f)
 
     println("Top flux saved in $savefile")
-
     return nothing
 end
 
-
 """
-    downsampling_fluxes(directory_to_process, downsampling_factor)
+    make_Ie_top_file(sim::AuroraSimulation)
 
-This function extracts `Ie` from the simulation results in `directory_to_process` and
-downsample it in time.
-For example: if `Ie` is given with a time step of 1ms and we use a `downsampling_factor` of
-10, this function will extract the values of `Ie` with a time step of 10ms. It will then
-save the results in a new subfolder called`downsampled_10x`, inside the `directory_to_process`.
-
-# Calling
-`downsampling_fluxes(directory_to_process, downsampling_factor)`
-
-# Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process.
-- `downsampling_factor`: downsampling factor for the time
-
-# Outputs
-The downsampled electron fluxes `Ie` will be saved in a subfolder inside the `directory_to_process`.
+Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.output.savedir`.
 """
-function downsampling_fluxes(directory_to_process, downsampling_factor)
-    files_to_process = list_result_files(directory_to_process)
-
-    for f in files_to_process
-        r               = read_result(f)
-        Ie              = r.Ie_ztE    # [n_μ * nz, nt, nE]
-        E_centers       = r.E_centers
-        E_edges         = r.E_edges
-        ΔE              = r.dE
-        t_run           = r.t_run
-        μ_lims          = r.mu_lims
-        z               = r.h_atm
-        I0              = r.I0
-        scattering_data = r.mu_scatterings
-
-        # downsample the data
-        dt = diff(t_run)[1]
-        println("The time-step from simulation is ", dt, "s.")
-        new_dt = dt * downsampling_factor
-        println("The time-step of the new file will be ", new_dt, "s.")
-        Ie = Ie[:, 1:downsampling_factor:end, :]
-        t_run = t_run[1:downsampling_factor:end]
-
-        # create new subdir if it doesn't exist
-        new_subdir = "downsampled_" * string(downsampling_factor) * "x"
-        full_path_to_new_subdir = joinpath(directory_to_process, new_subdir)
-        mkpath(full_path_to_new_subdir)
-
-        # create new file
-        new_filename = splitdir(f)[2][1:end-4] * "d.mat" # add a 'd' after the number to indicate that it is downsampled
-        full_path_to_new_filename = joinpath(full_path_to_new_subdir, new_filename)
-        file = matopen(full_path_to_new_filename, "w")
-            write(file, "Ie_ztE", Ie)
-            write(file, "E_centers", E_centers)
-            write(file, "E_edges", E_edges)
-            write(file, "dE", ΔE)
-            write(file, "t_run", t_run)
-            write(file, "mu_lims", μ_lims)
-            write(file, "h_atm", z)
-            write(file, "I0", I0)
-            write(file, "mu_scatterings", scattering_data)
-        close(file)
-    end
-
-    return nothing
-end
+make_Ie_top_file(sim::AuroraSimulation; kwargs...) = make_Ie_top_file(sim.output.savedir; kwargs...)
 
 
 # ======================================================================================== #
@@ -160,131 +114,88 @@ end
 """
     make_current_file(directory_to_process)
 
-Reads into a folder `directory_to_process` containing results from an AURORA.jl simulation,
-loads the particle flux `Ie` (#e⁻/m²/s) and calculates the field-aligned current-density
-and field-aligned energy-flux for each height and through time.
-
-The following variables are saved to a file named *J.mat*:
-- `J_up`: Field-aligned current-density in the upward direction. 2D array [n\\_z, n\\_t]
-- `J_down`: Field-aligned current-density in the downward direction. 2D array [n\\_z, n\\_t]
-- `IeE_up`: Field-aligned energy-flux (eV/m²/s) in the upward direction. 2D array [n\\_z, n\\_t]
-- `IeE_down`: Field-aligned energy-flux (eV/m²/s) in the downward direction. 2D array [n\\_z, n\\_t]
+Read `simulation_data.nc` from `directory_to_process`, compute field-aligned
+current density and energy flux, and write results to `analysis/currents.nc`.
 
 # Calling
 `make_current_file(directory_to_process)`
 
-# Inputs
-- `directory_to_process`: absolute or relative path to the simulation directory to process.
+# Keyword arguments
+- `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
 """
-function make_current_file(directory_to_process)
-    ## Find the files to process
-    files_to_process = list_result_files(directory_to_process)
+function make_current_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
+    ## Load coordinates
+    coord     = load_coordinates(directory_to_process)
+    t         = coord.t
+    z         = coord.h_atm
+    E_centers = coord.E_centers
+    μ_lims    = coord.μ_lims
 
-    if isempty(files_to_process)
-        @warn "No simulation results found in $directory_to_process. Skipping current-density calculations."
-        return nothing
-    end
+    θ_lims   = acosd.(μ_lims)
+    μ_center = mu_avg(θ_lims)
 
-    ## Load simulation grid
-    first_result = read_result(files_to_process[1])
-    z            = first_result.h_atm
-    E_centers    = first_result.E_centers
-    μ_lims       = first_result.mu_lims
-    μ_center = mu_avg(acosd.(μ_lims))
+    ## Elementary charge
+    q_e = 1.602176620898e-19  # C
 
-    ## Initialize arrays to store the results for each time-slice
-    J_up = Vector{Array{Float64, 2}}()
-    J_down = Vector{Array{Float64, 2}}()
-    IeE_up = Vector{Array{Float64, 2}}()
-    IeE_down = Vector{Array{Float64, 2}}()
-    t = Float64[]
+    n_z, n_μ, n_t = coord.n_z, coord.n_μ, coord.n_t
+    J_up      = zeros(n_z, n_t)
+    J_down    = zeros(n_z, n_t)
+    IeE_up    = zeros(n_z, n_t)
+    IeE_down  = zeros(n_z, n_t)
 
-    ## Define constant
-    q_e = 1.602176620898e-19 # elementary charge (C)
-
-    n_files = length(files_to_process)
-    p = Progress(n_files; desc=string("Processing data"), dt=1.0, color=:blue)
-    ## Loop over the files
-    for file in files_to_process
-        ## Load simulation results for current file.
-        result  = read_result(file)
-        Ie_ztE  = result.Ie_ztE
-        t_local = result.t_run
-
-        ## Calculate the field aligned currents and energy flux
-        n_z = length(z)
-        n_μ = length(μ_center)
-        n_t = size(Ie_ztE, 2)
-        J_up_local = zeros(n_z, n_t)
-        J_down_local = zeros(n_z, n_t)
-        IeE_up_local = zeros(n_z, n_t)
-        IeE_down_local = zeros(n_z, n_t)
+    ## Stream Ie over time chunks; accumulate per pitch-angle beam into the [n_z, n_t] outputs.
+    foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
         @views for i_μ in 1:n_μ
+            flux_block   = dropdims(sum(Ie_chunk[:, i_μ, :, :], dims=3), dims=3)   # [n_z, n_t_chunk]
+            energy_block = dropdims(sum(Ie_chunk[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
             if μ_center[i_μ] > 0
-                J_up_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
-                IeE_up_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E_centers, (1, 1, :)), dims=3)
+                J_up[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                IeE_up[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
             else
-                J_down_local .+= q_e * abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :], dims=3)
-                IeE_down_local .+= abs(μ_center[i_μ]) .* sum(Ie_ztE[(i_μ - 1) * n_z .+ (1:n_z), :, :] .* reshape(E_centers, (1, 1, :)), dims=3)
+                J_down[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                IeE_down[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
             end
         end
-
-        ## Push the J of the current time-slice into a vector
-        # We get J_up = [[n_z, n_t1], [n_z, n_t2], ...]
-        push!(J_up, J_up_local)
-        push!(J_down, J_down_local)
-        push!(IeE_up, IeE_up_local)
-        push!(IeE_down, IeE_down_local)
-        append!(t, t_local)
-
-        next!(p)
     end
 
-    ## Concatenate along time
-    # We get J_up = [n_z, n_t]
-    J_up = reduce(hcat, J_up)
-    J_down = reduce(hcat, J_down)
-    IeE_up = reduce(hcat, IeE_up)
-    IeE_down = reduce(hcat, IeE_down)
+    ## Write to analysis/currents.nc
+    analysis_dir = joinpath(directory_to_process, "analysis")
+    mkpath(analysis_dir)
+    savefile = joinpath(analysis_dir, "currents.nc")
 
-    ## Save results
-    savefile = joinpath(directory_to_process, "J.mat")
-    f = matopen(savefile, "w")
-        write(f, "h_atm", z)
-        write(f, "t", t)
-        write(f, "J_up", J_up)
-        write(f, "J_down", J_down)
-        write(f, "IeE_up", IeE_up)
-        write(f, "IeE_down", IeE_down)
-    close(f)
+    NCDataset(savefile, "c") do ds
+        n_z = length(z)
+        n_t = length(t)
+        defDim(ds, "altitude", n_z)
+        defDim(ds, "time",     n_t)
+
+        alt_v = defVar(ds, "altitude", Float64, ("altitude",);
+                       attrib=["units" => "m", "long_name" => "altitude"])
+        alt_v[:] = z
+        t_v = defVar(ds, "time", Float64, ("time",);
+                     attrib=["units" => "s", "long_name" => "simulation time"])
+        t_v[:] = t
+
+        for (name, data, long_name, units) in (
+                ("J_up",     J_up,     "Upward field-aligned current density",  "A m-2"),
+                ("J_down",   J_down,   "Downward field-aligned current density", "A m-2"),
+                ("IeE_up",   IeE_up,   "Upward field-aligned energy flux",       "eV m-2 s-1"),
+                ("IeE_down", IeE_down, "Downward field-aligned energy flux",     "eV m-2 s-1"),
+            )
+            v = defVar(ds, name, Float64, ("altitude", "time");
+                       deflatelevel=4,
+                       attrib=["units" => units, "long_name" => long_name])
+            v[:, :] = data
+        end
+    end
 
     println("Currents saved in $savefile")
-
     return nothing
 end
-
-
-# ======================================================================================== #
-#                         AuroraSimulation convenience wrappers                          #
-# ======================================================================================== #
-
-"""
-    make_Ie_top_file(sim::AuroraSimulation)
-
-Convenience wrapper that calls [`make_Ie_top_file`](@ref) on `sim.savedir`.
-"""
-make_Ie_top_file(sim::AuroraSimulation) = make_Ie_top_file(sim.savedir)
 
 """
     make_current_file(sim::AuroraSimulation)
 
-Convenience wrapper that calls [`make_current_file`](@ref) on `sim.savedir`.
+Convenience wrapper that calls [`make_current_file`](@ref) on `sim.output.savedir`.
 """
-make_current_file(sim::AuroraSimulation) = make_current_file(sim.savedir)
-
-"""
-    downsampling_fluxes(sim::AuroraSimulation, downsampling_factor)
-
-Convenience wrapper that calls [`downsampling_fluxes`](@ref) on `sim.savedir`.
-"""
-downsampling_fluxes(sim::AuroraSimulation, downsampling_factor) = downsampling_fluxes(sim.savedir, downsampling_factor)
+make_current_file(sim::AuroraSimulation; kwargs...) = make_current_file(sim.output.savedir; kwargs...)

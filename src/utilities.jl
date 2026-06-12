@@ -1,9 +1,5 @@
 using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using LoopVectorization: @tturbo
-using StyledStrings: @styled_str
-
-
-## ====================================================================================== ##
 
 
 """
@@ -26,28 +22,6 @@ function v_of_E(E)
 
 	v = (2 * qₑ * abs(E) / mₑ) .^ (1/2) .* sign(E);
 	return v
-end
-
-function CFL_criteria(duration, dt, z, v, CFL_number=64)
-    # The Courant-Freidrichs-Lewy (CFL) number normally has to be small (<4) to ensure numerical
-    # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
-    # should be careful about numerical accuracy though.
-    # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
-    # on the results, while reducing computational time tremendously
-    dz = z[2] - z[1]
-    # Maximum dt that satisfies the CFL condition
-    dt_max = CFL_number * dz / v
-    # Refinement factor: how many internal steps per save interval.
-    # dt_internal = dt / CFL_factor, which is exact by construction.
-    CFL_factor = ceil(Int, dt / dt_max)
-    # Number of save intervals (validated upstream to be an exact integer multiple of dt)
-    n_save = round(Int, duration / dt)
-    # Coarse save grid: the time points we want to write to disk.
-    t_save = range(0.0, n_save * dt; length = n_save + 1)
-    # Fine internal grid: CFL_factor sub-steps per save interval.
-    t_internal = range(0.0, n_save * dt; length = n_save * CFL_factor + 1)
-
-    return t_internal, t_save, CFL_factor
 end
 
 
@@ -101,127 +75,26 @@ function beam_weight(θ_lims)
 end
 
 
-## ====================================================================================== ##
+function CFL_criteria(duration, dt, z, v, CFL_number=64)
+    # The Courant-Freidrichs-Lewy (CFL) number normally has to be small (<4) to ensure numerical
+    # stability. However, as a Crank-Nicolson scheme is always stable, we can take a bigger CFL. We
+    # should be careful about numerical accuracy though.
+    # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
+    # on the results, while reducing computational time tremendously
+    dz = z[2] - z[1]
+    # Maximum dt that satisfies the CFL condition
+    dt_max = CFL_number * dz / v
+    # Refinement factor: how many internal steps per save interval.
+    # dt_internal = dt / CFL_factor, which is exact by construction.
+    CFL_factor = ceil(Int, dt / dt_max)
+    # Number of save intervals (validated upstream to be an exact integer multiple of dt)
+    n_save = round(Int, duration / dt)
+    # Coarse save grid: the time points we want to write to disk.
+    t_save = range(0.0, n_save * dt; length = n_save + 1)
+    # Fine internal grid: CFL_factor sub-steps per save interval.
+    t_internal = range(0.0, n_save * dt; length = n_save * CFL_factor + 1)
 
-import LibGit2
-import Pkg
-function save_parameters(sim::AuroraSimulation)
-    model = sim.model
-    mode = sim.mode
-
-	savefile = joinpath(sim.savedir, "parameters.txt")
-    commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
-        LibGit2.head(pkgdir(AURORA))
-    else
-        "Not available"
-    end
-    version_AURORA = pkgversion(AURORA)
-    open(savefile, "w") do f
-        write(f, "altitude_lims = [$(model.altitude_grid.h[1]/1e3), $(model.altitude_grid.h[end]/1e3)] \n")
-        write(f, "θ_lims = $(model.pitch_angle_grid.θ_lims) \n")
-        write(f, "E_max = $(model.energy_grid.E_max) \n")
-        write(f, "B_angle_to_zenith = $(model.B_angle_to_zenith) \n")
-        write(f, "\n")
-        write(f, "mode = $mode \n")
-        write_time_params(f, sim)
-        write(f, "\n")
-        write(f, "flux = $(sim.flux) \n")
-        write(f, "\n")
-        write(f, "commit_hash = $commit_hash \n")
-        write(f, "version_AURORA = $version_AURORA")
-    end
-end
-
-write_time_params(f::IO, sim::AuroraSimulation) = write_time_params(f, sim.time)
-
-function write_time_params(f::IO, time::RefinedTimeGrid)
-    write(f, "duration = $(time.duration) \n")
-    write(f, "dt = $(time.dt) \n")
-    write(f, "dt_internal = $(time.dt_internal) \n")
-    write(f, "t_internal = $(time.t) \n")
-    write(f, "n_loop = $(time.n_loop) \n")
-    write(f, "CFL_factor = $(time.CFL_factor) \n")
-end
-function write_time_params(f::IO, time::UniformTimeGrid)
-    write(f, "duration = $(time.duration) \n")
-    write(f, "dt = $(time.dt) \n")
-    write(f, "n_steps = $(time.n_steps) \n")
-    write(f, "t = $(time.t) \n")
-end
-function write_time_params(f::IO, ::SingleStepConfig)
-    write(f, "duration = nothing \n")
-    write(f, "dt = nothing \n")
-end
-
-
-using MAT: matopen
-function save_neutrals(sim::AuroraSimulation)
-    model = sim.model
-    ionosphere = model.ionosphere
-    savefile = joinpath(sim.savedir, "neutral_atm.mat")
-    file = matopen(savefile, "w")
-        write(file, "h_atm", model.altitude_grid.h)
-        for sp in model.species
-            write(file, "n" * String(sp.name), sp.density)
-        end
-        write(file, "ne", ionosphere.ne)
-        write(file, "Te", ionosphere.Te)
-    close(file)
-end
-
-
-using MAT: matopen
-function save_Ie_top(sim::AuroraSimulation, Ie_top, t)
-    energy_grid = sim.model.energy_grid
-    μ_lims = sim.model.pitch_angle_grid.μ_lims
-    savefile = joinpath(sim.savedir, "Ie_incoming.mat")
-    file = matopen(savefile, "w")
-        write(file, "Ie_total", Ie_top)
-        write(file, "E_centers", energy_grid.E_centers)
-        write(file, "E_edges", energy_grid.E_edges)
-        write(file, "dE", energy_grid.ΔE)
-        write(file, "mu_lims", collect(μ_lims))
-        write(file, "t_top", collect(Float64, t))
-    close(file)
-end
-
-mode_type_tag(::RefinedTimeGrid)  = "time_dependent"
-mode_type_tag(::UniformTimeGrid)  = "steady_state_multi_step"
-mode_type_tag(::SingleStepConfig) = "steady_state_single_step"
-
-solver_type_tag(::TimeDependentMode) = "time_dependent"
-solver_type_tag(::SteadyStateMode)   = "steady_state"
-
-using MAT: matopen
-using Printf: @sprintf
-function save_results(sim::AuroraSimulation, Ie_save, t_run, I0, i)
-    energy_grid = sim.model.energy_grid
-    μ_lims = sim.model.pitch_angle_grid.μ_lims
-    z = sim.model.altitude_grid.h
-    scattering = sim.model.scattering
-
-    # Mode type tags for downstream analysis
-    mode_type = mode_type_tag(sim.time)
-    solver_type = solver_type_tag(sim.mode)
-
-    savefile = joinpath(sim.savedir, (@sprintf "IeFlickering-%02d.mat" i))
-	file = matopen(savefile, "w")
-		write(file, "Ie_ztE", Ie_save)
-		write(file, "E_centers", energy_grid.E_centers)
-		write(file, "E_edges", energy_grid.E_edges)
-		write(file, "dE", energy_grid.ΔE)
-		write(file, "t_run", collect(Float64, t_run))
-		write(file, "mu_lims", collect(μ_lims))
-		write(file, "h_atm", z)
-		write(file, "I0", I0)
-        write(file, "solver_type", solver_type)
-        write(file, "mode_type", mode_type)
-		write(file, "mu_scatterings", Dict(
-			"P_scatter" => scattering.P_scatter,
-            "BeamWeight_relative" => scattering.Ω_subbeam_relative,
-			"BeamWeight" => scattering.Ω_beam,
-			"theta_scatter" => scattering.θ_scatter))
-	close(file)
+    return t_internal, t_save, CFL_factor
 end
 
 
@@ -268,99 +141,6 @@ end
 
 
 """
-    find_input_file(path_to_directory)
-
-Look for Ie\\_incoming file present in the directory given by `path_to_directory`. If several
-files are starting with the name "Ie\\_incoming", return an error. If only one file is found,
-return a string with the path to that file.
-
-# Calling
-`input_file = find_input_file(path_to_directory)`
-
-# Inputs
-- `path_to_directory`: path to a directory
-
-# Returns
-- `input_file`: path to the Ie\\_incoming file, in the form "path_to_directory/Ie_incoming_*.mat"
-"""
-function find_input_file(path_to_directory)
-    incoming_files = filter(file -> startswith(file, "Ie_incoming"), readdir(path_to_directory))
-    if isempty(incoming_files)
-        error("No Ie_incoming*.mat file found in $path_to_directory.")
-    elseif length(incoming_files) > 1
-        error("More than one file contains incoming flux. This is not normal")
-    else
-        return input_file = joinpath(path_to_directory, incoming_files[1])
-    end
-end
-
-
-"""
-    make_savedir(root_savedir, name_savedir; behavior = "default")
-
-Return the path to the directory where the results will be saved. If the directory does not
-already exist, create it.
-
-If the constructed `savedir` already exists and contains files starting with `"IeFlickering-"`,
-a new directory is created to avoid accidental overwriting of results (e.g., `savedir(1)`, `savedir(2)`, etc.).
-
-# Calling
-`savedir = make_savedir(root_savedir, name_savedir)` \\
-`savedir = make_savedir(root_savedir, name_savedir; behavior = "custom")`
-
-# Arguments
-- `root_savedir::String`: The root directory where the data will be saved. If empty or
-    contains only spaces, it defaults to `"backup"`.
-- `name_savedir::String`: The name of the subdirectory to be created within `root_savedir`.
-    If empty or contains only spaces, it defaults to the current date and time in the
-    format `"yyyymmdd-HHMM"`.
-- `behavior::String` (optional): Determines how the full path is constructed.
-    - `"default"`: The path will be built starting under the `data/` folder of the AURORA installation
-        (i.e., `AURORA_folder/data/root_savedir/name_savedir/`, where `AURORA_folder` is
-        the folder containing the AURORA code). This is the default behavior.
-    - `"custom"`: The path will be built as `root_savedir/name_savedir/`, with the argument
-        `root_savedir` treated as an absolute or relative path. This allows for saving results
-        in any location on the system. Useful if AURORA is installed as a dependency to some
-        other project.
-
-# Returns
-- `savedir::String`: The full path to the directory where the results will be saved.
-"""
-function make_savedir(root_savedir, name_savedir; behavior = "default")
-    ## Create the folder to save the data to
-    # If `root_savedir` is empty or contains only "space" characters, we use "backup/" as a name
-    if isempty(root_savedir) || !occursin(r"[^ ]", root_savedir)
-        root_savedir = "backup"
-    end
-    # If `name_savedir` is empty or contains only "space" characters, we use the current date and time as a name
-    if isempty(name_savedir) || !occursin(r"[^ ]", name_savedir)
-        name_savedir = string(Dates.format(now(), "yyyymmdd-HHMM"))
-    end
-
-    # Make a string with full path of savedir from root_savedir and name_savedir
-    if behavior == "default"
-        savedir = pkgdir(AURORA, "data", root_savedir, name_savedir)
-    elseif behavior == "custom"
-        savedir = joinpath(root_savedir, name_savedir)
-    end
-
-    # Rename `savedir` to `savedir(1)` if it exists and already contain results. If
-    # `savedir(1)` exists then it will be renamed to `savedir(2)` and so on
-    if isdir(savedir) && (filter(startswith("IeFlickering-"), readdir(savedir)) |> length) > 0
-        savedir = rename_if_exists(savedir)
-    end
-
-    # And finally create the directory
-    mkpath(savedir)
-    print("\n", styled"{bold:Results will be saved at $savedir}\n")
-
-    return savedir
-end
-
-
-## ====================================================================================== ##
-
-"""
     smooth_transition(x, x_start = 0.0, x_end = 1.0)
 
 Create a smooth transition from 0 to 1 over the interval `[x_start, x_end]` using a
@@ -398,7 +178,6 @@ function smooth_transition(x, x_start = 0.0, x_end = 1.0)
     return transition_value
 end
 
-## ====================================================================================== ##
 
 # Function to restructure the matrix from 3D [n_mu x nz, nt, nE] to 4D [nz, n_mu, nt, nE]
 function restructure_Ie_from_3D_to_4D(Ie_raw, μ_lims, z, t_run, E_centers)
@@ -511,7 +290,6 @@ function restructure_streams_of_Ie!(Ie_plot, Ie, θ_lims, new_θ_lims)
     return Ie_plot
 end
 
-
 function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
     # Input Ie has shape [n_z, n_μ, n_t, n_E]
     n_μ_new = length(new_θ_lims)
@@ -523,8 +301,6 @@ function restructure_streams_of_Ie(Ie, θ_lims, new_θ_lims)
 end
 
 
-
-## ====================================================================================== ##
 """
     interpolate_profile(data_values, data_altitude_km, target_altitude_m;
                        log_interpolation=true)
@@ -573,10 +349,9 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
 end
 
 
-
-## ====================================================================================== ##
-## Memory estimation and automatic n_loop calculation
-## ====================================================================================== ##
+# ======================================================================================== #
+#                       Memory estimation and automatic n_loop calculation                #
+# ======================================================================================== #
 
 
 """

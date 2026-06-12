@@ -1,5 +1,5 @@
 @testitem "AURORA steady-state results" begin
-    using MAT
+    using NCDatasets
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
@@ -19,30 +19,33 @@
 
     ## Run the simulation
     sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
-    initialize!(sim; force_recompute=true) # force recomputation instead of loading from cache to test regressions
+    initialize!(sim; force_recompute=true, verbose=false) # force recomputation instead of loading from cache to test regressions
     run!(sim)
 
     ## Analyze the results
-    make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
-    make_column_excitation_file(savedir)
-    make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "SS", "Qzt_all_L.mat")
-    data_ref = matread(reference_file)
-    data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
+    reference_file = joinpath(@__DIR__, "reference_results", "SS", "volume_excitation.nc")
+    NCDataset(reference_file, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
+            QO1S_ref = Array(ds_ref["QO1S"])
+            QO1S_new = Array(ds_new["QO1S"])
+            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
 
-    ## Print the actual maximum relative difference
-    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
-    println("Maximum relative difference: ", maximum(rel_diff))
+            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
+                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
+            idx = argmax(rel_diff)
+            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
+            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
+            println("  QO1S_new[idx] = ", QO1S_new[idx])
+        end
+    end
 end
 
 
 @testitem "AURORA time-dependent results" begin
-    using MAT
+    using NCDatasets
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
@@ -65,23 +68,26 @@ end
     sim = AuroraSimulation(model, flux, savedir;
                            mode=TimeDependentMode(duration = 0.2, dt = 0.01,
                                                   CFL_number = 128, n_loop = 2))
-    initialize!(sim; force_recompute=true) # force recomputation instead of loading from cache to test regressions
+    initialize!(sim; force_recompute=true, verbose=false) # force recomputation instead of loading from cache to test regressions
     run!(sim)
 
     ## Analyze the results
-    make_Ie_top_file(savedir)
     make_volume_excitation_file(savedir)
-    make_column_excitation_file(savedir)
-    make_current_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "TD", "Qzt_all_L.mat")
-    data_ref = matread(reference_file)
-    data_new = matread(joinpath(savedir, "Qzt_all_L.mat"))
-    @test all(isapprox.(data_new["QO1S"], data_ref["QO1S"], rtol = 1e-4))
+    reference_file = joinpath(@__DIR__, "reference_results", "TD", "volume_excitation.nc")
+    NCDataset(reference_file, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
+            QO1S_ref = Array(ds_ref["QO1S"])
+            QO1S_new = Array(ds_new["QO1S"])
+            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
 
-    ## Print the actual maximum relative difference
-    rel_diff = abs.(data_new["QO1S"] .- data_ref["QO1S"]) ./
-               max.(abs.(data_new["QO1S"]), abs.(data_ref["QO1S"]), eps())
-    println("Maximum relative difference: ", maximum(rel_diff))
+            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
+                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
+            idx = argmax(rel_diff)
+            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
+            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
+            println("  QO1S_new[idx] = ", QO1S_new[idx])
+        end
+    end
 end

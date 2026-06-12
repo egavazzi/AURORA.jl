@@ -5,8 +5,8 @@
         E_max = 100
         B_angle_to_zenith = 13
 
-        msis_file = find_msis_file()
-        iri_file = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SmoothOnset(0.0, 0.05);
@@ -20,7 +20,7 @@
         @test sim.time isa RefinedTimeGrid
         @test sim.time.dt_internal <= sim.time.dt
 
-        initialize!(sim)
+        initialize!(sim; verbose=false)
 
         @test sim.cache_initialized
         @test sim.model.initialized
@@ -40,8 +40,8 @@ end
         θ_lims = 180:-45:0
         E_max = 100
         B_angle_to_zenith = 13
-        msis_file = find_msis_file()
-        iri_file = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
@@ -49,46 +49,47 @@ end
 
         @test !sim.cache_initialized
 
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.cache_initialized
     end
 end
 
 @testitem "Multi-step SS: saved t_run matches time grid" begin
-    using MAT
+    using NCDatasets
     mktempdir() do savedir
         altitude_lims = [100, 200]
         θ_lims = 180:-90:0
         E_max = 100
         B_angle_to_zenith = 13
 
-        msis_file = find_msis_file()
-        iri_file = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
 
         model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0), SinusoidalFlickering(5.0); beams=1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode(duration = 0.04, dt = 0.01))
 
-        run!(sim)
+        run!(sim; verbose=false)
 
-        data = matread(joinpath(savedir, "IeFlickering-01.mat"))
-        t_run = vec(data["t_run"])
-        expected_t = collect(sim.time.t)
+        NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+            t_run = Array(ds["time"])
+            expected_t = collect(sim.time.t)
 
-        # t_run must span the full time axis, not be a scalar 1
-        @test length(t_run) == length(expected_t)
-        @test t_run ≈ expected_t
+            # t_run must span the full time axis, not be a scalar 1
+            @test length(t_run) == length(expected_t)
+            @test t_run ≈ expected_t
 
-        # Ie_ztE time dimension must also match
-        @test size(data["Ie_ztE"], 2) == length(expected_t)
+            # Ie time dimension must also match
+            @test size(ds["Ie"], 3) == length(expected_t)
+        end
     end
 end
 
 @testitem "SteadyStateMode() → SingleStepConfig" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
         flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
 
@@ -137,8 +138,8 @@ end
 end
 
 @testitem "NeutralSpecies density_profile types" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
     # Default model: all species backed by MSISDensity; density is empty before initialize!
@@ -148,7 +149,7 @@ end
     @test isempty(model.species[1].density)
 
     # After initialize! density is populated
-    initialize!(model)
+    initialize!(model; verbose=false)
     ag = model.altitude_grid
     @test !isempty(model.species[1].density)
 
@@ -157,20 +158,24 @@ end
     vd = VectorDensity(ag.h, raw_n2)
     model_vd = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
     model_vd.species[1].density_profile = vd
-    initialize!(model_vd)
+    initialize!(model_vd; verbose=false)
     @test model_vd.species[1].density_profile isa VectorDensity
     @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
-    # Plain callable is also accepted as density_profile; density is empty until initialize!
-    flat_profile = h -> fill(1e15, length(h))
+    # A @law profile is accepted as density_profile, and density remains empty until initialize!
+    flat_profile = @law h -> fill(1e15, length(h))
     sp_fn = AURORA.N2Species(flat_profile)
+    @test sp_fn.density_profile isa ExprLaw
     @test sp_fn.density_profile === flat_profile
     @test isempty(sp_fn.density)
+
+    # A bare anonymous law is rejected to ensure reproducibility
+    @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
 end
 
 @testitem "AuroraModel species support Symbol indexing" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
     @test model.species[:N2] === model.species[1]
@@ -180,8 +185,8 @@ end
 end
 
 @testitem "Species Symbol indexing rejects duplicate names" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
                         species = (N2Species(msis_file), N2Species(msis_file)))
 
@@ -189,8 +194,8 @@ end
 end
 
 @testitem "AuroraModel is uninitialized before initialize!" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
     @test !model.initialized
@@ -201,18 +206,18 @@ end
 
 @testitem "initialize!(model) interception window" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-        flat_n2 = h -> fill(1e18, length(h))
+        flat_n2 = @law h -> fill(1e18, length(h))
         model.species[:N2].density_profile = flat_n2
 
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
         @test !sim.model.initialized
-        run!(sim)
+        run!(sim; verbose=false)
         @test sim.model.initialized
 
         n2_density = sim.model.species[:N2].density
@@ -223,14 +228,14 @@ end
 
 @testitem "AuroraModel with 2 species: run! succeeds" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
                             species = (O2Species(msis_file), OSpecies(msis_file)))
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.model.initialized
         @test length(sim.model.species) == 2
@@ -240,12 +245,12 @@ end
 
 @testitem "Custom 4th species with pre-populated cross sections: run! succeeds" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
-        custom_law  = (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+        custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
         custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75], custom_law)
-        custom_sp   = AURORA.NeutralSpecies(:CustomGas, h -> fill(1e18, length(h));
+        custom_sp   = AURORA.NeutralSpecies(:CustomGas, @law(h -> fill(1e18, length(h)));
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)
 
@@ -262,7 +267,7 @@ end
 
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.model.initialized
         @test length(sim.model.species) == 4
@@ -274,17 +279,17 @@ end
 
 @testitem "Custom phase function via interception window: run! succeeds" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-        custom_generator = (θ, E) -> AURORA.phase_fcn_N2(θ, E)
+        custom_generator = @law (θ, E) -> AURORA.phase_fcn_N2(θ, E)
         model.species[1].phase_fcn_generator = custom_generator
 
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.model.initialized
         @test model.species[1].phase_fcn_generator === custom_generator
@@ -292,18 +297,18 @@ end
 end
 
 @testitem "Altitude grid swap: initialize!(model) rebuilds s_field and ionosphere" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
 
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-    initialize!(model)
+    initialize!(model; verbose=false)
     old_n_z = model.altitude_grid.n
     @test length(model.s_field)               == old_n_z
     @test length(model.ionosphere.ne)         == old_n_z
     @test length(model.species[1].density)    == old_n_z
 
     model.altitude_grid = AltitudeGrid(100, 300)
-    initialize!(model)
+    initialize!(model; verbose=false)
 
     new_n_z = model.altitude_grid.n
     @test new_n_z > old_n_z
@@ -314,17 +319,18 @@ end
 
 @testitem "Altitude grid swap: run! after initialize!(model) succeeds" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim)
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output; mode = SteadyStateMode())
+        run!(sim; verbose=false)
 
         model.altitude_grid = AltitudeGrid(100, 300)
-        initialize!(model)   # recomputes s_field, ionosphere, species
-        initialize!(sim)     # rebuilds simulation cache for new grid dimensions
+        initialize!(model; verbose=false)   # recomputes s_field, ionosphere, species
+        initialize!(sim; verbose=false)     # rebuilds simulation cache for new grid dimensions
         run!(sim)
 
         @test sim.model.initialized
@@ -333,65 +339,180 @@ end
 end
 
 @testitem "Reassigning a grid invalidates the model" begin
-    msis_file = find_msis_file()
-    iri_file  = find_iri_file()
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
 
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-    initialize!(model)
+    initialize!(model; verbose=false)
     @test model.initialized
 
     # Each geometry reassignment must flip `initialized` back to false.
     model.altitude_grid = AltitudeGrid(100, 300)
     @test !model.initialized
 
-    initialize!(model)
+    initialize!(model; verbose=false)
     model.energy_grid = EnergyGrid(200)
     @test !model.initialized
 
-    initialize!(model)
+    initialize!(model; verbose=false)
     model.B_angle_to_zenith = 20
     @test !model.initialized
 end
 
 @testitem "Grid change then bare run! auto-reinitializes (no manual init)" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim)
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output; mode = SteadyStateMode())
+        run!(sim; verbose=false)
 
         # Change the grid and call run! directly — no initialize!(model)/initialize!(sim).
         model.altitude_grid = AltitudeGrid(100, 300)
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.model.initialized
-        @test length(sim.model.s_field)           == model.altitude_grid.n
+        @test length(sim.model.s_field) == model.altitude_grid.n
         @test size(sim.cache.Ie, 1) ÷ length(model.pitch_angle_grid.μ_center) == model.altitude_grid.n
     end
 end
 
+@testitem "AuroraOutputManager compress kwarg" begin
+    # true/false/integer conversion and out-of-range guard
+    @test AuroraOutputManager("x"; compress=true).deflatelevel  == 4
+    @test AuroraOutputManager("x"; compress=false).deflatelevel == 0
+    @test AuroraOutputManager("x"; compress=6).deflatelevel     == 6
+    @test AuroraOutputManager("x"; compress=0).deflatelevel     == 0
+    @test_throws ArgumentError AuroraOutputManager("x"; compress=10)
+    @test_throws ArgumentError AuroraOutputManager("x"; compress=-1)
+end
+
+@testitem "Higher compress level produces smaller simulation_data.nc" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 13)
+    flux  = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+
+    # Use a multi-step run so the Ie array is big enough for the compression to have an effect
+    mode = SteadyStateMode(duration=0.5, dt=0.01)
+
+    size_lo = mktempdir() do dir
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=false); mode)
+        run!(sim; verbose=false)
+        filesize(joinpath(dir, "simulation_data.nc"))
+    end
+
+    size_hi = mktempdir() do dir
+        sim = AuroraSimulation(model, flux, AuroraOutputManager(dir; compress=9); mode)
+        run!(sim; verbose=false)
+        filesize(joinpath(dir, "simulation_data.nc"))
+    end
+
+    @test size_hi < size_lo
+end
+
 @testitem "Energy grid change rebuilds sim.time and cache (TimeDependent)" begin
     mktempdir() do savedir
-        msis_file = find_msis_file()
-        iri_file  = find_iri_file()
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 80, msis_file, iri_file, 0)
         flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
-        sim   = AuroraSimulation(model, flux, savedir;
+        output = AuroraOutputManager(savedir; overwrite=true)
+        sim   = AuroraSimulation(model, flux, output;
                                  mode = TimeDependentMode(duration=0.02, dt=0.01,
                                                           CFL_number=128, n_loop=1))
-        run!(sim)
+        run!(sim; verbose=false)
         @test size(sim.cache.Ie, 3) == model.energy_grid.n
 
         # Larger energy grid → more energy bins AND a different CFL-refined time grid.
         model.energy_grid = EnergyGrid(200)
-        run!(sim)
+        run!(sim; verbose=false)
 
         @test sim.model.initialized
         @test size(sim.cache.Ie, 3) == model.energy_grid.n
         @test sim.time isa AURORA.RefinedTimeGrid
+    end
+end
+
+@testitem "Law enforcement: bare lambdas and captured locals rejected" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    # Bare anonymous functions are rejected
+    @test_throws ArgumentError AURORA.CascadingSpec("X", [1.0], (a, b) -> a)
+    @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
+    @test_throws ArgumentError AURORA.NeutralSpecies(:G, MSISDensity(msis_file, :N2);
+                                   cascading_spec      = AURORA.DefaultCascadingSpecN2(),
+                                   phase_fcn_generator = (θ, E) -> θ)
+
+    # A @law that closes over a local variable is rejected (its source can't be rebuilt)
+    @test_throws ArgumentError (let n0 = 1e18
+        @law h -> fill(n0, length(h))
+    end)
+
+    # @law, functors and named functions are all accepted
+    @test (@law h -> fill(1e15, length(h))) isa ExprLaw
+    sp = AURORA.N2Species(MSISDensity(msis_file, :N2))
+    @test sp.density_profile isa MSISDensity        # functor
+    @test sp.phase_fcn_generator === phase_fcn_N2   # named function
+end
+
+@testitem "@law density round-trips through physics_state.jld2" begin
+    using JLD2
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        model.species[:N2].density_profile = @law h -> fill(1e18, length(h))
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+
+        savefile = joinpath(savedir, "inputs", "physics_state.jld2")
+        model2 = JLD2.load(savefile, "model")
+
+        prof = model2.species[:N2].density_profile
+        @test prof isa ExprLaw
+        @test prof.src == model.species[:N2].density_profile.src
+        # Reconstructed law is callable in this same scope (relies on invokelatest)
+        h = model2.altitude_grid.h
+        @test prof(h) == fill(1e18, length(h))
+        # Reloaded model re-initializes from the reconstructed law
+        initialize!(model2; verbose=false)
+        @test model2.species[:N2].density[1] ≈ 1e18
+    end
+end
+
+@testitem "Default model laws round-trip through physics_state.jld2" begin
+    using JLD2, NCDatasets
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        flux  = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim   = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+        Ie1 = NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+            Array(ds["Ie"])
+        end
+
+        model2 = JLD2.load(joinpath(savedir, "inputs", "physics_state.jld2"), "model")
+
+        # Prove laws round-tripped by running a full simulation from the reloaded model
+        # and checking that results are identical
+        mktempdir() do savedir2
+            sim2 = AuroraSimulation(model2, flux, savedir2; mode = SteadyStateMode())
+            run!(sim2; verbose=false)
+            Ie2 = NCDataset(joinpath(savedir2, "simulation_data.nc"), "r") do ds
+                Array(ds["Ie"])
+            end
+            @test all(Ie2 .≈ Ie1)
+        end
     end
 end

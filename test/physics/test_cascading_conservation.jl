@@ -108,7 +108,7 @@ end
     E_EDGES = collect(0.0:0.125:8.0)
     E_CENTERS = (E_EDGES[1:end-1] .+ E_EDGES[2:end]) ./ 2
     # A constant-law where all energies have the same probability.
-    SPEC = AURORA.CascadingSpec("TEST", [THRESHOLD], (E_s, E_p) -> 1.0)
+    SPEC = AURORA.CascadingSpec("TEST", [THRESHOLD], @law((E_s, E_p) -> 1.0))
     Q_PRIMARY, Q_SECONDARY, _, _ = AURORA.calculate_cascading_matrices(SPEC, E_EDGES; verbose = false)
 
     FIRST_ACTIVE_PRIMARY = findfirst(x -> x >= THRESHOLD, @view(E_EDGES[1:end-1]))
@@ -125,7 +125,7 @@ end
     E_EDGES = vcat(lower_end[1:end-1], BASE_GRID.E_edges)
     E_CENTERS = (E_EDGES[1:end-1] .+ E_EDGES[2:end]) ./ 2
     # A constant-law where all energies have the same probability.
-    SPEC = AURORA.CascadingSpec("TEST", [THRESHOLD], (E_s, E_p) -> 1.0)
+    SPEC = AURORA.CascadingSpec("TEST", [THRESHOLD], @law((E_s, E_p) -> 1.0))
     Q_PRIMARY, Q_SECONDARY, _, _ = AURORA.calculate_cascading_matrices(SPEC, E_EDGES; verbose = false)
 
     FIRST_ACTIVE_PRIMARY = findfirst(x -> x >= THRESHOLD, @view(E_EDGES[1:end-1]))

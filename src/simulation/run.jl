@@ -1,4 +1,5 @@
 using ProgressMeter: Progress, next!
+using NCDatasets: NCDataset
 
 """
     run!(sim::AuroraSimulation)
@@ -15,28 +16,46 @@ sim = AuroraSimulation(model, flux, savedir;
 run!(sim)
 ```
 """
-function run!(sim::AuroraSimulation)
+function run!(sim::AuroraSimulation; verbose::Bool = true)
+    out     = sim.output
+    savedir = out.savedir
+
+    nc_path = joinpath(savedir, "simulation_data.nc")
+    if isfile(nc_path) && !out.overwrite
+        error("simulation_data.nc already exists in \"$savedir\". " *
+              "Pass overwrite=true to AuroraOutputManager to allow overwriting.")
+    end
+
+    analysis_dir = joinpath(savedir, "analysis")
+    if isfile(nc_path) && out.overwrite && isdir(analysis_dir)
+        rm(analysis_dir; recursive=true)
+    end
+
     if needs_initialization(sim)
-        initialize!(sim)
+        initialize!(sim; verbose)
     end
-    if sim.save_input_flux
-        t_save = save_time_axis(sim.time)
-        save_Ie_top(sim, sim.cache.Ie_top, t_save)
+
+    mkpath(savedir)
+    mkpath(joinpath(savedir, "inputs"))
+
+    write_config_toml(sim)
+    write_atmosphere_nc(sim)
+    write_physics_jld2(sim)
+
+    ds = create_simulation_nc(sim)
+    try
+        solve!(sim, ds; verbose)
+    finally
+        close(ds)
     end
-    save_parameters(sim)
-    save_neutrals(sim)
-    solve!(sim)
     return sim
 end
 
-save_time_axis(::SingleStepConfig) = (1:1:1)
-save_time_axis(time::UniformTimeGrid) = time.t
-save_time_axis(time::RefinedTimeGrid) = time.t
+solve!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true) =
+    solve!(sim, sim.mode, ds; verbose)
 
-solve!(sim::AuroraSimulation) = solve!(sim, sim.mode)
-
-function solve!(sim::AuroraSimulation, ::TimeDependentMode)
-    @info "Starting time-dependent simulation..."
+function solve!(sim::AuroraSimulation, ::TimeDependentMode, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting time-dependent simulation..."
     cache = get_cache(sim)
     time = sim.time::RefinedTimeGrid
     n_E = sim.model.energy_grid.n
@@ -87,18 +106,21 @@ function solve!(sim::AuroraSimulation, ::TimeDependentMode)
         t_save_tofile  = time.t_save[start_save_loop + skip : stop_save_loop]
         Ie_save_tofile = @view cache.Ie_save[:, 1 + skip : n_save_cols, :]
 
-        save_results(sim, Ie_save_tofile, t_save_tofile, cache.I0, i_loop)
+        append_chunk_nc!(ds, Ie_save_tofile, t_save_tofile, sim)
     end
 
     return sim
 end
 
-solve!(sim::AuroraSimulation, ::SteadyStateMode) = solve!(sim, sim.time)
-solve!(sim::AuroraSimulation, ::SingleStepConfig)  = solve_single_step_steady_state!(sim)
-solve!(sim::AuroraSimulation, ::UniformTimeGrid)   = solve_multi_step_steady_state!(sim)
+solve!(sim::AuroraSimulation, ::SteadyStateMode, ds::NCDataset; verbose::Bool = true) =
+    solve!(sim, sim.time, ds; verbose)
+solve!(sim::AuroraSimulation, ::SingleStepConfig, ds::NCDataset; verbose::Bool = true) =
+    solve_single_step_steady_state!(sim, ds; verbose)
+solve!(sim::AuroraSimulation, ::UniformTimeGrid, ds::NCDataset; verbose::Bool = true) =
+    solve_multi_step_steady_state!(sim, ds; verbose)
 
-function solve_single_step_steady_state!(sim::AuroraSimulation)
-    @info "Starting single-step steady-state simulation..."
+function solve_single_step_steady_state!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting single-step steady-state simulation..."
     cache = get_cache(sim)
     n_E = sim.model.energy_grid.n
 
@@ -109,13 +131,13 @@ function solve_single_step_steady_state!(sim::AuroraSimulation)
     Ie_top_local = @view cache.Ie_top[:, 1, :]
     progress = Progress(n_E; desc="Solving", dt=1.0)
     energy_loop!(sim, Ie_top_local, cache.t_loop, progress)
-    save_results(sim, cache.Ie, cache.t_loop, cache.I0, 1)
+    append_chunk_nc!(ds, cache.Ie[:, 1:1, :], [0.0], sim)
 
     return sim
 end
 
-function solve_multi_step_steady_state!(sim::AuroraSimulation)
-    @info "Starting multi-step steady-state simulation..."
+function solve_multi_step_steady_state!(sim::AuroraSimulation, ds::NCDataset; verbose::Bool = true)
+    verbose && @info "Starting multi-step steady-state simulation..."
     cache = get_cache(sim)
     time = sim.time::UniformTimeGrid
     n_E = sim.model.energy_grid.n
@@ -135,8 +157,7 @@ function solve_multi_step_steady_state!(sim::AuroraSimulation)
         cache.Ie_save[:, i_step, :] .= @view cache.Ie[:, 1, :]
     end
 
-    # Save all steps to a single file
-    save_results(sim, cache.Ie_save, time.t, cache.I0, 1)
+    append_chunk_nc!(ds, cache.Ie_save, collect(Float64, time.t), sim)
 
     return sim
 end

@@ -9,3 +9,11 @@ find_msis_file
 ```@docs; canonical=false
 find_iri_file
 ```
+
+## Species density profiles and laws
+```@docs; canonical=false
+MSISDensity
+VectorDensity
+@law
+ExprLaw
+```

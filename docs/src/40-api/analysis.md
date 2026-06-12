@@ -1,7 +1,8 @@
 # [Analysis](@id Analysis)
 
-Post-processing functions that compute derived quantities from raw simulation output.
-All functions write their results to the simulation's save directory.
+Post-processing functions that compute derived quantities from raw simulation output. Each
+reads `simulation_data.nc` and writes a NetCDF file into the `analysis/` subdirectory of the
+simulation's save directory (see [Output & data](@ref Output) for the layout and schema).
 
 !!! note "Compatibility"
 
@@ -13,7 +14,6 @@ All functions write their results to the simulation's save directory.
     | `make_current_file` | ✓ | ✓ |
     | `make_heating_rate_file` | ✓ | ✓ |
     | `make_psd_file` | | ✓ |
-    | `downsampling_fluxes` | | ✓ |
 
 ## Excitation rates
 
@@ -22,7 +22,7 @@ make_volume_excitation_file
 make_column_excitation_file
 ```
 
-## Boundary condition
+## Top-of-model flux
 
 ```@docs; canonical=false
 make_Ie_top_file
@@ -39,10 +39,4 @@ make_heating_rate_file
 
 ```@docs; canonical=false
 make_psd_file
-```
-
-## Downsampling
-
-```@docs; canonical=false
-downsampling_fluxes
 ```

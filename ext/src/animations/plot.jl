@@ -46,18 +46,19 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
             isnothing(angles_to_plot[i, j]) && continue
 
             ax = Axis(ga[i, j], xscale = log10, xminorticks = IntervalsBetween(9),
-                      xminorticksvisible = true, yticks = 100:100:600)
+                      xticks = LogTicks(0:5), xminorticksvisible = true,
+                      yticks = 100:100:600)
             heatmap!(E_centers, z / 1e3, Ie_streams[idx]; colorrange, colorscale = log10, colormap = :inferno)
 
-            # Generate title based on angle values (>90° = DOWN, <90° = UP)
+            # Generate title based on angle values (>90° = ↓ downward, <90° = ↑ upward)
             θ1, θ2 = angles_to_plot[i, j]
             avg_angle = (θ1 + θ2) / 2
             direction = if θ1 < 90 < θ2 || θ2 < 90 < θ1
                 ""
             elseif avg_angle >= 90
-                "DOWN"
+                "↓"
             else
-                "UP"
+                "↑"
             end
             ax.title = "$(Int(θ1))° - $(Int(θ2))° $direction"
 
@@ -87,7 +88,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
                         yminorticksvisible = true, yminorticks = IntervalsBetween(9),
                         xticklabelsvisible = true, xminorticksvisible = true,
                         xticksmirrored = true, yticksmirrored = true,
-                        limits = ((0, 1), nothing))
+                        yticks = LogTicks(0:5))
         hm = heatmap!(ax_Ietop, input_struct.t_top, E_centers, input_struct.data_input;
                       colormap = :inferno, colorscale = log10,
                       colorrange = (1e6, maximum(input_struct.data_input)))

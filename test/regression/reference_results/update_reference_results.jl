@@ -1,4 +1,7 @@
-# Helper to regenerate reference results after volontary numerical breaking changes.
+# Helper to regenerate reference results after voluntary numerical breaking changes.
+# Run this script from the AURORA.jl package root after any change that intentionally
+# alters numerical output.  The generated NC files are then committed to the repository
+# and used by test/regression/test_regression.jl for future comparisons.
 
 # ======================================================================================== #
 #                                  STEADY STATE                                            #
@@ -31,12 +34,11 @@ run!(sim)
 make_volume_excitation_file(sim)
 
 ## Overwrite the reference results
-source_file = joinpath(savedir, "Qzt_all_L.mat")
-dest_file = "test/regression/reference_results/SS/Qzt_all_L.mat"
+mkpath("test/regression/reference_results/SS")
+source_file = joinpath(savedir, "analysis", "volume_excitation.nc")
+dest_file = "test/regression/reference_results/SS/volume_excitation.nc"
 cp(source_file, dest_file; force = true)
-
-
-
+println("Saved SS reference to $dest_file")
 
 
 
@@ -75,6 +77,8 @@ run!(sim)
 make_volume_excitation_file(sim)
 
 ## Overwrite the reference results
-source_file = joinpath(savedir, "Qzt_all_L.mat")
-dest_file = "test/regression/reference_results/TD/Qzt_all_L.mat"
+mkpath("test/regression/reference_results/TD")
+source_file = joinpath(savedir, "analysis", "volume_excitation.nc")
+dest_file = "test/regression/reference_results/TD/volume_excitation.nc"
 cp(source_file, dest_file; force = true)
+println("Saved TD reference to $dest_file")
