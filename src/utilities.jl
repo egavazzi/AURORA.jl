@@ -81,7 +81,7 @@ function CFL_criteria(duration, dt, z, v, CFL_number=64)
     # should be careful about numerical accuracy though.
     # For Gaussian inputs (or similar), it seems that the CFL can be set to 64 without major effects
     # on the results, while reducing computational time tremendously
-    dz = z[2] - z[1]
+    dz = minimum(diff(z))
     # Maximum dt that satisfies the CFL condition
     dt_max = CFL_number * dz / v
     # Refinement factor: how many internal steps per save interval.

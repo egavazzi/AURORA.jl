@@ -27,7 +27,9 @@ computation (scattering matrices, species densities, cross sections, cascading d
 deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
 
 ## Inputs
-- `altitude_lims`: altitude limits (km) for the bottom and top of the ionosphere
+- `altitude_lims`: altitude limits (km) for the bottom and top of the ionosphere, or a
+  prebuilt [`AltitudeGrid`](@ref) for full control over the grid spacing.
+  [`suggest_bottom_altitude`](@ref) can help pick the lower limit.
 - `θ_lims`: pitch-angle beam limits (e.g. `180:-10:0`), 180° = field-aligned down
 - `E_max`: upper energy-grid limit (eV)
 - `msis_file`: path to the MSIS atmosphere file
@@ -60,7 +62,8 @@ An uninitialized `AuroraModel`. Call `initialize!(model)` or `run!(sim)` to comp
 """
 function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
                      species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)))
-    altitude_grid    = AltitudeGrid(altitude_lims[1], altitude_lims[2])
+    altitude_grid    = altitude_lims isa AltitudeGrid ? altitude_lims :
+                       AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid      = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
     ionosphere       = Ionosphere(msis_file, iri_file, altitude_grid.h)

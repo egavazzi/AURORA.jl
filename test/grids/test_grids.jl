@@ -3,52 +3,82 @@
 
     @test grid isa AltitudeGrid
     @test grid isa AURORA.AbstractGrid
+    @test grid.bottom == 80
+    @test grid.top == 700
     @test length(grid.h) == grid.n
     @test length(grid.Δh) == grid.n - 1
     @test all(grid.Δh .> 0) # ensure grid is strictly increasing
-    @test grid.h[1] ≈ 80e3
-    @test grid.h[end] ≤ 700e3
-    # bottom/top now report the actual grid endpoints
-    @test grid.bottom ≈ grid.h[1] / 1e3
-    @test grid.top ≈ grid.h[end] / 1e3
-    @test grid.bottom == 80
-    @test grid.top ≤ 700
+    # the grid lands exactly on the requested limits and on the transition altitude
+    @test grid.h[1] == 80e3
+    @test grid.h[end] == 700e3
+    @test 100e3 in grid.h
+    # uniform ~150 m spacing below 100 km
+    i_transition = findfirst(==(100e3), grid.h)
+    @test all(isapprox.(grid.Δh[1:(i_transition - 1)], 150; atol=1))
+    # smooth growth above: consecutive steps grow by at most exp(dz_max / growth_scale),
+    # except the topmost step which can absorb up to half a step to land exactly on `top`
+    ratios = grid.Δh[2:(end - 1)] ./ grid.Δh[1:(end - 2)]
+    @test all(ratios .< exp(10 / 60) + 0.01)
+    @test grid.Δh[end] < 1.6 * grid.Δh[end - 1]
 end
 
-@testitem "AltitudeGrid clean transition at 100 km" begin
-    # the uniform sub-100 km segment lands exactly on the bottom and on 100 km, with no
-    # anomalous step straddling the transition
-    h = AURORA.make_altitude_grid(80, 700)
-    @test h[1] == 80e3
-    @test 100e3 in h
-    i = findfirst(==(100e3), h)
-    Δ = diff(h)
-    @test all(isapprox.(Δ[1:(i - 1)], Δ[1]; rtol = 1e-6))      # uniform below the transition
-    @test isapprox(Δ[i], Δ[i - 1]; rtol = 0.05)               # no jump across 100 km
-end
-
-@testitem "AltitudeGrid bottom above 100 km" begin
-    # used to silently collapse to a grid starting at 100 km; now snaps to the nearest grid
-    # point at or above the requested bottom
+@testitem "AltitudeGrid with bottom above 100 km" begin
+    # Used to silently produce a grid starting at 100 km whatever the requested bottom
     grid = AltitudeGrid(250, 500)
-    @test grid.h[1] ≥ 250e3
-    @test grid.h[1] < 260e3                 # snapped close to the request
-    @test grid.bottom ≈ grid.h[1] / 1e3
+
+    @test grid.h[1] == 250e3
+    @test grid.bottom == 250
+    @test grid.h[end] == 500e3
     @test all(grid.Δh .> 0)
-    @test grid.n < AltitudeGrid(100, 500).n / 2
+    @test grid.n < AltitudeGrid(100, 500).n / 2  # F-region grid is much smaller
 end
 
-@testitem "AltitudeGrid is not capped at 500 points" begin
-    # the old version hard-coded 500 graded steps, capping both the point count and the
-    # reachable altitude
-    h = AURORA.make_altitude_grid(100, 5000)
-    @test length(h) > 500
-    @test h[end] ≤ 5000e3
-    @test 5000e3 - h[end] < maximum(diff(h))     # reached within one step of the top
+@testitem "AltitudeGrid scale" begin
+    grid    = AltitudeGrid(90, 400)
+    coarse  = AltitudeGrid(90, 400; scale=2)
+    fine    = AltitudeGrid(90, 400; scale=0.5)
+
+    # scale = 1 reproduces the default grid exactly
+    @test AltitudeGrid(90, 400; scale=1).h == grid.h
+
+    # point counts scale roughly inversely with the step size
+    @test coarse.n < grid.n < fine.n
+    @test isapprox(grid.n / coarse.n, 2; rtol=0.1)
+    @test isapprox(fine.n / grid.n, 2; rtol=0.1)
+
+    # scaled grids stay valid, with exact endpoints
+    for g in (coarse, fine)
+        @test g.h[1] == 90e3
+        @test g.h[end] == 400e3
+        @test all(g.Δh .> 0)
+    end
 end
 
 @testitem "AltitudeGrid invalid inputs" begin
-    @test_throws Exception AltitudeGrid(700, 80)
+    @test_throws ArgumentError AltitudeGrid(700, 80)
+    @test_throws ArgumentError AltitudeGrid(80, 700; dz0=0)
+    @test_throws ArgumentError AltitudeGrid(80, 700; scale=-1)
+end
+
+@testitem "suggest_bottom_altitude" begin
+    msis_file = joinpath(@__DIR__, "..", "regression", "reference_results",
+                         "msis_20051008-2200_70N-19E.txt")
+
+    # 3 keV electrons fully stop near 113 km on this profile; with the default safety
+    # margin the suggestion should land a few km below that
+    z3 = suggest_bottom_altitude(3000, msis_file)
+    @test 100 <= z3 <= 113
+
+    # higher energies penetrate deeper
+    @test suggest_bottom_altitude(10_000, msis_file) < z3
+
+    # larger safety margin pushes the boundary further down
+    @test suggest_bottom_altitude(3000, msis_file; safety=4) < z3
+
+    # 100 keV electrons penetrate below the bottom of the MSIS file (85 km):
+    # warn and fall back to the lowest available altitude
+    z100k = @test_logs (:warn, r"penetrate below") suggest_bottom_altitude(100_000, msis_file)
+    @test z100k == 85
 end
 
 @testitem "EnergyGrid construction" begin

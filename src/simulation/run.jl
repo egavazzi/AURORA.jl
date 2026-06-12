@@ -45,6 +45,7 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
     ds = create_simulation_nc(sim)
     try
         solve!(sim, ds; verbose)
+        check_bottom_boundary(sim, ds)
     finally
         close(ds)
     end
@@ -217,4 +218,59 @@ function get_cache(sim::AuroraSimulation)
     cache = sim.cache
     !sim.cache_initialized && error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
     return cache
+end
+
+"""
+    check_bottom_boundary(sim::AuroraSimulation, ds; threshold=0.01)
+
+Post-solve sanity check of the bottom boundary placement, called automatically by
+[`run!`](@ref). Compares the time-averaged downward electron energy flux reaching the
+bottom of the altitude grid with the one injected at the top. The bottom boundary
+absorbs any remaining flux, so a non-negligible ratio means the electrons are not fully
+stopped within the grid and the low-altitude part of the solution is clipped. Emits a
+warning with a suggested bottom altitude (from [`suggest_bottom_altitude`](@ref)) when
+the ratio exceeds `threshold`.
+
+Reads the bottom z-slice of `Ie` from `ds` in blocks of time steps, so the cost stays
+negligible compared to the solve.
+"""
+function check_bottom_boundary(sim::AuroraSimulation, ds::NCDataset; threshold = 0.01)
+    E = sim.model.energy_grid.E_centers
+    # Downward beams (μ < 0) come first in beam order (θ_lims goes 180° → 0°)
+    n_down = count(<(0), sim.model.pitch_angle_grid.μ_center)
+
+    # Time-averaged downward energy flux: sum over down beams and energy bins, mean over
+    # time, read in blocks of time steps to keep memory bounded
+    function mean_down_eflux(read_block, n_t)
+        s = 0.0
+        # Load in arbitrary blocks of 128 time steps. Reasonably small to keep memory low,
+        # but large enough to amortize the overhead of reading from disk.
+        for t1 in 1:128:n_t
+            t2 = min(t1 + 127, n_t)
+            s += sum(read_block(t1, t2) .* reshape(E, 1, 1, :))
+        end
+        return s / n_t
+    end
+
+    Ietop_v = ds["Ie_input"].var    # [n_μ, n_t_top, n_E]
+    eflux_top = mean_down_eflux((t1, t2) -> Ietop_v[1:n_down, t1:t2, :], size(Ietop_v, 2))
+    eflux_top <= 0 && return nothing
+
+    # The bottom grid point itself is forced to 0 by the boundary condition, so the flux
+    # about to be absorbed is the downward flux at the second grid point
+    Ie_v = ds["Ie"].var     # [n_z, n_μ, n_t, n_E]
+    eflux_bottom = mean_down_eflux((t1, t2) -> Ie_v[2, 1:n_down, t1:t2, :], size(Ie_v, 3))
+
+    ratio = eflux_bottom / eflux_top
+    if ratio > threshold
+        bottom = sim.model.altitude_grid.bottom
+        suggestion = suggest_bottom_altitude(sim.model.energy_grid.E_max,
+                                             sim.model.ionosphere.msis_file)
+        @warn "$(round(100 * ratio, sigdigits=2))% of the precipitating energy flux " *
+              "reaches the bottom of the altitude grid ($(bottom) km), where it is " *
+              "absorbed by the boundary condition. The solution is likely clipped at " *
+              "low altitudes. Consider extending the grid down to ~$(suggestion) km " *
+              "(see suggest_bottom_altitude)."
+    end
+    return nothing
 end

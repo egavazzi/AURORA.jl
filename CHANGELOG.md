@@ -1,5 +1,11 @@
 # Changelog
 
+- **Numerical Breaking (small)** Rework the altitude-grid construction [#XXX](https://github.com/egavazzi/AURORA.jl/pull/XXX)
+  - Replace the legacy index-based step formula (ported from MATLAB) with an explicit spacing law: uniform `dz0` (150 m) below `z_transition` (100 km), then exponential growth with e-folding scale `growth_scale` (60 km), capped at `dz_max` (10 km). The grid now lands exactly on the requested bottom and top altitudes and on the transition altitude.
+  - Fix silently-ignored limits: a requested bottom above 100 km no longer collapses to 100 km, and tops are no longer clipped one step short.
+  - `AltitudeGrid` now accepts the spacing keywords, including `scale` for first-order grid-convergence testing (e.g. rerun with `scale=0.5`). `AuroraModel` also accepts a prebuilt `AltitudeGrid` in place of altitude limits.
+  - Add `suggest_bottom_altitude` to pick the lower boundary from the electron range (Rees, 1989) and the MSIS mass-density profile. `run!` now warns when the bottom boundary absorbs a non-negligible fraction of the precipitating energy flux.
+  - Regression reference results regenerated.
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.

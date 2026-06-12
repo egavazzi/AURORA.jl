@@ -27,13 +27,34 @@ simulations, but will also lead to longer runtimes. A balance between the two ne
 ## Altitude grid
 
 The altitude grid is built from the altitude limits passed to [`AuroraModel`](@ref), for
-example `AuroraModel([100, 500], ...)`. The default internal grid is constructed with:
+example `AuroraModel([100, 500], ...)`. The first and last grid points land exactly on the
+requested limits. The default grid is constructed with:
 
-- uniform 150 m spacing below 100 km,
-- nonuniform spacing above 100 km, with coarser and coarser steps as altitude increases
-- but with a maximum spacing capped by `dz_max` (25 km by default).
+- uniform 150 m spacing below 100 km (`dz0`),
+- steps growing exponentially with altitude above 100 km, with an e-folding scale of
+  60 km (`growth_scale`), keeping the grid fine where the electron energy-deposition
+  layers develop sharp vertical structure (~95–200 km),
+- a maximum spacing capped by `dz_max` (10 km by default).
 
-The spacing can be inspected with `model.altitude_grid.Δh`.
+The spacing can be inspected with `model.altitude_grid.Δh`, and the construction is
+documented in [`make_altitude_grid`](@ref). For full control over the spacing, build the
+grid yourself and pass it to the model in place of the altitude limits:
+
+```julia
+grid = AltitudeGrid(100, 500; dz0=0.1, growth_scale=80)
+model = AuroraModel(grid, θ_lims, E_max, msis_file, iri_file)
+```
+
+Two helpers are worth knowing about:
+
+- [`suggest_bottom_altitude`](@ref) estimates how deep the grid must reach for electrons
+  of a given maximum energy to be fully stopped within it. The bottom boundary absorbs any
+  flux that reaches it, and `run!` emits a warning when that absorbed flux is
+  non-negligible.
+- the `scale` keyword of [`AltitudeGrid`](@ref) multiplies every grid step and is meant
+  for convergence testing: rerun a case with `scale=0.5` and compare the results to
+  quantify the spatial discretisation error of the default grid for that case. The
+  transport scheme converges at first order in the step size.
 
 
 ## Energy grid
