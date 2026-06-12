@@ -45,7 +45,7 @@ function make_Ie_in_time_plot(Ie_timeslice::Observable,
             # Skip empty panels (nothing entries)
             isnothing(angles_to_plot[i, j]) && continue
 
-            ax = Axis(ga[i, j], xscale = log10, xminorticks = IntervalsBetween(9),
+            ax = Axis(ga[i, j], xscale = log10, xminorticks = IntervalsBetween(9), xticks = LogTicks(0:5),
                       xminorticksvisible = true, yticks = 100:100:600)
             heatmap!(E_centers, z / 1e3, Ie_streams[idx]; colorrange, colorscale = log10, colormap = :inferno)
 
