@@ -1,7 +1,7 @@
 using Dates: now, Dates
 
 """
-    AuroraOutputManager(savedir; overwrite=false, compress=true)
+    AuroraOutputManager(savedir; overwrite=false, compress=false)
 
 Configuration struct that controls where and how simulation output is written.
 
@@ -14,9 +14,12 @@ Configuration struct that controls where and how simulation output is written.
 - `overwrite::Bool=false`: if `false` (the default), `run!` errors when
   `simulation_data.nc` already exists in `savedir`; set to `true` to allow overwriting.
 - `compress`: zlib compression level for all NetCDF variables.
-  - `true` (default): level 4
-  - `false` or `0`: no compression
+  - `false` or `0` (default): no compression
+  - `true`: level 4
   - `1`–`9`: exact deflate level
+
+  Note about compression: from experience, zlib saves only a few percent of
+  file size while slowing writes and reads severalfold. Use with caution.
 
 # Output layout
 ```
@@ -32,8 +35,8 @@ savedir/
 # Examples
 ```julia
 # Full control:
-out = AuroraOutputManager("my_run"; compress=false)
-out = AuroraOutputManager("my_run"; compress=6)   # deflate level 6
+out = AuroraOutputManager("my_run"; compress=true)   # deflate level 4
+out = AuroraOutputManager("my_run"; compress=6)      # deflate level 6
 sim = AuroraSimulation(model, flux, out; mode=TimeDependentMode(duration=0.5, dt=0.001))
 
 # Convenience — pass a plain String and defaults apply:
@@ -46,7 +49,7 @@ struct AuroraOutputManager
     deflatelevel::Int
 end
 
-function AuroraOutputManager(savedir; overwrite=false, compress=true)
+function AuroraOutputManager(savedir; overwrite=false, compress=false)
     dl = compress === true  ? 4 :
          compress === false ? 0 :
          Int(compress)

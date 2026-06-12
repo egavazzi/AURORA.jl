@@ -1,4 +1,4 @@
-using NCDatasets: NCDataset
+using NCDatasets: NCDataset, load!
 
 # ======================================================================================== #
 #                              RESULT FILE READERS                                       #
@@ -77,16 +77,31 @@ time-chunks, calling `f(Ie_chunk, t_range)` for each. `Ie_chunk::Array{Float64,4
 The chunk length is the largest that keeps one `Ie_chunk` under `max_bytes`, so peak memory is
 bounded regardless of the total run length. On disk `Ie` is chunked one time-slice per chunk,
 so each slab read is contiguous.
+
+!!! warning
+    For performance, `Ie_chunk` is a buffer reused between invocations of `f`: its contents
+    are overwritten by the next chunk. Copy it if you need to keep data past the return of
+    `f`.
 """
 function foreach_Ie_time_chunk(f, sim_dir::AbstractString; max_bytes::Real = 512 * 1024^2)
     nc_path = joinpath(sim_dir, "simulation_data.nc")
     NCDataset(nc_path, "r") do ds
-        n_z, n_μ, n_t, n_E = size(ds["Ie"])
+        # Read through the raw variable into a preallocated buffer
+        v = ds["Ie"].var
+        n_z, n_μ, n_t, n_E = size(v)
         slice_bytes = n_z * n_μ * n_E * sizeof(Float64)
         nt_chunk = time_chunk_length(slice_bytes, max_bytes, n_t)
+        buffer = Array{Float64, 4}(undef, n_z, n_μ, nt_chunk, n_E)
         for t0 in 1:nt_chunk:n_t
             t_range = t0:min(t0 + nt_chunk - 1, n_t)
-            f(Array{Float64, 4}(ds["Ie"][:, :, t_range, :]), t_range)
+            if length(t_range) == nt_chunk
+                load!(v, buffer, :, :, t_range, :)
+                f(buffer, t_range)
+            else
+                # Final partial chunk: read into a right-sized array so the shape of
+                # Ie_chunk always matches length(t_range)
+                f(v[:, :, t_range, :], t_range)
+            end
         end
     end
     return nothing
@@ -140,7 +155,8 @@ function load_results(sim_dir::AbstractString;
                 "or stream the data with foreach_Ie_time_chunk."))
         end
 
-        Ie           = Array{Float64, 4}(ds["Ie"][zsel, μsel, tsel, esel])  # [n_z, n_μ, n_t, n_E]
+        # Read through the raw variable
+        Ie           = ds["Ie"].var[zsel, μsel, tsel, esel]  # [n_z, n_μ, n_t, n_E]
         t            = Vector{Float64}(ds["time"][tsel])
         h_atm        = Vector{Float64}(ds["altitude"][zsel])
         E_centers    = Vector{Float64}(ds["energy"][esel])

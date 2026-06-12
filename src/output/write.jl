@@ -190,11 +190,13 @@ function create_simulation_nc(sim::AuroraSimulation)
                            "long_name" => "solid-angle beam weight"])
     bw_v[:] = Ω_beam
 
-    # Main output variable — chunked and compressed.
+    # Main output variable — chunked, one time slice per chunk. When compression is
+    # requested, the byte-shuffle filter is added: on Float64 flux data it both shrinks the
+    # file and speeds up zlib substantially.
     # NOTE: Ie is the electron *number* flux, already integrated over each energy bin and
     # over each beam's solid angle (not a differential flux). Units are m-2 s-1.
     defVar(ds, "Ie", Float64, ("altitude", "pitch_angle", "time", "energy");
-           deflatelevel=dl,
+           deflatelevel=dl, shuffle=(dl > 0),
            chunksizes=(n_z, n_μ, 1, n_E),
            attrib=["units"     => "m-2 s-1",
                     "long_name" => "electron number flux"])
@@ -210,7 +212,7 @@ function create_simulation_nc(sim::AuroraSimulation)
     t_top_v[:] = t_top
 
     Ietop_v = defVar(ds, "Ie_input", Float64, ("pitch_angle", "time_input", "energy");
-                     deflatelevel=dl,
+                     deflatelevel=dl, shuffle=(dl > 0),
                      chunksizes=(n_μ, 1, n_E),
                      attrib=["units"     => "m-2 s-1",
                               "long_name" => "input boundary number flux (precipitation, top of atmosphere)"])
@@ -273,7 +275,8 @@ function append_chunk_nc!(ds::NCDataset, Ie_chunk, t_chunk, sim::AuroraSimulatio
     n_existing = length(ds["time"])
     idx = n_existing+1 : n_existing+n_new
 
-    ds["time"][idx]              = t_vec
-    ds["Ie"][:, :, idx, :]      = Ie_4D
+    ds["time"][idx] = t_vec
+    # Write through the raw variable for maximum performance
+    ds["Ie"].var[:, :, idx, :] = Ie_4D
     sync(ds)
 end

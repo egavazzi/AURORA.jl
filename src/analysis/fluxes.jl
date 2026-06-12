@@ -88,7 +88,7 @@ function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
             nt_chunk = time_chunk_length(slice_bytes, max_bytes, n_t)
             for t0 in 1:nt_chunk:n_t
                 tr  = t0:min(t0 + nt_chunk - 1, n_t)
-                raw = Array{Float64, 3}(dsin["Ie"][n_z, :, tr, :])   # [n_μ, length(tr), n_E]
+                raw = dsin["Ie"].var[n_z, :, tr, :]   # [n_μ, length(tr), n_E]
                 Ie_top_raw_v[:, tr, :] = raw
                 Ie_top_v[:, tr, :]     = raw .* invΔE .* invΩ
             end

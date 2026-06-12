@@ -197,7 +197,7 @@ function make_psd_file(
         f_v = nothing
         if want_f
             f_v = defVar(ds, "f", Float64, ("altitude", "pitch_angle", "time", "energy");
-                         deflatelevel=4,
+                         deflatelevel=4, shuffle=true,
                          chunksizes=(Nz, nμ, 1, nE),
                          attrib=["units" => "s3 m-6", "long_name" => "phase-space density"])
         end
@@ -217,7 +217,7 @@ function make_psd_file(
                           attrib=["units" => "m s-1", "long_name" => "v_parallel bin widths"])
             dv_v[:] = diff(vpe)
             F_v = defVar(ds, "F", Float64, ("vpar", "altitude", "time");
-                         deflatelevel=4,
+                         deflatelevel=4, shuffle=true,
                          attrib=["units" => "s m-4",
                                   "long_name" => "reduced distribution function F(v_parallel)"])
         end
