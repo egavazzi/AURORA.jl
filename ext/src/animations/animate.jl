@@ -53,18 +53,6 @@ function generate_default_angles(θ_lims)
 end
 
 
-"""
-    compute_default_colorrange(Ie_plot)
-
-Compute a default colorrange based on the maximum value of the data.
-Returns (max_value / 1e4, max_value) to span 4 orders of magnitude.
-"""
-function compute_default_colorrange(Ie_plot)
-    max_val = maximum(filter(!isnan, Ie_plot))
-    return (max_val / 1e4, max_val)
-end
-
-
 # Main function
 function AURORA.animate_Ie_in_time(directory_to_process;
                                    angles_to_plot = nothing,
@@ -90,15 +78,14 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         println(styled"{bold:The animation will be saved at $video_filename.}")
     end
 
-    ## Load simulation data
-    print("(1/1) [$(Dates.format(now(), "HH:MM:SS"))] Load data... ")
-    result = AURORA.load_results(full_path_to_directory)
-    Ie       = result.Ie          # [n_z, n_μ, n_t, n_E]
-    μ_lims   = result.μ_lims
-    t_run    = result.t
-    E_centers = result.E_centers
-    z        = result.h_atm
-    ΔE       = result.ΔE
+    ## Load the coordinates
+    print("(1/1) [$(Dates.format(now(), "HH:MM:SS"))] Load coordinates... ")
+    coord = AURORA.load_coordinates(full_path_to_directory)
+    μ_lims    = coord.μ_lims
+    t_run     = coord.t
+    E_centers = coord.E_centers
+    z         = coord.h_atm
+    ΔE        = coord.ΔE
 
     θ_lims = round.(acosd.(μ_lims))
 
@@ -120,21 +107,20 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     end
 
     # Subsample the time axis
-    t_indices = 1:dt_steps:length(t_run)
-    t_sub     = t_run[t_indices]
-    Ie_sub    = Ie[:, :, t_indices, :]
+    t_sub = t_run[1:dt_steps:length(t_run)]
 
-    # Restructure and normalise beams
-    Ie_plot = AURORA.restructure_streams_of_Ie(Ie_sub, θ_lims, angles_to_plot)
-    # Ie_plot is [n_z, n_panels, n_t, n_E] — convert to #e-/m²/s/eV/ster
-    n_z, n_panels, n_t_sub, n_E = size(Ie_plot)
-    @tturbo for i_E in 1:n_E, i_t in 1:n_t_sub, i_μ in 1:n_panels, i_z in 1:n_z
-        Ie_plot[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
-    end
-
-    # Compute default colorrange if not provided
+    # Compute default colorrange if not provided: a streaming pass over the file to
+    # find the global maximum of the processed flux.
     if isnothing(colorrange)
-        colorrange = compute_default_colorrange(Ie_plot)
+        print("scan colorrange... ")
+        max_val = -Inf
+        AURORA.foreach_Ie_time_chunk(full_path_to_directory) do Ie_chunk, t_range
+            Ie_block, g = process_animation_chunk(Ie_chunk, t_range, dt_steps,
+                                                  θ_lims, angles_to_plot, scale_μ, ΔE)
+            isempty(g) && return
+            max_val = max(max_val, maximum(filter(!isnan, Ie_block)))
+        end
+        colorrange = (max_val / 1e4, max_val)
     end
 
     # Load input flux if requested
@@ -158,10 +144,15 @@ function AURORA.animate_Ie_in_time(directory_to_process;
         (; bool = false, t_top = nothing, data_input = nothing, input_angle_cone = nothing)
     end
 
-    # Create the figure
+    # Create the figure, already containing the first frame
     print("create figure... ")
-    Ie_timeslice = Observable(@view Ie_plot[:, :, 1, :])
-    time_obs = Observable("$(t_sub[1]) s")
+    first_slice = NCDataset(joinpath(full_path_to_directory, "simulation_data.nc"), "r") do ds
+        ds["Ie"].var[:, :, 1:1, :]
+    end
+    first_frame, = process_animation_chunk(first_slice, 1:1, dt_steps,
+                                           θ_lims, angles_to_plot, scale_μ, ΔE)
+    Ie_timeslice = Observable(@view first_frame[:, :, 1, :])
+    time_obs = Observable(@sprintf("%.3f s", t_sub[1]))
     fig = make_Ie_in_time_plot(Ie_timeslice, time_obs, z, E_centers, angles_to_plot, colorrange, input_struct)
     display(fig)
 
@@ -171,13 +162,19 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     end
 
     println("animate.")
-    for i_t in eachindex(t_sub)
-        Ie_timeslice[] = @view Ie_plot[:, :, i_t, :]
-        time_obs[] = @sprintf("%.3f s", t_sub[i_t])
-        if save_to_file
-            recordframe!(io)
+    # Stream the flux again, recording one frame per subsampled time step. Only one
+    # processed time-chunk is held in memory at a time.
+    AURORA.foreach_Ie_time_chunk(full_path_to_directory) do Ie_chunk, t_range
+        Ie_block, g = process_animation_chunk(Ie_chunk, t_range, dt_steps,
+                                              θ_lims, angles_to_plot, scale_μ, ΔE)
+        for (k, gk) in enumerate(g)
+            Ie_timeslice[] = @view Ie_block[:, :, k, :]
+            time_obs[] = @sprintf("%.3f s", t_run[gk])
+            if save_to_file
+                recordframe!(io)
+            end
+            sleep(0.01)
         end
-        sleep(0.01)
     end
 
     if save_to_file
@@ -187,4 +184,29 @@ function AURORA.animate_Ie_in_time(directory_to_process;
     end
 
     return fig
+end
+
+
+"""
+    process_animation_chunk(Ie_chunk, t_range, dt_steps, θ_lims, angles_to_plot, scale_μ, ΔE)
+
+Process one streamed flux chunk for animation: select the subsampled time steps
+(`1:dt_steps:end` on the global time axis) that fall inside `t_range`, restructure the beams
+into the panels of `angles_to_plot`, and convert to differential flux (#e⁻/m²/s/eV/ster).
+
+Returns `(Ie_block, g)` where `Ie_block` is `[n_z, n_panels, length(g), n_E]` and `g` are the
+corresponding global time indices (empty if no subsampled step falls inside `t_range`).
+`Ie_block` is a fresh array, safe to keep after `Ie_chunk` (a reused buffer) is overwritten.
+"""
+function process_animation_chunk(Ie_chunk, t_range, dt_steps, θ_lims, angles_to_plot,
+                                 scale_μ, ΔE)
+    g = [t for t in t_range if (t - 1) % dt_steps == 0]
+    isempty(g) && return zeros(0, 0, 0, 0), g
+    Ie_sub = Ie_chunk[:, :, g .- (first(t_range) - 1), :]
+    Ie_block = AURORA.restructure_streams_of_Ie(Ie_sub, θ_lims, angles_to_plot)
+    n_z, n_panels, n_t, n_E = size(Ie_block)
+    @tturbo for i_E in 1:n_E, i_t in 1:n_t, i_μ in 1:n_panels, i_z in 1:n_z
+        Ie_block[i_z, i_μ, i_t, i_E] *= scale_μ[i_μ] / ΔE[i_E]
+    end
+    return Ie_block, g
 end
