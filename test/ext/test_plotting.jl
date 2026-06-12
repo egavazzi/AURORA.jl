@@ -3,7 +3,7 @@
     using AURORA
     using CairoMakie
 
-    CairoMakie.activate!()
+    CairoMakie.activate!(visible = false) # ensure we render but don't pop up windows during tests
 
     vol = load_volume_excitation(SharedSimResults.td_dir)
     col = load_column_excitation(SharedSimResults.td_dir)
