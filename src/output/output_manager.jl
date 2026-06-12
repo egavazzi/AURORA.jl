@@ -50,12 +50,22 @@ struct AuroraOutputManager
 end
 
 function AuroraOutputManager(savedir; overwrite=false, compress=false)
+    dir = resolve_savedir(savedir)
+    return AuroraOutputManager(dir, overwrite, resolve_deflatelevel(compress))
+end
+
+"""
+    resolve_deflatelevel(compress) -> Int
+
+Convert a user-facing `compress` value into a zlib deflate level: `false` → 0, `true` → 4,
+an integer `0`–`9` → itself.
+"""
+function resolve_deflatelevel(compress)
     dl = compress === true  ? 4 :
          compress === false ? 0 :
          Int(compress)
     0 <= dl <= 9 || throw(ArgumentError("compress must be true/false or an integer 0–9, got $compress"))
-    dir = resolve_savedir(savedir)
-    return AuroraOutputManager(dir, overwrite, dl)
+    return dl
 end
 
 """

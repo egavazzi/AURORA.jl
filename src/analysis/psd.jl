@@ -114,7 +114,7 @@ end
 # ======================================================================================== #
 
 """
-    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, max_bytes=512*1024^2)
+    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, max_bytes=512*1024^2, compress=false)
 
 Read `simulation_data.nc` from `directory_to_process`, convert electron flux to
 phase-space density, and write results to `analysis/psd.nc`.
@@ -127,16 +127,21 @@ by chunk, so peak memory stays bounded even for large runs.
 - `vpar_edges`: custom `v_parallel` bin edges [m/s]. If `nothing`, an automatic
   symmetric uniform grid is used spanning `[-maximum(v), maximum(v)]`.
 - `max_bytes`: per-chunk memory budget for streaming the flux (default 512 MiB).
+- `compress`: zlib compression level for the `f` and `F` variables, with the same semantics
+  as in [`AuroraOutputManager`](@ref): `false`/`0` (default, no compression), `true`
+  (level 4), or an exact level `1`–`9`.
 """
 function make_psd_file(
     directory_to_process;
     compute::Symbol = :both,
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
     max_bytes::Real = 512 * 1024^2,
+    compress = false,
 )
     if compute ∉ (:f_only, :F_only, :both)
         throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
     end
+    dl = resolve_deflatelevel(compress)
     println("Converting Ie to PSD.")
 
     coord  = load_coordinates(directory_to_process)
@@ -197,7 +202,7 @@ function make_psd_file(
         f_v = nothing
         if want_f
             f_v = defVar(ds, "f", Float64, ("altitude", "pitch_angle", "time", "energy");
-                         deflatelevel=4, shuffle=true,
+                         deflatelevel=dl, shuffle=(dl > 0),
                          chunksizes=(Nz, nμ, 1, nE),
                          attrib=["units" => "s3 m-6", "long_name" => "phase-space density"])
         end
@@ -217,7 +222,7 @@ function make_psd_file(
                           attrib=["units" => "m s-1", "long_name" => "v_parallel bin widths"])
             dv_v[:] = diff(vpe)
             F_v = defVar(ds, "F", Float64, ("vpar", "altitude", "time");
-                         deflatelevel=4, shuffle=true,
+                         deflatelevel=dl, shuffle=(dl > 0),
                          attrib=["units" => "s m-4",
                                   "long_name" => "reduced distribution function F(v_parallel)"])
         end
