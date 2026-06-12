@@ -106,4 +106,7 @@ for d in data_dirs
     rm(d; recursive=true)
 end
 
-deploydocs(; repo = "github.com/egavazzi/AURORA.jl")
+deploydocs(;
+    repo = "github.com/egavazzi/AURORA.jl",
+    push_preview = true, # deploy PR builds to previews/PR##/ for review on the branch
+)
