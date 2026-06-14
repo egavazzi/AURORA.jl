@@ -30,7 +30,8 @@ end
 mutable struct DegradationCache{N}
     ionization_source_sum::Matrix{Float64}           # total incident flux summed over beams (shape: n_z x n_t)
     thermal_e_loss::Vector{Float64}
-    Ie_scatter::Matrix{Float64}
+    Ie_scatter::NTuple{N, Matrix{Float64}}           # inelastically-scattered flux per species (shape: n_z·n_μ x n_t)
+    inelastic_weight::NTuple{N, Vector{Float64}}     # energy degradation weighting for inelastic losses per species (shape: n_E)
     secondary_e_flux::NTuple{N, Matrix{Float64}}     # isotropic secondary e- flux per species (shape: n_z·n_μ x n_t)
     primary_e_flux::NTuple{N, Matrix{Float64}}       # forward primary e- flux per species    (shape: n_z·n_μ x n_t)
     secondary_e_spectrum::NTuple{N, Vector{Float64}} # energy spectrum weighting for secondaries per species (shape: n_E)
@@ -41,14 +42,16 @@ end
 function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
     ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
     thermal_e_loss = Vector{Float64}(undef, n_z)
-    Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
+    Ie_scatter = ntuple(_ -> Matrix{Float64}(undef, n_z * n_μ, n_t), Val(N))
+    inelastic_weight = ntuple(_ -> zeros(n_E), Val(N))
 
     secondary_e_flux = ntuple(_ -> zeros(n_z * n_μ, n_t), Val(N))
     primary_e_flux = ntuple(_ -> zeros(n_z * n_μ, n_t), Val(N))
     secondary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
     primary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
 
-    return DegradationCache(ionization_source_sum, thermal_e_loss, Ie_scatter,
+    return DegradationCache(ionization_source_sum, thermal_e_loss,
+                            Ie_scatter, inelastic_weight,
                             secondary_e_flux, primary_e_flux,
                             secondary_e_spectrum, primary_e_spectrum)
 end

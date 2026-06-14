@@ -29,7 +29,9 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                                          cache.thermal_e_loss, ΔE[iE], n_z, n_μ)
     end
 
-    # Get the pre-allocated ionization arrays from cache
+    # Get the pre-allocated degradation arrays from cache
+    Ie_scatter           = cache.Ie_scatter
+    inelastic_weight     = cache.inelastic_weight
     secondary_e_flux     = cache.secondary_e_flux
     primary_e_flux       = cache.primary_e_flux
     secondary_e_spectrum = cache.secondary_e_spectrum
@@ -43,7 +45,12 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         B2B_inelastic = B2B_inelastic_neutrals[i]
         species_cascading = sp.cascading_data
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
+        # ── Inelastic (non-ionizing) collisions ──
+        # Compute the scattered flux and the per-target-bin degradation weights, but
+        # do NOT accumulate into Q here. The accumulation is fused below across all
+        # species and channels so that Q is swept only once.
+        calculate_scattered_flux!(Ie_scatter[i], B2B_inelastic, n, @view(Ie[:, :, iE]))
+        compute_inelastic_weights!(inelastic_weight[i], σ, E_levels, energy_grid, iE)
 
         # Zero out the ionization arrays for this species
         fill!(secondary_e_flux[i], 0)
@@ -66,14 +73,19 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                                         σ, E_levels, species_cascading, iE)
         end
     end
-    # If there is no ionization to add (everything is zero), skip the update of Q
-    # Mmh the compiler seems to be smart enough to skip the update of Q anyway when
-    # everything is zero. But let's keep this if statement just in case.
-    has_ionization = any(!iszero, secondary_e_spectrum) || any(!iszero, primary_e_spectrum)
-    if has_ionization
-        add_ionization_collisions!(Q, iE,
-                                   secondary_e_flux, primary_e_flux,
-                                   secondary_e_spectrum, primary_e_spectrum)
+    # Fused accumulation into Q for ALL degradation channels (inelastic losses +
+    # ionization secondaries + degraded primaries) of ALL species. This touches the
+    # lower-energy block of Q exactly once per energy step instead of once per
+    # species/excitation-level/target-bin. Skipped entirely when there is nothing to
+    # degrade (lowest energy bin, or all contributions zero).
+    has_degradation = any(!iszero, inelastic_weight) ||
+                      any(!iszero, secondary_e_spectrum) ||
+                      any(!iszero, primary_e_spectrum)
+    if iE > 1 && has_degradation
+        add_degradation_collisions!(Q, iE,
+                                    Ie_scatter, inelastic_weight,
+                                    secondary_e_flux, primary_e_flux,
+                                    secondary_e_spectrum, primary_e_spectrum)
     end
 end
 
@@ -148,65 +160,88 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid::EnergyGrid, iE, cache)
+# Partition fraction for position `u` (1-based) within the target bin range `i_degrade`,
+# replicating the original first/middle/last bin handling exactly. The last position is
+# evaluated first so that a single-bin range (u == 1 == n_deg) uses the "last" formula,
+# matching the original code where partition_fraction[end] overwrote partition_fraction[1].
+@inline function inelastic_partition_fraction(u, n_deg, i_degrade, iE, E_loss, E_edges, ΔE)
+    if u == n_deg
+        idx_end = i_degrade[n_deg]
+        idx_end == iE && return 0.0
+        return min(1.0, (E_edges[iE + 1] - E_edges[idx_end] - E_loss) / ΔE[iE])
+    elseif u == 1
+        return min(1.0, (E_edges[i_degrade[1] + 1] - E_edges[iE] + E_loss) / ΔE[iE])
+    else
+        return min(1.0, ΔE[i_degrade[u]] / ΔE[iE])
+    end
+end
+
+"""
+    compute_inelastic_weights!(weight, σ, E_levels, energy_grid, iE)
+
+Compute, for one neutral species, the per-target-bin energy-degradation weights from
+non-ionizing inelastic collisions of an electron at energy index `iE`.
+
+`weight[iE_degrade]` accumulates, over every non-ionizing excitation channel,
+```
+    partition_fraction × σ[level, iE] × min(1, E_loss / ΔE[iE])
+```
+where `partition_fraction` distributes the degraded electrons over the lower-energy bins
+they fall into. The weights are consumed once by the fused `add_degradation_collisions!`
+together with the species' scattered flux `Ie_scatter`, so that
+```
+    Q[:, :, iE_degrade] += Ie_scatter[:, :] × weight[iE_degrade]
+```
+This replaces the original per-channel accumulation directly into Q.
+
+# Arguments
+- `weight`: output vector (n_E,), overwritten with the degradation weights
+- `σ`: cross-sections for this species (n_levels × n_E)
+- `E_levels`: excitation-level table (column 1 = energy loss, column 2 = #secondaries)
+- `energy_grid::EnergyGrid`
+- `iE`: current energy index
+"""
+function compute_inelastic_weights!(weight, σ, E_levels, energy_grid::EnergyGrid, iE)
     E_edges = energy_grid.E_edges
     ΔE = energy_grid.ΔE
-    # Use cached matrices to avoid allocations
-    Ie_scatter = cache.Ie_scatter
 
-    # Calculate the flux of electrons after pitch-angle scattering by inelastic collisions
-    # This is computed ONCE for all energy levels of this species at this energy
-    calculate_scattered_flux!(Ie_scatter, B2B_inelastic, n, @view(Ie[:, :, iE]))
+    fill!(weight, 0.0)
 
-    # Loop over the energy levels of the collisions with the i-th neutral species
+    # Loop over the energy levels of the collisions with this neutral species
     for i_level in axes(E_levels, 1)[2:end]
-        if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
-            # Calculate the degradation factor combining:
-            # 1) Cross-section σ[i_level, iE] - collision probability
-            # 2) Energy loss correction min(1, E_loss/ΔE[iE]) - accounts for when the energy
-            #    loss is smaller than the bin width (prevents over-depleting the current bin)
-            factor = σ[i_level, iE] * min(1, E_levels[i_level, 1] / ΔE[iE])
+        E_levels[i_level, 2] <= 0 || continue  # only collisions that do not produce secondary e-
 
-            # Find the energy bins where electrons will end up after losing E_levels[i_level, 1] eV
-            E_loss = E_levels[i_level, 1]
-            E_min = E_edges[iE] - E_loss           # Minimum energy after collision
-            E_max = E_edges[iE+1] - E_loss         # Maximum energy after collision
-            # Find indices where degraded electrons end up
-            i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)  # First bin with upper edge > E_min
-            i_max = searchsortedlast(@view(E_edges[1:end-1]), E_max) # Last bin with lower edge < E_max
-            i_degrade = i_min:i_max
-            partition_fraction = zeros(length(i_degrade)) # initialise
+        # Degradation factor combining:
+        # 1) Cross-section σ[i_level, iE] - collision probability
+        # 2) Energy loss correction min(1, E_loss/ΔE[iE]) - accounts for when the energy
+        #    loss is smaller than the bin width (prevents over-depleting the current bin)
+        E_loss = E_levels[i_level, 1]
+        factor = σ[i_level, iE] * min(1.0, E_loss / ΔE[iE])
 
-            if !isempty(i_degrade) && i_degrade[1] < iE
-                # Distribute the degrading e- between those bins
-                partition_fraction[1] = min(1, (E_edges[i_degrade[1]+1] -
-                                                E_edges[iE] + E_levels[i_level, 1]) / ΔE[iE])
-                if length(i_degrade) > 2
-                    partition_fraction[2:end-1] = min.(1, ΔE[i_degrade[2:end-1]] / ΔE[iE])
-                end
-                partition_fraction[end] = min(1, (E_edges[iE+1] - E_edges[i_degrade[end]] -
-                                                    E_levels[i_level, 1]) / ΔE[iE])
-                if i_degrade[end] == iE
-                    partition_fraction[end] = 0
-                end
+        # Find the energy bins where electrons will end up after losing E_loss eV
+        E_min = E_edges[iE] - E_loss           # Minimum energy after collision
+        E_max = E_edges[iE + 1] - E_loss       # Maximum energy after collision
+        i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)   # First bin with upper edge > E_min
+        i_max = searchsortedlast(@view(E_edges[1:end - 1]), E_max) # Last bin with lower edge < E_max
+        i_degrade = i_min:i_max
+        (isempty(i_degrade) || i_degrade[1] >= iE) && continue
 
-                # Normalize partition fractions to sum to 1
-                partition_fraction = partition_fraction / sum(partition_fraction)
+        n_deg = length(i_degrade)
 
-                # Add the degraded electron flux to Q
-                # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
-                for i_u in eachindex(partition_fraction)
-                    iE_degrade = i_degrade[i_u]
-                    weight = partition_fraction[i_u] * factor
-                    @tturbo for j in axes(Q, 2)
-                        for k in axes(Q, 1)
-                            Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
-                        end
-                    end
-                end
-            end
+        # Normalize the partition fractions to sum to 1, then accumulate into `weight`.
+        sum_pf = 0.0
+        for u in 1:n_deg
+            sum_pf += inelastic_partition_fraction(u, n_deg, i_degrade, iE, E_loss, E_edges, ΔE)
+        end
+        sum_pf > 0 || continue
+        norm_factor = factor / sum_pf
+        for u in 1:n_deg
+            pf = inelastic_partition_fraction(u, n_deg, i_degrade, iE, E_loss, E_edges, ΔE)
+            weight[i_degrade[u]] += pf * norm_factor
         end
     end
+
+    return nothing
 end
 
 
@@ -245,13 +280,16 @@ The factorization in Part 2 is the key optimization: all ionization channels of 
 are collapsed into a single spectrum vector, so the expensive (n_E × n_z × n_μ × n_t)
 accumulation into Q only needs to run once per species instead of once per channel.
 
-The final accumulation into Q is done in `add_ionization_collisions!`:
+The final accumulation into Q is done in `add_degradation_collisions!`, which fuses these
+ionization terms together with the inelastic degradation term (`Ie_scatter × inelastic_weight`,
+see `compute_inelastic_weights!`) into a single pass over Q:
 ```julia
 for i_s in eachindex(secondary_e_flux)
     for iI in 1:(iE - 1)
         for j in axes(Q, 2)
             for k in axes(Q, 1)
-                Q[k, j, iI] += secondary_e_flux[i_s][k, j] * secondary_e_spectrum[i_s][iI] +  # secondaries of species i_s
+                Q[k, j, iI] += Ie_scatter[i_s][k, j]     * inelastic_weight[i_s][iI] +     # inelastic degradation of species i_s
+                               secondary_e_flux[i_s][k, j] * secondary_e_spectrum[i_s][iI] + # secondaries of species i_s
                                primary_e_flux[i_s][k, j]   * primary_e_spectrum[i_s][iI]      # degraded primaries of species i_s
             end
         end
@@ -340,14 +378,19 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     end
 end
 
-@generated function add_ionization_collisions!(Q, iE,
-                                               secondary_e_flux::NTuple{N, <:AbstractMatrix},
-                                               primary_e_flux::NTuple{N, <:AbstractMatrix},
-                                               secondary_e_spectrum::NTuple{N, <:AbstractVector},
-                                               primary_e_spectrum::NTuple{N, <:AbstractVector}) where {N}
+@generated function add_degradation_collisions!(Q, iE,
+                                                Ie_scatter::NTuple{N, <:AbstractMatrix},
+                                                inelastic_weight::NTuple{N, <:AbstractVector},
+                                                secondary_e_flux::NTuple{N, <:AbstractMatrix},
+                                                primary_e_flux::NTuple{N, <:AbstractMatrix},
+                                                secondary_e_spectrum::NTuple{N, <:AbstractVector},
+                                                primary_e_spectrum::NTuple{N, <:AbstractVector}) where {N}
 
-    # Unroll the loop over species to accumulate in Q only once and reduce memory access.
-    terms = [:(secondary_e_flux[$i_s][k, j] * secondary_e_spectrum[$i_s][iI] +
+    # Unroll the loop over species so that Q is accumulated in a single pass, fusing all
+    # three degradation channels (inelastic losses + ionization secondaries + degraded
+    # primaries) and reducing memory traffic on the large Q array.
+    terms = [:(Ie_scatter[$i_s][k, j] * inelastic_weight[$i_s][iI] +
+               secondary_e_flux[$i_s][k, j] * secondary_e_spectrum[$i_s][iI] +
                primary_e_flux[$i_s][k, j] * primary_e_spectrum[$i_s][iI])
              for i_s in 1:N]
     rhs = reduce((a, b) -> :($a + $b), terms)

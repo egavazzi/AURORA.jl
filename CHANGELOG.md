@@ -18,6 +18,7 @@
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
 - Performance: remove per-energy-step allocations in the transport solver hot path (`update_A!`/`update_B!`, the Crank-Nicolson and steady-state schemes, and the ionization branch of `update_Q!`), reducing allocations in the energy loop by ~25% with identical results. The energy loop is `@tturbo`-threaded, so running Julia with multiple threads (`julia -t auto`) gives a large additional speedup (e.g. ~1.8× on 4 threads).
+- Performance: fuse the energy-degradation accumulation in `update_Q!`. The inelastic (non-ionizing) losses, ionization secondaries and degraded primaries of all neutral species are now collapsed into per-target-bin weight vectors and written into `Q` in a single pass (`add_degradation_collisions!`), instead of one pass per species/excitation-level/target-bin. This cuts the `update_Q!` time by ~11% at `E_max = 500 eV` and ~15% at `E_max = 3000 eV` (the gain grows with `E_max`, where the O(n_E²) degradation dominates). Results are numerically identical (max relative difference ~1e-14).
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
