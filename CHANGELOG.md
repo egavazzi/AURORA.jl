@@ -17,6 +17,7 @@
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
+- Fix `check_n_loop` memory check: it called the undefined `warn` (now `@warn`) and had its warning/error thresholds swapped so the out-of-RAM `error` branch was unreachable
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
