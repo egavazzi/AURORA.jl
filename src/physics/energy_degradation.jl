@@ -51,9 +51,15 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         fill!(secondary_e_spectrum[i], 0)
         fill!(primary_e_spectrum[i], 0)
 
-        # If the energy is too low, skip the ionization calculation (use zeros)
-        idx_ionization = (E_levels[:, 2] .> 0)
-        if minimum(E_levels[idx_ionization, 1]) < E_edges[iE]
+        # If the energy is too low, skip the ionization calculation (use zeros).
+        # Find the minimum ionization-channel threshold without allocating a mask/index array.
+        min_ionization_E = Inf
+        for i_level in axes(E_levels, 1)
+            if E_levels[i_level, 2] > 0
+                min_ionization_E = min(min_ionization_E, E_levels[i_level, 1])
+            end
+        end
+        if min_ionization_E < E_edges[iE]
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
                                      n, Ie, z, μ_center, Ω_beam, iE, cache)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],

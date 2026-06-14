@@ -9,6 +9,7 @@ mutable struct SolverCache
     indices_lhs::Matrix{BlockIndices}     # nzval index map for Mlhs  (SS + CN)
     indices_rhs::Matrix{BlockIndices}     # nzval index map for Mrhs  (CN only)
     op_diags::OperatorDiagonals           # dense diagonals of Ddz_Up, Ddz_Down, Ddiffusion
+    rhs::Vector{Float64}                  # reusable RHS buffer for Crank-Nicolson time-stepping
 end
 
 function SolverCache()
@@ -20,8 +21,10 @@ function SolverCache()
     indices_rhs = fill(dummy_bi, 1, 1)
     op_diags = OperatorDiagonals(
         [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0])
+    rhs = Float64[]
 
-    return SolverCache(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs, op_diags)
+    return SolverCache(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs,
+                       op_diags, rhs)
 end
 
 mutable struct DegradationCache{N}

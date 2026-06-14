@@ -1,4 +1,5 @@
 using SparseArrays: SparseArrays, spdiagm
+using LinearAlgebra: mul!
 using LoopVectorization: @tturbo
 
 """
@@ -93,7 +94,18 @@ function beams2beams(phase_fcn, B2B_fragment)
     return B2B
 end
 
-function update_A!(A, model::AuroraModel, iE)
+# In-place version of `beams2beams` writing into the pre-allocated `B2B` (n_beam × n_beam),
+# avoiding the per-call output allocation and per-row temporaries on the hot path.
+function beams2beams!(B2B, phase_fcn, B2B_fragment)
+    for i = size(B2B_fragment, 3):-1:1
+        @views mul!(B2B[i, :], B2B_fragment[:, :, i], phase_fcn)
+    end
+    return B2B
+end
+
+function update_A!(matrices::TransportMatrices, model::AuroraModel, iE)
+    A = matrices.A
+    Le = matrices.Le
     ionosphere = model.ionosphere
     energy_grid = model.energy_grid
     E_centers = energy_grid.E_centers
@@ -114,13 +126,15 @@ function update_A!(A, model::AuroraModel, iE)
         end
     end
 
-    # add losses due to electron-electron collisions
-    A .+= loss_to_thermal_electrons(E_centers[iE], ionosphere.ne, ionosphere.Te) ./ ΔE[iE];
+    # add losses due to electron-electron collisions (computed into the reusable Le buffer)
+    loss_to_thermal_electrons!(Le, E_centers[iE], ionosphere.ne, ionosphere.Te)
+    A .+= Le ./ ΔE[iE];
 
     return nothing
 end
 
-function update_B!(B, model::AuroraModel, iE, B2B_fragment)
+function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
+    B = matrices.B
     energy_grid = model.energy_grid
     scattering = model.scattering
     ΔE = energy_grid.ΔE
@@ -128,7 +142,8 @@ function update_B!(B, model::AuroraModel, iE, B2B_fragment)
 
     # Zero out B in place
     fill!(B, 0.0)
-    B2B_inelastic_neutrals = Vector{Matrix{Float64}}(undef, length(model.species));
+    # Pre-allocated per-species inelastic beam-to-beam buffers (filled below, reused next step)
+    B2B_inelastic_neutrals = matrices.B2B_inelastic_neutrals
     # Loop over the neutral species
     for (i, sp) in enumerate(model.species)
         n = sp.density
@@ -136,11 +151,13 @@ function update_B!(B, model::AuroraModel, iE, B2B_fragment)
         E_levels = sp.excitation_levels
         phase_fcn = sp.phase_fcn
 
-        # Convert to 3D the scattering probabilities that are in 1D
-        phase_fcn_e = convert_phase_fcn_to_3D(phase_fcn[1][:, iE], finer_θ);
-        phase_fcn_i = convert_phase_fcn_to_3D(phase_fcn[2][:, iE], finer_θ);
-        B2B_elastic = beams2beams(phase_fcn_e, B2B_fragment);
-        B2B_inelastic = beams2beams(phase_fcn_i, B2B_fragment);
+        # Convert to 3D the scattering probabilities that are in 1D (into reusable buffers)
+        convert_phase_fcn_to_3D!(matrices.phase_fcn_e, @view(phase_fcn[1][:, iE]), finer_θ);
+        convert_phase_fcn_to_3D!(matrices.phase_fcn_i, @view(phase_fcn[2][:, iE]), finer_θ);
+        B2B_elastic = matrices.B2B_elastic
+        B2B_inelastic = B2B_inelastic_neutrals[i]
+        beams2beams!(B2B_elastic, matrices.phase_fcn_e, B2B_fragment);
+        beams2beams!(B2B_inelastic, matrices.phase_fcn_i, B2B_fragment);
 
         # add scattering from elastic collisions
         n_z = length(n)
@@ -175,8 +192,8 @@ function update_B!(B, model::AuroraModel, iE, B2B_fragment)
             end
         end
 
-        # Save the inelastic B2B matrices for the future energy degradations (updates of Q)
-        B2B_inelastic_neutrals[i] = copy(B2B_inelastic);
+        # `B2B_inelastic` aliases `B2B_inelastic_neutrals[i]`, so the inelastic beam-to-beam
+        # matrix is already stored for the future energy degradations (updates of Q).
     end
     return B2B_inelastic_neutrals
 end
@@ -260,8 +277,8 @@ Update the A and B matrices in place for a given energy level iE.
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
 function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
-    update_A!(matrices.A, model, iE)
-    return update_B!(matrices.B, model, iE, B2B_fragment)
+    update_A!(matrices, model, iE)
+    return update_B!(matrices, model, iE, B2B_fragment)
 end
 
 
@@ -277,6 +294,13 @@ function initialize_transport_matrices(model::AuroraModel, t)
     n_energy = model.energy_grid.n
 
     matrices = TransportMatrices(n_altitude, n_angle, n_time, n_energy)
+
+    # Size the scratch buffers that depend on the number of species and the scattering grid.
+    n_species = length(model.species)
+    n_θ = length(model.scattering.θ_scatter)
+    matrices.B2B_inelastic_neutrals = [zeros(Float64, n_angle, n_angle) for _ in 1:n_species]
+    matrices.phase_fcn_e = zeros(Float64, n_θ)
+    matrices.phase_fcn_i = zeros(Float64, n_θ)
 
     return matrices
 end

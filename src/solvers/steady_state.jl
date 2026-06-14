@@ -3,6 +3,7 @@
 # writing physics values directly into `nzval` via pre-computed index arrays.
 
 using KLU: klu, klu!
+using LinearAlgebra: ldiv!
 using SparseArrays: spdiagm
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -171,18 +172,18 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     index_bottom = 1:n_z:(n_angle * n_z)
     index_top    = n_z:n_z:(n_angle * n_z)
 
-    # ── Set boundary conditions in the RHS vector ──
-    Q_local = copy(Q_slice)
-    Q_local[index_bottom] .= 0.0
-    Q_local[index_top]    .= Ie_top
-
-    # ── Solve  Mlhs · Ie = Q ──
-    Ie .= cache.KLU \ Q_local
+    # ── Set up the RHS in `Ie`, apply boundary conditions, and solve in place ──
+    # Filling `Ie` with the RHS and using `ldiv!` avoids both the `copy(Q_slice)`
+    # allocation and the temporary produced by `KLU \ rhs`.
+    copyto!(Ie, Q_slice)
+    Ie[index_bottom] .= 0.0
+    Ie[index_top]    .= Ie_top
+    ldiv!(cache.KLU, Ie)
 
     # Check for negative values (if it happens we have a problem) and clamp to zero
-    if any(Ie .< 0)
-        @warn "Negative fluxes detected and clamped to zero ($(count(Ie .< 0)) values)"
-        Ie[Ie .< 0] .= 0
+    if any(<(0), Ie)
+        @warn "Negative fluxes detected and clamped to zero ($(count(<(0), Ie)) values)"
+        clamp!(Ie, 0.0, Inf)
     end
 
     return nothing

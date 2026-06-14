@@ -266,16 +266,20 @@ function phase_fcn_O(θ, Energy)
     return phfcnE, phfcnI
 end
 
-function convert_phase_fcn_to_3D!(phase_fcn, θ)
-    # The measurements of scattering probabilities that make up the phase function matrices were done
-    # in a plane (2D). Problem with that is that the electrons scatter in the 3 dimensions, so only
-    # a fraction of them are measured. This fraction depends on the scattering angle, as the e- will
-    # scatter on a "ring" (think about a slice of a sphere) of area 2π*sin(θ)*dθ. This means that the
-    # probability of scattering will be underestimated the more we approach angles around 90°. This
-    # function is here to correct that.
-    phase_fcn = phase_fcn .* abs.(sin.(θ));     # we don't need the factors 2π and dθ as they are the same for all theta bins.
-    phase_fcn = phase_fcn ./ sum(phase_fcn);    # so that sum of probabilities = 1
-    return nothing
+function convert_phase_fcn_to_3D!(out, phase_fcn, θ)
+    # In-place version of `convert_phase_fcn_to_3D`: writes the corrected, normalized 3D phase
+    # function into the pre-allocated `out` buffer (which must be distinct from `phase_fcn`).
+    # See `convert_phase_fcn_to_3D` for the physics rationale of the sin(θ) correction.
+    s = 0.0
+    @inbounds for i in eachindex(out, phase_fcn, θ)
+        out[i] = phase_fcn[i] * abs(sin(θ[i]))  # 2π and dθ factors are common to all bins
+        s += out[i]
+    end
+    inv_s = inv(s)
+    @inbounds for i in eachindex(out)
+        out[i] *= inv_s                         # so that sum of probabilities = 1
+    end
+    return out
 end
 
 function convert_phase_fcn_to_3D(phase_fcn, θ)
