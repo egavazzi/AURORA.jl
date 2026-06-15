@@ -11,8 +11,7 @@ mutable struct TransportMatrices
     D::Array{Float64, 2}
     Q::Array{Float64, 3}
     Ddiffusion::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    # Scratch buffers reused on the hot path (see `update_A!`/`update_B!`) to avoid
-    # per-energy-step allocations. Sized for the real run in `initialize_transport_matrices`.
+
     Le::Vector{Float64}                              # thermal e- energy loss (length n_z)
     B2B_elastic::Matrix{Float64}                     # elastic beam-to-beam (n_angle × n_angle)
     B2B_inelastic_neutrals::Vector{Matrix{Float64}}  # inelastic beam-to-beam per species
