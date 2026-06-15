@@ -17,7 +17,6 @@
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
-- Performance: remove per-energy-step allocations in the transport solver hot path (`update_A!`/`update_B!`, the Crank-Nicolson and steady-state schemes, and the ionization branch of `update_Q!`), reducing allocations in the energy loop by ~25% with identical results. The energy loop is `@tturbo`-threaded, so running Julia with multiple threads (`julia -t auto`) gives a large additional speedup (e.g. ~1.8× on 4 threads).
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
