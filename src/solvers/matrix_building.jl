@@ -126,7 +126,7 @@ function update_A!(matrices::TransportMatrices, model::AuroraModel, iE)
         end
     end
 
-    # add losses due to electron-electron collisions (computed into the reusable Le buffer)
+    # add losses due to electron-electron collisions
     loss_to_thermal_electrons!(Le, E_centers[iE], ionosphere.ne, ionosphere.Te)
     A .+= Le ./ ΔE[iE];
 
@@ -142,7 +142,7 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_frag
 
     # Zero out B in place
     fill!(B, 0.0)
-    # Pre-allocated per-species inelastic beam-to-beam buffers (filled below, reused next step)
+    # Pre-allocated per-species inelastic beam-to-beam buffers
     B2B_inelastic_neutrals = matrices.B2B_inelastic_neutrals
     # Loop over the neutral species
     for (i, sp) in enumerate(model.species)
@@ -151,7 +151,7 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_frag
         E_levels = sp.excitation_levels
         phase_fcn = sp.phase_fcn
 
-        # Convert to 3D the scattering probabilities that are in 1D (into reusable buffers)
+        # Convert to 3D the scattering probabilities that are in 1D
         convert_phase_fcn_to_3D!(matrices.phase_fcn_e, @view(phase_fcn[1][:, iE]), finer_θ);
         convert_phase_fcn_to_3D!(matrices.phase_fcn_i, @view(phase_fcn[2][:, iE]), finer_θ);
         B2B_elastic = matrices.B2B_elastic
@@ -191,9 +191,6 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_frag
                 end
             end
         end
-
-        # `B2B_inelastic` aliases `B2B_inelastic_neutrals[i]`, so the inelastic beam-to-beam
-        # matrix is already stored for the future energy degradations (updates of Q).
     end
     return B2B_inelastic_neutrals
 end
