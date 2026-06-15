@@ -267,7 +267,7 @@ struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <
     n_t_per_loop::Int    # = n_save_per_loop * CFL_factor + 1  (max internal steps per loop)
 end
 
-function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
+function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode; verbose::Bool=false)
     duration = mode.duration
     dt = mode.dt
     CFL_number = mode.CFL_number
@@ -293,7 +293,7 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
     # The automatic path is already capped at n_save inside calculate_n_loop.
     n_loop_resolved = isnothing(n_loop) ?
         calculate_n_loop(length(z), n_μ, n_E, length(t_internal), N_neutrals, CFL_factor,
-                         n_save; max_memory_gb) :
+                         n_save; max_memory_gb, verbose) :
         Int(n_loop)
 
     # A loop holds at least one save interval, so there cannot be more loops than save
@@ -307,7 +307,7 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
 
     # Check that the chosen split actually fits in RAM
     check_n_loop(n_loop_resolved, length(z), n_μ, n_E, length(t_internal), N_neutrals,
-                 CFL_factor)
+                 CFL_factor; verbose)
 
     # Save intervals are partitioned across loops as evenly as possible (balanced
     # partition, see `loop_save_count`): the first `rem(n_save, n_loop)` loops get
@@ -449,11 +449,14 @@ function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::Abstract
     return AuroraSimulation(model, flux, output; mode)
 end
 
-# Build the appropriate time configuration based on the mode
-build_time_config(model::AuroraModel, mode::SteadyStateMode) =
+# Build the appropriate time configuration based on the mode.
+# `verbose` is forwarded to the (potentially noisy) automatic n_loop calculation; it
+# defaults to `false` so that constructing an `AuroraSimulation` stays quiet, while
+# `initialize!`/`run!` can opt in to the printout.
+build_time_config(model::AuroraModel, mode::SteadyStateMode; verbose::Bool=false) =
     is_multi_step(mode) ? UniformTimeGrid(mode.duration, mode.dt) : SingleStepConfig()
-build_time_config(model::AuroraModel, mode::TimeDependentMode) =
-    RefinedTimeGrid(model, mode)
+build_time_config(model::AuroraModel, mode::TimeDependentMode; verbose::Bool=false) =
+    RefinedTimeGrid(model, mode; verbose)
 
 function Base.show(io::IO, sim::AuroraSimulation)
     mode_name = sim.mode isa SteadyStateMode ? "steady-state" : "time-dependent"

@@ -423,7 +423,7 @@ function calculate_n_loop(n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor, n_save;
         println()
     end
 
-    if budget_unmet
+    if budget_unmet && verbose
         @warn "Cannot keep the peak memory within max_memory_gb = $(max_memory_gb) GB " *
               "even with n_loop = $n_save (one save interval per loop). " *
               "Estimated peak: $(round(mem.fixed_gb + mem.scaling_gb / n_save, digits=2)) GB."
@@ -433,12 +433,13 @@ function calculate_n_loop(n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor, n_save;
 end
 
 """
-    check_n_loop(n_loop, n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor)
+    check_n_loop(n_loop, n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor; verbose=true)
 
 Verify that running with `n_loop` loops fits in the detected RAM. Errors if the estimated
-peak memory exceeds the available RAM, and warns if it exceeds half of it.
+peak memory exceeds the available RAM (always), and warns if it exceeds half of it (only
+when `verbose`).
 """
-function check_n_loop(n_loop, n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor)
+function check_n_loop(n_loop, n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor; verbose::Bool=true)
     total_ram_gb = Sys.total_memory() / 1e9
     mem = estimate_simulation_memory(n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor)
     peak_gb = mem.fixed_gb + mem.scaling_gb / n_loop
@@ -456,7 +457,7 @@ function check_n_loop(n_loop, n_z, n_μ, n_E, n_t, N_neutrals, CFL_factor)
               "Estimated peak memory: $(round(peak_gb, digits=2)) GB\n" *
               "Detected RAM:          $(round(total_ram_gb, digits=2)) GB\n" *
               suggestion)
-    elseif peak_gb > 0.5 * total_ram_gb
+    elseif verbose && peak_gb > 0.5 * total_ram_gb
         @warn "n_loop = $n_loop may lead to high memory usage.\n" *
               "Estimated peak memory: $(round(peak_gb, digits=2)) GB\n" *
               "Detected RAM:          $(round(total_ram_gb, digits=2)) GB\n" *
