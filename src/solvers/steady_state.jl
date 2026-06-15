@@ -173,8 +173,6 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     index_top    = n_z:n_z:(n_angle * n_z)
 
     # ── Set up the RHS in `Ie`, apply boundary conditions, and solve in place ──
-    # Filling `Ie` with the RHS and using `ldiv!` avoids both the `copy(Q_slice)`
-    # allocation and the temporary produced by `KLU \ rhs`.
     copyto!(Ie, Q_slice)
     Ie[index_bottom] .= 0.0
     Ie[index_top]    .= Ie_top
