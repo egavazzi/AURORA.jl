@@ -1,9 +1,5 @@
 using LoopVectorization: @tturbo
 
-#################################################################################
-#                                   Update Q                                    #
-#################################################################################
-
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                    B2B_inelastic_neutrals, iE, cache)
 
@@ -45,10 +41,8 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         B2B_inelastic = B2B_inelastic_neutrals[i]
         species_cascading = sp.cascading_data
 
-        # ── Inelastic (non-ionizing) collisions ──
-        # Compute the scattered flux and the per-target-bin degradation weights, but
-        # do NOT accumulate into Q here. The accumulation is fused below across all
-        # species and channels so that Q is swept only once.
+        # Inelastic (non-ionizing) collisions
+        # Compute the scattered flux and the per-target-bin degradation weights
         calculate_scattered_flux!(Ie_scatter[i], B2B_inelastic, n, @view(Ie[:, :, iE]))
         compute_inelastic_weights!(inelastic_weight[i], σ, E_levels, energy_grid, iE)
 
@@ -73,11 +67,9 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                                         σ, E_levels, species_cascading, iE)
         end
     end
+
     # Fused accumulation into Q for ALL degradation channels (inelastic losses +
-    # ionization secondaries + degraded primaries) of ALL species. This touches the
-    # lower-energy block of Q exactly once per energy step instead of once per
-    # species/excitation-level/target-bin. Skipped entirely when there is nothing to
-    # degrade (lowest energy bin, or all contributions zero).
+    # ionization secondaries + degraded primaries) of ALL species.
     has_degradation = any(!iszero, inelastic_weight) ||
                       any(!iszero, secondary_e_spectrum) ||
                       any(!iszero, primary_e_spectrum)
@@ -103,12 +95,6 @@ function add_thermal_electron_collisions!(Q_slice, Ie_slice, thermal_e_loss, ΔE
     return nothing
 end
 
-
-
-
-#################################################################################
-#                               Inelastic collisions                            #
-#################################################################################
 
 """
     calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
@@ -160,11 +146,22 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-# Partition fraction for position `u` (1-based) within the target bin range `i_degrade`,
-# replicating the original first/middle/last bin handling exactly. The last position is
-# evaluated first so that a single-bin range (u == 1 == n_deg) uses the "last" formula,
-# matching the original code where partition_fraction[end] overwrote partition_fraction[1].
-@inline function inelastic_partition_fraction(u, n_deg, i_degrade, iE, E_loss, E_edges, ΔE)
+# After losing `E_loss` eV, an electron starting anywhere in source bin `iE` lands somewhere
+# in the energy interval [E_edges[iE] - E_loss, E_edges[iE+1] - E_loss]. That interval spans
+# the consecutive target bins `i_degrade = i_min:i_max`. This returns how much of the interval
+# falls into the target bin at position `u` (within `i_degrade`), expressed as a
+# fraction of the source bin width ΔE[iE]:
+#   - interior bins that are fully covered                 → ΔE[target] / ΔE[iE]
+#   - the first/last bins that are only partially covered  → use the actual overlap width
+# The returned values are unnormalized; the caller divides by their sum so they partition the
+# degraded flux. Each result is also capped at 1 so a single target bin can never receive more
+# than the whole source bin.
+#
+# The `u == n_deg` branch is tested before `u == 1` so that a single-bin range (n_deg == 1, so
+# u == 1 == n_deg) uses the last-bin overlap formula. That branch also returns 0 when the only
+# target bin is `iE` itself, i.e. the electron stays in its source bin and there is no
+# degradation.
+function inelastic_partition_fraction(u, n_deg, i_degrade, iE, E_loss, E_edges, ΔE)
     if u == n_deg
         idx_end = i_degrade[n_deg]
         idx_end == iE && return 0.0
@@ -192,7 +189,6 @@ together with the species' scattered flux `Ie_scatter`, so that
 ```
     Q[:, :, iE_degrade] += Ie_scatter[:, :] × weight[iE_degrade]
 ```
-This replaces the original per-channel accumulation directly into Q.
 
 # Arguments
 - `weight`: output vector (n_E,), overwritten with the degradation weights
@@ -246,10 +242,6 @@ end
 
 
 
-
-#################################################################################
-#                               Ionization collisions                           #
-#################################################################################
 
 #=
 The three functions below compute the ionization contribution to Q more efficiently
