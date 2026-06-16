@@ -418,17 +418,17 @@ function check_n_loop(n_loop, n_z, n_μ, n_t, n_E)
     total_ram_gb = Sys.total_memory() / 1024^3
     estimated_memory_gb = estimate_simulation_memory(n_z, n_μ, n_t, n_E)
     memory_per_loop_gb = estimated_memory_gb / n_loop
-    if memory_per_loop_gb > total_ram_gb * 0.5
-        warn("The n_loop = $n_loop may lead to high memory usage.\n" *
-             "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
-             "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
-             "Consider increasing `n_loop` or or decreasing `max_memory_gb` to avoid issues.")
-    elseif memory_per_loop_gb > total_ram_gb
+    if memory_per_loop_gb > total_ram_gb
         error("The n_loop = $n_loop is too small for simulations to fit in available RAM.\n" *
               "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
               "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
               "Please increase `n_loop` to at least $(ceil(Int, estimated_memory_gb / total_ram_gb)) " *
               "or decrease `max_memory_gb`.")
+    elseif memory_per_loop_gb > total_ram_gb * 0.5
+        @warn("The n_loop = $n_loop may lead to high memory usage.\n" *
+              "Estimated memory per loop: $(round(memory_per_loop_gb, digits=2)) GB\n" *
+              "Maximum RAM available (detected): $(round(total_ram_gb, digits=2)) GB\n" *
+              "Consider increasing `n_loop` or decreasing `max_memory_gb` to avoid issues.")
     end
 end
 
