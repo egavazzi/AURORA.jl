@@ -263,7 +263,7 @@ struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <
     t_save::TS           # coarse save grid          (length = n_save + 1)
     n_save::Int          # total number of save intervals = round(Int, duration / dt)
     n_loop::Int
-    n_save_per_loop::Int # = cld(n_save, n_loop). Max save intervals per loop (for allocation)
+    n_save_per_loop::Int # = cld(n_save, n_loop) (max save intervals per loop)
     n_t_per_loop::Int    # = n_save_per_loop * CFL_factor + 1  (max internal steps per loop)
 end
 
@@ -450,9 +450,6 @@ function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::Abstract
 end
 
 # Build the appropriate time configuration based on the mode.
-# `verbose` is forwarded to the (potentially noisy) automatic n_loop calculation; it
-# defaults to `false` so that constructing an `AuroraSimulation` stays quiet, while
-# `initialize!`/`run!` can opt in to the printout.
 build_time_config(model::AuroraModel, mode::SteadyStateMode; verbose::Bool=false) =
     is_multi_step(mode) ? UniformTimeGrid(mode.duration, mode.dt) : SingleStepConfig()
 build_time_config(model::AuroraModel, mode::TimeDependentMode; verbose::Bool=false) =
