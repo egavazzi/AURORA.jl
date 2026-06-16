@@ -470,8 +470,7 @@ end
         → (; fixed_gb, scaling_gb, total_gb)
 
 Estimate the simulation's peak memory footprint (in decimal GB) by summing the actual
-working arrays allocated in [`build_simulation_cache`](@ref), rather than using a rough
-multiple of the `Ie` array.
+working arrays allocated in [`build_simulation_cache`](@ref).
 
 The footprint is split into two parts:
 
@@ -489,7 +488,7 @@ memory of an `n_loop`-loop run is ≈ `fixed_gb + scaling_gb / n_loop`.
 function estimate_simulation_memory(n_z::Int, n_μ::Int, n_E::Int, n_t::Int,
                                     N_neutrals::Int, CFL_factor::Int)
     F = 8            # bytes per Float64
-    GB = 1e9         # decimal GB, to match the human-facing `max_memory_gb`
+    GB = 1e9         # decimal GB, to match the user-facing `max_memory_gb`
     n_zμ = n_z * n_μ
     # Number of save intervals (the internal grid has n_t = n_save * CFL_factor + 1 points)
     n_save = (n_t - 1) ÷ CFL_factor
