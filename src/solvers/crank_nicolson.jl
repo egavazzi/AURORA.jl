@@ -85,6 +85,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
         cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
         cache.indices_rhs = extract_nzval_indices(cache.Mrhs, n_z, n_angle)
         cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+        cache.rhs         = Vector{Float64}(undef, n_z * n_angle)
     end
 
     # ── Update matrix values (fast, no allocations) ──
