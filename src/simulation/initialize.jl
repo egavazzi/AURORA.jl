@@ -23,7 +23,7 @@ function initialize!(sim::AuroraSimulation;
         initialize!(sim.model; policy=cache_policy, verbose)
     end
     # Rebuild the time configuration from the (possibly changed) model grids.
-    sim.time = build_time_config(sim.model, sim.mode)
+    sim.time = build_time_config(sim.model, sim.mode; verbose)
     sim.cache = build_simulation_cache(sim; cache_policy)
     sim.cache_initialized = true
     return nothing

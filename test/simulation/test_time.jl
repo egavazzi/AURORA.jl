@@ -70,6 +70,38 @@ end
     @test AURORA.loop_save_count(t_d, 1) == 2
     @test AURORA.loop_save_count(t_d, 2) == 2
     @test AURORA.loop_save_count(t_d, 3) == 2
+
+    # Balanced partition: n_save=5, n_loop=4  →  [2, 1, 1, 1] (the old cld+remainder
+    # scheme produced [2, 2, 2, -1] here and wrongly rejected this valid config).
+    sim_b = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
+                             mode=TimeDependentMode(duration=0.05, dt=0.01,
+                                                    CFL_number=128, n_loop=4))
+    t_b = sim_b.time
+    @test t_b.n_save == 5
+    @test [AURORA.loop_save_count(t_b, i) for i in 1:4] == [2, 1, 1, 1]
+    @test sum(AURORA.loop_save_count(t_b, i) for i in 1:4) == t_b.n_save
+
+    # No loop is ever empty for any valid n_loop ≤ n_save, and counts stay balanced
+    # (max − min ≤ 1) with a correct total.
+    for nl in 1:5
+        sim_n = AuroraSimulation(TimeTestModel.model, flux, mktempdir();
+                                 mode=TimeDependentMode(duration=0.05, dt=0.01,
+                                                        CFL_number=128, n_loop=nl))
+        counts = [AURORA.loop_save_count(sim_n.time, i) for i in 1:nl]
+        @test sum(counts) == 5
+        @test minimum(counts) >= 1
+        @test maximum(counts) - minimum(counts) <= 1
+    end
+end
+
+@testitem "RefinedTimeGrid: n_loop > n_save is rejected" setup=[TimeTestModel] begin
+    using AURORA
+    flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
+
+    # n_save=5, requesting n_loop=6 is impossible (a loop must hold ≥ 1 save interval).
+    @test_throws ArgumentError AuroraSimulation(
+        TimeTestModel.model, flux, mktempdir();
+        mode=TimeDependentMode(duration=0.05, dt=0.01, CFL_number=128, n_loop=6))
 end
 
 @testitem "RefinedTimeGrid: loop_internal_start covers disjoint windows" setup=[TimeTestModel] begin
@@ -138,6 +170,26 @@ end
             t_all = Array(ds["time"])
 
             # Full time axis equals the expected uniform save grid
+            expected = collect(range(0.0, 0.05; length=6))
+            @test length(t_all) == 6
+            @test t_all ≈ expected  atol=1e-12
+        end
+    end
+end
+
+@testitem "Time-dependent 4 loops (balanced, uneven): t_run is exact" setup=[TimeTestModel] begin
+    using NCDatasets
+    mktempdir() do savedir
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0), SmoothOnset(0.0, 0.05); beams=1:2)
+
+        # duration=0.05s, dt=0.01s, n_save=5, n_loop=4  →  loop sizes [2, 1, 1, 1]
+        sim = AuroraSimulation(TimeTestModel.model, flux, savedir;
+                               mode=TimeDependentMode(duration=0.05, dt=0.01,
+                                                      CFL_number=128, n_loop=4))
+        run!(sim; verbose=false)
+
+        NCDataset(joinpath(savedir, "simulation_data.nc"), "r") do ds
+            t_all = Array(ds["time"])
             expected = collect(range(0.0, 0.05; length=6))
             @test length(t_all) == 6
             @test t_all ≈ expected  atol=1e-12

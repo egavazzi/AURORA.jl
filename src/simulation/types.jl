@@ -247,8 +247,9 @@ then the fine internal grid (`t`) is obtained by subdividing each save interval 
 CFL condition is satisfied. The end result is a grid with `CFL_factor` sub-steps per save
 interval.
 
-Loops are partitioned by save intervals using ceiling division, so all loops have exactly
-`n_save_per_loop` save intervals, except the last one which gets the remainder (if any).
+Loops are partitioned by save intervals using a balanced partition (loop sizes differ by at
+most one), so every loop holds between `fld(n_save, n_loop)` and `cld(n_save, n_loop)` save
+intervals and none is ever empty (for `n_loop ≤ n_save`).
 
 See [`loop_save_count`](@ref), [`loop_save_start`](@ref), [`loop_internal_count`](@ref),
 [`loop_internal_start`](@ref) for helpers to index into these grids per loop.
@@ -262,11 +263,11 @@ struct RefinedTimeGrid{TI<:AbstractRange{Float64}, TS<:AbstractRange{Float64}} <
     t_save::TS           # coarse save grid          (length = n_save + 1)
     n_save::Int          # total number of save intervals = round(Int, duration / dt)
     n_loop::Int
-    n_save_per_loop::Int # = cld(n_save, n_loop). Last loop gets the remainder (≤ than this)
+    n_save_per_loop::Int # = cld(n_save, n_loop) (max save intervals per loop)
     n_t_per_loop::Int    # = n_save_per_loop * CFL_factor + 1  (max internal steps per loop)
 end
 
-function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
+function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode; verbose::Bool=false)
     duration = mode.duration
     dt = mode.dt
     CFL_number = mode.CFL_number
@@ -286,29 +287,34 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode)
     # Total number of save intervals (-1 because we do not count the initial time t=0)
     n_save = length(t_save) - 1
 
-    # Determine number of loops based on memory constraints, or use the provided value
+    N_neutrals = length(model.species)
+
+    # Determine the number of loops from the memory budget, or use the provided value.
+    # The automatic path is already capped at n_save inside calculate_n_loop.
     n_loop_resolved = isnothing(n_loop) ?
-                      calculate_n_loop(t_internal, length(z), n_μ, n_E; max_memory_gb) :
-                      Int(n_loop)
-    # Check if it actually fits in RAM
-    check_n_loop(n_loop_resolved, length(z), n_μ, length(t_internal), n_E)
+        calculate_n_loop(length(z), n_μ, n_E, length(t_internal), N_neutrals, CFL_factor,
+                         n_save; max_memory_gb, verbose) :
+        Int(n_loop)
 
-    # Partition save intervals across loops.
-    # All loops except the last get n_save_per_loop intervals.
-    # The last gets the remainder (≤ n_save_per_loop).
-    n_save_per_loop = cld(n_save, n_loop_resolved)
-
-    # With ceiling division, the first (n_loop-1) loops can collectively consume more
-    # save intervals than exist, leaving the last loop with 0 or a negative count.
-    # This happens when (n_loop-1)*cld(n_save, n_loop) > n_save. Throw an error if
-    # this is the case.
-    n_last_loop = n_save - (n_loop_resolved - 1) * n_save_per_loop
-    if n_last_loop < 1
+    # A loop holds at least one save interval, so there cannot be more loops than save
+    # intervals. (Only reachable for a user-supplied n_loop; the auto path is capped.)
+    if n_loop_resolved > n_save
         throw(ArgumentError(
-            "n_loop=$n_loop_resolved is too large for n_save=$n_save: the last loop would " *
-            "have $n_last_loop save intervals (need ≥ 1). " *
-            "Reduce n_loop to ≤ $n_save, or increase duration/reduce dt."))
+            "n_loop=$n_loop_resolved is too large for n_save=$n_save: there cannot be more " *
+            "loops than save intervals. Reduce n_loop to ≤ $n_save, or increase duration / " *
+            "reduce dt."))
     end
+
+    # Check that the chosen split actually fits in RAM
+    check_n_loop(n_loop_resolved, length(z), n_μ, n_E, length(t_internal), N_neutrals,
+                 CFL_factor; verbose)
+
+    # Save intervals are partitioned across loops as evenly as possible (balanced
+    # partition, see `loop_save_count`): the first `rem(n_save, n_loop)` loops get
+    # `cld(n_save, n_loop)` intervals and the rest get `fld(n_save, n_loop)`. No loop is
+    # ever empty as long as n_loop ≤ n_save.
+    # `n_save_per_loop` is the *maximum* per-loop count, used to size the working arrays.
+    n_save_per_loop = cld(n_save, n_loop_resolved)
     # Maximum number of internal steps in a loop (used for cache allocation)
     n_t_per_loop = n_save_per_loop * CFL_factor + 1
 
@@ -321,15 +327,15 @@ end
 """
     loop_save_count(time::RefinedTimeGrid, i_loop) → Int
 
-Number of save intervals covered by loop `i_loop`. All loops except the last cover
-`time.n_save_per_loop` intervals; the last loop covers the remainder (≤ `n_save_per_loop`).
+Number of save intervals covered by loop `i_loop` under a balanced partition: the first
+`rem(n_save, n_loop)` loops carry `cld(n_save, n_loop)` intervals and the rest carry
+`fld(n_save, n_loop)`. Loop sizes differ by at most one and no loop is ever empty (for
+`n_loop ≤ n_save`). The counts sum to `time.n_save`.
 """
 function loop_save_count(time::RefinedTimeGrid, i_loop::Int)
-    if i_loop < time.n_loop
-        return time.n_save_per_loop
-    else
-        return time.n_save - (time.n_loop - 1) * time.n_save_per_loop
-    end
+    q, r = divrem(time.n_save, time.n_loop)
+    # The first `r` loops carry one extra save interval.
+    return q + (i_loop <= r ? 1 : 0)
 end
 
 """
@@ -346,8 +352,12 @@ loop_internal_count(time::RefinedTimeGrid, i_loop::Int) =
 
 Return index in `time.t_save` of the first (boundary) save point of loop `i_loop`.
 """
-loop_save_start(time::RefinedTimeGrid, i_loop::Int) =
-    (i_loop - 1) * time.n_save_per_loop + 1
+function loop_save_start(time::RefinedTimeGrid, i_loop::Int)
+    q, r = divrem(time.n_save, time.n_loop)
+    # Number of save intervals covered by loops 1 … i_loop-1 (balanced partition).
+    prev = (i_loop - 1) * q + min(i_loop - 1, r)
+    return prev + 1
+end
 
 """
     loop_internal_start(time::RefinedTimeGrid, i_loop) → Int
@@ -355,8 +365,12 @@ loop_save_start(time::RefinedTimeGrid, i_loop::Int) =
 Return index in `time.t` (the full internal grid) of the boundary point that starts
 loop `i_loop`.
 """
-loop_internal_start(time::RefinedTimeGrid, i_loop::Int) =
-    (i_loop - 1) * time.n_save_per_loop * time.CFL_factor + 1
+function loop_internal_start(time::RefinedTimeGrid, i_loop::Int)
+    q, r = divrem(time.n_save, time.n_loop)
+    # Save intervals before this loop, converted to internal-grid steps (balanced partition).
+    prev = (i_loop - 1) * q + min(i_loop - 1, r)
+    return prev * time.CFL_factor + 1
+end
 
 function Base.show(io::IO, time::RefinedTimeGrid)
     print(io, "RefinedTimeGrid(duration=$(time.duration), dt=$(time.dt), n_loop=$(time.n_loop))")
@@ -435,11 +449,11 @@ function AuroraSimulation(model::AuroraModel, flux::InputFlux, savedir::Abstract
     return AuroraSimulation(model, flux, output; mode)
 end
 
-# Build the appropriate time configuration based on the mode
-build_time_config(model::AuroraModel, mode::SteadyStateMode) =
+# Build the appropriate time configuration based on the mode.
+build_time_config(model::AuroraModel, mode::SteadyStateMode; verbose::Bool=false) =
     is_multi_step(mode) ? UniformTimeGrid(mode.duration, mode.dt) : SingleStepConfig()
-build_time_config(model::AuroraModel, mode::TimeDependentMode) =
-    RefinedTimeGrid(model, mode)
+build_time_config(model::AuroraModel, mode::TimeDependentMode; verbose::Bool=false) =
+    RefinedTimeGrid(model, mode; verbose)
 
 function Base.show(io::IO, sim::AuroraSimulation)
     mode_name = sim.mode isa SteadyStateMode ? "steady-state" : "time-dependent"
