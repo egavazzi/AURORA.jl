@@ -109,7 +109,9 @@ The [`RefinedTimeGrid`](@ref) is constructed automatically from the
 [`TimeDependentMode`](@ref) parameters. It determines two key quantities:
 
 - **`dt_internal`**: the internal time step, chosen to satisfy the CFL condition. This is
-  typically much smaller than the requested output `dt`.
+  typically much smaller than the requested output `dt`. The `CFL_number` controls how fine it
+  is — see [Choosing the CFL number](@ref CFL) for how to pick a value and why large numbers
+  are usually safe.
 - **`n_loop`**: the number of time chunks the simulation is split into. Each chunk is solved
   independently and its results are saved before moving to the next. This keeps memory
   usage within the specified `max_memory_gb` budget.
