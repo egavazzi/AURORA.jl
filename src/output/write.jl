@@ -39,9 +39,14 @@ function write_config_toml(sim::AuroraSimulation)
         config["mode"] = "steady_state_single_step"
     end
 
+    # Explicit key order for the output file (keys not listed are appended last).
+    key_order = ["altitude_lims_km", "theta_lims", "E_max_eV", "B_angle_to_zenith",
+                 "mode", "duration_s", "dt_s", "aurora_version", "commit_hash"]
+    rank(k) = something(findfirst(==(k), key_order), length(key_order) + 1)
+
     savefile = joinpath(sim.output.savedir, "config.toml")
     open(savefile, "w") do f
-        TOML.print(f, config)
+        TOML.print(f, config; sorted=true, by=rank)
     end
 end
 
