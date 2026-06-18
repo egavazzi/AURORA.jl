@@ -203,8 +203,10 @@ end
     IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
 
-    # The vertical energy flux equals IeE_tot regardless of the beam selection
-    @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3 ≈ IeE_tot
+    # The vertical energy flux is independent of the beam selection.
+    # With the low-energy tail enabled, we cannot check IeE_tot equality, as the LET adds
+    # energy on top of the IeE_tot-normalized Maxwellian core.
+    @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
 @testitem "FlatSpectrum - energy conservation" begin
