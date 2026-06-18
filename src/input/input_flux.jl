@@ -209,6 +209,11 @@ Evaluates the energy spectrum, distributes it over beams, and applies temporal
 modulation (including energy- and angle-dependent electron travel-time delays if a
 `z_source` was specified in the InputFlux).
 
+The spectrum is spread over the selected downward-going beams proportionally to their
+solid angle, and normalized so that the **field-aligned (vertical) energy flux**
+crossing the horizontal top boundary equals `IeE_tot`, independent of the beam
+selection.
+
 # Arguments
 - `flux`: an [`InputFlux`](@ref) describing the precipitation
 - `model`: an [`AuroraModel`](@ref) with grids and atmosphere/ionosphere
@@ -252,12 +257,15 @@ function compute_flux(flux::InputFlux{<:AbstractSpectrum}, model::AuroraModel, t
     # Calculate reference time shift (for highest energy in first beam)
     t_ref = z_distance / (abs(μ_center[flux.beams[1]]) * v_of_E(E_centers[end]))
 
+    # Field-aligned (vertical) normalization: pin the vertical energy flux to IeE_tot
+    beam_norm = field_aligned_beam_norm(flux.beams, μ_center, Ω_beam)
+
     ## ==================== Main loop ==================== ##
     for i_μ in flux.beams
         if μ_center[i_μ] >= 0
             continue  # Skip upward-going beams
         end
-        beam_fraction = Ω_beam[i_μ] / sum(Ω_beam[flux.beams])
+        beam_fraction = Ω_beam[i_μ] / beam_norm
 
         for iE in eachindex(E_centers)
             if Φ_spectrum[iE] ≈ 0
@@ -291,7 +299,9 @@ end
 Compute the electron flux array for a **steady-state** simulation.
 
 This method is for steady-state runs: it evaluates the energy spectrum and distributes
-it over beams without any time dependence or travel-time delays.
+it over beams without any time dependence or travel-time delays. As in the
+time-dependent method, the spectrum is normalized so that the field-aligned (vertical)
+energy flux equals `IeE_tot`, independent of the beam selection.
 
 Only [`ConstantModulation`](@ref) is allowed for steady-state. Other modulation types
 will raise an error.
@@ -322,11 +332,14 @@ function compute_flux(flux::InputFlux{<:AbstractSpectrum, ConstantModulation}, m
     # Initialize output array [n_beams, 1, n_energy]
     Ie_top = zeros(length(μ_center), 1, length(E_centers))
 
+    # Field-aligned (vertical) normalization: pin the vertical energy flux to IeE_tot
+    beam_norm = field_aligned_beam_norm(flux.beams, μ_center, Ω_beam)
+
     for i_μ in flux.beams
         if μ_center[i_μ] >= 0
             continue  # Skip upward-going beams
         end
-        beam_fraction = Ω_beam[i_μ] / sum(Ω_beam[flux.beams])
+        beam_fraction = Ω_beam[i_μ] / beam_norm
         Ie_top[i_μ, 1, :] = Φ_spectrum .* beam_fraction .* ΔE
     end
 
@@ -337,6 +350,24 @@ function compute_flux(flux::InputFlux{<:AbstractSpectrum, <:AbstractModulation},
     error("Steady-state compute_flux does not support $(typeof(flux.modulation)). " *
           "Use ConstantModulation() for steady-state simulations, " *
           "or provide a time grid for time-dependent simulations: compute_flux(flux, model, t).")
+end
+
+
+# Internal: field-aligned (vertical) normalization denominator for distributing a
+# spectrum over beams.
+#
+# The spectrum is spread over the downward-going selected beams proportionally to
+# their solid angle (Ω_beam), but normalized by Σ Ω·|μ| rather than Σ Ω. This makes
+# the *field-aligned* (vertical) energy flux crossing the horizontal top boundary
+# equal to `IeE_tot`, independent of how the beams are chosen. Only downward-going
+# beams (μ < 0) contribute.
+function field_aligned_beam_norm(beams, μ_center, Ω_beam)
+    downward = filter(b -> μ_center[b] < 0, beams)
+    isempty(downward) && error(
+        "InputFlux has no downward-going beams (μ < 0) among the selected beams $(beams). " *
+        "At least one downward-going beam is required to inject precipitation.")
+    denom = sum(Ω_beam[b] * abs(μ_center[b]) for b in downward)
+    return denom
 end
 
 

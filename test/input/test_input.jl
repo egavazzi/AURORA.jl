@@ -182,12 +182,14 @@ end
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
+    # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
+    μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
     # Check that IeE_top is respected for a Maxwellian without LET (with a tolerance of 0.1%)
     IeE_tot = 1e-2  # W/m²
     flux = InputFlux(MaxwellianSpectrum(IeE_tot, 100; low_energy_tail=false); beams=1)
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # Check that varying the beams does not change IeE_top
@@ -197,10 +199,13 @@ end
     Ie_top_LET_1 = compute_flux(flux1, model)
     Ie_top_LET_2 = compute_flux(flux2, model)
     Ie_top_LET_3 = compute_flux(flux3, model)
-    IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E_centers, (1, 1, :))) * qₑ
-    IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E_centers, (1, 1, :))) * qₑ
-    IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_1 = sum(Ie_top_LET_1 .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
+    IeE_top_2 = sum(Ie_top_LET_2 .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
+    IeE_top_3 = sum(Ie_top_LET_3 .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
 
+    # The vertical energy flux is independent of the beam selection.
+    # With the low-energy tail enabled, we cannot check IeE_tot equality, as the LET adds
+    # energy on top of the IeE_tot-normalized Maxwellian core.
     @test IeE_top_1 ≈ IeE_top_2 ≈ IeE_top_3
 end
 
@@ -217,6 +222,8 @@ end
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
+    # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
+    μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
     IeE_tot = 1e-2  # W/m²
     E_min = E_max - 100
@@ -225,44 +232,44 @@ end
     # SS
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min); beams=Beams)
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different Beams
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min); beams=[1, 3, 4])
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_max - 1000); beams=Beams)
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_max - 10); beams=Beams)
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # SS, different E_min
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=Float64(E_max)); beams=Beams)
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), ConstantModulation(); beams=Beams)
     Ie_top = compute_flux(flux, model, 0:0.01:1)
-    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, high source altitude
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), ConstantModulation();
                      beams=Beams, z_source=1000.0)
     Ie_top = compute_flux(flux, model, 0:0.01:1)
-    IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
     # TD, delayed smooth onset
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SmoothOnset(0.4, 0.8);
                      beams=Beams, z_source=altitude_lims[2])
     Ie_top = compute_flux(flux, model, 0:0.01:1)
-    IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_top_check = sum(Ie_top[:, end, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end
 
@@ -280,6 +287,8 @@ end
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
+    # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
+    μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
     IeE_tot = 1e-2  # W/m²
     E₀ = 5000.0     # center energy (eV)
@@ -288,25 +297,25 @@ end
     # SS - check energy flux is conserved
     flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE); beams=[1, 2])
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # SS, different Beams
     flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE); beams=[1, 3, 4])
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # SS, different E₀ and ΔE
     flux = InputFlux(GaussianSpectrum(IeE_tot, 3000.0, 1000.0); beams=[1, 2])
     Ie_top = compute_flux(flux, model)
-    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :))) * qₑ
+    IeE_top_check = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 
     # TD
     flux = InputFlux(GaussianSpectrum(IeE_tot, E₀, ΔE), ConstantModulation(); beams=[1, 2])
     Ie_top = compute_flux(flux, model, 0:0.01:1)
-    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_top_check = sum(Ie_top[:, 1, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_top_check, IeE_tot, rtol = 0.001)
 end
 
@@ -324,6 +333,8 @@ end
 
     # Physical constants
     qₑ = 1.602176620898e-19  # Elementary charge (C)
+    # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
+    μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
     IeE_tot = 1e-2  # W/m²
     E_min = 4000.0
@@ -336,19 +347,19 @@ end
     # At t where modulation is at peak (sin²(πft) = 1), flux should be IeE_tot
     # This happens when πft = π/2, i.e., t = 0.05s for f=10Hz
     t_peak_idx = round(Int, 0.05 / 0.001) + 1  # index for t=0.05s
-    IeE_at_peak = sum(Ie_top[:, t_peak_idx, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_at_peak = sum(Ie_top[:, t_peak_idx, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_at_peak, IeE_tot, rtol = 0.001)
     # At t where modulation is at minimum (sin²(πft) = 0), flux should be (1 - amplitude)*IeE_tot
     # This happens when πft = 0, i.e. t = 0.1s for f=10Hz
     t_min_idx = round(Int, 0.1 / 0.001) + 1  # index for t=0.1s
-    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_at_min, 0.2 * IeE_tot, rtol = 0.001)
 
     # Square modulation
     flux = InputFlux(FlatSpectrum(IeE_tot; E_min=E_min), SquareFlickering(f; amplitude=0.2);
                      beams=[1, 2])
     Ie_top = compute_flux(flux, model, 0:0.001:0.5)
-    IeE_in_time = sum(Ie_top .* reshape(E_centers, (1, 1, :)) * qₑ, dims = (1, 3))
+    IeE_in_time = sum(Ie_top .* reshape(E_centers, (1, 1, :)) .* μ_abs * qₑ, dims = (1, 3))
     # The maximum value should be equal to IeE_tot
     @test isapprox(maximum(IeE_in_time), IeE_tot, rtol=0.001)
     # The minimum value should be equal to 0.8 * IeE_tot
@@ -360,7 +371,7 @@ end
     Ie_top = compute_flux(flux, model, 0:0.001:0.5)
     # At minimum of sinus (where sin²(πft)=0), flux should be 0.5*IeE_tot
     t_min_idx = 1 # at t=0, sin²(0)=0 (modulation minimum)
-    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E_centers, (1, :))) * qₑ
+    IeE_at_min = sum(Ie_top[:, t_min_idx, :] .* reshape(E_centers, (1, :)) .* μ_abs) * qₑ
     @test isapprox(IeE_at_min, 0.5 * IeE_tot, rtol=0.001)
 end
 
