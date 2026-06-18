@@ -28,8 +28,7 @@ Normalized so that the integrated field-aligned (vertical) energy flux equals `I
 
 # Arguments
 - `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
-  crossing the horizontal top boundary. This is held fixed regardless of the beam
-  selection in [`InputFlux`](@ref).
+  crossing the horizontal top boundary.
 
 # Keyword Arguments
 - `E_min=0.0`: minimum energy threshold (eV). Flux is zero below this energy.
@@ -71,8 +70,7 @@ integrated field-aligned (vertical) energy flux equals `IeE_tot`.
 
 # Arguments
 - `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
-  crossing the horizontal top boundary. This is held fixed regardless of the beam
-  selection in [`InputFlux`](@ref).
+  crossing the horizontal top boundary.
 - `E₀`: center energy (eV)
 - `ΔE`: energy width (eV)
 
@@ -114,8 +112,7 @@ JGR 1989 (pages 13541-13552).
 
 # Arguments
 - `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
-  crossing the horizontal top boundary. This is held fixed regardless of the beam
-  selection in [`InputFlux`](@ref).
+  crossing the horizontal top boundary.
 - `E₀`: characteristic energy (eV)
 
 # Keyword Arguments

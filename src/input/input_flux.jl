@@ -59,27 +59,6 @@ to_beam_vector(b::AbstractRange{<:Integer}) = collect(Int, b)
 to_beam_vector(b::AbstractVector{<:Integer}) = convert(Vector{Int}, b)
 
 
-# Internal: field-aligned (vertical) normalization denominator for distributing a
-# spectrum over beams.
-#
-# The spectrum is spread over the downward-going selected beams proportionally to
-# their solid angle (Ω_beam), but normalized by Σ Ω·|μ| rather than Σ Ω. This makes
-# the *field-aligned* (vertical) energy flux crossing the horizontal top boundary
-# equal to `IeE_tot`, independent of how the beams are chosen. Only downward-going
-# beams (μ < 0) contribute; upward-going beams carry no precipitation.
-function field_aligned_beam_norm(beams, μ_center, Ω_beam)
-    downward = filter(b -> μ_center[b] < 0, beams)
-    isempty(downward) && error(
-        "InputFlux has no downward-going beams (μ < 0) among the selected beams $(beams). " *
-        "At least one downward-going beam is required to inject precipitation.")
-    denom = sum(Ω_beam[b] * abs(μ_center[b]) for b in downward)
-    denom > 0 || error(
-        "The selected beams $(beams) have a vanishing field-aligned solid angle (Σ Ω·|μ| ≈ 0). " *
-        "Select beams with μ sufficiently far from 0 (i.e. away from 90°).")
-    return denom
-end
-
-
 function Base.show(io::IO, flux::InputFlux)
     print(io, "InputFlux($(flux.spectrum), $(flux.modulation), beams=$(flux.beams))")
 end
@@ -371,6 +350,24 @@ function compute_flux(flux::InputFlux{<:AbstractSpectrum, <:AbstractModulation},
     error("Steady-state compute_flux does not support $(typeof(flux.modulation)). " *
           "Use ConstantModulation() for steady-state simulations, " *
           "or provide a time grid for time-dependent simulations: compute_flux(flux, model, t).")
+end
+
+
+# Internal: field-aligned (vertical) normalization denominator for distributing a
+# spectrum over beams.
+#
+# The spectrum is spread over the downward-going selected beams proportionally to
+# their solid angle (Ω_beam), but normalized by Σ Ω·|μ| rather than Σ Ω. This makes
+# the *field-aligned* (vertical) energy flux crossing the horizontal top boundary
+# equal to `IeE_tot`, independent of how the beams are chosen. Only downward-going
+# beams (μ < 0) contribute.
+function field_aligned_beam_norm(beams, μ_center, Ω_beam)
+    downward = filter(b -> μ_center[b] < 0, beams)
+    isempty(downward) && error(
+        "InputFlux has no downward-going beams (μ < 0) among the selected beams $(beams). " *
+        "At least one downward-going beam is required to inject precipitation.")
+    denom = sum(Ω_beam[b] * abs(μ_center[b]) for b in downward)
+    return denom
 end
 
 
