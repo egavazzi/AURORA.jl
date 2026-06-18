@@ -327,8 +327,15 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             sum_secondary = sum(secondary_e_spectra)    # for normalization
             sum_primary = sum(primary_e_spectra)        # for normalization
             if sum_secondary > 0
-                # scale by cross-section, spectra normalization, and number of secondaries
-                secondary_scale = σ_level * n_secondary / sum_secondary
+                # Normalize the secondary spectrum by `sum_primary` (the UNtruncated event count,
+                # == full secondary integral) rather than its own `sum_secondary`. The secondary
+                # law peaks at E_s→0, so the part below the ~2 eV grid floor is missing from the
+                # binned matrix (sum_secondary < sum_primary). Dividing by sum_secondary would
+                # smear that missing low-energy mass onto the surviving higher-energy bins,
+                # inflating ⟨E_s⟩ and breaking energy conservation (degraded+secondary > E_p-I).
+                # Using sum_primary correctly *loses* the sub-floor secondaries (they thermalize
+                # locally) and places the on-grid ones at their true energies → energy-conserving.
+                secondary_scale = σ_level * n_secondary / sum_primary
                 secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
             end
             if sum_primary > 0

@@ -1,5 +1,6 @@
 # Changelog
 
+- **Numerical Breaking (small)** Fix a bug in the energy cascading that led to creation of energy: secondary electrons below the energy-grid floor were mis-normalized (divided by their truncated sum), inflating the deposited energy.
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.
