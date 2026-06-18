@@ -21,15 +21,44 @@ function compute_f(
     @assert length(ΔΩ) == nμ "ΔΩ length must match pitch-angle dimension of Ie"
     @assert length(v) == nE "v length must match energy dimension of Ie"
 
-    f = similar(Ie, Float64)
-    @tturbo for i in 1:nE
+    return compute_f!(similar(Ie, Float64), Ie, psd_f_factor(ΔE_J, ΔΩ, v))
+end
+
+"""
+    psd_f_factor(ΔE_J, ΔΩ, v) -> factor[nμ, nE]
+
+Per-(beam, energy) conversion factor `m_e / (ΔE_J * v^2 * ΔΩ)` used by [`compute_f!`](@ref).
+It depends only on the grids, so when streaming it is built once and reused across time-chunks.
+"""
+function psd_f_factor(ΔE_J::AbstractVector, ΔΩ::AbstractVector, v::AbstractVector)
+    nE = length(v)
+    nμ = length(ΔΩ)
+    factor = Matrix{Float64}(undef, nμ, nE)
+    @inbounds for i in 1:nE
         denom_E = ΔE_J[i] * v[i]^2
         for j in 1:nμ
-            denom = denom_E * ΔΩ[j]
-            for it in 1:Nt, iz in 1:Nz
-                f[iz, j, it, i] = Ie[iz, j, it, i] * m_e / denom
-            end
+            factor[j, i] = m_e / (denom_E * ΔΩ[j])
         end
+    end
+    return factor
+end
+
+"""
+    compute_f!(f, Ie, factor) -> f
+
+In-place core of [`compute_f`](@ref): write the phase-space density into `f` (shape matching
+`Ie`) using the precomputed `factor` from [`psd_f_factor`](@ref). Folding the division into
+`factor` turns the hot loop into a single multiply, and reusing `f` avoids a full-chunk
+allocation per time-chunk.
+"""
+function compute_f!(
+    f::AbstractArray{<:Real, 4},
+    Ie::AbstractArray{<:Real, 4},
+    factor::AbstractMatrix,
+)
+    Nz, nμ, Nt, nE = size(Ie)
+    @tturbo for i in 1:nE, it in 1:Nt, j in 1:nμ, iz in 1:Nz
+        f[iz, j, it, i] = Ie[iz, j, it, i] * factor[j, i]
     end
     return f
 end
@@ -68,7 +97,34 @@ function compute_F(
 
     Nvpar = length(Δvpar)
     vpar_centers = @. 0.5 * (vpar_edges[1:(end - 1)] + vpar_edges[2:end])
+
+    F = Array{Float64, 3}(undef, Nvpar, Nz, Nt)
     F_local = zeros(Float64, Nz, Nvpar, Nt)
+    compute_F!(F, F_local, Ie, μ_lims, v, vpar_edges, Δvpar)
+
+    return (F = F, vpar_edges = vpar_edges, vpar_centers = vpar_centers, Δvpar = Δvpar)
+end
+
+"""
+    compute_F!(F, F_local, Ie, μ_lims, v, vpar_edges, Δvpar) -> F
+
+In-place core of [`compute_F`](@ref). Accumulates the reduction into the work buffer
+`F_local` (shape `[Nz, Nvpar, Nt]`, zeroed on entry) and writes the `[Nvpar, Nz, Nt]` result
+into `F`. Both buffers are reused across time-chunks when streaming; `vpar_edges`/`Δvpar` are
+fixed up front so every chunk maps onto the same bins.
+"""
+function compute_F!(
+    F::AbstractArray{<:Real, 3},
+    F_local::AbstractArray{<:Real, 3},
+    Ie::AbstractArray{<:Real, 4},
+    μ_lims::AbstractVector,
+    v::AbstractVector,
+    vpar_edges::AbstractVector,
+    Δvpar::AbstractVector,
+)
+    Nz, nμ, Nt, nE = size(Ie)
+    Nvpar = length(Δvpar)
+    fill!(F_local, 0.0)
 
     for i in 1:nE
         inv_v = 1 / v[i]
@@ -95,17 +151,21 @@ function compute_F(
                     continue
                 end
 
-                weight = overlap / src_width / Δvpar[k]
-                @tturbo for it in 1:Nt, iz in 1:Nz
-                    F_local[iz, k, it] += Ie[iz, j, it, i] * inv_v * weight
+                # Fold inv_v into the weight (one multiply per element) and use the
+                # non-threaded @turbo: this inner loop is launched once per (energy, beam,
+                # vpar-bin) — tens of thousands of times — so @tturbo's per-launch thread
+                # spawn is pure overhead and actually slows multi-threaded runs down. SIMD
+                # vectorisation (@turbo) is where the speed-up is.
+                weight = inv_v * overlap / src_width / Δvpar[k]
+                @turbo for it in 1:Nt, iz in 1:Nz
+                    F_local[iz, k, it] += Ie[iz, j, it, i] * weight
                 end
             end
         end
     end
 
-    F = permutedims(F_local, (2, 1, 3))
-
-    return (F = F, vpar_edges = vpar_edges, vpar_centers = vpar_centers, Δvpar = Δvpar)
+    permutedims!(F, F_local, (2, 1, 3))
+    return F
 end
 
 
@@ -155,6 +215,7 @@ function make_psd_file(
     vpe = want_F ?
           (isnothing(vpar_edges) ? default_vpar_edges(grids.v) : collect(Float64, vpar_edges)) :
           nothing
+    Nvpar = want_F ? length(vpe) - 1 : 0
 
     analysis_dir = joinpath(directory_to_process, "analysis")
     mkpath(analysis_dir)
@@ -209,7 +270,6 @@ function make_psd_file(
 
         F_v = nothing
         if want_F
-            Nvpar = length(vpe) - 1
             defDim(ds, "vpar",        Nvpar)
             defDim(ds, "vpar_bounds", Nvpar + 1)
             vpc_v = defVar(ds, "vpar_centers", Float64, ("vpar",);
@@ -227,13 +287,39 @@ function make_psd_file(
                                   "long_name" => "reduced distribution function F(v_parallel)"])
         end
 
+        # Grid-only quantities are constant across chunks, so build them once.
+        factor = want_f ? psd_f_factor(grids.ΔE_J, grids.ΔΩ, grids.v) : nothing
+        Δvpar  = want_F ? diff(vpe) : nothing
+
+        # Work buffers, allocated on the first (largest) chunk and reused afterwards. The final
+        # chunk may be shorter; for it we allocate a right-sized array rather than view the
+        # buffer, keeping the @tturbo kernels on dense contiguous memory.
+        fbuf    = nothing  # f output                [Nz, nμ, nt, nE]
+        F_work  = nothing  # F accumulation buffer   [Nz, Nvpar, nt]
+        F_out   = nothing  # F result (pre-permuted) [Nvpar, Nz, nt]
+
         # Stream the flux and fill the data variables chunk by chunk
         foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
+            nt = length(t_range)
             if want_f
-                f_v[:, :, t_range, :] = compute_f(Ie_chunk, grids.ΔE_J, grids.ΔΩ, grids.v)
+                if isnothing(fbuf)
+                    fbuf = Array{Float64, 4}(undef, Nz, nμ, nt, nE)
+                end
+                f_chunk = size(fbuf, 3) == nt ? fbuf : Array{Float64, 4}(undef, Nz, nμ, nt, nE)
+                compute_f!(f_chunk, Ie_chunk, factor)
+                f_v[:, :, t_range, :] = f_chunk
             end
             if want_F
-                F_v[:, :, t_range] = compute_F(Ie_chunk, coord.μ_lims, grids.v; vpar_edges = vpe).F
+                if isnothing(F_work)
+                    F_work = zeros(Float64, Nz, Nvpar, nt)
+                    F_out  = Array{Float64, 3}(undef, Nvpar, Nz, nt)
+                end
+                if size(F_work, 3) != nt
+                    F_work = zeros(Float64, Nz, Nvpar, nt)
+                    F_out  = Array{Float64, 3}(undef, Nvpar, Nz, nt)
+                end
+                compute_F!(F_out, F_work, Ie_chunk, coord.μ_lims, grids.v, vpe, Δvpar)
+                F_v[:, :, t_range] = F_out
             end
         end
     end
