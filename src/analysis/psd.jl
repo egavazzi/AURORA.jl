@@ -151,9 +151,14 @@ function compute_F!(
                     continue
                 end
 
-                weight = overlap / src_width / Δvpar[k]
-                @tturbo for it in 1:Nt, iz in 1:Nz
-                    F_local[iz, k, it] += Ie[iz, j, it, i] * inv_v * weight
+                # Fold inv_v into the weight (one multiply per element) and use the
+                # non-threaded @turbo: this inner loop is launched once per (energy, beam,
+                # vpar-bin) — tens of thousands of times — so @tturbo's per-launch thread
+                # spawn is pure overhead and actually slows multi-threaded runs down. SIMD
+                # vectorisation (@turbo) is where the speed-up is.
+                weight = inv_v * overlap / src_width / Δvpar[k]
+                @turbo for it in 1:Nt, iz in 1:Nz
+                    F_local[iz, k, it] += Ie[iz, j, it, i] * weight
                 end
             end
         end
