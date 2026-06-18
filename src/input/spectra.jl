@@ -24,10 +24,12 @@ abstract type AbstractSpectrum end
 Flat (constant) differential number flux spectrum above a minimum energy.
 
 The flux is uniform in #e⁻/m²/s/eV for energies above `E_min`, and zero below.
-Normalized so that the integrated energy flux equals `IeE_tot`.
+Normalized so that the integrated field-aligned (vertical) energy flux equals `IeE_tot`.
 
 # Arguments
-- `IeE_tot`: total energy flux (W/m²)
+- `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
+  crossing the horizontal top boundary. This is held fixed regardless of the beam
+  selection in [`InputFlux`](@ref).
 
 # Keyword Arguments
 - `E_min=0.0`: minimum energy threshold (eV). Flux is zero below this energy.
@@ -65,10 +67,12 @@ end
 Gaussian energy spectrum centered at `E₀` with width `ΔE`.
 
 The spectral shape is Φ(E) ∝ exp(-(E - E₀)² / ΔE²), normalized so that the
-integrated energy flux equals `IeE_tot`.
+integrated field-aligned (vertical) energy flux equals `IeE_tot`.
 
 # Arguments
-- `IeE_tot`: total energy flux (W/m²)
+- `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
+  crossing the horizontal top boundary. This is held fixed regardless of the beam
+  selection in [`InputFlux`](@ref).
 - `E₀`: center energy (eV)
 - `ΔE`: energy width (eV)
 
@@ -109,7 +113,9 @@ Based on the corrected implementation of Meier/Strickland/Hecht/Christensen
 JGR 1989 (pages 13541-13552).
 
 # Arguments
-- `IeE_tot`: total energy flux (W/m²)
+- `IeE_tot`: total field-aligned (vertical) energy flux (W/m²), i.e. the energy flux
+  crossing the horizontal top boundary. This is held fixed regardless of the beam
+  selection in [`InputFlux`](@ref).
 - `E₀`: characteristic energy (eV)
 
 # Keyword Arguments

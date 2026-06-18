@@ -23,7 +23,8 @@ Once an `InputFlux` is built, it is bundled with an [`AuroraModel`](@ref) into a
 
 A spectrum controls the *energy shape* of the input flux. All built-in spectrum types
 are sub-types of [`AbstractSpectrum`](@ref) and are normalized so that the integrated
-energy flux equals `IeE_tot` (W/m²).
+**field-aligned (vertical) energy flux** equals `IeE_tot` (W/m²) — that is, the energy
+flux crossing the horizontal top boundary of the simulated ionosphere.
 
 | Type | Shape | Key parameters |
 |------|-------|----------------|
@@ -91,8 +92,20 @@ source altitude (`z_source`).
 **`beams`** selects which pitch-angle beams receive precipitating flux. Beam indices
 correspond to the downward-pointing elements of the pitch-angle grid (i.e. beams with
 μ < 0). Upward-going beams are always forced to zero inside `compute_flux`.
-The total spectrum is divided among the selected beams weighted by their solid angle
-(Ω_beam), so the total energy flux is preserved regardless of how many beams are chosen.
+The spectrum is divided among the selected beams weighted by their solid angle
+(Ω_beam), and normalized so that the **field-aligned (vertical) energy flux** is
+preserved regardless of which beams are chosen. In other words, `beams` controls only
+the *angular distribution* of the precipitation, not the total energy budget reaching
+the atmosphere: the vertical energy flux through the top boundary always equals
+`IeE_tot`.
+
+!!! warning "Breaking change"
+    Earlier versions normalized `IeE_tot` to the *omnidirectional* energy flux
+    (`Σ number-flux × energy`, with no projection onto the field line), so the energy
+    actually deposited varied with the beam selection. `IeE_tot` now denotes the
+    **field-aligned (vertical)** energy flux. For near-field-aligned beams the
+    difference is negligible (≲1 %), but for wide pitch-angle selections (down to 90°)
+    the resulting number fluxes are larger by up to a factor of ~2.
 
 **`z_source`** (km) is the altitude from which electrons are launched. If set, electrons
 of different energies and pitch angles acquire a *travel-time delay* before reaching the
