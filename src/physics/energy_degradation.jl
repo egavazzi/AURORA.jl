@@ -190,17 +190,24 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, ene
                     partition_fraction[end] = 0
                 end
 
-                # Normalize partition fractions to sum to 1
-                partition_fraction = partition_fraction / sum(partition_fraction)
+                # Normalize partition fractions to sum to 1. If they sum to zero, the degraded
+                # electrons all land on/below the grid floor (no overlap with any on-grid bin),
+                # so they are lost — they thermalise below the grid. Skip placing them. This also
+                # guards a 0/0 NaN that a coarse energy grid can hit when an energy loss aligns
+                # exactly with a bin edge (degraded band has zero overlap with its only target bin).
+                partition_sum = sum(partition_fraction)
+                if partition_sum > 0
+                    partition_fraction = partition_fraction / partition_sum
 
-                # Add the degraded electron flux to Q
-                # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
-                for i_u in eachindex(partition_fraction)
-                    iE_degrade = i_degrade[i_u]
-                    weight = partition_fraction[i_u] * factor
-                    @tturbo for j in axes(Q, 2)
-                        for k in axes(Q, 1)
-                            Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
+                    # Add the degraded electron flux to Q
+                    # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
+                    for i_u in eachindex(partition_fraction)
+                        iE_degrade = i_degrade[i_u]
+                        weight = partition_fraction[i_u] * factor
+                        @tturbo for j in axes(Q, 2)
+                            for k in axes(Q, 1)
+                                Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
+                            end
                         end
                     end
                 end
