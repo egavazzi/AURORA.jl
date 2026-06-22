@@ -484,3 +484,55 @@ end
     # The cascade must never create energy: outgoing electrons carry ≤ the available excess.
     @test maximum(ratios) <= 1.005
 end
+
+
+# Double-ionization energy conservation. A double-ionization event ejects TWO secondaries that,
+# together with the degraded primary, share the excess W = E_primary − threshold. The previous
+# implementation reused the SINGLE-secondary transfer matrices and merely multiplied the secondary
+# spectrum by n_secondary = 2, so the outgoing electrons carried W + ⟨E_s⟩ > W — the cascade
+# created energy (this test's `maximum(ratios) <= 1.005` fails on that code). The fix builds proper
+# joint-integral matrices (two i.i.d. secondaries, degraded primary = the largest remainder), so
+# ⟨E_d⟩ + 2·⟨E_s⟩ = W exactly and energy is conserved with `compute_ionization_spectra!` unchanged.
+@testitem "Cascading double-ionization energy conservation (floored grid)" begin
+    using AURORA
+
+    spec = AURORA.DefaultCascadingSpecN2()             # real law 1 / (11.4² + E_s²)
+    @test spec.n_secondaries[end] == 2                 # sanity: last channel is double ionization
+    I = spec.ionization_thresholds[end]                # 42.0 eV double-ionization threshold
+    eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
+    Ec = eg.E_centers
+    nE = length(Ec)
+
+    # Build the transfer matrices on this grid and stuff them into a cache by hand (so the test
+    # is deterministic and independent of the on-disk cascading cache).
+    P, S, Eed, thr = AURORA.calculate_cascading_matrices(spec, eg.E_edges; verbose = false)
+    cache = AURORA.SpeciesCascadingCache(spec)
+    cache.primary_transfer_matrix   = P
+    cache.secondary_transfer_matrix = S
+    cache.E_edges                   = collect(Eed)
+    cache.ionization_thresholds     = collect(thr)
+
+    # A single DOUBLE-ionizing channel: threshold I ejects two secondaries (column 2 == 2). Level 1
+    # is the (skipped) elastic placeholder, matching the real E_levels layout.
+    E_levels = [0.0 0.0; I 2.0]
+    σ = zeros(2, nE); σ[2, :] .= 1.0
+
+    ratios = Float64[]
+    for iE in eachindex(Ec)
+        Ec[iE] - I < 10 && continue                    # skip near-threshold (too few bins to be meaningful)
+        sec  = zeros(nE)
+        prim = zeros(nE)
+        AURORA.compute_ionization_spectra!(sec, prim, σ, E_levels, cache, iE)
+        sum(prim) <= 0 && continue
+        # Energy carried away by the three outgoing electrons (degraded primary + 2 secondaries).
+        placed = sum(Ec .* (sec .+ prim)) / σ[2, iE]
+        push!(ratios, placed / (Ec[iE] - I))
+    end
+
+    @test length(ratios) > 50
+    # Never create energy: degraded primary + two secondaries carry ≤ the available excess.
+    @test maximum(ratios) <= 1.005
+    # And well above threshold (secondaries mostly on-grid) the cascade places ~all of the excess,
+    # confirming the two secondaries are actually deposited rather than dropped.
+    @test maximum(ratios) >= 0.95
+end

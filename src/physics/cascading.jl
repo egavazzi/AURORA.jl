@@ -1,5 +1,10 @@
 using HCubature: hcubature, hcubature_buffer
 
+# Relative tolerance for the 3-D double-ionization cubatures. The single-ionization 2-D integrals
+# use hcubature's tight default (rtol ≈ 1.5e-8); the extra dimension makes that prohibitively
+# expensive, and the transfer matrices feed a physics solver where ~1e-3 is amply accurate.
+const DOUBLE_ION_RTOL = 1e-3
+
 # ======================================================================================== #
 #           CASCADING SPEC — Species specific cascading physics definition                 #
 # ======================================================================================== #
@@ -8,10 +13,18 @@ using HCubature: hcubature, hcubature_buffer
 struct CascadingSpec{F}
     name::String
     ionization_thresholds::Vector{Float64}
+    n_secondaries::Vector{Int}   # secondary e⁻ ejected per channel: 1 = single, 2 = double ionization
     secondary_law::F   # callable (E_secondary, E_primary) -> Float64
-    function CascadingSpec(name::AbstractString, thresholds::AbstractVector, law)
+    function CascadingSpec(name::AbstractString, thresholds::AbstractVector, law;
+                           n_secondaries::AbstractVector{<:Integer} = ones(Int, length(thresholds)))
         require_reproducible(law, "cascading secondary_law")
-        return new{typeof(law)}(String(name), collect(Float64, thresholds), law)
+        length(n_secondaries) == length(thresholds) || throw(ArgumentError(
+            "n_secondaries (length $(length(n_secondaries))) must match ionization_thresholds \
+             (length $(length(thresholds)))"))
+        all(n -> 1 <= n <= 2, n_secondaries) || throw(ArgumentError(
+            "n_secondaries entries must be 1 (single) or 2 (double ionization); got $(collect(n_secondaries))"))
+        return new{typeof(law)}(String(name), collect(Float64, thresholds),
+                                collect(Int, n_secondaries), law)
     end
 end
 
@@ -39,25 +52,30 @@ function interp_flat(x::AbstractVector, y::AbstractVector, xq)
     return y[i] + t * (y[i + 1] - y[i])
 end
 
+# `n_secondaries` mirrors the last column of the `*_levels.dat` files: every channel ejects a
+# single secondary electron except the last (double-ionization) threshold, which ejects two.
 function DefaultCascadingSpecN2()
     ionization_thresholds = [15.581, 16.73, 18.75, 24.0, 42.0]
+    n_secondaries         = [1, 1, 1, 1, 2]
     law = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-    return CascadingSpec("N2", ionization_thresholds, law)
+    return CascadingSpec("N2", ionization_thresholds, law; n_secondaries)
 end
 
 function DefaultCascadingSpecO2()
     ionization_thresholds = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
+    n_secondaries         = [1, 1, 1, 1, 1, 2]
     law = @law (E_s, E_p) -> 1.0 / (15.2^2 + E_s^2)
-    return CascadingSpec("O2", ionization_thresholds, law)
+    return CascadingSpec("O2", ionization_thresholds, law; n_secondaries)
 end
 
 function DefaultCascadingSpecO()
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
+    n_secondaries         = [1, 1, 1, 2]
     energy_params = [100.0, 200, 500, 1000, 2000]  # eV
     A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
     B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
     law = OSecondaryLaw(energy_params, A_params, B_params)
-    return CascadingSpec("O", ionization_thresholds, law)
+    return CascadingSpec("O", ionization_thresholds, law; n_secondaries)
 end
 
 
@@ -187,6 +205,115 @@ function (integrand::SecondaryCascadingIntegrand)(vars)
 end
 
 
+#=
+DOUBLE IONIZATION
+-----------------
+A double-ionization event ejects TWO secondary electrons, so the excess energy
+    W = E_primary - threshold
+is shared by three outgoing electrons: the degraded primary E_d and two secondaries E_s1, E_s2,
+with E_d + E_s1 + E_s2 = W. The two secondaries are drawn i.i.d. from the same `secondary_law`,
+so their joint (unnormalized) density is `secondary_law(E_s1, E_p) * secondary_law(E_s2, E_p)`.
+By convention the degraded primary is the most energetic electron (E_d ≥ E_s1 and E_d ≥ E_s2),
+which restricts the integration to
+    R = { E_s1, E_s2 ≥ 0 ,  2·E_s1 + E_s2 ≤ W ,  E_s1 + 2·E_s2 ≤ W }.
+
+These two integrands add a third integration variable (the partner electron) on top of the
+E_primary mapping used by the single-ionization integrands. The resulting matrices are built so
+that, summed over their respective output bins, both equal the same event count
+    Z₂ = ∬_R secondary_law(E_s1)·secondary_law(E_s2) dE_s1 dE_s2 ,
+exactly like the single-ionization pair. `compute_ionization_spectra!` then normalizes by
+`sum_primary` (≈ Z₂, the degraded primary being the highest-energy electron and thus on-grid)
+and multiplies the secondary spectrum by `n_secondary = 2`. With the secondary matrix carrying
+the PER-secondary marginal (∫ over the partner), this reproduces ⟨E_d⟩ + 2·⟨E_s⟩ = W exactly,
+so energy is conserved with no change to `compute_ionization_spectra!`.
+
+Caveat — `secondary_law` is a SINGLE-ionization fit. The forms used here (the Cauchy/Lorentzian
+`1 / (a² + E_s²)` for N₂/O₂ and the Opal–Peterson–Beaty form for O) describe the ejected-electron
+energy spectrum of *single* ionization. There is no equally well-established law for the two
+electrons freed in a double-ionization event, so we reuse the single-ionization law and treat the
+two secondaries as independent, identically-distributed draws from it. This neglects both the
+(likely different) true double-ionization secondary spectrum and the energy correlation between
+the two ejected electrons. It is a deliberate approximation — the best we can do without a
+dedicated double-ionization differential cross section — but it conserves energy and reduces to
+the correct single-ionization behaviour, which is what matters most for the transport cascade.
+=#
+
+"""
+    DoubleSecondaryCascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
+
+Integrand for the per-secondary marginal of a double-ionization event. Outer variable is the
+binned secondary energy `E_s1`; `u_partner` maps the partner secondary `E_s2`, and `u_primary`
+maps `E_primary` (each over [0, 1]).
+"""
+struct DoubleSecondaryCascadingIntegrand{FT, F}
+    E_primary_bin_min::FT
+    E_primary_bin_max::FT
+    threshold::FT
+    secondary_law::F
+end
+
+"""
+    DoublePrimaryCascadingIntegrand(E_primary_bin_min, E_primary_bin_max, threshold, secondary_law)
+
+Integrand for the degraded-primary distribution of a double-ionization event. Outer variable is
+the binned degraded energy `E_d`; `u_secondary` maps the free secondary `E_s1` (the partner
+`E_s2 = W - E_d - E_s1` follows from energy conservation), and `u_primary` maps `E_primary`.
+"""
+struct DoublePrimaryCascadingIntegrand{FT, F}
+    E_primary_bin_min::FT
+    E_primary_bin_max::FT
+    threshold::FT
+    secondary_law::F
+end
+
+function (integrand::DoubleSecondaryCascadingIntegrand)(vars)
+    E_s1, u_partner, u_primary = vars
+
+    # E_s1 must be ≤ the degraded primary, i.e. E_s1 ≤ W/2 ⟺ E_primary ≥ threshold + 2·E_s1.
+    E_primary_lower = max(integrand.E_primary_bin_min, integrand.threshold + 2 * E_s1)
+    E_primary_upper = integrand.E_primary_bin_max
+    jac_primary = E_primary_upper - E_primary_lower
+    jac_primary <= 0 && return 0.0
+    E_primary = E_primary_lower + u_primary * jac_primary
+    W = E_primary - integrand.threshold
+
+    # Given E_s1, the partner E_s2 is bounded by E_d ≥ E_s1 (E_s2 ≤ W - 2·E_s1) and
+    # E_d ≥ E_s2 (E_s2 ≤ (W - E_s1)/2). Both are ≥ 0 here since E_primary ≥ threshold + 2·E_s1.
+    E_s2_upper = min(W - 2 * E_s1, (W - E_s1) / 2)
+    E_s2_upper <= 0 && return 0.0
+    E_s2 = u_partner * E_s2_upper
+    jac_partner = E_s2_upper
+
+    return jac_primary * jac_partner *
+           integrand.secondary_law(E_s1, E_primary) * integrand.secondary_law(E_s2, E_primary)
+end
+
+function (integrand::DoublePrimaryCascadingIntegrand)(vars)
+    E_degraded, u_secondary, u_primary = vars
+
+    # E_d is the most energetic electron, so W ∈ [E_d, 3·E_d] ⟺ E_primary ∈ [threshold + E_d,
+    # threshold + 3·E_d] (W ≥ E_d so the two secondaries fit; W ≤ 3·E_d so E_d ≥ W/3 stays max).
+    E_primary_lower = max(integrand.E_primary_bin_min, integrand.threshold + E_degraded)
+    E_primary_upper = min(integrand.E_primary_bin_max, integrand.threshold + 3 * E_degraded)
+    jac_primary = E_primary_upper - E_primary_lower
+    jac_primary <= 0 && return 0.0
+    E_primary = E_primary_lower + u_primary * jac_primary
+    W = E_primary - integrand.threshold
+
+    # With E_d fixed, sweep E_s1 over its valid range; E_s2 = W - E_d - E_s1 (Jacobian 1). The
+    # bounds enforce E_s2 ≥ 0 (E_s1 ≤ W - E_d), E_s1 ≤ E_d, and E_s2 ≤ E_d (E_s1 ≥ W - 2·E_d).
+    E_s1_lower = max(0.0, W - 2 * E_degraded)
+    E_s1_upper = min(E_degraded, W - E_degraded)
+    jac_secondary = E_s1_upper - E_s1_lower
+    jac_secondary <= 0 && return 0.0
+    E_s1 = E_s1_lower + u_secondary * jac_secondary
+    E_s2 = W - E_degraded - E_s1
+
+    return jac_primary * jac_secondary *
+           integrand.secondary_law(E_s1, E_primary) * integrand.secondary_law(E_s2, E_primary)
+end
+
+
 """
     calculate_cascading_matrices(spec, E_edges; verbose=true)
 
@@ -214,100 +341,164 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
     n_E = length(E_left) # number of energy bins is one less than number of edges
 
     ionization_thresholds = spec.ionization_thresholds
+    n_secondaries = spec.n_secondaries
     n_thresholds = length(ionization_thresholds)
     primary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
     secondary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
-    # Pre-allocate hcubature work buffers. One per thread (heap located).
+    # Pre-allocate hcubature work buffers, one per thread (heap located). Single-ionization
+    # integrands are 2-D; double ionization adds a third (partner-electron) integration variable.
     primary_bufs = [hcubature_buffer(DegradedCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
                                      (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
     secondary_bufs = [hcubature_buffer(SecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
                                        (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
+    double_primary_bufs = [hcubature_buffer(DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+                                            (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
+    double_secondary_bufs = [hcubature_buffer(DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+                                              (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
 
     # Loop over ionization thresholds
     for i_threshold in n_thresholds:-1:1
         threshold = ionization_thresholds[i_threshold]
+        single_secondary = n_secondaries[i_threshold] == 1
 
         # Find the first primary bin whose left edge is above the threshold and can
-        # therefore be contribute to ionization collisions.
+        # therefore contribute to ionization collisions.
         i_min_primary = searchsortedfirst(E_left, threshold)
 
-        # Loop over primary electron energy bins
+        # Loop over primary electron energy bins. The per-bin work is delegated so the single-
+        # ionization numerics stay untouched while double ionization uses the 3-D integrands.
         Threads.@threads :static for i_primary in i_min_primary:n_E
-            E_primary_bin_min = E_edges[i_primary]      # left edge
-            E_primary_bin_max = E_edges[i_primary + 1]  # right edge
-
-            # Define the integrands for this primary bin and ionization threshold.
-            degraded_integrand = DegradedCascadingIntegrand(E_primary_bin_min,
-                                                           E_primary_bin_max,
-                                                           threshold,
-                                                           spec.secondary_law)
-            secondary_integrand = SecondaryCascadingIntegrand(E_primary_bin_min,
-                                                              E_primary_bin_max,
-                                                              threshold,
-                                                              spec.secondary_law)
-
-
-            # For a fixed primary energy, the secondary/degraded boundary sits at half of
-            # the excess energy. Using the lower edge of the primary bin gives the lowest
-            # such boundary for this primary bin.
-            E_secondary_boundary_lower = (E_primary_bin_min - threshold) / 2
-            # First bin that can receive a degraded primary electron. Its left edge can be
-            # ≤ E_secondary_boundary_lower as long as its right edge extends into
-            # the degraded-primary range. As such, we select based on the first right edge
-            # above the lowest secondary/degraded boundary for this primary bin.
-            i_min_degraded = searchsortedlast(E_left, E_secondary_boundary_lower)
-            # If the lowest secondary/degraded boundary lies below the grid minimum, skip.
-            i_min_degraded == 0 && continue
-            # Loop over degraded primary electron energy bins
-            for i_degraded in i_min_degraded:(i_primary - 1)
-                E_degraded_bin_min = E_edges[i_degraded]
-                E_degraded_bin_max = E_edges[i_degraded + 1]
-                E_degraded_lower = max(E_degraded_bin_min, E_secondary_boundary_lower)
-                E_degraded_upper = min(E_degraded_bin_max, E_primary_bin_max - threshold)
-                # Integrate only if limits are physical
-                if E_degraded_upper > E_degraded_lower
-                    result, _ = hcubature(degraded_integrand,
-                                         (E_degraded_lower, 0.0),
-                                         (E_degraded_upper, 1.0);
-                                         buffer = primary_bufs[Threads.threadid()],
-                                         )
-                    primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
-                end
-            end
-
-
-            # Using the upper edge of the primary bin gives the highest secondary/degraded
-            # boundary for this primary bin.
-            E_secondary_boundary_upper = (E_primary_bin_max - threshold) / 2
-            # Last bin that can receive a secondary electron. Its left edge must be below
-            # the highest secondary/degraded boundary for this primary bin.
-            i_max_secondary = searchsortedlast(E_left, E_secondary_boundary_upper)
-            # Theoritically the secondary/degraded boundary could lie above the left edge of
-            # the primary bin (if we use a very coarse grid). Ensure it must be under.
-            i_max_secondary = min(i_max_secondary, i_primary - 1)
-            # Loop over the secondary electron energy bins
-            for i_secondary in 1:i_max_secondary
-                E_secondary_bin_min = E_edges[i_secondary]
-                E_secondary_bin_max = E_edges[i_secondary + 1]
-                E_secondary_upper = min(E_secondary_bin_max, E_secondary_boundary_upper)
-                # Integrate only if limits are physical
-                if E_secondary_upper > E_secondary_bin_min
-                    result, _ = hcubature(secondary_integrand,
-                                         (E_secondary_bin_min, 0.0),
-                                         (E_secondary_upper, 1.0);
-                                         buffer = secondary_bufs[Threads.threadid()],
-                                         )
-                    secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
-                end
+            tid = Threads.threadid()
+            if single_secondary
+                fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                            E_edges, E_left, threshold, i_primary, i_threshold,
+                                            spec.secondary_law, primary_bufs[tid], secondary_bufs[tid])
+            else
+                fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                            E_edges, E_left, threshold, i_primary, i_threshold,
+                                            spec.secondary_law, double_primary_bufs[tid],
+                                            double_secondary_bufs[tid])
             end
         end
     end
 
     verbose && println(" done.")
     return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds
+end
+
+
+# Single-ionization (one secondary) contribution for one primary bin `i_primary` and threshold
+# index `i_threshold`. Extracted verbatim from the per-bin body so the single-ion numerics are
+# unchanged; double ionization is handled by `fill_double_ionization_bin!`.
+function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                     E_edges, E_left, threshold, i_primary, i_threshold,
+                                     secondary_law, primary_buf, secondary_buf)
+    E_primary_bin_min = E_edges[i_primary]      # left edge
+    E_primary_bin_max = E_edges[i_primary + 1]  # right edge
+
+    # Define the integrands for this primary bin and ionization threshold.
+    degraded_integrand = DegradedCascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                                    threshold, secondary_law)
+    secondary_integrand = SecondaryCascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                                      threshold, secondary_law)
+
+    # For a fixed primary energy, the secondary/degraded boundary sits at half of the excess
+    # energy. Using the lower edge of the primary bin gives the lowest such boundary.
+    E_secondary_boundary_lower = (E_primary_bin_min - threshold) / 2
+    # First bin that can receive a degraded primary electron (right edge above that boundary).
+    i_min_degraded = searchsortedlast(E_left, E_secondary_boundary_lower)
+    # If the lowest secondary/degraded boundary lies below the grid minimum, skip this bin.
+    i_min_degraded == 0 && return
+    # Loop over degraded primary electron energy bins
+    for i_degraded in i_min_degraded:(i_primary - 1)
+        E_degraded_bin_min = E_edges[i_degraded]
+        E_degraded_bin_max = E_edges[i_degraded + 1]
+        E_degraded_lower = max(E_degraded_bin_min, E_secondary_boundary_lower)
+        E_degraded_upper = min(E_degraded_bin_max, E_primary_bin_max - threshold)
+        # Integrate only if limits are physical
+        if E_degraded_upper > E_degraded_lower
+            result, _ = hcubature(degraded_integrand, (E_degraded_lower, 0.0),
+                                 (E_degraded_upper, 1.0); buffer = primary_buf)
+            primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
+        end
+    end
+
+    # Using the upper edge of the primary bin gives the highest secondary/degraded boundary.
+    E_secondary_boundary_upper = (E_primary_bin_max - threshold) / 2
+    # Last bin that can receive a secondary electron (left edge below that boundary).
+    i_max_secondary = searchsortedlast(E_left, E_secondary_boundary_upper)
+    # On a coarse grid the boundary could lie above the left edge of the primary bin; clamp.
+    i_max_secondary = min(i_max_secondary, i_primary - 1)
+    # Loop over the secondary electron energy bins
+    for i_secondary in 1:i_max_secondary
+        E_secondary_bin_min = E_edges[i_secondary]
+        E_secondary_bin_max = E_edges[i_secondary + 1]
+        E_secondary_upper = min(E_secondary_bin_max, E_secondary_boundary_upper)
+        # Integrate only if limits are physical
+        if E_secondary_upper > E_secondary_bin_min
+            result, _ = hcubature(secondary_integrand, (E_secondary_bin_min, 0.0),
+                                 (E_secondary_upper, 1.0); buffer = secondary_buf)
+            secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
+        end
+    end
+    return
+end
+
+
+# Double-ionization (two secondaries) contribution for one primary bin. Builds the degraded-
+# primary distribution and the PER-secondary marginal via the 3-D joint integrands above. Both
+# matrices sum (over their output bins) to the same event count Z₂, so `compute_ionization_spectra!`
+# conserves energy unchanged. Bin ranges differ from single ionization: the degraded primary is
+# the highest-energy electron, so it reaches down only to W/3 (not W/2), while a single secondary
+# still maxes out at W/2.
+function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                     E_edges, E_left, threshold, i_primary, i_threshold,
+                                     secondary_law, primary_buf, secondary_buf)
+    E_primary_bin_min = E_edges[i_primary]      # left edge
+    E_primary_bin_max = E_edges[i_primary + 1]  # right edge
+
+    degraded_integrand = DoublePrimaryCascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                                        threshold, secondary_law)
+    secondary_integrand = DoubleSecondaryCascadingIntegrand(E_primary_bin_min, E_primary_bin_max,
+                                                          threshold, secondary_law)
+
+    # Degraded primary: E_d ≥ W/3, so the lowest reachable degraded energy for this primary bin
+    # is (E_primary_bin_min − threshold)/3 and the highest is W = E_primary_bin_max − threshold.
+    E_degraded_boundary_lower = (E_primary_bin_min - threshold) / 3
+    E_degraded_max = E_primary_bin_max - threshold
+    i_min_degraded = max(1, searchsortedlast(E_left, E_degraded_boundary_lower))
+    for i_degraded in i_min_degraded:(i_primary - 1)
+        E_degraded_bin_min = E_edges[i_degraded]
+        E_degraded_bin_max = E_edges[i_degraded + 1]
+        E_degraded_lower = max(E_degraded_bin_min, E_degraded_boundary_lower)
+        E_degraded_upper = min(E_degraded_bin_max, E_degraded_max)
+        if E_degraded_upper > E_degraded_lower
+            result, _ = hcubature(degraded_integrand, (E_degraded_lower, 0.0, 0.0),
+                                 (E_degraded_upper, 1.0, 1.0);
+                                 rtol = DOUBLE_ION_RTOL, buffer = primary_buf)
+            primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
+        end
+    end
+
+    # Secondary: a single secondary still reaches at most W/2 = (E_primary_bin_max − threshold)/2.
+    E_secondary_boundary_upper = (E_primary_bin_max - threshold) / 2
+    i_max_secondary = searchsortedlast(E_left, E_secondary_boundary_upper)
+    i_max_secondary = min(i_max_secondary, i_primary - 1)
+    for i_secondary in 1:i_max_secondary
+        E_secondary_bin_min = E_edges[i_secondary]
+        E_secondary_bin_max = E_edges[i_secondary + 1]
+        E_secondary_upper = min(E_secondary_bin_max, E_secondary_boundary_upper)
+        if E_secondary_upper > E_secondary_bin_min
+            result, _ = hcubature(secondary_integrand, (E_secondary_bin_min, 0.0, 0.0),
+                                 (E_secondary_upper, 1.0, 1.0);
+                                 rtol = DOUBLE_ION_RTOL, buffer = secondary_buf)
+            secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
+        end
+    end
+    return
 end
 
 
