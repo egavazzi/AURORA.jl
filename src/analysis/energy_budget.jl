@@ -196,7 +196,8 @@ function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = n
 end
 
 """
-    energy_budget_integrated(sim_dir; trange=:, verbose=true) -> TimeIntegratedEnergyBudget
+    energy_budget_integrated(sim_dir; trange=:, max_bytes=512*1024^2, verbose=true)
+        -> TimeIntegratedEnergyBudget
 
 Time-integrated energy balance for a *time-dependent* run, computed from a saved directory by
 trapezoidally integrating the per-time-slice [`energy_budget`](@ref) over the time axis (or the
@@ -209,9 +210,13 @@ energy left stored in the population over `[t0, t1]` plus numerical non-conserva
 appropriate tool for a pulsed / Alfvénic precipitation run, where a single snapshot does not
 conserve.
 
-`z_centroid` is the deposition-energy-weighted average of the per-slice centroids.
+The flux is streamed from `simulation_data.nc` in time-chunks (a single pass, peak memory
+bounded by `max_bytes`; cf. [`foreach_Ie_time_chunk`](@ref)) rather than loaded all at once. A
+sub-range `trange` still streams the whole file and filters in memory. `z_centroid` is the
+deposition-energy-weighted average of the per-slice centroids.
 """
-function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(), verbose::Bool = true)
+function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(),
+                                  max_bytes::Real = 512 * 1024^2, verbose::Bool = true)
     model = load_model(sim_dir)
     model.s_field = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
     co = load_coordinates(sim_dir)
@@ -222,26 +227,39 @@ function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(), ver
         throw(ArgumentError("need ≥ 2 time slices to integrate; use `energy_budget` for a single snapshot"))
     tt = co.t[ts]
     w  = trapz_weights(tt)             # ∫ f dt ≈ Σ w[k] f[k]
+    lo, hi = first(ts), last(ts)
+
+    # Stream the flux in time-chunks (a single pass over simulation_data.nc, peak memory bounded
+    # by `max_bytes`) and keep the cheap per-slice snapshot budgets; integrate them afterwards.
+    # `push!` mutates the vectors in place, so the streaming closure boxes none of the totals.
+    budgets = EnergyBudget[]
+    idxs    = Int[]
+    foreach_Ie_time_chunk(sim_dir; max_bytes) do Ie_chunk, t_range
+        for (j, it) in enumerate(t_range)
+            lo <= it <= hi || continue
+            push!(budgets, energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]);
+                                                  verbose = false))
+            push!(idxs, it)
+        end
+    end
 
     names = [String(sp.name) for sp in model.species]
     sums  = Dict(n => 0.0 for n in names)
     input = 0.0; escape = 0.0; inelastic = 0.0; ionization = 0.0; excitation = 0.0
     heating = 0.0; input_raw = 0.0; escape_raw = 0.0; ionpairs = 0.0; excevents = 0.0
     cz_num = 0.0; cz_den = 0.0
-    for (k, it) in enumerate(ts)
-        res = load_results(sim_dir; tidx = it:it)
-        Ie  = @view res.Ie[:, :, 1, :]
-        b   = energy_budget_snapshot(model, Ie; verbose = false)
-        input += w[k]*b.input;          escape += w[k]*b.escape
-        inelastic += w[k]*b.inelastic;  ionization += w[k]*b.ionization
-        excitation += w[k]*b.excitation; heating += w[k]*b.heating
-        input_raw += w[k]*b.input_raw;  escape_raw += w[k]*b.escape_raw
-        ionpairs += w[k]*b.ionpairs;    excevents += w[k]*b.excevents
+    for (m, b) in enumerate(budgets)
+        wk = w[idxs[m] - lo + 1]
+        input += wk*b.input;          escape += wk*b.escape
+        inelastic += wk*b.inelastic;  ionization += wk*b.ionization
+        excitation += wk*b.excitation; heating += wk*b.heating
+        input_raw += wk*b.input_raw;  escape_raw += wk*b.escape_raw
+        ionpairs += wk*b.ionpairs;    excevents += wk*b.excevents
         for (name, val) in b.inelastic_by_species
-            sums[name] += w[k]*val
+            sums[name] += wk*val
         end
         if b.inelastic > 0 && isfinite(b.z_centroid)
-            cz_num += w[k]*b.inelastic*b.z_centroid; cz_den += w[k]*b.inelastic
+            cz_num += wk*b.inelastic*b.z_centroid; cz_den += wk*b.inelastic
         end
     end
     net        = input - escape
