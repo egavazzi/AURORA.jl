@@ -452,14 +452,10 @@ end
     Ec = eg.E_centers
     nE = length(Ec)
 
-    # Build the transfer matrices on this grid and stuff them into a cache by hand (so the test
-    # is deterministic and independent of the on-disk cascading cache).
-    P, S, Eed, thr = AURORA.calculate_cascading_matrices(spec, eg.E_edges; verbose = false)
+    # Force a fresh recompute on this grid
     cache = AURORA.SpeciesCascadingCache(spec)
-    cache.primary_transfer_matrix   = P
-    cache.secondary_transfer_matrix = S
-    cache.E_edges                   = collect(Eed)
-    cache.ionization_thresholds     = collect(thr)
+    policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
+    AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
 
     # A single ionizing channel (threshold I, one secondary) with unit cross-section. Level 1 is
     # the (skipped) elastic placeholder, matching the real E_levels layout.
@@ -486,13 +482,7 @@ end
 end
 
 
-# Double-ionization energy conservation. A double-ionization event ejects TWO secondaries that,
-# together with the degraded primary, share the excess W = E_primary − threshold. The previous
-# implementation reused the SINGLE-secondary transfer matrices and merely multiplied the secondary
-# spectrum by n_secondary = 2, so the outgoing electrons carried W + ⟨E_s⟩ > W — the cascade
-# created energy (this test's `maximum(ratios) <= 1.005` fails on that code). The fix builds proper
-# joint-integral matrices (two i.i.d. secondaries, degraded primary = the largest remainder), so
-# ⟨E_d⟩ + 2·⟨E_s⟩ = W exactly and energy is conserved with `compute_ionization_spectra!` unchanged.
+# Double-ionization energy conservation
 @testitem "Cascading double-ionization energy conservation (floored grid)" begin
     using AURORA
 
@@ -503,14 +493,10 @@ end
     Ec = eg.E_centers
     nE = length(Ec)
 
-    # Build the transfer matrices on this grid and stuff them into a cache by hand (so the test
-    # is deterministic and independent of the on-disk cascading cache).
-    P, S, Eed, thr = AURORA.calculate_cascading_matrices(spec, eg.E_edges; verbose = false)
+    # Force a fresh recompute on this grid
     cache = AURORA.SpeciesCascadingCache(spec)
-    cache.primary_transfer_matrix   = P
-    cache.secondary_transfer_matrix = S
-    cache.E_edges                   = collect(Eed)
-    cache.ionization_thresholds     = collect(thr)
+    policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
+    AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
 
     # A single DOUBLE-ionizing channel: threshold I ejects two secondaries (column 2 == 2). Level 1
     # is the (skipped) elastic placeholder, matching the real E_levels layout.
