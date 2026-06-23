@@ -324,9 +324,10 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
             E_loss = E_levels[i_level, 1]
+            # Number of secondary electrons ejected (1 = single, 2 = double ionization)
             n_secondary = E_levels[i_level, 2]
             σ_level = σ[i_level, iE]
-            # Retrieve precomputed, bin-integrated spectra from the cascading cache.
+            # Retrieve precomputed, bin-integrated spectra from the cascading cache
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 

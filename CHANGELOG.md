@@ -10,10 +10,11 @@
   - The simulation model state is now saved to disk next to the results, and can be reloaded for full reproducibility.
 - **Numerical Breaking (small)** Minor correction of the Crank-Nicolson top boundary indexing/timing [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking (small)** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
-- **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 - **Numerical Breaking (small)** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
 - **Numerical Breaking (small)** Remove the erf taper of density profiles at the top of the ionosphere [#141](https://github.com/egavazzi/AURORA.jl/pull/141)
+- **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 - **Numerical Breaking (small)** Fix a bug in the energy cascading that led to a small creation of energy [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
+- **Numerical Breaking (small)** Properly handle double-ionization collisions [#156](https://github.com/egavazzi/AURORA.jl/pull/156)
 - Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
