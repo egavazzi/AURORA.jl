@@ -190,17 +190,23 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, ene
                     partition_fraction[end] = 0
                 end
 
-                # Normalize partition fractions to sum to 1
-                partition_fraction = partition_fraction / sum(partition_fraction)
+                # Normalize partition fractions to sum to 1. If they sum to zero, the degraded
+                # electrons all land on/below the grid floor (no overlap with any on-grid bin),
+                # so they are lost (they thermalise below the grid). Skip placing them to avoid
+                # a 0/0 division producing NaNs in some very specific cases.
+                partition_sum = sum(partition_fraction)
+                if partition_sum > 0
+                    partition_fraction = partition_fraction / partition_sum
 
-                # Add the degraded electron flux to Q
-                # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
-                for i_u in eachindex(partition_fraction)
-                    iE_degrade = i_degrade[i_u]
-                    weight = partition_fraction[i_u] * factor
-                    @tturbo for j in axes(Q, 2)
-                        for k in axes(Q, 1)
-                            Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
+                    # Add the degraded electron flux to Q
+                    # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
+                    for i_u in eachindex(partition_fraction)
+                        iE_degrade = i_degrade[i_u]
+                        weight = partition_fraction[i_u] * factor
+                        @tturbo for j in axes(Q, 2)
+                            for k in axes(Q, 1)
+                                Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
+                            end
                         end
                     end
                 end
@@ -327,8 +333,14 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             sum_secondary = sum(secondary_e_spectra)    # for normalization
             sum_primary = sum(primary_e_spectra)        # for normalization
             if sum_secondary > 0
-                # scale by cross-section, spectra normalization, and number of secondaries
-                secondary_scale = σ_level * n_secondary / sum_secondary
+                # Here we normalize the secondary spectrum by `sum_primary` for the following
+                # reason: The secondary law peaks at E_s→0, so the part below the ~2 eV grid
+                # floor is missing from the binned matrix. Dividing by sum_secondary would
+                # smear that missing low-energy mass onto the surviving higher-energy bins,
+                # inflating ⟨E_s⟩ and breaking energy conservation (degraded+secondary > E_p-I).
+                # Using sum_primary is like using the "true" total sum_secondary as if they
+                # were all on-grid, preserving energy conservation.
+                secondary_scale = σ_level * n_secondary / sum_primary
                 secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
             end
             if sum_primary > 0
