@@ -1,10 +1,5 @@
 using HCubature: hcubature, hcubature_buffer
 
-# Relative tolerance for the 3-D double-ionization cubatures. The single-ionization 2-D integrals
-# use hcubature's tight default (rtol ≈ 1.5e-8); the extra dimension makes that prohibitively
-# expensive, and the transfer matrices feed a physics solver where ~1e-3 is amply accurate.
-const DOUBLE_ION_RTOL = 1e-3
-
 # ======================================================================================== #
 #           CASCADING SPEC — Species specific cascading physics definition                 #
 # ======================================================================================== #
@@ -52,8 +47,6 @@ function interp_flat(x::AbstractVector, y::AbstractVector, xq)
     return y[i] + t * (y[i + 1] - y[i])
 end
 
-# `n_secondaries` mirrors the last column of the `*_levels.dat` files: every channel ejects a
-# single secondary electron except the last (double-ionization) threshold, which ejects two.
 function DefaultCascadingSpecN2()
     ionization_thresholds = [15.581, 16.73, 18.75, 24.0, 42.0]
     n_secondaries         = [1, 1, 1, 1, 2]
@@ -211,7 +204,7 @@ DOUBLE IONIZATION
 A double-ionization event ejects TWO secondary electrons, so the excess energy
     W = E_primary - threshold
 is shared by three outgoing electrons: the degraded primary E_d and two secondaries E_s1, E_s2,
-with E_d + E_s1 + E_s2 = W. The two secondaries are drawn i.i.d. from the same `secondary_law`,
+with E_d + E_s1 + E_s2 = W. The two secondaries are drawn independently from the same `secondary_law`,
 so their joint (unnormalized) density is `secondary_law(E_s1, E_p) * secondary_law(E_s2, E_p)`.
 By convention the degraded primary is the most energetic electron (E_d ≥ E_s1 and E_d ≥ E_s2),
 which restricts the integration to
@@ -227,15 +220,14 @@ and multiplies the secondary spectrum by `n_secondary = 2`. With the secondary m
 the PER-secondary marginal (∫ over the partner), this reproduces ⟨E_d⟩ + 2·⟨E_s⟩ = W exactly,
 so energy is conserved with no change to `compute_ionization_spectra!`.
 
-Caveat — `secondary_law` is a SINGLE-ionization fit. The forms used here (the Cauchy/Lorentzian
-`1 / (a² + E_s²)` for N₂/O₂ and the Opal–Peterson–Beaty form for O) describe the ejected-electron
-energy spectrum of *single* ionization. There is no equally well-established law for the two
-electrons freed in a double-ionization event, so we reuse the single-ionization law and treat the
-two secondaries as independent, identically-distributed draws from it. This neglects both the
-(likely different) true double-ionization secondary spectrum and the energy correlation between
-the two ejected electrons. It is a deliberate approximation — the best we can do without a
-dedicated double-ionization differential cross section — but it conserves energy and reduces to
-the correct single-ionization behaviour, which is what matters most for the transport cascade.
+Small caveat: `secondary_law` is a SINGLE-ionization fit. The forms used here (the Cauchy/Lorentzian
+(of course I had to place Cauchy) `1 / (a² + E_s²)` for N₂/O₂ and the Opal–Peterson–Beaty form for O)
+describe the ejected-electron energy spectrum of *single* ionization. There is no equally well-established
+law (to our knowledge) for the two electrons freed in a double-ionization event, so we do the approximation
+of treating the two secondaries as independent, identically-distributed draws from the single-ionization law.
+This neglects both the (likely different) true double-ionization secondary spectrum and the energy + scattering
+correlation between the two ejected electrons. It is the best we can do for now without a dedicated
+double-ionization differential cross section.
 =#
 
 """
@@ -269,7 +261,10 @@ end
 function (integrand::DoubleSecondaryCascadingIntegrand)(vars)
     E_s1, u_partner, u_primary = vars
 
-    # E_s1 must be ≤ the degraded primary, i.e. E_s1 ≤ W/2 ⟺ E_primary ≥ threshold + 2·E_s1.
+    # The degraded primary is the most energetic electron, so E_d ≥ E_s1 requires
+    #   W - E_s1 - E_s2 ≥ E_s1  (using E_d = W - E_s1 - E_s2)
+    # In the worst case E_s2 = 0, leaving E_d = W - E_s1 ≥ E_s1, i.e. W ≥ 2·E_s1, i.e.
+    #   E_primary ≥ threshold + 2·E_s1.
     E_primary_lower = max(integrand.E_primary_bin_min, integrand.threshold + 2 * E_s1)
     E_primary_upper = integrand.E_primary_bin_max
     jac_primary = E_primary_upper - E_primary_lower
@@ -277,11 +272,20 @@ function (integrand::DoubleSecondaryCascadingIntegrand)(vars)
     E_primary = E_primary_lower + u_primary * jac_primary
     W = E_primary - integrand.threshold
 
-    # Given E_s1, the partner E_s2 is bounded by E_d ≥ E_s1 (E_s2 ≤ W - 2·E_s1) and
-    # E_d ≥ E_s2 (E_s2 ≤ (W - E_s1)/2). Both are ≥ 0 here since E_primary ≥ threshold + 2·E_s1.
+    # With E_s1 fixed, find the valid range for the partner E_s2. Energy conservation gives
+    #   E_d = W - E_s1 - E_s2,
+    # and the two ordering constraints E_d ≥ E_s1 and E_d ≥ E_s2 translate to:
+    #
+    #   (1) E_d ≥ E_s1:  W - E_s1 - E_s2 ≥ E_s1  =>  E_s2 ≤ W - 2·E_s1
+    #   (2) E_d ≥ E_s2:  W - E_s1 - E_s2 ≥ E_s2  =>  E_s2 ≤ (W - E_s1)/2
+    #
+    # Both bounds are ≥ 0 because E_primary ≥ threshold + 2·E_s1 guarantees W ≥ 2·E_s1.
+    # Which one is tighter depends on W relative to E_s1:
+    #   W - 2·E_s1 ≤ (W - E_s1)/2  ⟺  2W - 4·E_s1 ≤ W - E_s1  ⟺  W ≤ 3·E_s1.
+    # So constraint (1) wins when the primary is barely above threshold; (2) wins at high energy.
     E_s2_upper = min(W - 2 * E_s1, (W - E_s1) / 2)
     E_s2_upper <= 0 && return 0.0
-    E_s2 = u_partner * E_s2_upper
+    E_s2 = u_partner * E_s2_upper   # E_s2 ∈ [0, E_s2_upper], mapped from u_partner ∈ [0, 1]
     jac_partner = E_s2_upper
 
     return jac_primary * jac_partner *
@@ -291,8 +295,12 @@ end
 function (integrand::DoublePrimaryCascadingIntegrand)(vars)
     E_degraded, u_secondary, u_primary = vars
 
-    # E_d is the most energetic electron, so W ∈ [E_d, 3·E_d] ⟺ E_primary ∈ [threshold + E_d,
-    # threshold + 3·E_d] (W ≥ E_d so the two secondaries fit; W ≤ 3·E_d so E_d ≥ W/3 stays max).
+    # E_d is the most energetic electron, so E_d ≥ E_s1 and E_d ≥ E_s2. Since E_s1, E_s2 ≥ 0
+    # and E_d + E_s1 + E_s2 = W, the minimum W is achieved when both secondaries are zero:
+    #   W_min = E_d  =>  E_primary_lower = threshold + E_d.
+    # The maximum W is achieved when both secondaries are as large as possible while still
+    # satisfying E_d ≥ E_s1 and E_d ≥ E_s2, i.e. E_s1 = E_s2 = E_d:
+    #   W_max = 3·E_d  =>  E_primary_upper = threshold + 3·E_d.
     E_primary_lower = max(integrand.E_primary_bin_min, integrand.threshold + E_degraded)
     E_primary_upper = min(integrand.E_primary_bin_max, integrand.threshold + 3 * E_degraded)
     jac_primary = E_primary_upper - E_primary_lower
@@ -300,8 +308,13 @@ function (integrand::DoublePrimaryCascadingIntegrand)(vars)
     E_primary = E_primary_lower + u_primary * jac_primary
     W = E_primary - integrand.threshold
 
-    # With E_d fixed, sweep E_s1 over its valid range; E_s2 = W - E_d - E_s1 (Jacobian 1). The
-    # bounds enforce E_s2 ≥ 0 (E_s1 ≤ W - E_d), E_s1 ≤ E_d, and E_s2 ≤ E_d (E_s1 ≥ W - 2·E_d).
+    # With E_d and E_primary fixed, E_s2 = W - E_d - E_s1 is determined by E_s1 (Jacobian 1).
+    # The four constraints on E_s1 are:
+    #   E_s1 ≥ 0                (obvious)
+    #   E_s2 ≥ 0  =>  E_s1 ≤ W - E_d
+    #   E_s1 ≤ E_d              (E_d is the maximum)
+    #   E_s2 ≤ E_d  =>  W - E_d - E_s1 ≤ E_d  =>  E_s1 ≥ W - 2·E_d
+    # Combined: E_s1 ∈ [max(0, W - 2·E_d),  min(E_d, W - E_d)].
     E_s1_lower = max(0.0, W - 2 * E_degraded)
     E_s1_upper = min(E_degraded, W - E_degraded)
     jac_secondary = E_s1_upper - E_s1_lower
@@ -349,7 +362,7 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
     # Pre-allocate hcubature work buffers, one per thread (heap located). Single-ionization
-    # integrands are 2-D; double ionization adds a third (partner-electron) integration variable.
+    # integrands are 2-D. Double ionization integrands are 3-D.
     primary_bufs = [hcubature_buffer(DegradedCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
                                      (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
     secondary_bufs = [hcubature_buffer(SecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
@@ -368,8 +381,7 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
         # therefore contribute to ionization collisions.
         i_min_primary = searchsortedfirst(E_left, threshold)
 
-        # Loop over primary electron energy bins. The per-bin work is delegated so the single-
-        # ionization numerics stay untouched while double ionization uses the 3-D integrands.
+        # Loop over primary electron energy bins
         Threads.@threads :static for i_primary in i_min_primary:n_E
             tid = Threads.threadid()
             if single_secondary
@@ -391,8 +403,7 @@ end
 
 
 # Single-ionization (one secondary) contribution for one primary bin `i_primary` and threshold
-# index `i_threshold`. Extracted verbatim from the per-bin body so the single-ion numerics are
-# unchanged; double ionization is handled by `fill_double_ionization_bin!`.
+# index `i_threshold`.
 function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
                                      E_edges, E_left, threshold, i_primary, i_threshold,
                                      secondary_law, primary_buf, secondary_buf)
@@ -449,11 +460,14 @@ end
 
 
 # Double-ionization (two secondaries) contribution for one primary bin. Builds the degraded-
-# primary distribution and the PER-secondary marginal via the 3-D joint integrands above. Both
+# primary distribution and the PER-secondary marginal via the 3-D joint integrands defined above. Both
 # matrices sum (over their output bins) to the same event count Z₂, so `compute_ionization_spectra!`
 # conserves energy unchanged. Bin ranges differ from single ionization: the degraded primary is
 # the highest-energy electron, so it reaches down only to W/3 (not W/2), while a single secondary
 # still maxes out at W/2.
+# We use a relative tolerance of 1e-3 for the 3-D integrals, which makes it much faster
+# (~230x faster with 2s vs 460s from testing on my laptop) while still keeping a < 0.1% error
+# on each cascading matrix entry.
 function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
                                      E_edges, E_left, threshold, i_primary, i_threshold,
                                      secondary_law, primary_buf, secondary_buf)
@@ -478,7 +492,7 @@ function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer
         if E_degraded_upper > E_degraded_lower
             result, _ = hcubature(degraded_integrand, (E_degraded_lower, 0.0, 0.0),
                                  (E_degraded_upper, 1.0, 1.0);
-                                 rtol = DOUBLE_ION_RTOL, buffer = primary_buf)
+                                 rtol = 1e-3, buffer = primary_buf)
             primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
         end
     end
@@ -494,7 +508,7 @@ function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer
         if E_secondary_upper > E_secondary_bin_min
             result, _ = hcubature(secondary_integrand, (E_secondary_bin_min, 0.0, 0.0),
                                  (E_secondary_upper, 1.0, 1.0);
-                                 rtol = DOUBLE_ION_RTOL, buffer = secondary_buf)
+                                 rtol = 1e-3, buffer = secondary_buf)
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
         end
     end
