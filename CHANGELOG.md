@@ -1,7 +1,5 @@
 # Changelog
 
-- Fix a `0/0` NaN in the inelastic degradation operator that could occur on coarse energy grids when an energy loss aligns exactly with a bin edge (the degraded electrons all fall on/below the grid floor). No effect on the default energy grid [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
-- **Numerical Breaking (small)** Fix a bug in the energy cascading that led to creation of energy: secondary electrons below the energy-grid floor were mis-normalized (divided by their truncated sum), inflating the deposited energy [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.
@@ -15,6 +13,7 @@
 - **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 - **Numerical Breaking (small)** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
 - **Numerical Breaking (small)** Remove the erf taper of density profiles at the top of the ionosphere [#141](https://github.com/egavazzi/AURORA.jl/pull/141)
+- **Numerical Breaking (small)** Fix a bug in the energy cascading that led to a small creation of energy [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
 - Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
