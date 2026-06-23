@@ -1,6 +1,5 @@
 # Changelog
 
-- **Numerical Breaking (small)** Properly handle double-ionization collisions. Each species' double-ionization channel (N₂ 42 eV, O₂ 32.51 eV, O 28.5 eV) now ejects two secondary electrons drawn from the secondary-distribution law, with the degraded primary being the most energetic of the three outgoing electrons. Previously the single-secondary transfer matrices were reused and the secondary spectrum simply doubled, which placed both secondaries at too-high energies and created energy in the cascade. The double-ionization transfer matrices are now built from the proper joint (two-secondary) distribution, conserving energy by construction [#156](https://github.com/egavazzi/AURORA.jl/pull/156)
 - Fix a `0/0` NaN in the inelastic degradation operator that could occur on coarse energy grids when an energy loss aligns exactly with a bin edge (the degraded electrons all fall on/below the grid floor). No effect on the default energy grid [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
 - **Numerical Breaking (small)** Fix a bug in the energy cascading that led to creation of energy: secondary electrons below the energy-grid floor were mis-normalized (divided by their truncated sum), inflating the deposited energy [#153](https://github.com/egavazzi/AURORA.jl/pull/153)
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
@@ -13,9 +12,11 @@
   - The simulation model state is now saved to disk next to the results, and can be reloaded for full reproducibility.
 - **Numerical Breaking (small)** Minor correction of the Crank-Nicolson top boundary indexing/timing [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking (small)** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
-- **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
 - **Numerical Breaking (small)** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
 - **Numerical Breaking (small)** Remove the erf taper of density profiles at the top of the ionosphere [#141](https://github.com/egavazzi/AURORA.jl/pull/141)
+- **Numerical Breaking (small)** Improve physical accuracy of cascading calculations [#132](https://github.com/egavazzi/AURORA.jl/pull/132)
+- **Numerical Breaking (small)** Properly handle double-ionization collisions [#156](https://github.com/egavazzi/AURORA.jl/pull/156)
+
 - Add error message for when iri calculations return invalid data or when loading invalid data from file [#116](https://github.com/egavazzi/AURORA.jl/pull/116)
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
