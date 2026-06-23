@@ -69,7 +69,7 @@ include("simulation/initialize.jl")
 export initialize!
 include("output/write.jl")
 include("output/read.jl")
-export SimulationResult, load_results, load_coordinates
+export SimulationResult, load_results, load_coordinates, load_model
 include("simulation/run.jl")
 export run!
 

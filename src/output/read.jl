@@ -1,4 +1,5 @@
 using NCDatasets: NCDataset, load!
+import JLD2
 
 # ======================================================================================== #
 #                              RESULT FILE READERS                                       #
@@ -169,6 +170,22 @@ function load_results(sim_dir::AbstractString;
 end
 
 load_results(sim::AuroraSimulation; kwargs...) = load_results(sim.output.savedir; kwargs...)
+
+
+"""
+    load_model(sim_dir) → AuroraModel
+
+Load the fully-initialized [`AuroraModel`](@ref) saved in `<sim_dir>/inputs/physics_state.jld2`
+(written by `run!`). The returned model holds the grids, ionosphere, and species with their
+cross sections, excitation levels, and densities used to produce the run — suitable for
+post-hoc analysis such as [`energy_budget`](@ref).
+"""
+function load_model(sim_dir::AbstractString)
+    jld_path = joinpath(sim_dir, "inputs", "physics_state.jld2")
+    isfile(jld_path) ||
+        throw(ArgumentError("no physics_state.jld2 found under $(joinpath(sim_dir, "inputs"))"))
+    return JLD2.load(jld_path, "model")
+end
 
 
 """
