@@ -434,15 +434,7 @@ end
 end
 
 
-# Real-law energy conservation through `compute_ionization_spectra!` (the actual code path).
-# The constant-law tests above are symmetric about E_excess/2, so they cannot see the bug that
-# the real secondary laws (which peak at E_s→0) expose: a large share of the secondary
-# distribution sits BELOW the ~2 eV grid floor and is dropped from `secondary_transfer_matrix`.
-# If the on-grid secondaries are normalized by their own (truncated) sum, that missing
-# low-energy mass is smeared onto higher-energy bins, inflating ⟨E_s⟩ so the outgoing electrons
-# (degraded primary + secondaries) carry MORE than E_primary − threshold — the cascade "creates"
-# energy. The fix normalizes by the untruncated event count (sum_primary), correctly losing the
-# sub-floor secondaries. This test fails with the truncated-sum normalization and passes the fix.
+# Real-law energy conservation (to catch cases that the constant-law tests might miss)
 @testitem "Cascading real-law energy conservation (floored grid)" begin
     using AURORA
 
