@@ -94,7 +94,8 @@ include("analysis/energy_budget.jl")
 export make_volume_excitation_file, make_column_excitation_file,
        make_Ie_top_file, make_current_file,
        make_heating_rate_file, make_psd_file,
-       energy_budget, EnergyBudget
+       energy_budget, EnergyBudget,
+       energy_budget_integrated, TimeIntegratedEnergyBudget
 
 include("viz_interface.jl")
 

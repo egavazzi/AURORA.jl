@@ -97,6 +97,50 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
 end
 
 """
+    TimeIntegratedEnergyBudget
+
+Result of [`energy_budget_integrated`](@ref): an [`EnergyBudget`](@ref) whose terms have been
+integrated over a time interval `[t0, t1]` (seconds). Energy fluxes are therefore in **eV m⁻²**
+(energy per area over the interval) and `ionpairs`/`excevents` are **total counts m⁻²**. All
+`EnergyBudget` fields are forwarded (e.g. `b.input`, `b.residual`); additionally `t0`, `t1`, and
+`span` (= `t1 - t0`) are available.
+
+For a transient that starts and ends at rest the balance closes, and `residual` then collects
+the energy left stored in the population over the interval plus numerical non-conservation.
+"""
+struct TimeIntegratedEnergyBudget
+    budget::EnergyBudget
+    t0::Float64
+    t1::Float64
+end
+
+function Base.getproperty(b::TimeIntegratedEnergyBudget, s::Symbol)
+    s === :span && return getfield(b, :t1) - getfield(b, :t0)
+    (s === :budget || s === :t0 || s === :t1) && return getfield(b, s)
+    return getproperty(getfield(b, :budget), s)   # forward EnergyBudget fields
+end
+
+Base.propertynames(b::TimeIntegratedEnergyBudget) =
+    (:t0, :t1, :span, propertynames(getfield(b, :budget))...)
+
+function Base.show(io::IO, ::MIME"text/plain", b::TimeIntegratedEnergyBudget)
+    pct(x) = round(100x / b.input, digits=2)
+    println(io, "TimeIntegratedEnergyBudget (eV m⁻², ∫ over Δt = ", round(b.span, digits=4),
+            " s, ∫ along field line):")
+    println(io, "├── input (precip., ↓ top) : ", b.input)
+    println(io, "├── inelastic deposited     : ", b.inelastic, "  (", pct(b.inelastic), "%)")
+    println(io, "│     ├── ionization        : ", b.ionization, "  (", pct(b.ionization), "%)")
+    println(io, "│     ├── excitation        : ", b.excitation, "  (", pct(b.excitation), "%)")
+    for (name, val) in b.inelastic_by_species
+        println(io, "│     ├── ", rpad(name, 4), "             : ", val, "  (", pct(val), "%)")
+    end
+    println(io, "├── thermal heating         : ", b.heating, "  (", pct(b.heating), "%)")
+    println(io, "├── escape (↑ top)          : ", b.escape, "  (", pct(b.escape),
+            "%)  albedo = ", round(b.albedo, digits=3))
+    println(io, "└── residual (Δstored+num)  : ", b.residual, "  (", b.residual_fraction * 100, "%)")
+end
+
+"""
     energy_budget(sim::AuroraSimulation; tidx=<last>, verbose=true) -> EnergyBudget
     energy_budget(sim_dir::AbstractString; tidx=<last>, verbose=true) -> EnergyBudget
 
@@ -149,6 +193,67 @@ function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = n
     res = load_results(sim_dir; tidx = it:it)
     Ie  = @view res.Ie[:, :, 1, :]                              # [n_z, n_μ, n_E]
     return energy_budget_snapshot(model, Ie; verbose)
+end
+
+"""
+    energy_budget_integrated(sim_dir; trange=:, verbose=true) -> TimeIntegratedEnergyBudget
+
+Time-integrated energy balance for a *time-dependent* run, computed from a saved directory by
+trapezoidally integrating the per-time-slice [`energy_budget`](@ref) over the time axis (or the
+contiguous integer sub-range `trange`). Returns a [`TimeIntegratedEnergyBudget`](@ref) (energy
+fluxes in eV m⁻²; rates as total counts m⁻²); also prints a summary unless `verbose=false`.
+
+Unlike the single-slice `energy_budget`, this closes for a transient that starts and ends at
+rest: `input = inelastic + heating + escape + residual`, with `residual` then collecting the
+energy left stored in the population over `[t0, t1]` plus numerical non-conservation. This is the
+appropriate tool for a pulsed / Alfvénic precipitation run, where a single snapshot does not
+conserve.
+
+`z_centroid` is the deposition-energy-weighted average of the per-slice centroids.
+"""
+function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(), verbose::Bool = true)
+    model = load_model(sim_dir)
+    model.s_field = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
+    co = load_coordinates(sim_dir)
+    ts = trange === Colon() ? (1:co.n_t) : trange
+    (ts isa AbstractUnitRange{<:Integer} && first(ts) >= 1 && last(ts) <= co.n_t) ||
+        throw(ArgumentError("trange must be a Colon (:) or a contiguous range within 1:$(co.n_t)"))
+    length(ts) >= 2 ||
+        throw(ArgumentError("need ≥ 2 time slices to integrate; use `energy_budget` for a single snapshot"))
+    tt = co.t[ts]
+    w  = trapz_weights(tt)             # ∫ f dt ≈ Σ w[k] f[k]
+
+    names = [String(sp.name) for sp in model.species]
+    sums  = Dict(n => 0.0 for n in names)
+    input = 0.0; escape = 0.0; inelastic = 0.0; ionization = 0.0; excitation = 0.0
+    heating = 0.0; input_raw = 0.0; escape_raw = 0.0; ionpairs = 0.0; excevents = 0.0
+    cz_num = 0.0; cz_den = 0.0
+    for (k, it) in enumerate(ts)
+        res = load_results(sim_dir; tidx = it:it)
+        Ie  = @view res.Ie[:, :, 1, :]
+        b   = energy_budget_snapshot(model, Ie; verbose = false)
+        input += w[k]*b.input;          escape += w[k]*b.escape
+        inelastic += w[k]*b.inelastic;  ionization += w[k]*b.ionization
+        excitation += w[k]*b.excitation; heating += w[k]*b.heating
+        input_raw += w[k]*b.input_raw;  escape_raw += w[k]*b.escape_raw
+        ionpairs += w[k]*b.ionpairs;    excevents += w[k]*b.excevents
+        for (name, val) in b.inelastic_by_species
+            sums[name] += w[k]*val
+        end
+        if b.inelastic > 0 && isfinite(b.z_centroid)
+            cz_num += w[k]*b.inelastic*b.z_centroid; cz_den += w[k]*b.inelastic
+        end
+    end
+    net        = input - escape
+    residual   = input - inelastic - heating - escape
+    z_centroid = cz_den > 0 ? cz_num / cz_den : NaN
+    budget = EnergyBudget(input, escape, net, inelastic, ionization, excitation, heating,
+                          residual, input > 0 ? residual / input : NaN,
+                          input > 0 ? escape / input : NaN, input_raw, escape_raw,
+                          ionpairs, excevents, z_centroid, [n => sums[n] for n in names])
+    result = TimeIntegratedEnergyBudget(budget, first(tt), last(tt))
+    verbose && (show(stdout, MIME"text/plain"(), result); println())
+    return result
 end
 
 # The budget closes only at steady state. Warn (once per call, when printing) that a snapshot of
@@ -273,4 +378,18 @@ function trapz_path(x, f)
         s += 0.5 * (f[i] + f[i + 1]) * abs(x[i + 1] - x[i])
     end
     return s
+end
+
+# Trapezoidal quadrature weights w for samples at points x, so that ∫ f dx ≈ Σ w[k] f[k].
+# Lets the time-integrated budget integrate each per-slice quantity with one weight vector.
+function trapz_weights(x)
+    n = length(x)
+    w = zeros(n)
+    n == 1 && return w
+    @inbounds for k in 1:n
+        lo = k == 1 ? x[1] : x[k - 1]
+        hi = k == n ? x[n] : x[k + 1]
+        w[k] = (hi - lo) / 2
+    end
+    return w
 end
