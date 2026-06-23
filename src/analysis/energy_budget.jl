@@ -31,6 +31,9 @@
 #
 # The vertical-energy-flux projection (Σ Ie·E·|μ|) matches `field_aligned_beam_norm`, so
 # E_in computed here equals the InputFlux's `IeE_tot` normalisation.
+#
+# Works either on an in-memory `sim` or on a saved run directory (reconstructing the model and
+# flux from disk) — see the two `energy_budget` methods below.
 
 """
     EnergyBudget
@@ -94,35 +97,87 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
 end
 
 """
-    energy_budget(sim::AuroraSimulation; verbose=true) -> EnergyBudget
+    energy_budget(sim::AuroraSimulation; tidx=<last>, verbose=true) -> EnergyBudget
+    energy_budget(sim_dir::AbstractString; tidx=<last>, verbose=true) -> EnergyBudget
 
-Compute the steady-state energy balance of a finished simulation directly from the in-memory
-solution (`sim.cache.Ie`). Returns an [`EnergyBudget`](@ref); also prints a summary unless
-`verbose=false`.
+Compute the steady-state energy balance of a finished simulation. Returns an
+[`EnergyBudget`](@ref); also prints a summary unless `verbose=false`.
+
+Two sources are accepted:
+- an in-memory `sim`, read from `sim.cache.Ie`;
+- a saved run directory `sim_dir`, reconstructing the model from
+  `<sim_dir>/inputs/physics_state.jld2` (see [`load_model`](@ref)) and the electron flux from
+  `<sim_dir>/simulation_data.nc`.
+
+The budget is evaluated at a single time slice, `tidx` (default: the **last** slice, which is
+the steady-state solution for an `n_t == 1` run). This balance closes only at steady state: on
+a **time-dependent** run a single snapshot does not conserve (energy is in transit / stored),
+and in particular a *transient* input (e.g. a pulse) will read `input == 0` at any time after
+the pulse has passed — pass `tidx` to evaluate at the time of interest (e.g. the input peak). A
+warning is emitted when the run has more than one time step.
 
 Use as a guardrail: on a converged, stable run the residual is a small positive fraction (the
 sub-floor thermalisation that AURORA does not track on-grid). A large or negative residual
 flags energy non-conservation — e.g. a grid whose maximum bin width exceeds the lowest
 ionization threshold, which destabilises the high→low energy-degradation sweep.
 """
-function energy_budget(sim::AuroraSimulation; verbose::Bool = true)
-    model = sim.model
-    eg    = model.energy_grid
-    z     = model.altitude_grid.h          # m (vertical altitude)
-    s     = model.s_field                  # m (path length along the magnetic field line)
-    μ     = model.pitch_angle_grid.μ_center
-    E     = eg.E_centers                   # eV
-    ne    = model.ionosphere.ne
-    Te    = model.ionosphere.Te
-    n_z   = length(z)
-    n_μ   = length(μ)
-    n_E   = length(E)
-
-    # Steady-state snapshot of the flux: reshape [n_z·n_μ, n_t, n_E] → [n_z, n_μ, n_E]
-    # (row = (i_μ-1)·n_z + i_z). Use the last time index (n_t = 1 for steady state).
+function energy_budget(sim::AuroraSimulation; tidx::Integer = size(sim.cache.Ie, 2),
+                       verbose::Bool = true)
+    model  = sim.model
     Ie_raw = sim.cache.Ie
-    it = size(Ie_raw, 2)
-    Ie = reshape(@view(Ie_raw[:, it, :]), n_z, n_μ, n_E)   # [n_z, n_μ, n_E]
+    n_t    = size(Ie_raw, 2)
+    1 <= tidx <= n_t || throw(ArgumentError("tidx = $tidx out of range 1:$n_t"))
+    warn_if_time_dependent(n_t, tidx, verbose)
+    n_z = length(model.altitude_grid.h)
+    n_μ = length(model.pitch_angle_grid.μ_center)
+    n_E = length(model.energy_grid.E_centers)
+    # Reshape [n_z·n_μ, n_t, n_E] → [n_z, n_μ, n_E]; row = (i_μ-1)·n_z + i_z.
+    Ie = reshape(@view(Ie_raw[:, tidx, :]), n_z, n_μ, n_E)
+    return energy_budget_snapshot(model, Ie; verbose)
+end
+
+function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = nothing,
+                       verbose::Bool = true)
+    model = load_model(sim_dir)
+    # Recompute the field-line path length from the saved geometry, so the diagnostic is robust
+    # to older physics_state.jld2 files written before `s_field` existed.
+    model.s_field = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
+    n_t = load_coordinates(sim_dir).n_t
+    it  = something(tidx, n_t)              # default: final slice
+    1 <= it <= n_t || throw(ArgumentError("tidx = $it out of range 1:$n_t"))
+    warn_if_time_dependent(n_t, it, verbose)
+    res = load_results(sim_dir; tidx = it:it)
+    Ie  = @view res.Ie[:, :, 1, :]                              # [n_z, n_μ, n_E]
+    return energy_budget_snapshot(model, Ie; verbose)
+end
+
+# The budget closes only at steady state. Warn (once per call, when printing) that a snapshot of
+# a time-dependent run does not conserve, since a transient input can read input == 0 at a slice
+# taken after the pulse — the usual source of a "surprising" zero/blown-up budget.
+function warn_if_time_dependent(n_t, tidx, verbose)
+    if n_t > 1 && verbose
+        @warn "energy_budget is a single-time snapshot (tidx = $tidx of $n_t); for a " *
+              "time-dependent run the balance does not close (energy in transit), and a " *
+              "transient input reads 0 after the pulse. Pass `tidx` to pick a time."
+    end
+end
+
+# Core computation shared by both `energy_budget` methods. `Ie` is the steady-state flux
+# snapshot, shape [n_z, n_μ, n_E].
+function energy_budget_snapshot(model, Ie; verbose::Bool = true)
+    eg  = model.energy_grid
+    z   = model.altitude_grid.h          # m (vertical altitude)
+    s   = model.s_field                  # m (path length along the magnetic field line)
+    μ   = model.pitch_angle_grid.μ_center
+    E   = eg.E_centers                   # eV
+    ne  = model.ionosphere.ne
+    Te  = model.ionosphere.Te
+    n_z = length(z)
+    n_μ = length(μ)
+    n_E = length(E)
+    size(Ie) == (n_z, n_μ, n_E) ||
+        throw(ArgumentError("Ie snapshot $(size(Ie)) does not match the model grid " *
+                            "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
 
     # ---- Boundary energy fluxes at the top altitude (i_z = n_z) --------------------------
     # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm). The raw
