@@ -1,5 +1,6 @@
 using NCDatasets: NCDataset, defDim, defVar
 using LoopVectorization
+using ProgressMeter: Progress, next!
 
 const m_e = 9.10938356e-31
 const e_charge = 1.602176634e-19
@@ -174,7 +175,7 @@ end
 # ======================================================================================== #
 
 """
-    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, max_bytes=512*1024^2, compress=false)
+    make_psd_file(directory_to_process; compute=:both, vpar_edges=nothing, max_bytes=512*1024^2, compress=false, show_progress=false)
 
 Read `simulation_data.nc` from `directory_to_process`, convert electron flux to
 phase-space density, and write results to `analysis/psd.nc`.
@@ -190,6 +191,7 @@ by chunk, so peak memory stays bounded even for large runs.
 - `compress`: zlib compression level for the `f` and `F` variables, with the same semantics
   as in [`AuroraOutputManager`](@ref): `false`/`0` (default, no compression), `true`
   (level 4), or an exact level `1`–`9`.
+- `show_progress`: show a `ProgressMeter` progress bar while streaming chunks (default `false`).
 """
 function make_psd_file(
     directory_to_process;
@@ -197,6 +199,7 @@ function make_psd_file(
     vpar_edges::Union{Nothing, AbstractVector} = nothing,
     max_bytes::Real = 512 * 1024^2,
     compress = false,
+    show_progress::Bool = false,
 )
     if compute ∉ (:f_only, :F_only, :both)
         throw(ArgumentError("compute must be one of :f_only, :F_only, or :both"))
@@ -299,6 +302,10 @@ function make_psd_file(
         F_out   = nothing  # F result (pre-permuted) [Nvpar, Nz, nt]
 
         # Stream the flux and fill the data variables chunk by chunk
+        slice_bytes = Nz * nμ * nE * sizeof(Float64)
+        nt_chunk = time_chunk_length(slice_bytes, max_bytes, Nt)
+        n_chunks = ceil(Int, Nt / nt_chunk)
+        progress = show_progress ? Progress(n_chunks; desc="Computing PSD: ", dt=1.0) : nothing
         foreach_Ie_time_chunk(directory_to_process; max_bytes) do Ie_chunk, t_range
             nt = length(t_range)
             if want_f
@@ -321,6 +328,7 @@ function make_psd_file(
                 compute_F!(F_out, F_work, Ie_chunk, coord.μ_lims, grids.v, vpe, Δvpar)
                 F_v[:, :, t_range] = F_out
             end
+            isnothing(progress) || next!(progress)
         end
     end
 
