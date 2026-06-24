@@ -53,8 +53,9 @@ this resolution carries a few % error at the peak of the volume-excitation profi
 `scale` below).
 
 The first and last grid points land exactly on the requested limits: the uniform step is
-rounded so that `z_transition` falls on a grid point, and the topmost step is adjusted
-(within 0.5 to 1.5 times its nominal size) to end exactly at `top_altitude`.
+rounded so that `z_transition` falls on a grid point, and the small leftover at the top is
+spread evenly across the graded steps (a uniform stretch of well under one step) so the
+grid ends exactly at `top_altitude` without introducing an anomalously small top step.
 
 # Arguments
 - `bottom_altitude`: altitude, in km, for the bottom of the simulation
@@ -95,14 +96,23 @@ function make_altitude_grid(bottom_altitude, top_altitude;
         h = [Float64(bottom_altitude)]
     end
 
-    # Graded segment, with the last step adjusted to land exactly on top_altitude
+    # Graded segment: grow steps by the law until the next one would overshoot, then land
+    # exactly on top_altitude by spreading the leftover across all graded steps (a small
+    # uniform stretch). This keeps the smooth step-size ratio with no special last step, so
+    # the smallest step in the grid stays the bottom one (important for the CFL limit, which
+    # is set by minimum(diff(z))).
+    i_knee = length(h)
     while h[end] + dz(h[end]) < top_altitude
         push!(h, h[end] + dz(h[end]))
     end
     if h[end] < top_altitude
-        if top_altitude - h[end] < 0.5 * dz(h[end]) && length(h) > 1
-            h[end] = top_altitude # absorb the small remainder into the last step
-        else
+        if length(h) - i_knee ≥ 1   # at least one graded step: distribute the remainder
+            z_knee = h[i_knee]
+            stretch = (top_altitude - z_knee) / (h[end] - z_knee)
+            for i in (i_knee + 1):length(h)
+                h[i] = z_knee + (h[i] - z_knee) * stretch
+            end
+        else                        # top is within one step of the knee: single step up
             push!(h, Float64(top_altitude))
         end
     end
