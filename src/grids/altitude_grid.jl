@@ -34,7 +34,7 @@ end
     make_altitude_grid(bottom_altitude, top_altitude; dz_max=25)
 
 Create an altitude grid based on the altitude limits given as input. It uses constant
-steps below 100 km, and a non-linear grid (steps growing with altitude, capped at
+steps of 150 m below 100 km, and a non-linear grid (steps growing with altitude, capped at
 `dz_max`) above 100 km.
 
 # Calling
@@ -48,51 +48,40 @@ steps below 100 km, and a non-linear grid (steps growing with altitude, capped a
 - `dz_max = 25`: maximum step size, in km. Relevant for high altitudes where the numbers
     can get large.
 
-# Notes
-- A `bottom_altitude` above 100 km is honoured (the grid snaps to the nearest grid point
-    at or above it) instead of silently collapsing back to 100 km.
-- The uniform segment below 100 km lands exactly on the transition, so there is no
-    anomalous step straddling 100 km.
-- The grid extends as far up as needed to reach `top_altitude`; there is no hard-coded
-    cap on the number of points.
-
 # Outputs
 - `h_atm`: altitude (m). Vector [nZ]
 """
 function make_altitude_grid(bottom_altitude, top_altitude; dz_max = 25)
     bottom_altitude < top_altitude || throw(ArgumentError(
         "bottom_altitude must be below top_altitude, got $(bottom_altitude) ≥ $(top_altitude)."))
-    bot_m, top_m, z_transition = bottom_altitude * 1e3, top_altitude * 1e3, 100e3
+    bottom_m = bottom_altitude * 1e3
+    top_m    = top_altitude * 1e3
+    z_transition = 100e3
 
-    # Legacy step-growth profile above the transition; step number `n` = 1, 2, …, capped at
-    # `dz_max`. The shape is unchanged from the previous version — only the assembly around
-    # it is fixed below.
-    step_at(n) = min(real(150 + 150 / 200 * n + 1.2 * exp(Complex((n - 150) / 22)^0.9)),
+    # Step-growth profile above the transition
+    Δz(n) = min(real(150 +
+                     150 / 200 * n +
+                     1.2 * exp(Complex((n - 150) / 22)^0.9)),
                      dz_max * 1e3)
 
     # Graded segment from the transition up to `top`, generating as many steps as needed
-    # (the old code hard-coded 500 steps, which capped the point count and the reachable
-    # altitude).
     graded = [z_transition]
     n = 1
     while graded[end] < top_m
-        push!(graded, graded[end] + step_at(n))
+        push!(graded, graded[end] + Δz(n))
         n += 1
     end
-    graded = graded[graded .<= top_m]   # clip at the top (legacy behaviour, no resizing)
+    graded = graded[graded .<= top_m]   # clip at the top
 
-    if bot_m ≥ z_transition
-        # Bottom in the F-region: snap to the nearest grid point at or above it, instead of
-        # silently collapsing the grid back to 100 km.
-        return graded[graded .≥ bot_m]
+    # Bottom above transition: snap to the nearest grid point
+    if bottom_m ≥ z_transition
+        return graded[graded .≥ bottom_m]
     end
 
-    # Bottom below the transition: uniform fill landing exactly on the transition (or on
-    # `top`, if that is itself below 100 km), removing the old spacing anomaly at 100 km.
-    knee = min(z_transition, top_m)
-    n_sub = max(1, round(Int, (knee - bot_m) / step_at(1)))
-    sub = collect(range(bot_m, knee; length = n_sub + 1))
-    return knee < top_m ? vcat(sub[1:end - 1], graded) : sub
+    # Bottom below the transition: uniform fill landing exactly on the transition
+    n_sub = max(1, round(Int, (z_transition - bottom_m) / Δz(1)))
+    sub = collect(range(bottom_m, z_transition; length = n_sub + 1))
+    return vcat(sub[1:end - 1], graded)
 end
 
 function Base.show(io::IO, grid::AltitudeGrid)

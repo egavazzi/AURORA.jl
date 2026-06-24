@@ -41,10 +41,10 @@ end
 @testitem "AltitudeGrid is not capped at 500 points" begin
     # the old version hard-coded 500 graded steps, capping both the point count and the
     # reachable altitude
-    h = AURORA.make_altitude_grid(100, 3000)
+    h = AURORA.make_altitude_grid(100, 5000)
     @test length(h) > 500
-    @test h[end] ≤ 3000e3
-    @test 3000e3 - h[end] < maximum(diff(h))     # reached within one step of the top
+    @test h[end] ≤ 5000e3
+    @test 5000e3 - h[end] < maximum(diff(h))     # reached within one step of the top
 end
 
 @testitem "AltitudeGrid invalid inputs" begin
