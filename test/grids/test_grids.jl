@@ -3,13 +3,48 @@
 
     @test grid isa AltitudeGrid
     @test grid isa AURORA.AbstractGrid
-    @test grid.bottom == 80
-    @test grid.top == 700
     @test length(grid.h) == grid.n
     @test length(grid.Δh) == grid.n - 1
     @test all(grid.Δh .> 0) # ensure grid is strictly increasing
     @test grid.h[1] ≈ 80e3
     @test grid.h[end] ≤ 700e3
+    # bottom/top now report the actual grid endpoints
+    @test grid.bottom ≈ grid.h[1] / 1e3
+    @test grid.top ≈ grid.h[end] / 1e3
+    @test grid.bottom == 80
+    @test grid.top ≤ 700
+end
+
+@testitem "AltitudeGrid clean transition at 100 km" begin
+    # the uniform sub-100 km segment lands exactly on the bottom and on 100 km, with no
+    # anomalous step straddling the transition
+    h = AURORA.make_altitude_grid(80, 700)
+    @test h[1] == 80e3
+    @test 100e3 in h
+    i = findfirst(==(100e3), h)
+    Δ = diff(h)
+    @test all(isapprox.(Δ[1:(i - 1)], Δ[1]; rtol = 1e-6))      # uniform below the transition
+    @test isapprox(Δ[i], Δ[i - 1]; rtol = 0.05)               # no jump across 100 km
+end
+
+@testitem "AltitudeGrid bottom above 100 km" begin
+    # used to silently collapse to a grid starting at 100 km; now snaps to the nearest grid
+    # point at or above the requested bottom
+    grid = AltitudeGrid(250, 500)
+    @test grid.h[1] ≥ 250e3
+    @test grid.h[1] < 260e3                 # snapped close to the request
+    @test grid.bottom ≈ grid.h[1] / 1e3
+    @test all(grid.Δh .> 0)
+    @test grid.n < AltitudeGrid(100, 500).n / 2
+end
+
+@testitem "AltitudeGrid is not capped at 500 points" begin
+    # the old version hard-coded 500 graded steps, capping both the point count and the
+    # reachable altitude
+    h = AURORA.make_altitude_grid(100, 5000)
+    @test length(h) > 500
+    @test h[end] ≤ 5000e3
+    @test 5000e3 - h[end] < maximum(diff(h))     # reached within one step of the top
 end
 
 @testitem "AltitudeGrid invalid inputs" begin
