@@ -1,10 +1,5 @@
 # Changelog
 
-- Fix altitude-grid construction bugs (legacy grid shape unchanged) [#XXX](https://github.com/egavazzi/AURORA.jl/pull/XXX)
-  - A `bottom_altitude` above 100 km is now honoured (the grid snaps to the nearest grid point at or above it) instead of silently collapsing back to a grid starting at 100 km.
-  - The uniform segment below 100 km now lands exactly on the transition, removing the anomalous step that could straddle 100 km.
-  - The grid is no longer capped at ~500 points: it extends as far up as needed to reach `top_altitude`.
-  - `AltitudeGrid.bottom`/`top` now report the actual grid endpoints.
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.
@@ -24,6 +19,7 @@
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
+- Fix some altitude grid construction bugs [#157](https://github.com/egavazzi/AURORA.jl/pull/157)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
