@@ -81,6 +81,20 @@ end
     @test z100k == 85
 end
 
+@testitem "suggest_bottom_altitude AuroraModel wrapper" begin
+    msis_file = joinpath(@__DIR__, "..", "regression", "reference_results",
+                         "msis_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "..", "regression", "reference_results",
+                        "iri_20051008-2200_70N-19E.txt")
+
+    model = AuroraModel([100, 400], 180:-90:0, 3000, msis_file, iri_file)
+    # the wrapper reads E_max and the MSIS file from the model
+    @test suggest_bottom_altitude(model) ==
+          suggest_bottom_altitude(model.energy_grid.E_max, msis_file)
+    @test suggest_bottom_altitude(model; safety=4) ==
+          suggest_bottom_altitude(model.energy_grid.E_max, msis_file; safety=4)
+end
+
 @testitem "EnergyGrid construction" begin
     grid = EnergyGrid(50_000)
 

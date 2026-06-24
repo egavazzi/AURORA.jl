@@ -224,12 +224,13 @@ end
     check_bottom_boundary(sim::AuroraSimulation, ds; threshold=0.01)
 
 Post-solve sanity check of the bottom boundary placement, called automatically by
-[`run!`](@ref). Compares the time-averaged downward electron energy flux reaching the
-bottom of the altitude grid with the one injected at the top. The bottom boundary
-absorbs any remaining flux, so a non-negligible ratio means the electrons are not fully
-stopped within the grid and the low-altitude part of the solution is clipped. Emits a
-warning with a suggested bottom altitude (from [`suggest_bottom_altitude`](@ref)) when
-the ratio exceeds `threshold`.
+[`run!`](@ref). Compares the time-averaged downward field-aligned (vertical) energy flux
+reaching the bottom of the altitude grid with the one injected at the top. Each beam is
+projected onto the vertical with its `|μ|` (the same convention as the `IeE_down` output
+of [`make_current_file`](@ref)). The bottom boundary absorbs any remaining flux, so a
+non-negligible ratio means the electrons are not fully stopped within the grid and the
+low-altitude part of the solution is clipped. Emits a warning with a suggested bottom
+altitude (from [`suggest_bottom_altitude`](@ref)) when the ratio exceeds `threshold`.
 
 Reads the bottom z-slice of `Ie` from `ds` in blocks of time steps, so the cost stays
 negligible compared to the solve.
@@ -237,17 +238,23 @@ negligible compared to the solve.
 function check_bottom_boundary(sim::AuroraSimulation, ds::NCDataset; threshold = 0.01)
     E = sim.model.energy_grid.E_centers
     # Downward beams (μ < 0) come first in beam order (θ_lims goes 180° → 0°)
-    n_down = count(<(0), sim.model.pitch_angle_grid.μ_center)
+    μ_center = sim.model.pitch_angle_grid.μ_center
+    n_down = count(<(0), μ_center)
+    # Per-beam projection onto the vertical and per-bin energy, broadcast over the
+    # [n_down, n_t_chunk, n_E] blocks read below
+    μ_down = reshape(abs.(@view μ_center[1:n_down]), n_down, 1, 1)
+    E_w = reshape(E, 1, 1, :)
 
-    # Time-averaged downward energy flux: sum over down beams and energy bins, mean over
-    # time, read in blocks of time steps to keep memory bounded
+    # Time-averaged downward field-aligned energy flux: Σ_beams |μ| Σ_E (Ie·E), summed over
+    # down beams and energy bins, mean over time, read in blocks of time steps to keep
+    # memory bounded
     function mean_down_eflux(read_block, n_t)
         s = 0.0
         # Load in arbitrary blocks of 128 time steps. Reasonably small to keep memory low,
         # but large enough to amortize the overhead of reading from disk.
         for t1 in 1:128:n_t
             t2 = min(t1 + 127, n_t)
-            s += sum(read_block(t1, t2) .* reshape(E, 1, 1, :))
+            s += sum(read_block(t1, t2) .* μ_down .* E_w)
         end
         return s / n_t
     end
@@ -264,8 +271,7 @@ function check_bottom_boundary(sim::AuroraSimulation, ds::NCDataset; threshold =
     ratio = eflux_bottom / eflux_top
     if ratio > threshold
         bottom = sim.model.altitude_grid.bottom
-        suggestion = suggest_bottom_altitude(sim.model.energy_grid.E_max,
-                                             sim.model.ionosphere.msis_file)
+        suggestion = suggest_bottom_altitude(sim.model)
         @warn "$(round(100 * ratio, sigdigits=2))% of the precipitating energy flux " *
               "reaches the bottom of the altitude grid ($(bottom) km), where it is " *
               "absorbed by the boundary condition. The solution is likely clipped at " *

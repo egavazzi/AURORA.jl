@@ -82,6 +82,15 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     )
 end
 
+"""
+    suggest_bottom_altitude(model::AuroraModel; safety=2.0)
+
+Convenience wrapper around [`suggest_bottom_altitude`](@ref) that reads the maximum energy
+and the MSIS atmosphere from an existing `model`.
+"""
+suggest_bottom_altitude(model::AuroraModel; safety = 2.0) =
+    suggest_bottom_altitude(model.energy_grid.E_max, model.ionosphere.msis_file; safety)
+
 # Reassigning a grid or the B-field geometry invalidates every derived quantity (scattering,
 # densities, cross sections, cascading, and any simulation cache built from this model). We
 # intercept those assignments to mark the model uninitialized, which lets `run!` /
