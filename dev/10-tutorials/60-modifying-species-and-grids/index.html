@@ -22,15 +22,15 @@ model.species[:N2].density</code></pre><pre class="documenter-example-output"><c
  9.599253184522903e17
  9.549228070241349e17
  ⋮
- 2.969908081046221e15
- 2.6998216467347665e15
- 2.4476211445806335e15
- 2.2127485658427435e15
- 1.994615322253459e15
- 1.7926051157286208e15
- 1.6060770665088785e15
- 1.434369072994877e15
- 1.276801372059796e15</code></pre><pre><code class="language-julia hljs"># Your own measured/downloaded profile, given as vectors:
+ 2.9699080810462155e15
+ 2.6998216467347545e15
+ 2.447621144580625e15
+ 2.2127485658427355e15
+ 1.9946153222534555e15
+ 1.7926051157286175e15
+ 1.6060770665088758e15
+ 1.4343690729948718e15
+ 1.276801372059794e15</code></pre><pre><code class="language-julia hljs"># Your own measured/downloaded profile, given as vectors:
 model.species[:N2].density_profile = VectorDensity(altitude_m, density_m3)
 
 # Or the default MSIS-backed profile, found/created by find_msis_file():
@@ -63,4 +63,4 @@ model = AuroraModel(alt_lims, θ_lims, E_max, msis_file, iri_file;
 model.species[:Ar].cross_sections    = my_sigma_matrix   # [n_levels × n_E]
 model.species[:Ar].excitation_levels = my_levels_matrix  # [n_levels × 2]
 
-run!(AuroraSimulation(model, flux, savedir; mode))</code></pre><div class="admonition is-success" id="Tip-c824e094fb2323f3"><header class="admonition-header">Tip<a class="admonition-anchor" href="#Tip-c824e094fb2323f3" title="Permalink"></a></header><div class="admonition-body"><p>Laws (density profiles, phase-function generators, cascading laws) must be reproducible so the model can be saved and reloaded. Use <a href="../../40-api/atmosphere/#AURORA.@law-40-api-atmosphere"><code>@law</code></a> for closed-form laws, a functor <code>struct</code> when the law carries parameters, or a named function. <strong>Bare anonymous functions are rejected</strong>. The chosen law will be stored in <code>inputs/physics_state.jld2</code> and possible to restore on load.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../50-post-processing/">« Post-Processing &amp; Analysis</a><a class="docs-footer-nextpage" href="../../20-physics/10-transport-equation/">Transport Equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 23 June 2026 14:49">Tuesday 23 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+run!(AuroraSimulation(model, flux, savedir; mode))</code></pre><div class="admonition is-success" id="Tip-c824e094fb2323f3"><header class="admonition-header">Tip<a class="admonition-anchor" href="#Tip-c824e094fb2323f3" title="Permalink"></a></header><div class="admonition-body"><p>Laws (density profiles, phase-function generators, cascading laws) must be reproducible so the model can be saved and reloaded. Use <a href="../../40-api/atmosphere/#AURORA.@law-40-api-atmosphere"><code>@law</code></a> for closed-form laws, a functor <code>struct</code> when the law carries parameters, or a named function. <strong>Bare anonymous functions are rejected</strong>. The chosen law will be stored in <code>inputs/physics_state.jld2</code> and possible to restore on load.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../50-post-processing/">« Post-Processing &amp; Analysis</a><a class="docs-footer-nextpage" href="../../20-physics/10-transport-equation/">Transport Equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Wednesday 24 June 2026 16:27">Wednesday 24 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
