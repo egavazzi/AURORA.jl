@@ -69,7 +69,7 @@ include("simulation/initialize.jl")
 export initialize!
 include("output/write.jl")
 include("output/read.jl")
-export SimulationResult, load_results, load_coordinates
+export SimulationResult, load_results, load_coordinates, load_model
 include("simulation/run.jl")
 export run!
 
@@ -83,9 +83,12 @@ include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")
 include("analysis/heating.jl")
+include("analysis/energy_budget.jl")
 export make_volume_excitation_file, make_column_excitation_file,
        make_Ie_top_file, make_current_file,
-       make_heating_rate_file, make_psd_file
+       make_heating_rate_file, make_psd_file,
+       energy_budget, EnergyBudget,
+       energy_budget_integrated, TimeIntegratedEnergyBudget
 
 # Define and export functions to be extended by the AURORA_viz module
 """
