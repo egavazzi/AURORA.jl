@@ -11,7 +11,7 @@ using SparseArrays: spdiagm
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    update_steady_state_matrix!(Mlhs, indices, A, B, D, op, μ, n_z)
+    update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D, op, μ, n_z)
 
 Fill the sparse matrix `Mlhs` with the steady-state transport operator values
 using the pre-computed `indices` (a `Matrix{BlockIndices}`) and dense operator
@@ -19,11 +19,15 @@ diagonals `op` (`OperatorDiagonals`).
 
 The physics formula for the system matrix is (per stream direction):
 ```
-Mlhs = μ * Ddz  +  diag(A)  −  B  −  D * Ddiffusion
+Mlhs = μ * Ddz  +  diag(A)  −  B  +  Mmirror  −  D * Ddiffusion
 ```
 where `Ddz = Ddz_Down` for downward (μ < 0) or `Ddz_Up` for upward (μ > 0).
+`Mmirror` is the magnetic mirror-force operator (zero when mirroring is off); like the
+scattering term `B` it couples beams through z-diagonal entries, so it shares the sparsity
+pattern.
 """
-function update_steady_state_matrix!(Mlhs, indices, A, B, D, op::OperatorDiagonals, μ, n_z)
+function update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D,
+                                     op::OperatorDiagonals, μ, n_z)
     n_angle = length(μ)
     nzval = Mlhs.nzval
     interior = 2:(n_z - 1)
@@ -32,11 +36,12 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, D, op::OperatorDiagona
         for i2 in 1:n_angle
             bi = indices[i1, i2]
             B_tmp = @view B[:, i1, i2]
+            M_tmp = @view Mmirror[:, i1, i2]
 
             if i1 != i2
-                # ── Off-diagonal blocks: scattering coupling ──
-                #   -B[interior]
-                @views nzval[bi.diag] .= .-B_tmp[interior]
+                # ── Off-diagonal blocks: scattering + mirror-force coupling ──
+                #   -B[interior] + Mmirror[interior]
+                @views nzval[bi.diag] .= .-B_tmp[interior] .+ M_tmp[interior]
             else
                 # ── Diagonal blocks: transport + loss + diffusion ──
                 nzval[bi.bc_first] = 1.0          # bottom boundary
@@ -45,9 +50,10 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, D, op::OperatorDiagona
                 D_i = D[i1]
 
                 if μ_i < 0   # ── downward streams ──
-                    # Main diagonal:  μ*Ddz_Down + A - B - D*Ddiffusion
+                    # Main diagonal:  μ*Ddz_Down + A - B + Mmirror - D*Ddiffusion
                     @views nzval[bi.diag] .= (μ_i .* op.Ddz_Down_diag[interior]
                                               .+ A[interior] .- B_tmp[interior]
+                                              .+ M_tmp[interior]
                                               .- D_i .* op.Ddiff_diag[interior])
 
                     # Super-diagonal: μ*Ddz_Down_super - D*Ddiff_super
@@ -63,9 +69,10 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, D, op::OperatorDiagona
                     nzval[bi.bc_last] = 1.0
 
                 else         # ── upward streams ──
-                    # Main diagonal:  μ*Ddz_Up + A - B - D*Ddiffusion
+                    # Main diagonal:  μ*Ddz_Up + A - B + Mmirror - D*Ddiffusion
                     @views nzval[bi.diag] .= (μ_i .* op.Ddz_Up_diag[interior]
                                               .+ A[interior] .- B_tmp[interior]
+                                              .+ M_tmp[interior]
                                               .- D_i .* op.Ddiff_diag[interior])
 
                     # Sub-diagonal: μ*Ddz_Up_sub - D*Ddiff_sub
@@ -105,12 +112,13 @@ operator diagonals are computed and stored in `cache`. On subsequent calls only 
 
 The steady-state electron transport equation is:
 ```
-μ ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ = Q
+μ ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ + Mmirror·Ie = Q
 ```
+where `Mmirror` is the (optional) magnetic mirror-force operator in pitch angle.
 
 After spatial discretization this becomes the linear system  `Mlhs · Ie = Q`  with:
 ```
-Mlhs = μ·Ddz + diag(A) − B − D·Ddiffusion
+Mlhs = μ·Ddz + diag(A) − B + Mmirror − D·Ddiffusion
 ```
 
 The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
@@ -130,7 +138,7 @@ The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
 # Arguments
 - `Ie`: pre-allocated output array [m⁻² s⁻¹], size `n_z * n_angle`
 - `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
-- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
+- `matrices::TransportMatrices`: container with `A`, `B`, `Mmirror`, `D`, `Q`, `Ddiffusion`
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
 - `cache`: `SolverCache` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
@@ -144,6 +152,7 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     # Extract physics data for this energy level
     A = matrices.A
     B = matrices.B
+    Mmirror = matrices.Mmirror
     D = @view(matrices.D[iE, :])
     Q_slice = @view(matrices.Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
@@ -157,7 +166,7 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     end
 
     # ── Update matrix values (fast, no allocations) ──
-    update_steady_state_matrix!(cache.Mlhs, cache.indices_lhs, A, B, D,
+    update_steady_state_matrix!(cache.Mlhs, cache.indices_lhs, A, B, Mmirror, D,
                                 cache.op_diags, μ, n_z)
 
     # ── Factorise / re-factorise ──

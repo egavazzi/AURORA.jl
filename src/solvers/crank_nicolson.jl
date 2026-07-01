@@ -31,9 +31,10 @@ Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  (Q^(n+1) + Q^n)/2
 
 with
 ```
-Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 − D·Ddiffusion
-Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 + D·Ddiffusion
+Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 + Mmirror/2 − D·Ddiffusion
+Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 − Mmirror/2 + D·Ddiffusion
 ```
+where `Mmirror` is the (optional) magnetic mirror-force operator in pitch angle.
 
 Both matrices share the same block structure as the steady-state system:
 ```
@@ -54,7 +55,7 @@ Both matrices share the same block structure as the steady-state system:
 - `t`: time grid [s]
 - `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `v`: electron velocity [km/s]
-- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
+- `matrices::TransportMatrices`: container with `A`, `B`, `Mmirror`, `D`, `Q`, `Ddiffusion`
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
@@ -69,6 +70,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     # Extract physics data for this energy level
     A = matrices.A
     B = matrices.B
+    Mmirror = matrices.Mmirror
     D = @view(matrices.D[iE, :])
     Q_slice = @view(matrices.Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
@@ -91,7 +93,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     # ── Update matrix values (fast, no allocations) ──
     update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs,
                                     cache.indices_lhs, cache.indices_rhs,
-                                    A, B, D, ddt, cache.op_diags, μ, n_z)
+                                    A, B, Mmirror, D, ddt, cache.op_diags, μ, n_z)
 
     # ── Boundary indices ──
     index_bottom = 1:n_z:(n_angle * n_z)
@@ -152,7 +154,7 @@ end
 
 """
     update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
-                                    A, B, D, ddt, op, μ, n_z)
+                                    A, B, Mmirror, D, ddt, op, μ, n_z)
 
 Fill both `Mlhs` and `Mrhs` with the Crank-Nicolson operator values using the
 pre-computed `BlockIndices` arrays and dense `OperatorDiagonals`.
@@ -161,13 +163,16 @@ pre-computed `BlockIndices` arrays and dense `OperatorDiagonals`.
 
 The physics formulas (per stream direction) are:
 ```
-Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2  −  D·Ddiffusion
-Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2  +  D·Ddiffusion
+Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2  +  Mmirror/2  −  D·Ddiffusion
+Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2  −  Mmirror/2  +  D·Ddiffusion
 ```
 where `Ddz` already contains the `/2` factor (built with `half_weight=true`).
+`Mmirror` is the magnetic mirror-force operator (zero when mirroring is off); like the
+scattering term `B` it couples beams through z-diagonal entries, so it shares the sparsity
+pattern.
 """
 function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
-                                         A, B, D, ddt::Float64,
+                                         A, B, Mmirror, D, ddt::Float64,
                                          op::OperatorDiagonals, μ, n_z)
     n_angle = length(μ)
     nz_lhs = Mlhs.nzval
@@ -179,12 +184,13 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
             bl = idx_lhs[i1, i2]
             br = idx_rhs[i1, i2]
             B_tmp = @view B[:, i1, i2]
+            M_tmp = @view Mmirror[:, i1, i2]
 
             if i1 != i2
-                # ── Off-diagonal blocks: scattering coupling ── #
-                #   Mlhs: -B/2,   Mrhs: +B/2
-                @views nz_lhs[bl.diag] .= .-B_tmp[interior] ./ 2
-                @views nz_rhs[br.diag] .=   B_tmp[interior] ./ 2
+                # ── Off-diagonal blocks: scattering + mirror-force coupling ── #
+                #   Mlhs: (-B + Mmirror)/2,   Mrhs: (B - Mmirror)/2
+                @views nz_lhs[bl.diag] .= (M_tmp[interior] .- B_tmp[interior]) ./ 2
+                @views nz_rhs[br.diag] .= (B_tmp[interior] .- M_tmp[interior]) ./ 2
             else
                 # ── Diagonal blocks: transport + loss + diffusion ── #
                 nz_lhs[bl.bc_first] = 1.0           # bottom boundary
@@ -196,13 +202,15 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                 if μ_i < 0   # ── downward streams ──
 
                     # Main diagonal
-                    #   Mlhs: ddt + μ·Ddz + A/2 - B/2 - D·Ddiff
-                    #   Mrhs: ddt - μ·Ddz - A/2 + B/2 + D·Ddiff
+                    #   Mlhs: ddt + μ·Ddz + A/2 - B/2 + Mmirror/2 - D·Ddiff
+                    #   Mrhs: ddt - μ·Ddz - A/2 + B/2 - Mmirror/2 + D·Ddiff
                     @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
                                                .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                               .+ M_tmp[interior] ./ 2
                                                .- D_i .* op.Ddiff_diag[interior])
                     @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
                                                .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                               .- M_tmp[interior] ./ 2
                                                .+ D_i .* op.Ddiff_diag[interior])
 
                     # Super-diagonal: μ·Ddz_super - D·Ddiff_super  /  negated
@@ -225,9 +233,11 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                     # Main diagonal
                     @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
                                                .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                               .+ M_tmp[interior] ./ 2
                                                .- D_i .* op.Ddiff_diag[interior])
                     @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
                                                .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                               .- M_tmp[interior] ./ 2
                                                .+ D_i .* op.Ddiff_diag[interior])
 
                     # Sub-diagonal: μ·Ddz_sub - D·Ddiff_sub  /  negated

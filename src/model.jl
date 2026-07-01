@@ -14,13 +14,17 @@ mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid
     ionosphere::IO
     species::SP
     B_angle_to_zenith::FT
+    # Magnetic field strength profile B(h) (any callable of altitude in meters), or `nothing`
+    # to disable the mirror force. Untyped so mirroring can be toggled on an existing model.
+    magnetic_field::Any
     s_field::V
     initialized::Bool
 end
 
 """
     AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
-                species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)))
+                species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)),
+                magnetic_field = nothing)
 
 Build a lightweight `AuroraModel`. Only the grids and ionosphere are set up; the expensive
 computation (scattering matrices, species densities, cross sections, cascading data) is
@@ -54,12 +58,20 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
   model.species[end].excitation_levels = my_levels_matrix  # [n_levels × 2]
   run!(sim)
   ```
+- `magnetic_field`: magnetic field strength profile B(h) as a callable of altitude in
+  meters, e.g. [`DipoleField`](@ref). Enables the magnetic mirror force in the transport
+  solvers. Only the logarithmic gradient of the profile matters, so any normalization works.
+  Defaults to `nothing` (no mirror force). Like density profiles, it must be a functor or
+  named function (not a bare anonymous function) so the model round-trips through JLD2.
+  See [`DipoleField`](@ref) for grid-resolution guidance (use μ-uniform beams; keep `dz_max`
+  small) when the mirror force is enabled.
 
 ## Returns
 An uninitialized `AuroraModel`. Call `initialize!(model)` or `run!(sim)` to complete setup.
 """
 function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith=0;
-                     species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)))
+                     species = (N2Species(msis_file), O2Species(msis_file), OSpecies(msis_file)),
+                     magnetic_field = nothing)
     altitude_grid    = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid      = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
@@ -67,6 +79,7 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     species_tuple    = Tuple(species)
     scattering       = ScatteringData()
     s_field          = altitude_grid.h ./ cosd(B_angle_to_zenith)
+    magnetic_field === nothing || require_reproducible(magnetic_field, "magnetic_field")
 
     FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
 
@@ -75,7 +88,7 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
                        FT, typeof(s_field)}(
         altitude_grid, energy_grid, pitch_angle_grid,
         scattering, ionosphere, species_tuple,
-        FT(B_angle_to_zenith), s_field, false
+        FT(B_angle_to_zenith), magnetic_field, s_field, false
     )
 end
 
@@ -86,7 +99,8 @@ end
 function Base.setproperty!(model::AuroraModel, name::Symbol, value)
     ty = fieldtype(typeof(model), name)
     setfield!(model, name, value isa ty ? value : convert(ty, value))
-    if name in (:altitude_grid, :energy_grid, :pitch_angle_grid, :B_angle_to_zenith)
+    if name in (:altitude_grid, :energy_grid, :pitch_angle_grid, :B_angle_to_zenith,
+                :magnetic_field)
         setfield!(model, :initialized, false)
     end
     return value
@@ -150,5 +164,7 @@ function Base.show(io::IO, ::MIME"text/plain", model::AuroraModel)
     println(io, "├── ", model.initialized ? model.scattering : "ScatteringData: (not initialized)")
     println(io, "├── ", model.ionosphere)
     println(io, "├── Species: ", join((String(sp.name) for sp in model.species), ", "))
-    print(io, "└── B angle to zenith: $(model.B_angle_to_zenith)°")
+    println(io, "├── B angle to zenith: $(model.B_angle_to_zenith)°")
+    print(io, "└── Magnetic field: ",
+          model.magnetic_field === nothing ? "none (no mirror force)" : model.magnetic_field)
 end

@@ -260,6 +260,68 @@ function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
 end
 
 """
+    update_Mmirror!(Mmirror, model)
+
+Fill the magnetic mirror-force operator in place. Zero when `model.magnetic_field` is
+`nothing` (mirroring off), so the solvers can add it unconditionally.
+
+The operator is an upwind finite-volume discretization, over the pitch-angle beams, of the
+focused-transport term `κ(z)·(1−μ²)/2·∂I/∂μ`, with `κ = −d(ln B)/ds` the inverse focusing
+length along the field line. Conservation of the first adiabatic invariant drifts all
+electrons toward μ = +1 (field-aligned up) as they move through the converging field, so
+each beam exchanges flux only with its neighbours in μ, and the edge coefficient `(1−μ²)`
+vanishes at μ = ±1 — no pitch-angle boundary conditions are needed. The `μ̄ₖ` part of the
+diagonal is the flux-tube convergence term: column sums equal `κ·μ̄ₖ` rather than zero, so
+particle number is conserved in the flux-tube sense (area ∝ 1/B), not the planar sense.
+
+`Mmirror[iz, i1, i2]` couples beam `i2` into the transport equation of beam `i1` and enters
+the system matrix with the same sign as `A` (`Mlhs = μ·Ddz + A − B + Mmirror − D·Ddiffusion`).
+Like the equation itself divided by `v`, the operator is independent of energy: it is filled
+once per simulation cache, not per energy step.
+"""
+function update_Mmirror!(Mmirror, model::AuroraModel)
+    fill!(Mmirror, 0.0)
+    field = model.magnetic_field
+    field === nothing && return nothing
+
+    # Inverse focusing length κ = −d(ln B)/ds, finite-differenced along the field line
+    s = model.s_field
+    lnB = log.(field.(model.altitude_grid.h))
+    n_z = length(s)
+    κ = zeros(n_z)
+    κ[1] = -(lnB[2] - lnB[1]) / (s[2] - s[1])
+    for iz in 2:(n_z - 1)
+        κ[iz] = -(lnB[iz + 1] - lnB[iz - 1]) / (s[iz + 1] - s[iz - 1])
+    end
+    κ[n_z] = -(lnB[n_z] - lnB[n_z - 1]) / (s[n_z] - s[n_z - 1])
+    any(<(0), κ) && throw(ArgumentError(
+        "the magnetic field strength must be non-increasing with altitude: the upwind \
+         mirror-force discretization assumes a field converging downward (μ-drift toward \
+         μ = +1 everywhere)."))
+
+    grid = model.pitch_angle_grid
+    μ_lims = grid.μ_lims    # beam edges, ascending from −1 (θ = 180°) to +1 (θ = 0°)
+    μ_center = grid.μ_center
+    Ω = 2π .* diff(μ_lims)  # beam solid angles
+
+    for k in 1:grid.n_beams
+        # Upwind loss across the beam's upper-μ edge, plus the flux-tube convergence term
+        c_diag = π * (1 - μ_lims[k + 1]^2) / Ω[k] + μ_center[k]
+        for iz in 1:n_z
+            Mmirror[iz, k, k] = κ[iz] * c_diag
+        end
+        # Upwind gain from the neighbouring beam below in μ
+        if k > 1
+            c_gain = π * (1 - μ_lims[k]^2) / Ω[k - 1]
+            for iz in 1:n_z
+                Mmirror[iz, k, k - 1] = -κ[iz] * c_gain
+            end
+        end
+    end
+    return nothing
+end
+
+"""
     update_matrices!(matrices, model, iE, B2B_fragment)
 
 Update the A and B matrices in place for a given energy level iE.
@@ -282,7 +344,8 @@ end
 """
     initialize_transport_matrices(model, t)
 
-Create a `TransportMatrices` container initialized with zeros for A, B, D, Q and Ddiffusion.
+Create a `TransportMatrices` container initialized with zeros for A, B, Mmirror, D, Q and
+Ddiffusion.
 """
 function initialize_transport_matrices(model::AuroraModel, t)
     n_altitude = length(model.altitude_grid.h)

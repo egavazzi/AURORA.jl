@@ -65,6 +65,7 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     matrices = initialize_transport_matrices(model, t_loop)
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)
+    update_Mmirror!(matrices.Mmirror, model)
 
     # Pre-compute beam-to-beam scattering fragment
     B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)

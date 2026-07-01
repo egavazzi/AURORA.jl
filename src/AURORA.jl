@@ -30,6 +30,9 @@ export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 include("physics/laws.jl")
 export ExprLaw, @law
 
+include("physics/magnetic_field.jl")
+export DipoleField
+
 include("physics/cascading.jl")
 include("physics/cascading_cache.jl")
 export clear_cascading_cache!
@@ -58,9 +61,10 @@ include("solvers/sparse_indexing.jl")
 include("solvers/steady_state.jl")
 include("solvers/crank_nicolson.jl")
 
-include("simulation/cache.jl")
 include("output/output_manager.jl")
 export AuroraOutputManager
+
+include("simulation/cache.jl")
 include("simulation/types.jl")
 export AuroraSimulation
 export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent
@@ -133,6 +137,7 @@ export plot_input, plot_input!
                        angles_to_plot=nothing, colorrange=nothing, save_to_file=true,
                        plot_input=false, input_angle_cone=[170, 180], dt_steps=1,
                        framerate=30, max_bytes=512*1024^2)
+                       framerate=30, max_bytes=512*1024^2)
 
 Plot a heatmap of Ie over height and energy, and animate it in time. The animation is saved
 as a .mp4 file under the `directory_to_process` if `save_to_file = true`.
@@ -155,10 +160,13 @@ Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
                          `directory_to_process`.
 - `plot_input = false`: if `true`, also plots the precipitating electron flux at the top of
                         the ionosphere by loading it from `simulation_data.nc`.
+                        the ionosphere by loading it from `simulation_data.nc`.
 - `input_angle_cone = [170, 180]`: pitch-angle cone (degrees) used to select and sum beams
                                    for the precipitation overlay. Only used when `plot_input = true`.
 - `dt_steps = 1`: plot one frame every `dt_steps` timesteps. Increase to speed up rendering.
 - `framerate = 30`: framerate of the animation in frames per second.
+- `max_bytes = 512 * 1024^2`: per-chunk memory budget for streaming the flux from
+                              `simulation_data.nc`.
 - `max_bytes = 512 * 1024^2`: per-chunk memory budget for streaming the flux from
                               `simulation_data.nc`.
 
