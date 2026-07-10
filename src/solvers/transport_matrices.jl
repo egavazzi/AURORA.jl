@@ -37,7 +37,6 @@ function TransportMatrices(n_altitude::Int, n_angle::Int, n_time::Int, n_energy:
     Q = zeros(Float64, n_altitude * n_angle, n_time, n_energy)
     Ddiffusion = SparseArrays.spzeros(Float64, n_altitude, n_altitude)
 
-
     Le = zeros(Float64, n_altitude)
     B2B_elastic = zeros(Float64, n_angle, n_angle)
     B2B_inelastic_neutrals = Matrix{Float64}[]

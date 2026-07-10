@@ -21,6 +21,7 @@ function write_config_toml(sim::AuroraSimulation)
         "theta_lims"         => collect(Float64, model.pitch_angle_grid.θ_lims),
         "E_max_eV"           => Float64(model.energy_grid.E_max),
         "B_angle_to_zenith"  => Float64(model.B_angle_to_zenith),
+        "magnetic_field"     => model.magnetic_field === nothing ? "none" : repr(model.magnetic_field),
     )
 
     if mode isa TimeDependentMode
@@ -41,7 +42,7 @@ function write_config_toml(sim::AuroraSimulation)
 
     # Explicit key order for the output file (keys not listed are appended last).
     key_order = ["altitude_lims_km", "theta_lims", "E_max_eV", "B_angle_to_zenith",
-                 "mode", "duration_s", "dt_s", "aurora_version", "commit_hash"]
+                 "magnetic_field", "mode", "duration_s", "dt_s", "aurora_version", "commit_hash"]
     rank(k) = something(findfirst(==(k), key_order), length(key_order) + 1)
 
     savefile = joinpath(sim.output.savedir, "config.toml")

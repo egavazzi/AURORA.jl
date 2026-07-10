@@ -1,5 +1,7 @@
 # Changelog
 
+- :sparkles: Add an optional magnetic mirror force :sparkles:
+  - Enabled by passing a magnetic field profile to `AuroraModel` with the `magnetic_field` keyword, e.g. `magnetic_field = DipoleField()`. The transport equation then gains the adiabatic focused-transport term (upwind pitch-angle advection plus flux-tube focusing), treated implicitly in both the steady-state and time-dependent solvers. Defaults to `nothing`, which leaves the behaviour unchanged.
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.

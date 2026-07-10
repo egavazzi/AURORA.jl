@@ -22,9 +22,9 @@ The physics formula for the system matrix is (per stream direction):
 Mlhs = μ * Ddz  +  diag(A)  −  B  +  Mmirror  −  D * Ddiffusion
 ```
 where `Ddz = Ddz_Down` for downward (μ < 0) or `Ddz_Up` for upward (μ > 0).
-`Mmirror` is the magnetic mirror-force operator (zero when mirroring is off); like the
-scattering term `B` it couples beams through z-diagonal entries, so it shares the sparsity
-pattern.
+`Mmirror` is the magnetic mirror-force operator; like the scattering term `B` it couples
+beams through z-diagonal entries, so it shares the sparsity pattern. It may be `nothing`
+when mirroring is off, in which case it is treated as zero (and simply skipped).
 """
 function update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D,
                                      op::OperatorDiagonals, μ, n_z)
@@ -36,12 +36,16 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D,
         for i2 in 1:n_angle
             bi = indices[i1, i2]
             B_tmp = @view B[:, i1, i2]
-            M_tmp = @view Mmirror[:, i1, i2]
 
             if i1 != i2
                 # ── Off-diagonal blocks: scattering + mirror-force coupling ──
                 #   -B[interior] + Mmirror[interior]
-                @views nzval[bi.diag] .= .-B_tmp[interior] .+ M_tmp[interior]
+                if Mmirror === nothing
+                    @views nzval[bi.diag] .= .-B_tmp[interior]
+                else
+                    M_tmp = @view Mmirror[:, i1, i2]
+                    @views nzval[bi.diag] .= .-B_tmp[interior] .+ M_tmp[interior]
+                end
             else
                 # ── Diagonal blocks: transport + loss + diffusion ──
                 nzval[bi.bc_first] = 1.0          # bottom boundary
@@ -51,10 +55,17 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D,
 
                 if μ_i < 0   # ── downward streams ──
                     # Main diagonal:  μ*Ddz_Down + A - B + Mmirror - D*Ddiffusion
-                    @views nzval[bi.diag] .= (μ_i .* op.Ddz_Down_diag[interior]
-                                              .+ A[interior] .- B_tmp[interior]
-                                              .+ M_tmp[interior]
-                                              .- D_i .* op.Ddiff_diag[interior])
+                    if Mmirror === nothing
+                        @views nzval[bi.diag] .= (μ_i .* op.Ddz_Down_diag[interior]
+                                                  .+ A[interior] .- B_tmp[interior]
+                                                  .- D_i .* op.Ddiff_diag[interior])
+                    else
+                        M_tmp = @view Mmirror[:, i1, i2]
+                        @views nzval[bi.diag] .= (μ_i .* op.Ddz_Down_diag[interior]
+                                                  .+ A[interior] .- B_tmp[interior]
+                                                  .+ M_tmp[interior]
+                                                  .- D_i .* op.Ddiff_diag[interior])
+                    end
 
                     # Super-diagonal: μ*Ddz_Down_super - D*Ddiff_super
                     @views nzval[bi.super] .= (μ_i .* op.Ddz_Down_super[interior]
@@ -70,10 +81,17 @@ function update_steady_state_matrix!(Mlhs, indices, A, B, Mmirror, D,
 
                 else         # ── upward streams ──
                     # Main diagonal:  μ*Ddz_Up + A - B + Mmirror - D*Ddiffusion
-                    @views nzval[bi.diag] .= (μ_i .* op.Ddz_Up_diag[interior]
-                                              .+ A[interior] .- B_tmp[interior]
-                                              .+ M_tmp[interior]
-                                              .- D_i .* op.Ddiff_diag[interior])
+                    if Mmirror === nothing
+                        @views nzval[bi.diag] .= (μ_i .* op.Ddz_Up_diag[interior]
+                                                  .+ A[interior] .- B_tmp[interior]
+                                                  .- D_i .* op.Ddiff_diag[interior])
+                    else
+                        M_tmp = @view Mmirror[:, i1, i2]
+                        @views nzval[bi.diag] .= (μ_i .* op.Ddz_Up_diag[interior]
+                                                  .+ A[interior] .- B_tmp[interior]
+                                                  .+ M_tmp[interior]
+                                                  .- D_i .* op.Ddiff_diag[interior])
+                    end
 
                     # Sub-diagonal: μ*Ddz_Up_sub - D*Ddiff_sub
                     @views nzval[bi.sub] .= (μ_i .* op.Ddz_Up_sub[interior .- 1]
@@ -152,7 +170,7 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     # Extract physics data for this energy level
     A = matrices.A
     B = matrices.B
-    Mmirror = matrices.Mmirror
+    Mmirror = model.magnetic_field === nothing ? nothing : matrices.Mmirror
     D = @view(matrices.D[iE, :])
     Q_slice = @view(matrices.Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion

@@ -14,9 +14,10 @@ mutable struct AuroraModel{AG<:AltitudeGrid, EG<:EnergyGrid, PAG<:PitchAngleGrid
     ionosphere::IO
     species::SP
     B_angle_to_zenith::FT
-    # Magnetic field strength profile B(h) (any callable of altitude in meters), or `nothing`
-    # to disable the mirror force. Untyped so mirroring can be toggled on an existing model.
-    magnetic_field::Any
+    # Magnetic field strength profile B(h) as an `AbstractFieldProfile`, or `nothing` to
+    # disable the mirror force. The field type is fixed (non-parametric) so mirroring can be
+    # toggled on an existing model through `setproperty!` without changing the model's type.
+    magnetic_field::Union{Nothing, AbstractFieldProfile}
     s_field::V
     initialized::Bool
 end
@@ -58,13 +59,13 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
   model.species[end].excitation_levels = my_levels_matrix  # [n_levels × 2]
   run!(sim)
   ```
-- `magnetic_field`: magnetic field strength profile B(h) as a callable of altitude in
-  meters, e.g. [`DipoleField`](@ref). Enables the magnetic mirror force in the transport
-  solvers. Only the logarithmic gradient of the profile matters, so any normalization works.
-  Defaults to `nothing` (no mirror force). Like density profiles, it must be a functor or
-  named function (not a bare anonymous function) so the model round-trips through JLD2.
-  See [`DipoleField`](@ref) for grid-resolution guidance (use μ-uniform beams; keep `dz_max`
-  small) when the mirror force is enabled.
+- `magnetic_field`: magnetic field strength profile B(h) as a subtype of
+  [`AbstractFieldProfile`](@ref) (a callable of altitude in meters), e.g. [`DipoleField`](@ref).
+  Enables the magnetic mirror force in the transport solvers. Only the logarithmic gradient of
+  the profile matters, so any normalization works. Defaults to `nothing` (no mirror force).
+  Wrapping the profile in an `AbstractFieldProfile` subtype (rather than a bare function) keeps
+  the model reproducible when saved to JLD2. See [`DipoleField`](@ref) for grid-resolution
+  guidance (use μ-uniform beams; keep `dz_max` small) when the mirror force is enabled.
 
 ## Returns
 An uninitialized `AuroraModel`. Call `initialize!(model)` or `run!(sim)` to complete setup.
@@ -79,7 +80,11 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
     species_tuple    = Tuple(species)
     scattering       = ScatteringData()
     s_field          = altitude_grid.h ./ cosd(B_angle_to_zenith)
-    magnetic_field === nothing || require_reproducible(magnetic_field, "magnetic_field")
+    magnetic_field === nothing || magnetic_field isa AbstractFieldProfile || throw(ArgumentError(
+        "magnetic_field must be `nothing` or a subtype of `AbstractFieldProfile`, got a \
+         $(typeof(magnetic_field)). Wrap your B(h) profile in an `AbstractFieldProfile` \
+         subtype (e.g. `DipoleField`); a bare function cannot be saved for reproducibility \
+         through JLD2."))
 
     FT = promote_type(eltype(s_field), typeof(B_angle_to_zenith))
 

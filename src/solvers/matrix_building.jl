@@ -278,33 +278,50 @@ particle number is conserved in the flux-tube sense (area ∝ 1/B), not the plan
 the system matrix with the same sign as `A` (`Mlhs = μ·Ddz + A − B + Mmirror − D·Ddiffusion`).
 Like the equation itself divided by `v`, the operator is independent of energy: it is filled
 once per simulation cache, not per energy step.
+
+The discretization itself lives in the pure, model-free [`fill_mirror_operator!`](@ref); this
+method only resolves the inverse focusing length `κ` from the model's field profile (via
+[`mirror_kappa`](@ref)) before handing off to it.
 """
 function update_Mmirror!(Mmirror, model::AuroraModel)
     fill!(Mmirror, 0.0)
     field = model.magnetic_field
     field === nothing && return nothing
 
-    # Inverse focusing length κ = −d(ln B)/ds, finite-differenced along the field line
-    s = model.s_field
-    lnB = log.(field.(model.altitude_grid.h))
-    n_z = length(s)
-    κ = zeros(n_z)
-    κ[1] = -(lnB[2] - lnB[1]) / (s[2] - s[1])
-    for iz in 2:(n_z - 1)
-        κ[iz] = -(lnB[iz + 1] - lnB[iz - 1]) / (s[iz + 1] - s[iz - 1])
-    end
-    κ[n_z] = -(lnB[n_z] - lnB[n_z - 1]) / (s[n_z] - s[n_z - 1])
-    any(<(0), κ) && throw(ArgumentError(
-        "the magnetic field strength must be non-increasing with altitude: the upwind \
-         mirror-force discretization assumes a field converging downward (μ-drift toward \
-         μ = +1 everywhere)."))
+    # Inverse focusing length κ = −d(ln B)/ds along the field line (closed form or
+    # finite-differenced, depending on the profile type)
+    κ = mirror_kappa(field, model.altitude_grid.h, model.B_angle_to_zenith)
 
     grid = model.pitch_angle_grid
     μ_lims = grid.μ_lims    # beam edges, ascending from −1 (θ = 180°) to +1 (θ = 0°)
     μ_center = grid.μ_center
     Ω = 2π .* diff(μ_lims)  # beam solid angles
 
-    for k in 1:grid.n_beams
+    fill_mirror_operator!(Mmirror, μ_lims, μ_center, Ω, κ)
+    return nothing
+end
+
+"""
+    fill_mirror_operator!(Mmirror, μ_lims, μ_center, Ω, κ)
+
+Pure, model-free core of the mirror-force discretization: fill the operator `Mmirror`
+(`n_z × n_beams × n_beams`) from bare arrays, so it can be unit-tested without an `AuroraModel`.
+
+- `μ_lims`: beam edges (length `n_beams + 1`), ascending from −1 (θ = 180°) to +1 (θ = 0°).
+- `μ_center`: beam centers (length `n_beams`).
+- `Ω`: beam solid angles `2π·diff(μ_lims)` (length `n_beams`).
+- `κ`: inverse focusing length per altitude (length `n_z`).
+
+The adiabatic μ-drift points toward μ = +1 everywhere in a field converging downward, so each
+beam loses flux upwind across its upper-μ edge and gains it from the beam below in μ (first
+order upwind). The edge coefficient `(1 − μ²)` vanishes at μ = ±1, so no pitch-angle boundary
+conditions are needed. The `μ̄ₖ` term on the diagonal is the flux-tube convergence term, which
+makes column sums telescope to `κ·μ̄ₖ` (flux-tube particle conservation) rather than to zero.
+"""
+function fill_mirror_operator!(Mmirror, μ_lims, μ_center, Ω, κ)
+    n_beams = length(μ_center)
+    n_z = length(κ)
+    for k in 1:n_beams
         # Upwind loss across the beam's upper-μ edge, plus the flux-tube convergence term
         c_diag = π * (1 - μ_lims[k + 1]^2) / Ω[k] + μ_center[k]
         for iz in 1:n_z

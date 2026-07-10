@@ -70,7 +70,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     # Extract physics data for this energy level
     A = matrices.A
     B = matrices.B
-    Mmirror = matrices.Mmirror
+    Mmirror = model.magnetic_field === nothing ? nothing : matrices.Mmirror
     D = @view(matrices.D[iE, :])
     Q_slice = @view(matrices.Q[:, :, iE])
     Ddiffusion = matrices.Ddiffusion
@@ -167,9 +167,9 @@ Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2  +  Mmirror/2  −  D·Ddiffusion
 Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2  −  Mmirror/2  +  D·Ddiffusion
 ```
 where `Ddz` already contains the `/2` factor (built with `half_weight=true`).
-`Mmirror` is the magnetic mirror-force operator (zero when mirroring is off); like the
-scattering term `B` it couples beams through z-diagonal entries, so it shares the sparsity
-pattern.
+`Mmirror` is the magnetic mirror-force operator; like the scattering term `B` it couples
+beams through z-diagonal entries, so it shares the sparsity pattern. It may be `nothing`
+when mirroring is off, in which case it is treated as zero (and simply skipped).
 """
 function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                                          A, B, Mmirror, D, ddt::Float64,
@@ -184,13 +184,18 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
             bl = idx_lhs[i1, i2]
             br = idx_rhs[i1, i2]
             B_tmp = @view B[:, i1, i2]
-            M_tmp = @view Mmirror[:, i1, i2]
 
             if i1 != i2
                 # ── Off-diagonal blocks: scattering + mirror-force coupling ── #
                 #   Mlhs: (-B + Mmirror)/2,   Mrhs: (B - Mmirror)/2
-                @views nz_lhs[bl.diag] .= (M_tmp[interior] .- B_tmp[interior]) ./ 2
-                @views nz_rhs[br.diag] .= (B_tmp[interior] .- M_tmp[interior]) ./ 2
+                if Mmirror === nothing
+                    @views nz_lhs[bl.diag] .= .-B_tmp[interior] ./ 2
+                    @views nz_rhs[br.diag] .=   B_tmp[interior] ./ 2
+                else
+                    M_tmp = @view Mmirror[:, i1, i2]
+                    @views nz_lhs[bl.diag] .= (M_tmp[interior] .- B_tmp[interior]) ./ 2
+                    @views nz_rhs[br.diag] .= (B_tmp[interior] .- M_tmp[interior]) ./ 2
+                end
             else
                 # ── Diagonal blocks: transport + loss + diffusion ── #
                 nz_lhs[bl.bc_first] = 1.0           # bottom boundary
@@ -204,14 +209,24 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                     # Main diagonal
                     #   Mlhs: ddt + μ·Ddz + A/2 - B/2 + Mmirror/2 - D·Ddiff
                     #   Mrhs: ddt - μ·Ddz - A/2 + B/2 - Mmirror/2 + D·Ddiff
-                    @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
-                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
-                                               .+ M_tmp[interior] ./ 2
-                                               .- D_i .* op.Ddiff_diag[interior])
-                    @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
-                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
-                                               .- M_tmp[interior] ./ 2
-                                               .+ D_i .* op.Ddiff_diag[interior])
+                    if Mmirror === nothing
+                        @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
+                                                   .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                                   .- D_i .* op.Ddiff_diag[interior])
+                        @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
+                                                   .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                                   .+ D_i .* op.Ddiff_diag[interior])
+                    else
+                        M_tmp = @view Mmirror[:, i1, i2]
+                        @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
+                                                   .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                                   .+ M_tmp[interior] ./ 2
+                                                   .- D_i .* op.Ddiff_diag[interior])
+                        @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
+                                                   .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                                   .- M_tmp[interior] ./ 2
+                                                   .+ D_i .* op.Ddiff_diag[interior])
+                    end
 
                     # Super-diagonal: μ·Ddz_super - D·Ddiff_super  /  negated
                     @views nz_lhs[bl.super] .= ( μ_i .* op.Ddz_Down_super[interior]
@@ -231,14 +246,24 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                 else         # ── upward streams ──
 
                     # Main diagonal
-                    @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
-                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
-                                               .+ M_tmp[interior] ./ 2
-                                               .- D_i .* op.Ddiff_diag[interior])
-                    @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
-                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
-                                               .- M_tmp[interior] ./ 2
-                                               .+ D_i .* op.Ddiff_diag[interior])
+                    if Mmirror === nothing
+                        @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
+                                                   .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                                   .- D_i .* op.Ddiff_diag[interior])
+                        @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
+                                                   .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                                   .+ D_i .* op.Ddiff_diag[interior])
+                    else
+                        M_tmp = @view Mmirror[:, i1, i2]
+                        @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
+                                                   .+ A_half ./ 2 .- B_tmp[interior] ./ 2
+                                                   .+ M_tmp[interior] ./ 2
+                                                   .- D_i .* op.Ddiff_diag[interior])
+                        @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
+                                                   .- A_half ./ 2 .+ B_tmp[interior] ./ 2
+                                                   .- M_tmp[interior] ./ 2
+                                                   .+ D_i .* op.Ddiff_diag[interior])
+                    end
 
                     # Sub-diagonal: μ·Ddz_sub - D·Ddiff_sub  /  negated
                     @views nz_lhs[bl.sub] .= ( μ_i .* op.Ddz_Up_sub[interior .- 1]
