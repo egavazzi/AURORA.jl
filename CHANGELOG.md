@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Numerical Breaking (small)** The single-ionization cascading integrals now use a relative tolerance of 1e-4 instead of the hcubature default (~1.5e-8), making the matrices ~1.1–1.3x faster to build with final analysis results changing by less than ~4e-6 (relative). `calculate_cascading_matrices` also reports throttled progress on large grids (at most one status update per 10 s by default) [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
 - **Breaking** Rename `AuroraSimulation.cache` to `AuroraSimulation.workspace`, and replace `cache_initialized` with `workspace.initialized`.
   The simulation working-state types are also renamed from cache to workspace, e.g. `SolverCache` → `SolverWorkspace`, `DegradationCache` → `DegradationWorkspace` [#161](https://github.com/egavazzi/AURORA.jl/pull/161)
 
