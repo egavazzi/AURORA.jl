@@ -12,7 +12,7 @@ identifiers:
     type: doi
     value: 10.5281/zenodo.11238620
 license: GPL-3.0
-version: 0.7.0
-date-released: "2026-03-25"
+version: 0.8.0
+date-released: "2026-07-28"
 doi: 10.5281/zenodo.11238620
 repository-code: "https://github.com/egavazzi/AURORA.jl"
