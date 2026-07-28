@@ -7,9 +7,9 @@
   - The grids, cross-section data and simulation state are now proper types, which makes them easier to inspect.
   - Visit the updated online [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
 - **Breaking** New output format [#140](https://github.com/egavazzi/AURORA.jl/pull/140)
-  - Results are saved as NetCDF/TOML/JLD2 instead of `.mat` files: one `simulation_data.nc` per run (appended per loop) with `Ie` in `[n_z, n_μ, n_t, n_E]` layout, a `config.toml` with the simulation parameters, the inputs under `inputs/`, and the derived quantities under `analysis/`.
-  - `savedir` can now be an absolute path or a path relative to the current directory, instead of always being placed under the package `data/` folder.
-  - The simulation model state is now saved to disk next to the results, and can be reloaded for full reproducibility.
+  - Results are saved as NetCDF/TOML/JLD2 instead of `.mat` files.
+  - `savedir` is now an absolute path or a path relative to the current directory, instead of always being placed under the package `data/` folder.
+  - The simulation model state is always saved to disk next to the results, and can be reloaded for full reproducibility.
 - **Breaking** `IeE_tot` is now the field-aligned (vertical) energy flux entering the top of the ionosphere, instead of the omnidirectional energy flux [#150](https://github.com/egavazzi/AURORA.jl/pull/150)
   - Previously the normalization did not project the flux onto the field line, so the energy actually deposited in the atmosphere depended on the pitch-angle beams selected as input (as little as half of the requested `IeE_tot` for wide selections). `IeE_tot` now denotes the vertical energy flux that actually enters the atmosphere, and is invariant with respect to the beam selection.
   - Simulations from previous versions can be reproduced by rescaling `IeE_tot`, as the transport is linear in the magnitude of the input flux.
