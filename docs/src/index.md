@@ -56,7 +56,7 @@ Version-specific DOIs can be found on Zenodo.
     author = {Gavazzi, Etienne and Gustavsson, Björn},
     doi = {10.5281/zenodo.11238620},
     license = {GPL-3.0},
-    month = mar,
+    month = jul,
     title = {{AURORA.jl}},
     url = {https://github.com/egavazzi/AURORA.jl},
     version = {0.8.0},
