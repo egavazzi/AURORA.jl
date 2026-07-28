@@ -52,14 +52,14 @@ If you use AURORA.jl in your work, please cite it as follows. Note that
 Version-specific DOIs can be found on Zenodo.
 
 ```bibtex
-@software{Gavazzi_AURORA_jl_2026,
+@software{Gavazzi_AURORA_2026,
     author = {Gavazzi, Etienne and Gustavsson, Björn},
     doi = {10.5281/zenodo.11238620},
     license = {GPL-3.0},
-    month = mar,
+    month = jul,
     title = {{AURORA.jl}},
     url = {https://github.com/egavazzi/AURORA.jl},
-    version = {0.7.0},
+    version = {0.8.0},
     year = {2026}
 }
 ```

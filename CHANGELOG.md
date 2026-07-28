@@ -1,13 +1,18 @@
 # Changelog
 
+## v0.8.0 - 2026-07-28
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
   - Neutral species can be inspected, modified, removed or even added.
+  - The grids, cross-section data and simulation state are now proper types, which makes them easier to inspect.
   - Visit the updated online [documentation](https://egavazzi.github.io/AURORA.jl/dev/) for more details and examples.
 - **Breaking** New output format [#140](https://github.com/egavazzi/AURORA.jl/pull/140)
-  - Results are saved as NetCDF/TOML/JLD2 instead of `.mat` files: one `simulation_data.nc` per run (appended per loop) with `Ie` in `[n_z, n_μ, n_t, n_E]` layout, a `config.toml` with the simulation parameters, the inputs under `inputs/`, and the derived quantities under `analysis/`.
-  - `savedir` can now be an absolute path or a path relative to the current directory, instead of always being placed under the package `data/` folder.
-  - The simulation model state is now saved to disk next to the results, and can be reloaded for full reproducibility.
+  - Results are saved as NetCDF/TOML/JLD2 instead of `.mat` files.
+  - `savedir` is now an absolute path or a path relative to the current directory, instead of always being placed under the package `data/` folder.
+  - The simulation model state is always saved to disk next to the results, and can be reloaded for full reproducibility.
+- **Breaking** `IeE_tot` is now the field-aligned (vertical) energy flux entering the top of the ionosphere, instead of the omnidirectional energy flux [#150](https://github.com/egavazzi/AURORA.jl/pull/150)
+  - Previously the normalization did not project the flux onto the field line, so the energy actually deposited in the atmosphere depended on the pitch-angle beams selected as input (as little as half of the requested `IeE_tot` for wide selections). `IeE_tot` now denotes the vertical energy flux that actually enters the atmosphere, and is invariant with respect to the beam selection.
+  - Simulations from previous versions can be reproduced by rescaling `IeE_tot`, as the transport is linear in the magnitude of the input flux.
 - **Numerical Breaking (small)** Minor correction of the Crank-Nicolson top boundary indexing/timing [#120](https://github.com/egavazzi/AURORA.jl/pull/120)
 - **Numerical Breaking (small)** Refactor of the cascading functions, during which a missing factor was found and fixed [#130](https://github.com/egavazzi/AURORA.jl/pull/130)
 - **Numerical Breaking (small)** The last `E_centers` is now always ≤ than `E_max` [#136](https://github.com/egavazzi/AURORA.jl/pull/136)
@@ -19,7 +24,8 @@
 - Switch from IRI2016 to IRI2020 model, solving the issue with recent dates that could not be computed [#117](https://github.com/egavazzi/AURORA.jl/pull/117)
 - Handle invalid iri values at top and bottom ends [#118](https://github.com/egavazzi/AURORA.jl/pull/118)
 - Cached cascading and scattering matrices created with different versions of AURORA are now automatically skipped [#135](https://github.com/egavazzi/AURORA.jl/pull/135/)
-- Fix some altitude grid construction bugs [#157](https://github.com/egavazzi/AURORA.jl/pull/157)
+- Only the relevant slices of the cached cascading matrices are loaded, instead of the whole matrices [#137](https://github.com/egavazzi/AURORA.jl/pull/137)
+- Various performance improvements [#127](https://github.com/egavazzi/AURORA.jl/pull/127) [#133](https://github.com/egavazzi/AURORA.jl/pull/133) [#146](https://github.com/egavazzi/AURORA.jl/pull/146) [#151](https://github.com/egavazzi/AURORA.jl/pull/151)
 
 ## v0.7.0 - 2026-03-25
 - **Breaking** Rename `animate_IeztE_3Dzoft` to `animate_Ie_in_time` [#89](https://github.com/egavazzi/AURORA.jl/pull/89)
