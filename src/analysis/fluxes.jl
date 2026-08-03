@@ -25,10 +25,8 @@ function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     E_centers = coord.E_centers
     ΔE        = coord.ΔE
     μ_lims    = coord.μ_lims
-
-    ## Beam weights
-    θ_lims = acosd.(μ_lims)
-    Ω_beam = beam_weight(θ_lims)   # [n_μ]
+    μ_center  = coord.μ_center
+    Ω_beam    = coord.beam_weights
 
     n_z, n_μ, n_t, n_E = coord.n_z, coord.n_μ, coord.n_t, coord.n_E
 
@@ -50,7 +48,7 @@ function make_Ie_top_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
 
         pa_v = defVar(ds, "pitch_angle", Float64, ("pitch_angle",);
                       attrib=["units" => "1", "long_name" => "cosine of pitch angle"])
-        pa_v[:] = mu_avg(θ_lims)
+        pa_v[:] = μ_center
 
         t_v = defVar(ds, "time", Float64, ("time",);
                      attrib=["units" => "s", "long_name" => "simulation time"])
@@ -129,10 +127,7 @@ function make_current_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     t         = coord.t
     z         = coord.h_atm
     E_centers = coord.E_centers
-    μ_lims    = coord.μ_lims
-
-    θ_lims   = acosd.(μ_lims)
-    μ_center = mu_avg(θ_lims)
+    μ_center  = coord.μ_center
 
     n_z, n_μ, n_t = coord.n_z, coord.n_μ, coord.n_t
     J_up      = zeros(n_z, n_t)

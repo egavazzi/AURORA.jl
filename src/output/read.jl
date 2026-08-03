@@ -46,8 +46,8 @@ end
     load_coordinates(sim_dir) → NamedTuple
 
 Load everything in [`SimulationResult`](@ref) *except* the bulky `Ie` array: the coordinate
-vectors (`t`, `h_atm`, `E_centers`, `E_edges`, `ΔE`, `μ_lims`, `beam_weights`), the `Ie`
-dimensions `(n_z, n_μ, n_t, n_E)`, and `savedir`. Cheap to call.
+vectors (`t`, `h_atm`, `E_centers`, `E_edges`, `ΔE`, `μ_lims`, `μ_center`,
+`beam_weights`), the `Ie` dimensions `(n_z, n_μ, n_t, n_E)`, and `savedir`. Cheap to call.
 """
 function load_coordinates(sim_dir::AbstractString)
     nc_path = joinpath(sim_dir, "simulation_data.nc")
@@ -60,6 +60,7 @@ function load_coordinates(sim_dir::AbstractString)
                   E_edges,
                   ΔE           = diff(E_edges),
                   μ_lims       = Vector{Float64}(ds["mu_lims"][:]),
+                  μ_center     = Vector{Float64}(ds["pitch_angle"][:]),
                   beam_weights = Vector{Float64}(ds["beam_weight"][:]),
                   n_z, n_μ, n_t, n_E,
                   savedir      = sim_dir)
