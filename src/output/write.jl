@@ -8,11 +8,7 @@ function write_config_toml(sim::AuroraSimulation)
     model = sim.model
     mode = sim.mode
 
-    commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
-        LibGit2.head(pkgdir(AURORA))
-    else
-        "Not available"
-    end
+    commit_hash = current_commit_hash()
 
     config = Dict{String, Any}(
         "aurora_version"     => string(pkgversion(AURORA)),
@@ -117,11 +113,7 @@ function create_simulation_nc(sim::AuroraSimulation)
     ΔE        = model.energy_grid.ΔE
     h         = model.altitude_grid.h
 
-    commit_hash = if isdir(joinpath(pkgdir(AURORA), ".git"))
-        LibGit2.head(pkgdir(AURORA))
-    else
-        "Not available"
-    end
+    commit_hash = current_commit_hash()
 
     nc_path = joinpath(out.savedir, "simulation_data.nc")
     ds = NCDataset(nc_path, "c",
@@ -269,4 +261,12 @@ function append_chunk_nc!(ds::NCDataset, Ie_chunk, t_chunk, sim::AuroraSimulatio
     # Write through the raw variable for maximum performance
     ds["Ie"].var[:, :, idx, :] = Ie_4D
     sync(ds)
+end
+
+
+function current_commit_hash()
+    if isdir(joinpath(pkgdir(AURORA), ".git"))
+        return LibGit2.head(pkgdir(AURORA))
+    end
+    return "Not available"
 end
