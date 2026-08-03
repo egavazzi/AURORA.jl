@@ -197,8 +197,6 @@ function update_D!(D, model::AuroraModel)
     θ_lims_rad = deg2rad.(θ_lims)
     nE = 3
     nθ = 3
-    # n_ti = 701
-    # n_thi = 401
     for iE in energy_grid.n:-1:1
         v = range(v_of_E(E_edges[iE]), v_of_E(E_edges[iE+1]), length=nE)
         for iθ in 1:(length(θ_lims_rad) - 1)
@@ -211,8 +209,10 @@ function update_D!(D, model::AuroraModel)
                 θb = θ_lims_rad[iθ] * 0.2 + 0.8 * θ_lims_rad[iθ + 1]
             end
             θ = range(θa, θb, length=nθ)
-            # θ4i = range(minimum(θ), maximum(θ), n_thi)
             v_par = [A * cos(B) for A in v, B in θ]
+            # Use a standard 100–600 km model span as a representative propagation distance.
+            # TODO: We should use a more realistic propagation distance that depends on the
+            #       actual simulation model geometry
             t_arrival = 500e3 ./ v_par
             at_a = (maximum(t_arrival) + minimum(t_arrival)) / 2
             dt_a = (maximum(t_arrival) - minimum(t_arrival))
