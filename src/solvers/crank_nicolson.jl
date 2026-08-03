@@ -103,7 +103,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     Ie[index_bottom, 1] .= 0.0
     Ie[index_top,    1] .= @view(Ie_top[:, 1])
     current = @view(Ie[:, 1])
-    rhs = similar(current)
+    rhs = workspace.rhs
 
     # ── Factorise / re-factorise ──
     if !workspace.initialized
