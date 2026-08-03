@@ -86,6 +86,7 @@ src/
 │   └── psd.jl                   # Phase space density analysis
 │
 ├── utilities.jl                 # Helpers (v_of_E, CFL_criteria, beam_weight, ...)
+├── viz_interface.jl             # Plotting interface extended by the Makie extension
 └── precompiles.jl               # Precompilation workload
 ```
 
