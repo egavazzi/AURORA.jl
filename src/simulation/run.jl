@@ -171,7 +171,7 @@ function energy_loop!(sim::AuroraSimulation, Ie_top_local, t_loop, progress::Pro
     # High-to-low ensures cascading sources are available when solving lower energies.
     for iE in n_E:-1:1
         # Update transport matrices with current energy's scattering geometry
-        B2B_inelastic_neutrals = update_matrices!(cache.matrices, model, iE, cache.B2B_fragment)
+        B2B_inelastic_neutrals = update_matrices!(cache.matrices, model, iE, cache.B2B_kernel)
 
         # Solve transport equation for current energy
         solve_energy_step!(sim, sim.mode, iE, Ie_top_local, t_loop)

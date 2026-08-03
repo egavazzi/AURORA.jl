@@ -42,10 +42,10 @@ function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConf
     Ie_save = zeros(1, 1, 1)
     I0 = zeros(1, 1)
     Ie_top = zeros(1, 1, 1)
-    B2B_fragment = zeros(1, 1, 1)
+    B2B_kernel = zeros(1, 1, 1)
 
     return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, B2B_fragment)
+                           Ie_top, t_loop, B2B_kernel)
 end
 
 function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy = CachePolicy())
@@ -66,8 +66,8 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)
 
-    # Pre-compute beam-to-beam scattering fragment
-    B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
+    # Pre-compute the beam-to-beam scattering kernel
+    B2B_kernel = beams2beams_kernel(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
 
     # Pre-compute input flux data
     Ie_top = compute_input_flux(sim)
@@ -79,7 +79,7 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
     return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, B2B_fragment)
+                           Ie_top, t_loop, B2B_kernel)
 end
 
 # Time parameters for working arrays: (n_t, t_loop)

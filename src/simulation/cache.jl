@@ -62,5 +62,5 @@ struct SimulationCache{D<:DegradationCache, TL, B}
     I0::Matrix{Float64}
     Ie_top::Array{Float64, 3}
     t_loop::TL
-    B2B_fragment::B
+    B2B_kernel::B
 end

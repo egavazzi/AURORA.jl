@@ -67,27 +67,27 @@ end
 
 
 # The new functions, for faster calculations
-function prepare_beams2beams(Ω_subbeam_relative, P_scatter)
-    B2B_fragment = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
+function beams2beams_kernel(Ω_subbeam_relative, P_scatter)
+    B2B_kernel = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
     for i = size(P_scatter, 3):-1:1
-        B2B_fragment[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
+        B2B_kernel[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
     end
-    return B2B_fragment
+    return B2B_kernel
 end
 
-function beams2beams(phase_fcn, B2B_fragment)
-    B2B = zeros(size(B2B_fragment, 3), size(B2B_fragment, 3));
-    for i = size(B2B_fragment, 3):-1:1
-        B2B[i, :] = @view(B2B_fragment[:, :, i]) * phase_fcn;
+function beams2beams(phase_fcn, B2B_kernel)
+    B2B = zeros(size(B2B_kernel, 3), size(B2B_kernel, 3));
+    for i = size(B2B_kernel, 3):-1:1
+        B2B[i, :] = @view(B2B_kernel[:, :, i]) * phase_fcn;
     end
     return B2B
 end
 
 # In-place version of `beams2beams` writing into the pre-allocated `B2B` (n_beam × n_beam),
 # avoiding the per-call output allocation and per-row temporaries on the hot path.
-function beams2beams!(B2B, phase_fcn, B2B_fragment)
-    for i = size(B2B_fragment, 3):-1:1
-        @views mul!(B2B[i, :], B2B_fragment[:, :, i], phase_fcn)
+function beams2beams!(B2B, phase_fcn, B2B_kernel)
+    for i = size(B2B_kernel, 3):-1:1
+        @views mul!(B2B[i, :], B2B_kernel[:, :, i], phase_fcn)
     end
     return B2B
 end
@@ -122,7 +122,7 @@ function update_A!(matrices::TransportMatrices, model::AuroraModel, iE)
     return nothing
 end
 
-function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
+function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kernel)
     B = matrices.B
     energy_grid = model.energy_grid
     scattering = model.scattering
@@ -145,8 +145,8 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_frag
         convert_phase_fcn_to_3D!(matrices.phase_fcn_i, @view(phase_fcn[2][:, iE]), finer_θ);
         B2B_elastic = matrices.B2B_elastic
         B2B_inelastic = B2B_inelastic_neutrals[i]
-        beams2beams!(B2B_elastic, matrices.phase_fcn_e, B2B_fragment);
-        beams2beams!(B2B_inelastic, matrices.phase_fcn_i, B2B_fragment);
+        beams2beams!(B2B_elastic, matrices.phase_fcn_e, B2B_kernel);
+        beams2beams!(B2B_inelastic, matrices.phase_fcn_i, B2B_kernel);
 
         # add scattering from elastic collisions
         n_z = length(n)
@@ -249,7 +249,7 @@ function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
 end
 
 """
-    update_matrices!(matrices, model, iE, B2B_fragment)
+    update_matrices!(matrices, model, iE, B2B_kernel)
 
 Update the A and B matrices in place for a given energy level iE.
 
@@ -257,14 +257,14 @@ Update the A and B matrices in place for a given energy level iE.
 - `matrices::TransportMatrices`: Container to update
 - `model`: `AuroraModel` (grids + atmosphere + physics)
 - `iE`: Current energy index
-- `B2B_fragment`: Pre-computed beam-to-beam fragments
+- `B2B_kernel`: Pre-computed beam-to-beam scattering kernel
 
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
+function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kernel)
     update_A!(matrices, model, iE)
-    return update_B!(matrices, model, iE, B2B_fragment)
+    return update_B!(matrices, model, iE, B2B_kernel)
 end
 
 
