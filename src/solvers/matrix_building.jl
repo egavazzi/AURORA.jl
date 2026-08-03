@@ -66,15 +66,6 @@ end
 
 
 
-# Depreciated function, for demo
-function beams2beams_demo(phase_fcn, P_scatter, Ω_subbeam_relative)
-    B2B = zeros(size(P_scatter, 3),size(P_scatter, 3));
-    for i = size(P_scatter, 3):-1:1
-        B2B[i, :] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
-    end
-    return B2B
-end
-
 # The new functions, for faster calculations
 function prepare_beams2beams(Ω_subbeam_relative, P_scatter)
     B2B_fragment = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
