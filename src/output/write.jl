@@ -225,18 +225,18 @@ Return the input boundary flux subsampled to the save cadence as
   `1 : CFL_factor : end`.
 """
 function input_flux_at_save_cadence(sim::AuroraSimulation)
-    cache = sim.cache
-    time  = sim.time
+    workspace = get_workspace(sim)
+    time = sim.time
 
     if time isa RefinedTimeGrid
         t_top     = collect(Float64, time.t_save)
-        Ie_top_3D = cache.Ie_top[:, 1:time.CFL_factor:end, :]
+        Ie_top_3D = workspace.Ie_top[:, 1:time.CFL_factor:end, :]
     elseif time isa UniformTimeGrid
         t_top     = collect(Float64, time.t)
-        Ie_top_3D = cache.Ie_top
+        Ie_top_3D = workspace.Ie_top
     else  # SingleStepConfig
         t_top     = [0.0]
-        Ie_top_3D = cache.Ie_top[:, 1:1, :]
+        Ie_top_3D = workspace.Ie_top[:, 1:1, :]
     end
 
     return t_top, Ie_top_3D

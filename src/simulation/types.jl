@@ -315,7 +315,7 @@ function RefinedTimeGrid(model::AuroraModel, mode::TimeDependentMode; verbose::B
     # ever empty as long as n_loop ≤ n_save.
     # `n_save_per_loop` is the *maximum* per-loop count, used to size the working arrays.
     n_save_per_loop = cld(n_save, n_loop_resolved)
-    # Maximum number of internal steps in a loop (used for cache allocation)
+    # Maximum number of internal steps in a loop (used for workspace allocation)
     n_t_per_loop = n_save_per_loop * CFL_factor + 1
 
 
@@ -341,7 +341,7 @@ end
 """
     loop_internal_count(time::RefinedTimeGrid, i_loop) → Int
 
-Number of internal time steps (columns of `cache.Ie`) for loop `i_loop`,
+Number of internal time steps (columns of `workspace.Ie`) for loop `i_loop`,
 including the shared boundary point that initialises from `I0`.
 """
 loop_internal_count(time::RefinedTimeGrid, i_loop::Int) =
@@ -402,7 +402,7 @@ end
     AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode}
 
 A complete simulation configuration, bundling the physical model, input flux,
-mode strategy, output configuration, resolved time configuration, and lazy simulation cache.
+mode strategy, output configuration, resolved time configuration, and lazy simulation workspace.
 
 Use [`initialize!`](@ref) to allocate the workspace explicitly, or call [`run!`](@ref)
 directly to auto-initialize and execute the simulation.
@@ -425,21 +425,20 @@ sim = AuroraSimulation(model, flux, out; mode=SteadyStateMode())
 ```
 """
 mutable struct AuroraSimulation{M<:AuroraModel, F<:InputFlux, S<:AbstractMode,
-                               T<:AbstractTimeConfig, C<:SimulationCache}
+                               T<:AbstractTimeConfig, W<:SimulationWorkspace}
     const model::M
     const flux::F
     const mode::S
     const output::AuroraOutputManager
     time::T               # rebuilt by initialize!(sim) if a grid changed (CFL grid depends on it)
-    cache::C
-    cache_initialized::Bool
+    workspace::W
 end
 
 function AuroraSimulation(model::AuroraModel, flux::InputFlux, output::AuroraOutputManager;
                           mode::AbstractMode=SteadyStateMode())
     time = build_time_config(model, mode)
-    cache = build_dummy_simulation_cache(model, time)
-    return AuroraSimulation(model, flux, mode, output, time, cache, false)
+    workspace = build_dummy_simulation_workspace(model, time)
+    return AuroraSimulation(model, flux, mode, output, time, workspace)
 end
 
 # Convenience: accept a plain String and wrap it in an AuroraOutputManager with defaults
@@ -468,7 +467,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::AuroraSimulation)
     println(io, "├── Mode:        ", sim.mode)
     println(io, "├── Savedir:     ", sim.output.savedir)
     show_time_fields(io, sim.time)
-    print(io,   "└── Cache:       ", sim.cache_initialized ? "initialized" : "not initialized")
+    print(io,   "└── Workspace:   ", sim.workspace.initialized ? "initialized" : "not initialized")
 end
 
 function show_time_fields(io::IO, time::RefinedTimeGrid)

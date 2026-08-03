@@ -1,4 +1,4 @@
-@testitem "AuroraSimulation initialize! populates cache" begin
+@testitem "AuroraSimulation initialize! populates workspace" begin
     mktempdir() do savedir
         altitude_lims = [100, 400]
         θ_lims = 180:-45:0
@@ -16,21 +16,46 @@
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 2))
 
-        @test !sim.cache_initialized
+        @test sim.workspace isa AURORA.SimulationWorkspace
+        @test sim.workspace.solver isa AURORA.SolverWorkspace
+        @test sim.workspace.degradation isa AURORA.DegradationWorkspace
+        @test !sim.workspace.initialized
+        dummy_workspace_type = typeof(sim.workspace)
         @test sim.time isa RefinedTimeGrid
         @test sim.time.dt_internal <= sim.time.dt
 
         initialize!(sim; verbose=false)
 
-        @test sim.cache_initialized
+        @test sim.workspace.initialized
+        @test typeof(sim.workspace) === dummy_workspace_type
         @test sim.model.initialized
         n_species = 3
-        @test sim.cache.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
-        @test sim.cache.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
+        @test sim.workspace.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
+        @test sim.workspace.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
         @test all(sp.cascading_data isa AURORA.SpeciesCascadingCache for sp in sim.model.species)
         @test all(!isempty(sp.cascading_data.E_edges) for sp in sim.model.species)
-        @test size(sim.cache.Ie, 2) == sim.time.n_t_per_loop
-        @test size(sim.cache.Ie_top, 2) == length(sim.time.t)
+        @test size(sim.workspace.Ie, 2) == sim.time.n_t_per_loop
+        @test size(sim.workspace.Ie_top, 2) == length(sim.time.t)
+    end
+end
+
+@testitem "Failed rebuild leaves workspace uninitialized" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file = find_iri_file(; verbose=false)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+        flux = InputFlux(FlatSpectrum(1e-2; E_min=50.0); beams=1:2, z_source=250.0)
+        sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
+        initialize!(sim; verbose=false)
+        @test sim.workspace.initialized
+
+        # Corrupt the mutable beam-index vector to force input-flux construction to fail after
+        # initialize! has invalidated the existing workspace.
+        empty!(flux.beams)
+        @test_throws BoundsError initialize!(sim; verbose=false)
+        @test !sim.workspace.initialized
+        @test AURORA.needs_initialization(sim)
     end
 end
 
@@ -47,11 +72,11 @@ end
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
 
-        @test !sim.cache_initialized
+        @test !sim.workspace.initialized
 
         run!(sim; verbose=false)
 
-        @test sim.cache_initialized
+        @test sim.workspace.initialized
     end
 end
 
@@ -239,7 +264,7 @@ end
 
         @test sim.model.initialized
         @test length(sim.model.species) == 2
-        @test sim.cache.degradation.secondary_e_flux isa NTuple{2, Matrix{Float64}}
+        @test sim.workspace.degradation.secondary_e_flux isa NTuple{2, Matrix{Float64}}
     end
 end
 
@@ -271,7 +296,7 @@ end
 
         @test sim.model.initialized
         @test length(sim.model.species) == 4
-        @test sim.cache.degradation.secondary_e_flux isa NTuple{4, Matrix{Float64}}
+        @test sim.workspace.degradation.secondary_e_flux isa NTuple{4, Matrix{Float64}}
         @test sim.model.species[end].name == :CustomGas
         @test !isempty(sim.model.species[end].density)
     end
@@ -330,7 +355,7 @@ end
 
         model.altitude_grid = AltitudeGrid(100, 300)
         initialize!(model; verbose=false)   # recomputes s_field, ionosphere, species
-        initialize!(sim; verbose=false)     # rebuilds simulation cache for new grid dimensions
+        initialize!(sim; verbose=false)     # rebuilds workspace for new grid dimensions
         run!(sim)
 
         @test sim.model.initialized
@@ -376,7 +401,7 @@ end
 
         @test sim.model.initialized
         @test length(sim.model.s_field) == model.altitude_grid.n
-        @test size(sim.cache.Ie, 1) ÷ length(model.pitch_angle_grid.μ_center) == model.altitude_grid.n
+        @test size(sim.workspace.Ie, 1) ÷ length(model.pitch_angle_grid.μ_center) == model.altitude_grid.n
     end
 end
 
@@ -414,7 +439,7 @@ end
     @test size_hi < size_lo
 end
 
-@testitem "Energy grid change rebuilds sim.time and cache (TimeDependent)" begin
+@testitem "Energy grid change rebuilds sim.time and workspace (TimeDependent)" begin
     mktempdir() do savedir
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
@@ -426,14 +451,14 @@ end
                                  mode = TimeDependentMode(duration=0.02, dt=0.01,
                                                           CFL_number=128, n_loop=1))
         run!(sim; verbose=false)
-        @test size(sim.cache.Ie, 3) == model.energy_grid.n
+        @test size(sim.workspace.Ie, 3) == model.energy_grid.n
 
         # Larger energy grid → more energy bins AND a different CFL-refined time grid.
         model.energy_grid = EnergyGrid(200)
         run!(sim; verbose=false)
 
         @test sim.model.initialized
-        @test size(sim.cache.Ie, 3) == model.energy_grid.n
+        @test size(sim.workspace.Ie, 3) == model.energy_grid.n
         @test sim.time isa AURORA.RefinedTimeGrid
     end
 end

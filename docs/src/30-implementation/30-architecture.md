@@ -69,8 +69,8 @@ src/
 │
 ├── simulation/
 │   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
-│   ├── cache.jl                 # SimulationCache, SolverCache, DegradationCache
-│   ├── initialize.jl            # initialize! — allocates cache
+│   ├── workspace.jl             # SimulationWorkspace, SolverWorkspace, DegradationWorkspace
+│   ├── initialize.jl            # initialize! — allocates workspace
 │   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
 │
 ├── output/
@@ -97,8 +97,9 @@ src/
 | [`InputFlux`](@ref) | Precipitating electron specification: spectrum x modulation |
 | [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + mode + output |
 | [`AbstractMode`](@ref) | Solver strategy: [`SteadyStateMode`](@ref) or [`TimeDependentMode`](@ref) |
-| `SimulationCache` | Internal workspace: solver matrices, flux arrays, factorizations |
-| `SolverCache` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
+| `SimulationWorkspace` | Internal working state: solver matrices, flux arrays, factorizations |
+| `SolverWorkspace` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
+| `DegradationWorkspace` | Reusable flux and spectrum arrays for energy degradation and ionization |
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
 | `BlockIndices` | Pre-computed `nzval` index arrays for a single block (replaces `Dict`-based mapping) |
 | `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down`, `Ddiffusion` (extracted once, reused each energy step) |
@@ -113,8 +114,8 @@ The entry point for all simulations is [`run!`](@ref). Here is the complete call
 ```
 run!(sim::AuroraSimulation)
 │
-├── initialize!(sim)                           # Allocate cache (if not done yet)
-│   ├── Build SimulationCache
+├── initialize!(sim)                           # Allocate workspace (if not done yet)
+│   ├── Build SimulationWorkspace
 │   │   ├── Compute phase functions (once)
 │   │   ├── Compute beam-to-beam scattering geometry
 │   │   └── Load/compute cascading transfer matrices

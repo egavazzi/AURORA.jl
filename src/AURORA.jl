@@ -60,7 +60,7 @@ include("solvers/sparse_indexing.jl")
 include("solvers/steady_state.jl")
 include("solvers/crank_nicolson.jl")
 
-include("simulation/cache.jl")
+include("simulation/workspace.jl")
 include("output/output_manager.jl")
 export AuroraOutputManager
 include("simulation/types.jl")

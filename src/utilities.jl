@@ -467,17 +467,17 @@ end
         → (; fixed_gb, scaling_gb, total_gb)
 
 Estimate the simulation's peak memory footprint (in decimal GB) by summing the actual
-working arrays allocated in [`build_simulation_cache`](@ref).
+working arrays allocated in [`build_simulation_workspace`](@ref).
 
 The footprint is split into two parts:
 
-- `scaling_gb`: arrays laid out along the internal time grid — `cache.Ie`, `matrices.Q`,
-  the energy-degradation working arrays, and the subsampled `cache.Ie_save` buffer.
+- `scaling_gb`: arrays laid out along the internal time grid — `workspace.Ie`, `matrices.Q`,
+  the energy-degradation working arrays, and the subsampled `workspace.Ie_save` buffer.
   Evaluated here at the *full* internal length `n_t`; splitting the run into `n_loop`
   loops shrinks this contribution to ≈ `scaling_gb / n_loop`.
 - `fixed_gb`: arrays whose size does **not** depend on the loop split — most importantly
-  `cache.Ie_top`, which always stores the entire input flux over the full time grid, plus
-  `cache.I0`, the transport/scattering matrices and the sparse solver factorisation.
+  `workspace.Ie_top`, which always stores the entire input flux over the full time grid, plus
+  `workspace.I0`, the transport/scattering matrices and the sparse solver factorisation.
 
 `total_gb = fixed_gb + scaling_gb` is the single-loop (`n_loop = 1`) footprint, so the peak
 memory of an `n_loop`-loop run is ≈ `fixed_gb + scaling_gb / n_loop`.
@@ -491,10 +491,10 @@ function estimate_simulation_memory(n_z::Int, n_μ::Int, n_E::Int, n_t::Int,
     n_save = (n_t - 1) ÷ CFL_factor
 
     # ── Arrays sized along the internal time grid (shrink by ≈ 1/n_loop when split) ──
-    Ie      = n_zμ * n_t * n_E                  # cache.Ie
+    Ie      = n_zμ * n_t * n_E                  # workspace.Ie
     Q       = n_zμ * n_t * n_E                  # matrices.Q
-    Ie_save = n_zμ * (n_save + 1) * n_E         # cache.Ie_save (subsampled to save cadence)
-    # cache.degradation working arrays, summed over the N_neutrals species:
+    Ie_save = n_zμ * (n_save + 1) * n_E         # workspace.Ie_save (save cadence)
+    # workspace.degradation working arrays, summed over the N_neutrals species:
     #   secondary_e_flux + primary_e_flux  → 2·N·(n_zμ·n_t)
     #   Ie_scatter                         → n_zμ·n_t
     #   ionization_source_sum              → n_z·n_t
@@ -502,8 +502,8 @@ function estimate_simulation_memory(n_z::Int, n_μ::Int, n_E::Int, n_t::Int,
     scaling_elems = Ie + Q + Ie_save + degradation
 
     # ── Arrays independent of the loop split ──
-    Ie_top   = n_μ * n_t * n_E                  # cache.Ie_top — full input flux, never split
-    I0       = n_zμ * n_E                       # cache.I0
+    Ie_top   = n_μ * n_t * n_E                  # workspace.Ie_top — full flux, never split
+    I0       = n_zμ * n_E                       # workspace.I0
     # Transport matrices: A (n_z) + B (n_z·n_μ²) + D (n_E·n_μ) + Ddiffusion (≈3·n_z stored)
     matrices = n_z + n_z * n_μ^2 + n_E * n_μ + 3 * n_z
     # Degradation energy spectra (2·N·n_E) + thermal-loss vector (n_z)

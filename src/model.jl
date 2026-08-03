@@ -80,7 +80,7 @@ function AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle
 end
 
 # Reassigning a grid or the B-field geometry invalidates every derived quantity (scattering,
-# densities, cross sections, cascading, and any simulation cache built from this model). We
+# densities, cross sections, cascading, and any simulation workspace built from this model). We
 # intercept those assignments to mark the model uninitialized, which lets `run!` /
 # `initialize!(sim)` detect the change and rebuild automatically.
 function Base.setproperty!(model::AuroraModel, name::Symbol, value)

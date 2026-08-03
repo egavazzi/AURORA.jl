@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- **Breaking (internal interface)** Rename `AuroraSimulation.cache` to
+  `AuroraSimulation.workspace`, and replace `cache_initialized` with
+  `workspace.initialized`. The unexported simulation working-state types are renamed from
+  `*Cache` to `*Workspace`.
+
 ## v0.8.0 - 2026-07-28
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.
