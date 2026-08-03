@@ -259,8 +259,7 @@ function calculate_volume_excitation(z, t, Ie_ztE_omni, σ, n)
 end
 
 
-using Integrals: SampledIntegralProblem, TrapezoidalRule, solve
-using Interpolations: interpolate, extrapolate, Gridded, Linear
+using DataInterpolations: LinearInterpolation
 """
     q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
 
@@ -292,12 +291,11 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     Q = Q .* τ .* A
     # Single time step: no time-shift interpolation needed
     if length(t) == 1
-        return solve(SampledIntegralProblem(Q, z; dim=1), TrapezoidalRule()).u
+        return integrate_over_altitude(Q, z)
     end
-    # Create a 2D interpolator over (altitude, time). For each grid point (z[i], t[j]) we
-    # will query it at the shifted time `t[j] - (z[i] - z[1]) / c`, which accounts for the
-    # finite travel time of photons from altitude z[i] to the bottom of the column. Values
-    # outside the interpolation domain are clamped to 0 (photons not yet arrived).
+    # Interpolate each altitude profile at `t[j] - (z[i] - z[1]) / c` to account for
+    # the finite travel time of photons to the bottom of the column. Values outside the
+    # interpolation domain are set to 0 (photons not yet arrived).
     #
     # Example (c = 1 for illustration):
     #   Q[z, t] (rows = altitude, cols = time):
@@ -312,16 +310,23 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     #     0.0    0.0    0.573  0.556  0.568   ← z=3 delayed by 2 units
     #     0.0    0.0    0.0    0.865  0.142
     #     0.0    0.0    0.0    0.0    0.708
-    # A single 2D interpolator is used (rather than one 1D interpolator per altitude) for
-    # convenience and to match the approach from the legacy Matlab code.
-    nodes = (z, t)
-    itp = interpolate(nodes, Q, Gridded(Linear()))
-    itp = extrapolate(itp, 0.0)  # extrapolated values (before arrival) → 0
-    I = [itp(z[i], (t[j] - (z[i] - z[1]) / c)) for i in eachindex(z), j in eachindex(t)]
+    I = similar(Q)
+    for i in eachindex(z)
+        itp = LinearInterpolation(@view(Q[i, :]), t)
+        delay = (z[i] - z[1]) / c
+        for j in eachindex(t)
+            shifted_time = t[j] - delay
+            I[i, j] = first(t) <= shifted_time <= last(t) ? itp(shifted_time) : 0
+        end
+    end
     # Integrate over altitude to get the column-integrated rate
-    problem = SampledIntegralProblem(I, z; dim=1)
-    method = TrapezoidalRule()
-    I_lambda = solve(problem, method)
-    return I_lambda.u
+    return integrate_over_altitude(I, z)
 end
 
+function integrate_over_altitude(values, z)
+    # Composite trapezoidal rule, supporting nonuniform altitude spacing
+    # ∫ values(z) dz ≈ Σᵢ (valuesᵢ + valuesᵢ₊₁)(zᵢ₊₁ - zᵢ) / 2
+    layer_widths = reshape(diff(z) ./ 2, :, 1)
+    layer_sums = @views values[1:(end - 1), :] .+ values[2:end, :]
+    return vec(sum(layer_sums .* layer_widths; dims=1))
+end
