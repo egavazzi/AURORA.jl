@@ -134,9 +134,6 @@ function make_current_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
     θ_lims   = acosd.(μ_lims)
     μ_center = mu_avg(θ_lims)
 
-    ## Elementary charge
-    q_e = 1.602176620898e-19  # C
-
     n_z, n_μ, n_t = coord.n_z, coord.n_μ, coord.n_t
     J_up      = zeros(n_z, n_t)
     J_down    = zeros(n_z, n_t)
@@ -149,10 +146,10 @@ function make_current_file(directory_to_process; max_bytes::Real = 512 * 1024^2)
             flux_block   = dropdims(sum(Ie_chunk[:, i_μ, :, :], dims=3), dims=3)   # [n_z, n_t_chunk]
             energy_block = dropdims(sum(Ie_chunk[:, i_μ, :, :] .* reshape(E_centers, 1, 1, :), dims=3), dims=3)
             if μ_center[i_μ] > 0
-                J_up[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                J_up[:, t_range]   .+= qₑ * abs(μ_center[i_μ]) .* flux_block
                 IeE_up[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
             else
-                J_down[:, t_range]   .+= q_e * abs(μ_center[i_μ]) .* flux_block
+                J_down[:, t_range]   .+= qₑ * abs(μ_center[i_μ]) .* flux_block
                 IeE_down[:, t_range] .+= abs(μ_center[i_μ]) .* energy_block
             end
         end

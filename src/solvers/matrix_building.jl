@@ -48,8 +48,6 @@ end
 function loss_to_thermal_electrons!(Le, E::Real, nₑ, Tₑ)
     @assert axes(Le) == axes(nₑ) == axes(Tₑ)
 
-    kB = 1.380662e-23     # Boltzmann constant [J/K]
-    qₑ = 1.6021773e-19    # elementary charge [C]
     velocity = v_of_E(E)
     energy_factor = 3.0271e-10 / (E^0.44 * velocity)
 

@@ -1,5 +1,7 @@
 module AURORA
 
+include("constants.jl")
+
 include("grids/abstract_grid.jl")
 include("grids/altitude_grid.jl")
 include("grids/energy_grid.jl")

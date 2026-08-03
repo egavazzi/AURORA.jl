@@ -288,14 +288,13 @@ The einstein coefficient `A` and effective lifetime `τ` are optional (equal to 
 - `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
 """
 function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
-    c = 2.99792458e8
     Q = Q .* τ .* A
     # Single time step: no time-shift interpolation needed
     if length(t) == 1
         return solve(SampledIntegralProblem(Q, z; dim=1), TrapezoidalRule()).u
     end
     # Create a 2D interpolator over (altitude, time). For each grid point (z[i], t[j]) we
-    # will query it at the shifted time `t[j] - (z[i] - z[1]) / c`, which accounts for the
+    # will query it at the shifted time `t[j] - (z[i] - z[1]) / c₀`, which accounts for the
     # finite travel time of photons from altitude z[i] to the bottom of the column. Values
     # outside the interpolation domain are clamped to 0 (photons not yet arrived).
     #
@@ -317,11 +316,10 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     nodes = (z, t)
     itp = interpolate(nodes, Q, Gridded(Linear()))
     itp = extrapolate(itp, 0.0)  # extrapolated values (before arrival) → 0
-    I = [itp(z[i], (t[j] - (z[i] - z[1]) / c)) for i in eachindex(z), j in eachindex(t)]
+    I = [itp(z[i], (t[j] - (z[i] - z[1]) / c₀)) for i in eachindex(z), j in eachindex(t)]
     # Integrate over altitude to get the column-integrated rate
     problem = SampledIntegralProblem(I, z; dim=1)
     method = TrapezoidalRule()
     I_lambda = solve(problem, method)
     return I_lambda.u
 end
-

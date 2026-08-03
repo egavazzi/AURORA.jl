@@ -17,9 +17,6 @@ Calculate the velocity (in **m/s**) of an electron with energy `E` (in **eV**).
 - `v` : velocity in **m/s**
 """
 function v_of_E(E)
-	mₑ = 9.10939e-31;
-	qₑ = 1.6021773e-19;
-
 	v = (2 * qₑ * abs(E) / mₑ) .^ (1/2) .* sign(E);
 	return v
 end
