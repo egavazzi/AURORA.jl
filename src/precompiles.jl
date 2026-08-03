@@ -23,7 +23,7 @@ let
             ss_dir = mktempdir()
             ss_flux = InputFlux(FlatSpectrum(1e-2; E_min = 25.0); beams = 1:2)
             mode = SteadyStateMode()
-            run!(AuroraSimulation(model, ss_flux, ss_dir;); mode, verbose = false)
+            run!(AuroraSimulation(model, ss_flux, ss_dir; mode), verbose = false)
             make_volume_excitation_file(ss_dir)
             make_column_excitation_file(ss_dir)
             make_Ie_top_file(ss_dir)
@@ -35,14 +35,14 @@ let
             td_flux = InputFlux(FlatSpectrum(1e-2; E_min = 25.0),
                                 SinusoidalFlickering(5.0); beams = 1:2)
             mode = SteadyStateMode(duration = 0.02, dt = 0.01)
-            run!(AuroraSimulation(model, td_flux, mktempdir();), mode, verbose = false)
+            run!(AuroraSimulation(model, td_flux, mktempdir(); mode), verbose = false)
 
             # Crank-Nicolson time-dependent solve
             td_flux = InputFlux(FlatSpectrum(1e-2; E_min = 25.0),
                                 SinusoidalFlickering(5.0); beams = 1:2)
             mode = TimeDependentMode(duration = 0.02, dt = 0.01, CFL_number = 1000,
                                      n_loop = 1)
-            run!(AuroraSimulation(model, td_flux, mktempdir();), mode, verbose = false)
+            run!(AuroraSimulation(model, td_flux, mktempdir(); mode), verbose = false)
         end
     end
 end
