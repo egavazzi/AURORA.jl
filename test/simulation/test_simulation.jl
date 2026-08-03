@@ -53,7 +53,7 @@ end
         # Corrupt the mutable beam-index vector to force input-flux construction to fail after
         # initialize! has invalidated the existing workspace.
         empty!(flux.beams)
-        @test_throws BoundsError initialize!(sim; verbose=false)
+        @test_throws ErrorException initialize!(sim; verbose=false)
         @test !sim.workspace.initialized
         @test AURORA.needs_initialization(sim)
     end
