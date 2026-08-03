@@ -54,7 +54,7 @@ export Ie_top_from_file
 include("solvers/transport_matrices.jl")
 include("solvers/matrix_building.jl")
 
-include("physics/energy_degradation.jl")
+include("solvers/energy_degradation.jl")
 
 include("solvers/sparse_indexing.jl")
 include("solvers/steady_state.jl")

@@ -55,7 +55,6 @@ src/
 ├── physics/
 │   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section data
 │   ├── cascading.jl             # Ionization cascading transfer matrices
-│   ├── energy_degradation.jl    # Loss frequencies, scattering, source terms
 │   ├── phase_functions.jl       # Differential cross sections → 3D scattering
 │   └── scattering.jl            # Pitch-angle scattering matrices
 │
@@ -63,6 +62,7 @@ src/
 │   ├── types.jl                 # AbstractMode, SteadyStateMode, TimeDependentMode
 │   ├── transport_matrices.jl    # TransportMatrices struct
 │   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
+│   ├── energy_degradation.jl    # Loss frequencies, scattering, source terms
 │   ├── sparse_indexing.jl       # Shared sparse infrastructure: BlockIndices, OperatorDiagonals, sparsity builders
 │   ├── steady_state.jl          # Steady-state solver (in-place, allocation-free)
 │   └── crank_nicolson.jl        # Crank-Nicolson time-dependent solver (in-place, allocation-free)
