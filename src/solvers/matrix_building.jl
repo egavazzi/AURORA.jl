@@ -64,9 +64,11 @@ function loss_to_thermal_electrons!(Le, E::Real, nₑ, Tₑ)
     return Le
 end
 
-
-
-# The new functions, for faster calculations
+# Beam-to-beam scattering helpers
+# - `B2B_kernel` precomputes the contribution of each scattering-grid direction
+#   between every pair of pitch-angle beams.
+# - `B2B` is computed by applying a species phase function to this kernel. It contains
+#   the final scattering weights between pairs of pitch-angle beams.
 function beams2beams_kernel(Ω_subbeam_relative, P_scatter)
     B2B_kernel = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
     for i = size(P_scatter, 3):-1:1
@@ -83,8 +85,6 @@ function beams2beams(phase_fcn, B2B_kernel)
     return B2B
 end
 
-# In-place version of `beams2beams` writing into the pre-allocated `B2B` (n_beam × n_beam),
-# avoiding the per-call output allocation and per-row temporaries on the hot path.
 function beams2beams!(B2B, phase_fcn, B2B_kernel)
     for i = size(B2B_kernel, 3):-1:1
         @views mul!(B2B[i, :], B2B_kernel[:, :, i], phase_fcn)

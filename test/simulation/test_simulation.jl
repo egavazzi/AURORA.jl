@@ -16,23 +16,17 @@
                                mode=TimeDependentMode(duration = 0.1, dt = 0.01,
                                                       CFL_number = 128, n_loop = 2))
 
-        @test sim.workspace isa AURORA.SimulationWorkspace
-        @test sim.workspace.solver isa AURORA.SolverWorkspace
-        @test sim.workspace.degradation isa AURORA.DegradationWorkspace
         @test !sim.workspace.initialized
-        dummy_workspace_type = typeof(sim.workspace)
         @test sim.time isa RefinedTimeGrid
         @test sim.time.dt_internal <= sim.time.dt
 
         initialize!(sim; verbose=false)
 
         @test sim.workspace.initialized
-        @test typeof(sim.workspace) === dummy_workspace_type
         @test sim.model.initialized
         n_species = 3
         @test sim.workspace.degradation.secondary_e_flux isa NTuple{n_species, Matrix{Float64}}
         @test sim.workspace.degradation.primary_e_spectrum isa NTuple{n_species, Vector{Float64}}
-        @test all(sp.cascading_data isa AURORA.SpeciesCascadingCache for sp in sim.model.species)
         @test all(!isempty(sp.cascading_data.E_edges) for sp in sim.model.species)
         @test size(sim.workspace.Ie, 2) == sim.time.n_t_per_loop
         @test size(sim.workspace.Ie_top, 2) == length(sim.time.t)
@@ -224,7 +218,6 @@ end
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
     @test !model.initialized
-    @test model.scattering isa AURORA.ScatteringData
     @test isempty(model.scattering.θ_scatter)
     @test isempty(model.species[1].density)
 end

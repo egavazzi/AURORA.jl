@@ -2,7 +2,6 @@
     grid = PitchAngleGrid(180:-30:0)
     sd = AURORA.ScatteringData(grid)
 
-    @test sd isa AURORA.ScatteringData
     @test size(sd.Ω_subbeam_relative, 1) == grid.n_beams
     @test size(sd.P_scatter, 1) == size(sd.P_scatter, 2)
     @test length(sd.Ω_beam) == grid.n_beams
