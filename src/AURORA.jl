@@ -63,6 +63,7 @@ include("solvers/crank_nicolson.jl")
 include("simulation/workspace.jl")
 include("output/output_manager.jl")
 export AuroraOutputManager
+include("simulation/loop_planning.jl")
 include("simulation/types.jl")
 export AuroraSimulation
 export AbstractMode, SteadyStateMode, TimeDependentMode, SteadyState, TimeDependent

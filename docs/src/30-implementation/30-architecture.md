@@ -68,6 +68,7 @@ src/
 │   └── crank_nicolson.jl        # Crank-Nicolson time-dependent solver (in-place, allocation-free)
 │
 ├── simulation/
+│   ├── loop_planning.jl         # CFL refinement, memory estimates, automatic loop partitioning
 │   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
 │   ├── workspace.jl             # SimulationWorkspace, SolverWorkspace, DegradationWorkspace
 │   ├── initialize.jl            # initialize! — allocates workspace
@@ -85,7 +86,7 @@ src/
 │   ├── heating.jl               # Electron heating rate
 │   └── psd.jl                   # Phase space density analysis
 │
-├── utilities.jl                 # Helpers (v_of_E, CFL_criteria, beam_weight, ...)
+├── utilities.jl                 # Helpers (v_of_E, beam_weight, interpolation, ...)
 ├── viz_interface.jl             # Plotting interface extended by the Makie extension
 └── precompiles.jl               # Precompilation workload
 ```
