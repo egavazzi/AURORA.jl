@@ -77,7 +77,7 @@ current working directory.
 """
 function resolve_savedir(savedir)
     s = String(savedir)
-    if isempty(s) || !occursin(r"[^ ]", s)
+    if isempty(strip(s))
         return joinpath("backup", Dates.format(now(), "yyyymmdd-HHMM"))
     end
     return s

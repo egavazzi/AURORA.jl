@@ -408,6 +408,16 @@ end
     @test_throws ArgumentError AuroraOutputManager("x"; compress=-1)
 end
 
+@testitem "AuroraOutputManager savedir normalization" begin
+    for savedir in ("", " ", "\t", "\n", " \t\n")
+        fallback = AuroraOutputManager(savedir).savedir
+        @test dirname(fallback) == "backup"
+        @test occursin(r"^\d{8}-\d{4}$", basename(fallback))
+    end
+
+    @test AuroraOutputManager("path with spaces").savedir == "path with spaces"
+end
+
 @testitem "Higher compress level produces smaller simulation_data.nc" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
