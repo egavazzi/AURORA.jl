@@ -197,11 +197,33 @@ function load_iri_data(iri_file)
                 EqVertIonDrift = data_matrix[:, 20],  # Equatorial vertical ion drift
                 foF2 = data_matrix[:, 21])
 
-    # Validate: check that the loaded data doesn't contain only -1 sentinel values
+    return trim_iri_sentinels(iri_data, "IRI file at\n  $(iri_file)\n")
+end
+
+"""
+    trim_iri_sentinels(iri_data, origin)
+
+Drop the -1 sentinel levels that IRI writes where it has no valid profile, at the bottom
+and top of the altitude column, and let the interpolator fill them by extrapolation.
+
+Shared by every entry point into IRI data (`load_iri_data` for files, [`run_iri`](@ref) for
+a live model run), so that no source of `ne`/`Te` can hand -1 values to the log-space
+interpolation downstream.
+
+# Arguments
+- `iri_data`: NamedTuple with at least `height_km`, `ne` and `Te`. Scalar fields are left
+    untouched; every vector field is trimmed to the same valid range.
+- `origin`: description of where the data came from, used in the error/warning messages
+
+# Returns
+- `NamedTuple`: `iri_data` with the boundary sentinel levels removed
+"""
+function trim_iri_sentinels(iri_data, origin::AbstractString)
+    # Validate: check that the data doesn't contain only -1 sentinel values
     if all(iri_data.ne .== -1) && all(iri_data.Te .== -1)
-        error("The IRI file at\n  $(iri_file)\n" *
+        error("The $(origin)" *
               "contains only -1 sentinel values (no valid ionospheric profiles).\n" *
-              "You might want to use another file or regenerate it.")
+              "You might want to try another date, location, or altitude range.")
     end
 
     # Check for sentinel -1 values at the lowest and highest altitudes.
@@ -227,7 +249,7 @@ function load_iri_data(iri_file)
                 location_str = "the $(n_top) highest altitude level(s) " *
                                "($(h[last_valid + 1]) – $(h[end]) km)"
             end
-            @warn "IRI file at\n  $(iri_file)\n" *
+            @warn "$(origin)" *
                   "has sentinel -1 values in ne or Te at $(location_str).\n" *
                   "These levels will be dropped and the interpolator will fill them " *
                   "through extrapolation."

@@ -72,6 +72,9 @@ is written to disk — the computed profile lives in the returned struct and rou
 `physics_state.jld2`.
 
 Only `ne` and `Te` (the quantities AURORA uses) are kept; the other IRI outputs are discarded.
+As when reading a file, the -1 sentinel levels that IRI returns where it has no valid profile
+(typically the D-region, at the bottom of the requested range) are dropped with a warning, and
+filled by extrapolation when the profile is sampled.
 
 # Example
 ```julia
@@ -83,12 +86,15 @@ function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
                  lat = 76, lon = 5, height = 85:1:700, verbose = true)
     iri_data, _ = calculate_iri_data(; year, month, day, hour, minute, lat, lon, height, verbose)
     data        = iri_data[2:end, :]               # drop the header row
-    h_m         = Float64.(data[:, 1]) .* 1e3      # height(km) → m
-    ne          = Float64.(data[:, 2])             # ne (m⁻³)
-    Te          = Float64.(data[:, 5])             # Te (K)
     instant     = DateTime(year, month, day, hour, minute)
     source      = "IRI-2020 $instant $(lat)N/$(lon)E"
-    return ElectronProfile(h_m, ne, Te; source)
+
+    raw = (height_km = Float64.(data[:, 1]),
+           ne        = Float64.(data[:, 2]),       # electron density (m⁻³)
+           Te        = Float64.(data[:, 5]))       # electron temperature (K)
+    trimmed = trim_iri_sentinels(raw, "IRI-2020 run for $instant at $(lat)N/$(lon)E\n")
+
+    return ElectronProfile(trimmed.height_km .* 1e3, trimmed.ne, trimmed.Te; source)
 end
 
 """
