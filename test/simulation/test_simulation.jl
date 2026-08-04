@@ -356,7 +356,7 @@ end
     end
 end
 
-@testitem "Reassigning a grid invalidates the model" begin
+@testitem "Reassigning model inputs invalidates the model" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
 
@@ -374,6 +374,11 @@ end
 
     initialize!(model; verbose=false)
     model.B_angle_to_zenith = 20
+    @test !model.initialized
+
+    initialize!(model; verbose=false)
+    replacement_species = deepcopy(model.species)
+    model.species = replacement_species
     @test !model.initialized
 end
 
