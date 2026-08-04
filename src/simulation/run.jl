@@ -154,11 +154,8 @@ function solve_multi_step_steady_state!(sim::AuroraSimulation, ds::NCDataset; ve
         Ie_top_local = @view workspace.Ie_top[:, i_step, :]
         energy_loop!(sim, Ie_top_local, workspace.t_loop, progress)
 
-        # Accumulate result into the save array
-        workspace.Ie_save[:, i_step, :] .= @view workspace.Ie[:, 1, :]
+        append_chunk_nc!(ds, workspace.Ie[:, 1:1, :], [time.t[i_step]], sim)
     end
-
-    append_chunk_nc!(ds, workspace.Ie_save, collect(Float64, time.t), sim)
 
     return sim
 end

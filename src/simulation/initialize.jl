@@ -115,6 +115,6 @@ compute_input_flux(sim::AuroraSimulation, time::RefinedTimeGrid) = compute_flux(
 # Number of time steps to save
 n_steps_to_save(sim::AuroraSimulation, t_loop) = n_steps_to_save(sim.time, t_loop)
 n_steps_to_save(::SingleStepConfig, t_loop) = 1
-n_steps_to_save(time::UniformTimeGrid, t_loop) = time.n_steps
+n_steps_to_save(::UniformTimeGrid, t_loop) = 1 # multi-step SS are appended after each solve
 # n_save_per_loop + 1 to include the boundary/I0 column at the start of each loop
 n_steps_to_save(time::RefinedTimeGrid, t_loop) = time.n_save_per_loop + 1
