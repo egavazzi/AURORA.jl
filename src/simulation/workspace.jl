@@ -1,7 +1,7 @@
 using SparseArrays: SparseArrays, spdiagm
 using KLU: KLU, klu
 
-mutable struct SolverCache
+mutable struct SolverWorkspace
     KLU::KLU.KLUFactorization{Float64, Int64}
     initialized::Bool
     Mlhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
@@ -12,7 +12,7 @@ mutable struct SolverCache
     rhs::Vector{Float64}                  # reusable RHS buffer for Crank-Nicolson time-stepping
 end
 
-function SolverCache()
+function SolverWorkspace()
     KLU_factorization = klu(spdiagm(0 => ones(1)))
     Mlhs = spdiagm(0 => ones(1))
     Mrhs = spdiagm(0 => ones(1))
@@ -23,11 +23,11 @@ function SolverCache()
         [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0])
     rhs = Float64[]
 
-    return SolverCache(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs,
-                       op_diags, rhs)
+    return SolverWorkspace(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs,
+                           op_diags, rhs)
 end
 
-mutable struct DegradationCache{N}
+mutable struct DegradationWorkspace{N}
     ionization_source_sum::Matrix{Float64}           # total incident flux summed over beams (shape: n_z x n_t)
     thermal_e_loss::Vector{Float64}
     Ie_scatter::Matrix{Float64}
@@ -38,7 +38,7 @@ mutable struct DegradationCache{N}
 end
 
 
-function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
+function DegradationWorkspace{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
     ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
     thermal_e_loss = Vector{Float64}(undef, n_z)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
@@ -48,13 +48,14 @@ function DegradationCache{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
     secondary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
     primary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
 
-    return DegradationCache(ionization_source_sum, thermal_e_loss, Ie_scatter,
-                            secondary_e_flux, primary_e_flux,
-                            secondary_e_spectrum, primary_e_spectrum)
+    return DegradationWorkspace(ionization_source_sum, thermal_e_loss, Ie_scatter,
+                                secondary_e_flux, primary_e_flux,
+                                secondary_e_spectrum, primary_e_spectrum)
 end
 
-struct SimulationCache{D<:DegradationCache, TL, B}
-    solver::SolverCache
+mutable struct SimulationWorkspace{D<:DegradationWorkspace, TL, B}
+    initialized::Bool
+    solver::SolverWorkspace
     degradation::D
     matrices::TransportMatrices
     Ie::Array{Float64, 3}
@@ -62,5 +63,5 @@ struct SimulationCache{D<:DegradationCache, TL, B}
     I0::Matrix{Float64}
     Ie_top::Array{Float64, 3}
     t_loop::TL
-    B2B_fragment::B
+    B2B_kernel::B
 end

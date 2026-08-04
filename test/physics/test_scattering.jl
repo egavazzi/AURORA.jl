@@ -49,14 +49,14 @@ end
         phaseOe, phaseOi = AURORA.phase_fcn_O(θ₁, E_centers);
         phase_fcn = ((phaseN2e, phaseN2i), (phaseO2e, phaseO2i), (phaseOe, phaseOi));
 
-        B2B_fragment = AURORA.prepare_beams2beams(Ω_subbeam_relative, P_scatter);
+        B2B_kernel = AURORA.beams2beams_kernel(Ω_subbeam_relative, P_scatter);
 
         iE = 400 # ~3730 eV (just to pick one)
         for i in 1:3
             phase_fcn_e = AURORA.convert_phase_fcn_to_3D(phase_fcn[i][1][:, iE], θ₁);
             phase_fcn_i = AURORA.convert_phase_fcn_to_3D(phase_fcn[i][2][:, iE], θ₁);
-            B2B_elastic = AURORA.beams2beams(phase_fcn_e, B2B_fragment);
-            B2B_inelastic = AURORA.beams2beams(phase_fcn_i, B2B_fragment);
+            B2B_elastic = AURORA.beams2beams(phase_fcn_e, B2B_kernel);
+            B2B_inelastic = AURORA.beams2beams(phase_fcn_i, B2B_kernel);
 
             @test all(sum(B2B_elastic, dims = 1) .≈ 1)
             @test all(sum(B2B_inelastic, dims = 1) .≈ 1)

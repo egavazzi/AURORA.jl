@@ -287,17 +287,16 @@ The einstein coefficient `A` and effective lifetime `τ` are optional (equal to 
 - `I`: integrated column-excitation-rate (#exc/m²/s) of the wavelength of interest. Vector [n\\_t]
 """
 function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
-    c = 2.99792458e8
     Q = Q .* τ .* A
     # Single time step: no time-shift interpolation needed
     if length(t) == 1
         return integrate_over_altitude(Q, z)
     end
-    # Interpolate each altitude profile at `t[j] - (z[i] - z[1]) / c` to account for
+    # Interpolate each altitude profile at `t[j] - (z[i] - z[1]) / c₀` to account for
     # the finite travel time of photons to the bottom of the column. Values outside the
     # interpolation domain are set to 0 (photons not yet arrived).
     #
-    # Example (c = 1 for illustration):
+    # Example (c₀ = 1 for illustration):
     #   Q[z, t] (rows = altitude, cols = time):
     #     0.657  0.065  0.313  0.408  0.812
     #     0.780  0.531  0.546  0.575  0.708
@@ -313,7 +312,7 @@ function q2colem(t::Vector, z, Q, A = 1, τ = ones(length(z)))
     I = similar(Q)
     for i in eachindex(z)
         itp = LinearInterpolation(@view(Q[i, :]), t)
-        delay = (z[i] - z[1]) / c
+        delay = (z[i] - z[1]) / c₀
         for j in eachindex(t)
             shifted_time = t[j] - delay
             I[i, j] = first(t) <= shifted_time <= last(t) ? itp(shifted_time) : 0

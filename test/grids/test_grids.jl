@@ -1,7 +1,6 @@
 @testitem "AltitudeGrid construction" begin
     grid = AltitudeGrid(80, 700)
 
-    @test grid isa AltitudeGrid
     @test grid isa AURORA.AbstractGrid
     @test length(grid.h) == grid.n
     @test length(grid.Δh) == grid.n - 1
@@ -54,7 +53,6 @@ end
 @testitem "EnergyGrid construction" begin
     grid = EnergyGrid(50_000)
 
-    @test grid isa EnergyGrid
     @test grid isa AURORA.AbstractGrid
     @test grid.E_max == 50_000
     @test length(grid.E_edges) == grid.n + 1
@@ -75,7 +73,6 @@ end
 @testitem "PitchAngleGrid construction" begin
     grid = PitchAngleGrid(180:-10:0)
 
-    @test grid isa PitchAngleGrid
     @test grid isa AURORA.AbstractGrid
     @test grid.n_beams == 18
     @test length(grid.μ_lims) == 19

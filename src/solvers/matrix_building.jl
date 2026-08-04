@@ -48,8 +48,6 @@ end
 function loss_to_thermal_electrons!(Le, E::Real, nₑ, Tₑ)
     @assert axes(Le) == axes(nₑ) == axes(Tₑ)
 
-    kB = 1.380662e-23     # Boltzmann constant [J/K]
-    qₑ = 1.6021773e-19    # elementary charge [C]
     velocity = v_of_E(E)
     energy_factor = 3.0271e-10 / (E^0.44 * velocity)
 
@@ -66,39 +64,30 @@ function loss_to_thermal_electrons!(Le, E::Real, nₑ, Tₑ)
     return Le
 end
 
-
-
-# Depreciated function, for demo
-function beams2beams_demo(phase_fcn, P_scatter, Ω_subbeam_relative)
-    B2B = zeros(size(P_scatter, 3),size(P_scatter, 3));
+# Beam-to-beam scattering helpers
+# - `B2B_kernel` precomputes the contribution of each scattering-grid direction
+#   between every pair of pitch-angle beams.
+# - `B2B` is computed by applying a species phase function to this kernel. It contains
+#   the final scattering weights between pairs of pitch-angle beams.
+function beams2beams_kernel(Ω_subbeam_relative, P_scatter)
+    B2B_kernel = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
     for i = size(P_scatter, 3):-1:1
-        B2B[i, :] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]) * phase_fcn);
+        B2B_kernel[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
+    end
+    return B2B_kernel
+end
+
+function beams2beams(phase_fcn, B2B_kernel)
+    B2B = zeros(size(B2B_kernel, 3), size(B2B_kernel, 3));
+    for i = size(B2B_kernel, 3):-1:1
+        B2B[i, :] = @view(B2B_kernel[:, :, i]) * phase_fcn;
     end
     return B2B
 end
 
-# The new functions, for faster calculations
-function prepare_beams2beams(Ω_subbeam_relative, P_scatter)
-    B2B_fragment = zeros(size(Ω_subbeam_relative, 1), size(P_scatter, 2), size(P_scatter, 3))
-    for i = size(P_scatter, 3):-1:1
-        B2B_fragment[:, :, i] = Ω_subbeam_relative * (@view(P_scatter[:, :, i]));
-    end
-    return B2B_fragment
-end
-
-function beams2beams(phase_fcn, B2B_fragment)
-    B2B = zeros(size(B2B_fragment, 3), size(B2B_fragment, 3));
-    for i = size(B2B_fragment, 3):-1:1
-        B2B[i, :] = @view(B2B_fragment[:, :, i]) * phase_fcn;
-    end
-    return B2B
-end
-
-# In-place version of `beams2beams` writing into the pre-allocated `B2B` (n_beam × n_beam),
-# avoiding the per-call output allocation and per-row temporaries on the hot path.
-function beams2beams!(B2B, phase_fcn, B2B_fragment)
-    for i = size(B2B_fragment, 3):-1:1
-        @views mul!(B2B[i, :], B2B_fragment[:, :, i], phase_fcn)
+function beams2beams!(B2B, phase_fcn, B2B_kernel)
+    for i = size(B2B_kernel, 3):-1:1
+        @views mul!(B2B[i, :], B2B_kernel[:, :, i], phase_fcn)
     end
     return B2B
 end
@@ -133,7 +122,7 @@ function update_A!(matrices::TransportMatrices, model::AuroraModel, iE)
     return nothing
 end
 
-function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
+function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kernel)
     B = matrices.B
     energy_grid = model.energy_grid
     scattering = model.scattering
@@ -156,8 +145,8 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_frag
         convert_phase_fcn_to_3D!(matrices.phase_fcn_i, @view(phase_fcn[2][:, iE]), finer_θ);
         B2B_elastic = matrices.B2B_elastic
         B2B_inelastic = B2B_inelastic_neutrals[i]
-        beams2beams!(B2B_elastic, matrices.phase_fcn_e, B2B_fragment);
-        beams2beams!(B2B_inelastic, matrices.phase_fcn_i, B2B_fragment);
+        beams2beams!(B2B_elastic, matrices.phase_fcn_e, B2B_kernel);
+        beams2beams!(B2B_inelastic, matrices.phase_fcn_i, B2B_kernel);
 
         # add scattering from elastic collisions
         n_z = length(n)
@@ -208,8 +197,6 @@ function update_D!(D, model::AuroraModel)
     θ_lims_rad = deg2rad.(θ_lims)
     nE = 3
     nθ = 3
-    # n_ti = 701
-    # n_thi = 401
     for iE in energy_grid.n:-1:1
         v = range(v_of_E(E_edges[iE]), v_of_E(E_edges[iE+1]), length=nE)
         for iθ in 1:(length(θ_lims_rad) - 1)
@@ -222,8 +209,10 @@ function update_D!(D, model::AuroraModel)
                 θb = θ_lims_rad[iθ] * 0.2 + 0.8 * θ_lims_rad[iθ + 1]
             end
             θ = range(θa, θb, length=nθ)
-            # θ4i = range(minimum(θ), maximum(θ), n_thi)
             v_par = [A * cos(B) for A in v, B in θ]
+            # Use a standard 100–600 km model span as a representative propagation distance.
+            # TODO: We should use a more realistic propagation distance that depends on the
+            #       actual simulation model geometry
             t_arrival = 500e3 ./ v_par
             at_a = (maximum(t_arrival) + minimum(t_arrival)) / 2
             dt_a = (maximum(t_arrival) - minimum(t_arrival))
@@ -260,7 +249,7 @@ function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
 end
 
 """
-    update_matrices!(matrices, model, iE, B2B_fragment)
+    update_matrices!(matrices, model, iE, B2B_kernel)
 
 Update the A and B matrices in place for a given energy level iE.
 
@@ -268,14 +257,14 @@ Update the A and B matrices in place for a given energy level iE.
 - `matrices::TransportMatrices`: Container to update
 - `model`: `AuroraModel` (grids + atmosphere + physics)
 - `iE`: Current energy index
-- `B2B_fragment`: Pre-computed beam-to-beam fragments
+- `B2B_kernel`: Pre-computed beam-to-beam scattering kernel
 
 # Returns
 - `B2B_inelastic_neutrals`: Array of inelastic beam-to-beam matrices for cascading calculations
 """
-function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_fragment)
+function update_matrices!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kernel)
     update_A!(matrices, model, iE)
-    return update_B!(matrices, model, iE, B2B_fragment)
+    return update_B!(matrices, model, iE, B2B_kernel)
 end
 
 

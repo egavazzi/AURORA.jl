@@ -181,7 +181,7 @@ end
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
-    qₑ = 1.602176620898e-19  # Elementary charge (C)
+    qₑ = AURORA.qₑ
     # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
     μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
@@ -221,7 +221,7 @@ end
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
-    qₑ = 1.602176620898e-19  # Elementary charge (C)
+    qₑ = AURORA.qₑ
     # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
     μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
@@ -286,7 +286,7 @@ end
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
-    qₑ = 1.602176620898e-19  # Elementary charge (C)
+    qₑ = AURORA.qₑ
     # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
     μ_abs = abs.(model.pitch_angle_grid.μ_center)
 
@@ -332,7 +332,7 @@ end
     E_centers = model.energy_grid.E_centers
 
     # Physical constants
-    qₑ = 1.602176620898e-19  # Elementary charge (C)
+    qₑ = AURORA.qₑ
     # Field-aligned (vertical) projection: IeE_tot is the vertical energy flux
     μ_abs = abs.(model.pitch_angle_grid.μ_center)
 

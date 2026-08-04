@@ -216,7 +216,6 @@ function evaluate_spectrum(spec::FlatSpectrum, model::AuroraModel)
     E_centers = model.energy_grid.E_centers
     ΔE = model.energy_grid.ΔE
 
-    qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
     return flat_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E_min)
 end
@@ -231,7 +230,6 @@ function evaluate_spectrum(spec::GaussianSpectrum, model::AuroraModel)
     E_centers = model.energy_grid.E_centers
     ΔE = model.energy_grid.ΔE
 
-    qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
     return gaussian_spectrum(IeE_tot_eV, E_centers, ΔE, spec.E₀, spec.ΔE)
 end
@@ -247,7 +245,6 @@ function evaluate_spectrum(spec::MaxwellianSpectrum, model::AuroraModel)
     ΔE = model.energy_grid.ΔE
     E₀ = spec.E₀
 
-    qₑ = 1.602176620898e-19
     IeE_tot_eV = spec.IeE_tot / qₑ
 
     # Maxwellian spectra (corrected Meier et al. 1989)

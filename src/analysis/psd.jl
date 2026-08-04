@@ -2,9 +2,6 @@ using NCDatasets: NCDataset, defDim, defVar
 using LoopVectorization
 using ProgressMeter: Progress, next!
 
-const m_e = 9.10938356e-31
-const e_charge = 1.602176634e-19
-
 """
     compute_f(Ie, ΔE_J, ΔΩ, v) -> f
 
@@ -28,7 +25,7 @@ end
 """
     psd_f_factor(ΔE_J, ΔΩ, v) -> factor[nμ, nE]
 
-Per-(beam, energy) conversion factor `m_e / (ΔE_J * v^2 * ΔΩ)` used by [`compute_f!`](@ref).
+Per-(beam, energy) conversion factor `mₑ / (ΔE_J * v^2 * ΔΩ)` used by [`compute_f!`](@ref).
 It depends only on the grids, so when streaming it is built once and reused across time-chunks.
 """
 function psd_f_factor(ΔE_J::AbstractVector, ΔΩ::AbstractVector, v::AbstractVector)
@@ -38,7 +35,7 @@ function psd_f_factor(ΔE_J::AbstractVector, ΔΩ::AbstractVector, v::AbstractVe
     @inbounds for i in 1:nE
         denom_E = ΔE_J[i] * v[i]^2
         for j in 1:nμ
-            factor[j, i] = m_e / (denom_E * ΔΩ[j])
+            factor[j, i] = mₑ / (denom_E * ΔΩ[j])
         end
     end
     return factor
@@ -357,9 +354,9 @@ function psd_grids(E_centers::AbstractVector, ΔE::AbstractVector, μ_lims_cosin
     nμ = length(μ_lims_cosine) - 1
     @assert length(ΔE) == nE "ΔE length must match E_centers length"
 
-    ΔE_J = ΔE .* e_charge
-    E_center_J = E_centers .* e_charge
-    v = sqrt.(2 .* E_center_J ./ m_e)
+    ΔE_J = ΔE .* qₑ
+    E_center_J = E_centers .* qₑ
+    v = sqrt.(2 .* E_center_J ./ mₑ)
 
     ΔΩ = Vector{Float64}(undef, nμ)
     for j in 1:nμ
