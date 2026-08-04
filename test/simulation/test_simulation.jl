@@ -137,14 +137,16 @@ end
     @test time_dependent.dt == 0.01
 end
 
-@testitem "NeutralSpecies density_profile types" begin
+@testitem "NeutralSpecies density_source types" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-    # Default model: all species backed by MSISDensity; density is empty before initialize!
+    # Default model from an MSIS file: MSISDensity reads the file eagerly and yields a
+    # VectorDensity (carrying a provenance source); density is empty before initialize!
     for sp in model.species
-        @test sp.density_profile isa MSISDensity
+        @test sp.density_source isa VectorDensity
+        @test occursin("MSIS file", sp.density_source.source)
     end
     @test isempty(model.species[1].density)
 
@@ -153,24 +155,44 @@ end
     ag = model.altitude_grid
     @test !isempty(model.species[1].density)
 
-    # VectorDensity round-trip: PCHIP through exact sample points → same density as MSISDensity
-    raw_n2 = AURORA.load_msis_density(msis_file, :N2, ag.h)
-    vd = VectorDensity(ag.h, raw_n2)
+    # A user VectorDensity built on the file's native grid reproduces the default density
+    raw = AURORA.load_msis(msis_file)
+    vd  = VectorDensity(raw.data.height_km .* 1e3, raw.data.N2; source="manual")
     model_vd = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-    model_vd.species[1].density_profile = vd
+    model_vd.species[1].density_source = vd
     initialize!(model_vd; verbose=false)
-    @test model_vd.species[1].density_profile isa VectorDensity
+    @test model_vd.species[1].density_source isa VectorDensity
     @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
-    # A @law profile is accepted as density_profile, and density remains empty until initialize!
+    # A @law source is accepted, and density remains empty until initialize!
     flat_profile = @law h -> fill(1e15, length(h))
     sp_fn = AURORA.N2Species(flat_profile)
-    @test sp_fn.density_profile isa ExprLaw
-    @test sp_fn.density_profile === flat_profile
+    @test sp_fn.density_source isa ExprLaw
+    @test sp_fn.density_source === flat_profile
     @test isempty(sp_fn.density)
 
     # A bare anonymous law is rejected to ensure reproducibility
     @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
+end
+
+@testitem "NeutralProfile as a model atmosphere" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    neutrals = read_msis_file(msis_file)
+    @test neutrals isa NeutralProfile
+    @test all(haskey(neutrals, s) for s in (:N2, :O2, :O))
+    @test neutrals[:N2] isa VectorDensity
+    @test_throws ArgumentError neutrals[:XX]
+
+    # A NeutralProfile is accepted wherever an MSIS path is, and gives the same densities
+    model_path = AuroraModel((100, 400), 180:-30:0, 100, msis_file, iri_file)
+    model_prof = AuroraModel((100, 400), 180:-30:0, 100, neutrals, iri_file)
+    initialize!(model_path)
+    initialize!(model_prof)
+    for name in (:N2, :O2, :O)
+        @test model_prof.species[name].density ≈ model_path.species[name].density rtol=1e-12
+    end
 end
 
 @testitem "AuroraModel species support Symbol indexing" begin
@@ -211,7 +233,7 @@ end
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
         flat_n2 = @law h -> fill(1e18, length(h))
-        model.species[:N2].density_profile = flat_n2
+        model.species[:N2].density_source = flat_n2
 
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
@@ -457,8 +479,8 @@ end
     # @law, functors and named functions are all accepted
     @test (@law h -> fill(1e15, length(h))) isa ExprLaw
     sp = AURORA.N2Species(MSISDensity(msis_file, :N2))
-    @test sp.density_profile isa MSISDensity        # functor
-    @test sp.phase_fcn_generator === phase_fcn_N2   # named function
+    @test sp.density_source isa VectorDensity        # eager file read → VectorDensity
+    @test sp.phase_fcn_generator === phase_fcn_N2    # named function
 end
 
 @testitem "@law density round-trips through physics_state.jld2" begin
@@ -468,7 +490,7 @@ end
         iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-        model.species[:N2].density_profile = @law h -> fill(1e18, length(h))
+        model.species[:N2].density_source = @law h -> fill(1e18, length(h))
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
         run!(sim; verbose=false)
@@ -476,15 +498,40 @@ end
         savefile = joinpath(savedir, "inputs", "physics_state.jld2")
         model2 = JLD2.load(savefile, "model")
 
-        prof = model2.species[:N2].density_profile
+        prof = model2.species[:N2].density_source
         @test prof isa ExprLaw
-        @test prof.src == model.species[:N2].density_profile.src
+        @test prof.src == model.species[:N2].density_source.src
         # Reconstructed law is callable in this same scope (relies on invokelatest)
         h = model2.altitude_grid.h
         @test prof(h) == fill(1e18, length(h))
         # Reloaded model re-initializes from the reconstructed law
         initialize!(model2; verbose=false)
         @test model2.species[:N2].density[1] ≈ 1e18
+    end
+end
+
+@testitem "ElectronProfile round-trips through physics_state.jld2" begin
+    using JLD2
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        # Build the electron background as an ElectronProfile (no file path stored on the model)
+        electron = read_iri_file(iri_file)
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, electron, 0)
+        @test model.ionosphere.electron_source isa ElectronProfile
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+
+        model2 = JLD2.load(joinpath(savedir, "inputs", "physics_state.jld2"), "model")
+        es = model2.ionosphere.electron_source
+        @test es isa ElectronProfile
+        @test es.source == electron.source
+        # Reloaded model re-samples electrons from the stored profile (no external file)
+        initialize!(model2; verbose=false)
+        @test model2.ionosphere.ne ≈ model.ionosphere.ne rtol=1e-9
+        @test model2.ionosphere.Te ≈ model.ionosphere.Te rtol=1e-9
     end
 end
 

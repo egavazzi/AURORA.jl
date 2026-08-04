@@ -1,48 +1,23 @@
 """
-    Ionosphere{FT, V<:AbstractVector{FT}}
+    Ionosphere{FT, V<:AbstractVector{FT}, S}
 
-Electron background: electron density and temperature.
+Electron background: electron density and temperature, sampled on the model altitude grid from
+an `electron_source` (an [`ElectronProfile`](@ref) or any callable `h_atm (m) → (ne, Te)`).
 Neutral species densities are owned by the individual [`NeutralSpecies`](@ref) objects.
 """
-struct Ionosphere{FT, V<:AbstractVector{FT}}
+struct Ionosphere{FT, V<:AbstractVector{FT}, S}
     Te::V
     ne::V
-    msis_file::String
-    iri_file::String
+    atmosphere_source::String
+    electron_source::S
 end
 
-function Ionosphere(msis_file::AbstractString, iri_file::AbstractString,
+function Ionosphere(atmosphere_source::AbstractString, electron_source,
                     h_atm::AbstractVector)
-    ne, Te = load_electron_densities(iri_file, h_atm)
-    FT = eltype(Te)
-    return Ionosphere{FT, typeof(Te)}(Te, ne, string(msis_file), string(iri_file))
-end
-
-"""
-    load_electron_densities(iri_file, h_atm)
-
-Load the electron density and temperature from an IRI file that was generated and saved
-using AURORA's IRI interface. Then interpolate the profiles over AURORA's altitude grid.
-
-# Calling
-`ne, Te = load_electron_densities(iri_file, h_atm)`
-
-# Inputs
-- `iri_file`: absolute path to the iri file to read ne and Te from. String
-- `h_atm`: altitude (m). Vector [nZ]
-
-# Returns
-- `ne`: e- density (m⁻³). Vector [nZ]
-- `Te`: e- temperature (K). Vector [nZ]
-
-# See also
-[`load_iri`](@ref), [`interpolate_iri_to_grid`](@ref)
-"""
-function load_electron_densities(iri_file, h_atm)
-    iri_raw = load_iri(iri_file)
-    iri = interpolate_iri_to_grid(iri_raw.data, h_atm)
-
-    return iri.ne, iri.Te
+    es     = to_electron_source(electron_source)   # legacy file path → ElectronProfile
+    ne, Te = es(h_atm)
+    FT     = eltype(Te)
+    return Ionosphere{FT, typeof(Te), typeof(es)}(Te, ne, string(atmosphere_source), es)
 end
 
 function Base.show(io::IO, iono::Ionosphere)
@@ -53,8 +28,8 @@ function Base.show(io::IO, ::MIME"text/plain", iono::Ionosphere)
     nz = length(iono.ne)
     println(io, "Ionosphere:")
     println(io, "├── Altitudes: $(nz)")
-    println(io, "├── MSIS file: $(basename(iono.msis_file))")
-    println(io, "├── IRI  file: $(basename(iono.iri_file))")
+    println(io, "├── Atmosphere: $(iono.atmosphere_source)")
+    println(io, "├── Electrons: $(electron_source_label(iono.electron_source))")
     println(io, "├── Max Te:    $(round(maximum(iono.Te), sigdigits=3)) K")
     print(io,   "└── Max ne:    $(round(maximum(iono.ne), sigdigits=3)) m⁻³")
 end

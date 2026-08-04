@@ -1,6 +1,7 @@
 include("calculation.jl")
 include("io.jl")
 include("interpolation.jl")
+include("electron_profile.jl")
 
 """
     find_iri_file(; year=2018, month=12, day=7, hour=11, minute=15,
@@ -48,7 +49,15 @@ function find_iri_file(;
         return file_to_load
     end
 
-    # Otherwise, calculate and save new IRI data
+    # Otherwise, calculate and save new IRI data. Generating files is deprecated: prefer
+    # run_iri, which returns an ElectronProfile stored in (and round-tripped with) the model
+    # rather than written to disk.
+    @warn """
+    find_iri_file() is generating a new IRI file via the Python `iri2020` package, which is \
+    deprecated. Prefer run_iri for new runs, e.g.:
+        iri   = run_iri(; year=$year, month=$month, day=$day, hour=$hour, minute=$minute, lat=$lat, lon=$lon)
+        model = AuroraModel(altitude_lims, θ_lims, E_max, atmosphere, iri)
+    Reading existing IRI files (via read_iri_file / AuroraModel) remains supported.""" maxlog = 1
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
                                               height, verbose)
     file_to_load = save_iri_data(iri_data, parameters; verbose)

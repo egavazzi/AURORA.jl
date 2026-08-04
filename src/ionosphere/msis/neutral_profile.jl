@@ -1,0 +1,198 @@
+using DataInterpolations: PCHIPInterpolation, ExtrapolationType
+
+# ======================================================================================== #
+#                              Density-source types                                        #
+# ======================================================================================== #
+
+"""
+    VectorDensity(h, n; source="")
+
+Density source defined by user-supplied altitude (`h`, m) and density (`n`, m⁻³) vectors.
+Callable on any altitude grid (m); evaluates via PCHIP interpolation in log-space,
+consistent with AURORA's MSIS interpolation convention.
+
+This is the universal interchange for densities produced outside AURORA (CCMC ModelWeb runs,
+radar inversions, any external atmospheric model): reduce the source to an altitude vector and
+a density vector, then wrap it here. The optional `source` string records provenance; it is
+shown by `show` and written into `inputs/atmosphere.nc`.
+
+# Example
+```julia
+profile = VectorDensity(h_msis_m, n_N2; source="ccmc_run_4321.txt")
+n = profile(altitude_grid.h)
+```
+"""
+struct VectorDensity
+    h::Vector{Float64}   # altitude (m)
+    n::Vector{Float64}   # density (m⁻³)
+    source::String       # provenance label (free-form, may be empty)
+end
+
+VectorDensity(h, n; source::AbstractString = "") =
+    VectorDensity(collect(Float64, h), collect(Float64, n), String(source))
+
+function (d::VectorDensity)(h_atm::AbstractVector)
+    itp = PCHIPInterpolation(log.(d.n), d.h ./ 1e3;
+                             extrapolation = ExtrapolationType.Linear)
+    return exp.(itp(collect(Float64, h_atm) ./ 1e3))
+end
+
+
+# ======================================================================================== #
+#                           NeutralProfile (neutral atmosphere)                             #
+# ======================================================================================== #
+
+"""
+    NeutralProfile(densities; source="")
+
+Neutral atmosphere holding one [`VectorDensity`](@ref) per species, keyed by symbol
+(`:N2`, `:O2`, `:O`, `:He`, `:H`, `:Ar`, `:N`, `:NO`). Index it to get a single species'
+density source (`neutrals[:N2]`), or pass it directly as the `atmosphere` argument of
+[`AuroraModel`](@ref) to build the three default species from it.
+
+This is the neutral analogue of [`ElectronProfile`](@ref): the universal interchange for a
+full set of neutral densities, whatever their origin. Build one from a legacy AURORA MSIS
+file with [`read_msis_file`](@ref), from a CCMC ModelWeb NRLMSIS download with
+[`read_ccmc_msis`](@ref), or directly from your own vectors. Because it stores data (not a
+file path), it round-trips through `physics_state.jld2` and reproduces on any machine with
+no external file.
+
+Species are stored on their own native altitude grids, so a source that reports a species
+only over part of the column (CCMC writes a `9.999E-38` sentinel for these) keeps just the
+levels where that species is actually defined.
+
+# Example
+```julia
+neutrals = read_ccmc_msis("nrlmsis_output.txt")
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+
+n_N2 = neutrals[:N2](altitude_grid.h)   # sample one species directly
+```
+"""
+struct NeutralProfile
+    densities::Dict{Symbol, VectorDensity}
+    source::String
+end
+
+NeutralProfile(densities::AbstractDict; source::AbstractString = "") =
+    NeutralProfile(Dict{Symbol, VectorDensity}(densities), String(source))
+
+function Base.getindex(p::NeutralProfile, species::Symbol)
+    haskey(p.densities, species) || throw(ArgumentError(
+        "NeutralProfile: no density for :$species. Available: " *
+        join(sort!(string.(keys(p.densities))), ", ")))
+    return p.densities[species]
+end
+
+Base.haskey(p::NeutralProfile, species::Symbol) = haskey(p.densities, species)
+Base.keys(p::NeutralProfile) = keys(p.densities)
+
+function Base.show(io::IO, p::NeutralProfile)
+    print(io, "NeutralProfile(", join(sort!(string.(keys(p.densities))), ", "), ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", p::NeutralProfile)
+    println(io, "NeutralProfile:")
+    println(io, "├── Source:  ", isempty(p.source) ? "(unlabelled)" : p.source)
+    print(io,   "└── Species: ", join(sort!(string.(keys(p.densities))), ", "))
+end
+
+# Human-readable provenance label for the model's default atmosphere, stored on the
+# Ionosphere. Accepts whatever is passed as the `atmosphere` argument to AuroraModel.
+atmosphere_label(p::NeutralProfile)  = p.source
+atmosphere_label(x::AbstractString)  = basename(string(x))
+atmosphere_label(x)                  = string(typeof(x))
+
+
+# ======================================================================================== #
+#                              Readers                                                     #
+# ======================================================================================== #
+
+"""
+    read_msis_file(msis_file) -> NeutralProfile
+
+Read every species from an MSIS text file generated by AURORA and return them as a
+[`NeutralProfile`](@ref) on the file's native altitude grid. The file is read once, here, so
+the result is self-contained and round-trips with no path dependency.
+
+This is the whole-atmosphere counterpart of [`MSISDensity`](@ref), which reads a single
+species. Kept for backward compatibility with existing MSIS files.
+
+# Example
+```julia
+neutrals = read_msis_file(msis_file)
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+```
+"""
+function read_msis_file(msis_file::AbstractString)
+    raw   = load_msis(msis_file)
+    h_m   = raw.data.height_km .* 1e3
+    label = "MSIS file $(basename(msis_file))"
+
+    densities = Dict{Symbol, VectorDensity}()
+    for species in (:N2, :O2, :O, :He, :H, :Ar, :N, :NO)
+        hasproperty(raw.data, species) || continue
+        densities[species] = VectorDensity(h_m, getproperty(raw.data, species);
+                                           source = "$label :$species")
+    end
+    return NeutralProfile(densities; source = label)
+end
+
+"""
+    read_ccmc_msis(file) -> NeutralProfile
+
+Read the neutral atmosphere from a CCMC ModelWeb NRLMSIS text export and return it as a
+[`NeutralProfile`](@ref). The CCMC table has a variable-length preamble, a single-line column
+header, densities in cm⁻³, and a `9.999E-38` sentinel for species that the model does not
+report at a given altitude; this reader locates the header (the line containing `N2den`),
+converts cm⁻³ → m⁻³, and drops sentinel levels per species.
+
+Works for both the NRLMSIS 2.x and NRLMSISE-00 exports, which share this column layout.
+
+# Example
+```julia
+neutrals = read_ccmc_msis("nrlmsis_output.txt")
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+```
+"""
+function read_ccmc_msis(file::AbstractString)
+    lines      = readlines(file)
+    header_idx = findfirst(l -> occursin("N2den", l), lines)
+    header_idx === nothing && throw(ArgumentError(
+        "read_ccmc_msis: could not find the CCMC column header (a line containing " *
+        "\"N2den\") in $file. Is this a CCMC ModelWeb NRLMSIS export?"))
+
+    # Columns of the data block, 1-based: 6=Heit(km), 9=Oden, 10=N2den, 11=O2den, 12=NOden,
+    # 16=Heden, 17=Arden, 18=Hden, 19=Nden — all number densities in cm⁻³.
+    columns = (:O => 9, :N2 => 10, :O2 => 11, :NO => 12,
+               :He => 16, :Ar => 17, :H => 18, :N => 19)
+    n_cols  = maximum(last, columns)
+
+    h_km = Float64[]
+    raw  = Dict(s => Float64[] for (s, _) in columns)
+    for l in lines[(header_idx + 1):end]
+        cols = split(l)
+        length(cols) >= n_cols || continue
+        h = tryparse(Float64, cols[6])
+        h === nothing && continue
+        values = map(((_, c),) -> tryparse(Float64, cols[c]), columns)
+        any(isnothing, values) && continue
+        push!(h_km, h)
+        for ((s, _), v) in zip(columns, values)
+            push!(raw[s], v)
+        end
+    end
+    isempty(h_km) && throw(ArgumentError(
+        "read_ccmc_msis: no valid data rows parsed from $file"))
+
+    label     = "CCMC NRLMSIS $(basename(file))"
+    densities = Dict{Symbol, VectorDensity}()
+    for (species, _) in columns
+        # Drop the levels CCMC fills with its missing-value sentinel (9.999E-38).
+        valid = findall(>(1e-37), raw[species])
+        isempty(valid) && continue
+        densities[species] = VectorDensity(h_km[valid] .* 1e3, raw[species][valid] .* 1e6;
+                                           source = "$label :$species")
+    end
+    return NeutralProfile(densities; source = label)
+end
