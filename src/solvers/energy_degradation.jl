@@ -5,7 +5,7 @@ using LoopVectorization: @tturbo
 #################################################################################
 
 function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
-                   B2B_inelastic_neutrals, iE, cache)
+                   B2B_inelastic_neutrals, iE, workspace)
 
     z = model.altitude_grid.h
     ne = model.ionosphere.ne
@@ -24,16 +24,16 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
 
     # e-e collisions
     if iE > 1
-        loss_to_thermal_electrons!(cache.thermal_e_loss, E_centers[iE], ne, Te)
+        loss_to_thermal_electrons!(workspace.thermal_e_loss, E_centers[iE], ne, Te)
         add_thermal_electron_collisions!(@view(Q[:, :, iE - 1]), @view(Ie[:, :, iE]),
-                                         cache.thermal_e_loss, ΔE[iE], n_z, n_μ)
+                                         workspace.thermal_e_loss, ΔE[iE], n_z, n_μ)
     end
 
-    # Get the pre-allocated ionization arrays from cache
-    secondary_e_flux     = cache.secondary_e_flux
-    primary_e_flux       = cache.primary_e_flux
-    secondary_e_spectrum = cache.secondary_e_spectrum
-    primary_e_spectrum   = cache.primary_e_spectrum
+    # Get the pre-allocated ionization arrays from the workspace
+    secondary_e_flux = workspace.secondary_e_flux
+    primary_e_flux = workspace.primary_e_flux
+    secondary_e_spectrum = workspace.secondary_e_spectrum
+    primary_e_spectrum = workspace.primary_e_spectrum
 
     # Loop over the neutral species
     for (i, sp) in enumerate(model.species)
@@ -43,7 +43,8 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         B2B_inelastic = B2B_inelastic_neutrals[i]
         species_cascading = sp.cascading_data
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid, iE, cache)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid,
+                                  iE, workspace)
 
         # Zero out the ionization arrays for this species
         fill!(secondary_e_flux[i], 0)
@@ -61,7 +62,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         end
         if min_ionization_E < E_edges[iE]
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
-                                     n, Ie, z, μ_center, Ω_beam, iE, cache)
+                                     n, Ie, z, μ_center, Ω_beam, iE, workspace)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
                                         σ, E_levels, species_cascading, iE)
         end
@@ -148,11 +149,12 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid::EnergyGrid, iE, cache)
+function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic,
+                                   energy_grid::EnergyGrid, iE, workspace)
     E_edges = energy_grid.E_edges
     ΔE = energy_grid.ΔE
-    # Use cached matrices to avoid allocations
-    Ie_scatter = cache.Ie_scatter
+    # Use the pre-allocated matrix to avoid allocations
+    Ie_scatter = workspace.Ie_scatter
 
     # Calculate the flux of electrons after pitch-angle scattering by inelastic collisions
     # This is computed ONCE for all energy levels of this species at this energy
@@ -267,8 +269,8 @@ end
 =#
 function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
                                   n, Ie, z, μ_center, Ω_beam, iE,
-                                  cache)
-    source_sum = cache.ionization_source_sum
+                                  workspace)
+    source_sum = workspace.ionization_source_sum
 
     n_z = length(z)
     n_μ = length(μ_center)

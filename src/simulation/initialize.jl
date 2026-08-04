@@ -5,7 +5,7 @@
                 save_cache=true,
                 cache_root=default_cache_root())
 
-Allocate or re-allocate the working cache for `sim`.
+Allocate or re-allocate the workspace for `sim`.
 
 # Keywords
 - `force_recompute`: ignore compatible on-disk cascading caches and rebuild them
@@ -17,38 +17,46 @@ function initialize!(sim::AuroraSimulation;
                      save_cache::Bool = true,
                      cache_root::String = default_cache_root(),
                      verbose::Bool = true)
+    # If any part of initialization fails, the previous workspace must not be reused with
+    # a partially rebuilt model or time configuration.
+    sim.workspace.initialized = false
+
     verbose && @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
     if !sim.model.initialized
         initialize!(sim.model; policy=cache_policy, verbose)
     end
-    # Rebuild the time configuration from the (possibly changed) model grids.
-    sim.time = build_time_config(sim.model, sim.mode; verbose)
-    sim.cache = build_simulation_cache(sim; cache_policy)
-    sim.cache_initialized = true
+    # Build both replacements before assigning either, so a failed workspace construction
+    # cannot leave the simulation with a new time grid and an old workspace.
+    new_time = build_time_config(sim.model, sim.mode; verbose)
+    new_workspace = build_simulation_workspace(sim, new_time; cache_policy)
+    sim.time = new_time
+    sim.workspace = new_workspace
     return nothing
 end
 
-needs_initialization(sim::AuroraSimulation) = !sim.cache_initialized || !sim.model.initialized
+needs_initialization(sim::AuroraSimulation) =
+    !sim.workspace.initialized || !sim.model.initialized
 
-function build_dummy_simulation_cache(model::AuroraModel, time::AbstractTimeConfig)
+function build_dummy_simulation_workspace(model::AuroraModel, time::AbstractTimeConfig)
     N_neutrals = length(model.species)
     _, t_loop = get_time_parameters(time)
 
-    solver = SolverCache()
-    degradation = DegradationCache{N_neutrals}(1, 1, 1, 1)
+    solver = SolverWorkspace()
+    degradation = DegradationWorkspace{N_neutrals}(1, 1, 1, 1)
     matrices = TransportMatrices(1, 1, 1, 1)
     Ie = zeros(1, 1, 1)
     Ie_save = zeros(1, 1, 1)
     I0 = zeros(1, 1)
     Ie_top = zeros(1, 1, 1)
-    B2B_fragment = zeros(1, 1, 1)
+    B2B_kernel = zeros(1, 1, 1)
 
-    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, B2B_fragment)
+    return SimulationWorkspace(false, solver, degradation, matrices, Ie, Ie_save, I0,
+                               Ie_top, t_loop, B2B_kernel)
 end
 
-function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy = CachePolicy())
+function build_simulation_workspace(sim::AuroraSimulation, time::AbstractTimeConfig;
+                                    cache_policy::CachePolicy = CachePolicy())
     # Extract model geometry and grids
     model = sim.model
     z = model.altitude_grid.h
@@ -57,29 +65,29 @@ function build_simulation_cache(sim::AuroraSimulation; cache_policy::CachePolicy
     n_E = model.energy_grid.n
 
     # Set up time grid dimensions for working arrays
-    n_t, t_loop = get_time_parameters(sim)
+    n_t, t_loop = get_time_parameters(time)
 
-    # Initialize solver and physical process caches
-    solver = SolverCache()
-    degradation = DegradationCache{N_neutrals}(length(μ_center), n_t, length(z), n_E)
+    # Initialize solver and physical-process workspaces
+    solver = SolverWorkspace()
+    degradation = DegradationWorkspace{N_neutrals}(length(μ_center), n_t, length(z), n_E)
     matrices = initialize_transport_matrices(model, t_loop)
     update_D!(matrices.D, model)
     update_Ddiffusion!(matrices.Ddiffusion, model)
 
-    # Pre-compute beam-to-beam scattering fragment
-    B2B_fragment = prepare_beams2beams(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
+    # Pre-compute the beam-to-beam scattering kernel
+    B2B_kernel = beams2beams_kernel(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
 
     # Pre-compute input flux data
-    Ie_top = compute_input_flux(sim)
+    Ie_top = compute_input_flux(sim, time)
 
     # Initialize solution arrays
     I0 = zeros(length(z) * length(μ_center), n_E)
     Ie = zeros(length(z) * length(μ_center), n_t, n_E)
-    n_t_save = n_steps_to_save(sim, t_loop)
+    n_t_save = n_steps_to_save(time, t_loop)
     Ie_save = zeros(length(z) * length(μ_center), n_t_save, n_E)
 
-    return SimulationCache(solver, degradation, matrices, Ie, Ie_save, I0,
-                           Ie_top, t_loop, B2B_fragment)
+    return SimulationWorkspace(true, solver, degradation, matrices, Ie, Ie_save, I0,
+                               Ie_top, t_loop, B2B_kernel)
 end
 
 # Time parameters for working arrays: (n_t, t_loop)
@@ -107,6 +115,6 @@ compute_input_flux(sim::AuroraSimulation, time::RefinedTimeGrid) = compute_flux(
 # Number of time steps to save
 n_steps_to_save(sim::AuroraSimulation, t_loop) = n_steps_to_save(sim.time, t_loop)
 n_steps_to_save(::SingleStepConfig, t_loop) = 1
-n_steps_to_save(time::UniformTimeGrid, t_loop) = time.n_steps
+n_steps_to_save(::UniformTimeGrid, t_loop) = 1 # multi-step SS are appended after each solve
 # n_save_per_loop + 1 to include the boundary/I0 column at the start of each loop
 n_steps_to_save(time::RefinedTimeGrid, t_loop) = time.n_save_per_loop + 1

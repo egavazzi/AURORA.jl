@@ -87,6 +87,8 @@ end
         alt_v[:] = h_atm
         en_v  = defVar(ds, "energy",        Float64, ("energy",))
         en_v[:] = E_centers
+        pa_v  = defVar(ds, "pitch_angle",   Float64, ("pitch_angle",))
+        pa_v[:] = @. 0.5 * (μ_lims[1:(end - 1)] + μ_lims[2:end])
         ee_v  = defVar(ds, "energy_edges",  Float64, ("energy_bounds",))
         ee_v[:] = E_edges
         ml_v  = defVar(ds, "mu_lims",       Float64, ("pitch_angle_bounds",))

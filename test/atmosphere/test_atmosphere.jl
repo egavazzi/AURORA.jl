@@ -3,7 +3,6 @@
     iri_file = find_iri_file(; verbose=false)
     iono = Ionosphere(iri_file, z)
 
-    @test iono isa Ionosphere
     @test length(iono.Te) == length(z)
     @test length(iono.ne) == length(z)
 

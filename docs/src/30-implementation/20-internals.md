@@ -165,7 +165,7 @@ vector for the current energy ``iE``:
      ``E'`` to the degraded-primary production at energy ``E < E'``.
 
 The cascading transfer matrices are loaded or computed through the per-species entries of
-`CascadingCache` and then reused from `SimulationCache` for the rest of the simulation.
+`CascadingCache` and then reused from `SimulationWorkspace` for the rest of the simulation.
 
 ## The energy-descending loop
 

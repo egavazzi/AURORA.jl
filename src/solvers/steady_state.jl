@@ -93,12 +93,12 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    steady_state_scheme!(Ie, model, matrices, iE, Ie_top, cache)
+    steady_state_scheme!(Ie, model, matrices, iE, Ie_top, workspace)
 
 Solve the steady-state electron transport equation for energy level `iE`.
 
-On the **first call** the sparse matrix structure, nzval index arrays, and
-operator diagonals are computed and stored in `cache`. On subsequent calls only the numerical values in
+On the **first call** the sparse matrix structure, nzval index arrays, and operator diagonals
+are computed and stored in `workspace`. On subsequent calls only the numerical values in
 `Mlhs.nzval` are updated (zero allocations on the hot path).
 
 # Mathematical Background
@@ -133,9 +133,9 @@ The matrix has a block structure indexed by pitch-angle pairs `(i1, i2)`:
 - `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹]
-- `cache`: `SolverCache` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
+- `workspace`: `SolverWorkspace` storing `Mlhs`, `indices_lhs`, `op_diags`, `KLU`
 """
-function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cache)
+function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, workspace)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -149,23 +149,23 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     Ddiffusion = matrices.Ddiffusion
 
     # ── First call: build sparsity pattern, index map, operator diagonals ──
-    if !cache.initialized
+    if !workspace.initialized
         Ddz_Up, Ddz_Down = build_spatial_operators(z)
-        cache.Mlhs       = create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion)
-        cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
-        cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+        workspace.Mlhs = create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion)
+        workspace.indices_lhs = extract_nzval_indices(workspace.Mlhs, n_z, n_angle)
+        workspace.op_diags = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
     end
 
     # ── Update matrix values (fast, no allocations) ──
-    update_steady_state_matrix!(cache.Mlhs, cache.indices_lhs, A, B, D,
-                                cache.op_diags, μ, n_z)
+    update_steady_state_matrix!(workspace.Mlhs, workspace.indices_lhs, A, B, D,
+                                workspace.op_diags, μ, n_z)
 
     # ── Factorise / re-factorise ──
-    if !cache.initialized
-        cache.KLU = klu(cache.Mlhs)
-        cache.initialized = true
+    if !workspace.initialized
+        workspace.KLU = klu(workspace.Mlhs)
+        workspace.initialized = true
     else
-        klu!(cache.KLU, cache.Mlhs)
+        klu!(workspace.KLU, workspace.Mlhs)
     end
 
     # ── Boundary indices ──
@@ -176,7 +176,7 @@ function steady_state_scheme!(Ie, model::AuroraModel, matrices, iE, Ie_top, cach
     copyto!(Ie, Q_slice)
     Ie[index_bottom] .= 0.0
     Ie[index_top]    .= Ie_top
-    ldiv!(cache.KLU, Ie)
+    ldiv!(workspace.KLU, Ie)
 
     # Check for negative values (if it happens we have a problem) and clamp to zero
     if any(<(0), Ie)

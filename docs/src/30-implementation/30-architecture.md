@@ -55,7 +55,6 @@ src/
 ├── physics/
 │   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section data
 │   ├── cascading.jl             # Ionization cascading transfer matrices
-│   ├── energy_degradation.jl    # Loss frequencies, scattering, source terms
 │   ├── phase_functions.jl       # Differential cross sections → 3D scattering
 │   └── scattering.jl            # Pitch-angle scattering matrices
 │
@@ -63,14 +62,16 @@ src/
 │   ├── types.jl                 # AbstractMode, SteadyStateMode, TimeDependentMode
 │   ├── transport_matrices.jl    # TransportMatrices struct
 │   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
+│   ├── energy_degradation.jl    # Loss frequencies, scattering, source terms
 │   ├── sparse_indexing.jl       # Shared sparse infrastructure: BlockIndices, OperatorDiagonals, sparsity builders
 │   ├── steady_state.jl          # Steady-state solver (in-place, allocation-free)
 │   └── crank_nicolson.jl        # Crank-Nicolson time-dependent solver (in-place, allocation-free)
 │
 ├── simulation/
+│   ├── loop_planning.jl         # CFL refinement, memory estimates, automatic loop partitioning
 │   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
-│   ├── cache.jl                 # SimulationCache, SolverCache, DegradationCache
-│   ├── initialize.jl            # initialize! — allocates cache
+│   ├── workspace.jl             # SimulationWorkspace, SolverWorkspace, DegradationWorkspace
+│   ├── initialize.jl            # initialize! — allocates workspace
 │   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
 │
 ├── output/
@@ -85,7 +86,8 @@ src/
 │   ├── heating.jl               # Electron heating rate
 │   └── psd.jl                   # Phase space density analysis
 │
-├── utilities.jl                 # Helpers (v_of_E, CFL_criteria, beam_weight, ...)
+├── utilities.jl                 # Helpers (v_of_E, beam_weight, interpolation, ...)
+├── viz_interface.jl             # Plotting interface extended by the Makie extension
 └── precompiles.jl               # Precompilation workload
 ```
 
@@ -97,8 +99,9 @@ src/
 | [`InputFlux`](@ref) | Precipitating electron specification: spectrum x modulation |
 | [`AuroraSimulation`](@ref) | Complete simulation descriptor: model + flux + mode + output |
 | [`AbstractMode`](@ref) | Solver strategy: [`SteadyStateMode`](@ref) or [`TimeDependentMode`](@ref) |
-| `SimulationCache` | Internal workspace: solver matrices, flux arrays, factorizations |
-| `SolverCache` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
+| `SimulationWorkspace` | Internal working state: solver matrices, flux arrays, factorizations |
+| `SolverWorkspace` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
+| `DegradationWorkspace` | Reusable flux and spectrum arrays for energy degradation and ionization |
 | `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
 | `BlockIndices` | Pre-computed `nzval` index arrays for a single block (replaces `Dict`-based mapping) |
 | `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down`, `Ddiffusion` (extracted once, reused each energy step) |
@@ -113,8 +116,8 @@ The entry point for all simulations is [`run!`](@ref). Here is the complete call
 ```
 run!(sim::AuroraSimulation)
 │
-├── initialize!(sim)                           # Allocate cache (if not done yet)
-│   ├── Build SimulationCache
+├── initialize!(sim)                           # Allocate workspace (if not done yet)
+│   ├── Build SimulationWorkspace
 │   │   ├── Compute phase functions (once)
 │   │   ├── Compute beam-to-beam scattering geometry
 │   │   └── Load/compute cascading transfer matrices

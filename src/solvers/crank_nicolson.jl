@@ -7,13 +7,13 @@ using LinearAlgebra: ldiv!, mul!
 using SparseArrays: spdiagm
 
 """
-    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, cache)
+    Crank_Nicolson!(Ie, t, model, v, matrices, iE, Ie_top, I0, workspace)
 
 Solve the time-dependent electron transport equation for energy level `iE`
 using the Crank-Nicolson implicit scheme.
 
 On the **first call** the sparse matrix structures, nzval index arrays, and
-operator diagonals are computed and stored in `cache`.  On subsequent calls
+operator diagonals are computed and stored in `workspace`. On subsequent calls
 only the numerical values in `Mlhs.nzval` / `Mrhs.nzval` are updated (zero
 allocations on the hot path).
 
@@ -58,9 +58,10 @@ Both matrices share the same block structure as the steady-state system:
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
-- `cache`: `SolverCache` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
+- `workspace`: `SolverWorkspace` storing `Mlhs`, `Mrhs`, indices, `op_diags`, `KLU`
 """
-function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0, cache)
+function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
+                         workspace)
     z = model.s_field
     μ = model.pitch_angle_grid.μ_center
     n_z = length(z)
@@ -78,20 +79,20 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     ddt = 1.0 / (v * dt)
 
     # ── First call : build sparsity patterns, index maps, operator diags ──
-    if !cache.initialized
+    if !workspace.initialized
         Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
-        cache.Mlhs, cache.Mrhs = create_transport_sparsity_pattern(
+        workspace.Mlhs, workspace.Mrhs = create_transport_sparsity_pattern(
             n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
-        cache.indices_lhs = extract_nzval_indices(cache.Mlhs, n_z, n_angle)
-        cache.indices_rhs = extract_nzval_indices(cache.Mrhs, n_z, n_angle)
-        cache.op_diags    = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
-        cache.rhs         = Vector{Float64}(undef, n_z * n_angle)
+        workspace.indices_lhs = extract_nzval_indices(workspace.Mlhs, n_z, n_angle)
+        workspace.indices_rhs = extract_nzval_indices(workspace.Mrhs, n_z, n_angle)
+        workspace.op_diags = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+        workspace.rhs = Vector{Float64}(undef, n_z * n_angle)
     end
 
     # ── Update matrix values (fast, no allocations) ──
-    update_crank_nicolson_matrices!(cache.Mlhs, cache.Mrhs,
-                                    cache.indices_lhs, cache.indices_rhs,
-                                    A, B, D, ddt, cache.op_diags, μ, n_z)
+    update_crank_nicolson_matrices!(workspace.Mlhs, workspace.Mrhs,
+                                    workspace.indices_lhs, workspace.indices_rhs,
+                                    A, B, D, ddt, workspace.op_diags, μ, n_z)
 
     # ── Boundary indices ──
     index_bottom = 1:n_z:(n_angle * n_z)
@@ -102,14 +103,14 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     Ie[index_bottom, 1] .= 0.0
     Ie[index_top,    1] .= @view(Ie_top[:, 1])
     current = @view(Ie[:, 1])
-    rhs = similar(current)
+    rhs = workspace.rhs
 
     # ── Factorise / re-factorise ──
-    if !cache.initialized
-        cache.KLU = klu(cache.Mlhs)
-        cache.initialized = true
+    if !workspace.initialized
+        workspace.KLU = klu(workspace.Mlhs)
+        workspace.initialized = true
     else
-        klu!(cache.KLU, cache.Mlhs)
+        klu!(workspace.KLU, workspace.Mlhs)
     end
 
     # ── Time-stepping loop ──
@@ -117,11 +118,11 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
         next = @view Ie[:, i_t + 1]
 
         # Crank-Nicolson step:  Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  Q
-        mul!(rhs, cache.Mrhs, current)
+        mul!(rhs, workspace.Mrhs, current)
         @views @. next = rhs + 0.5 * (Q_slice[:, i_t] + Q_slice[:, i_t + 1])
         next[index_bottom] .= 0.0                           # bottom BC
         next[index_top]    .= @view(Ie_top[:, i_t + 1])     # top BC
-        ldiv!(cache.KLU, next)
+        ldiv!(workspace.KLU, next)
 
         current = next
     end

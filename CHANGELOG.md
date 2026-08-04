@@ -12,6 +12,8 @@
 - Fix `run_iri` storing IRI's -1 sentinel values, which made sampling the profile fail with a `DomainError` whenever the altitude range reached the D-region
 - Fix `read_msis_file` and `MSISDensity` returning `NaN` densities for the species MSIS does not report at low altitude (N and anomalous O)
 - CCMC exports are read by matching column names in the header rather than by fixed column positions, so an export with a different column order can no longer be read as the wrong species or in the wrong unit
+- **Breaking** Rename `AuroraSimulation.cache` to `AuroraSimulation.workspace`, and replace `cache_initialized` with `workspace.initialized`.
+  The simulation working-state types are also renamed from cache to workspace, e.g. `SolverCache` → `SolverWorkspace`, `DegradationCache` → `DegradationWorkspace` [#161](https://github.com/egavazzi/AURORA.jl/pull/161)
 
 ## v0.8.0 - 2026-07-28
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
