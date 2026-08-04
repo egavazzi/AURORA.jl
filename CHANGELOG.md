@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+- **Breaking** :sparkles: Bring your own neutral and electron profiles :sparkles:
+  - The neutral atmosphere and the electron background can now come from anywhere: a CCMC ModelWeb download (`read_ccmc_msis`, `read_ccmc_iri`), a live model run that writes nothing to disk (`run_msis`, `run_iri`), an AURORA-generated file (`read_msis_file`, `read_iri_file`), or your own vectors (`VectorDensity`, `ElectronProfile`).
+  - Sources store data instead of a file path and are read once, at construction, so a model saved to `physics_state.jld2` reloads and re-initializes on any machine with no external file. Each source carries a free-form `source` label, shown when it is displayed and written into `inputs/atmosphere.nc`.
+  - `NeutralProfile` groups one density per species, each on its own altitude grid, so a species that the source only reports over part of the column (MSIS gives no N below ~95 km, CCMC writes a `9.999E-38` marker) keeps just the levels where it is defined.
+  - `NeutralSpecies.density_profile` is renamed `density_source`.
+  - `MSISDensity` is no longer a type: it is a constructor that reads the file and returns a `VectorDensity`, so `x isa MSISDensity` no longer works.
+  - `Ionosphere.msis_file` and `.iri_file` are replaced by `atmosphere_source` (a label, since the neutral densities live on the species) and `electron_source` (the profile itself).
+  - Passing MSIS and IRI file paths to `AuroraModel` keeps working, and generating new files with `find_iri_file` now warns in favour of `run_iri`.
+- Fix `run_iri` storing IRI's -1 sentinel values, which made sampling the profile fail with a `DomainError` whenever the altitude range reached the D-region
+- Fix `read_msis_file` and `MSISDensity` returning `NaN` densities for the species MSIS does not report at low altitude (N and anomalous O)
+- CCMC exports are read by matching column names in the header rather than by fixed column positions, so an export with a different column order can no longer be read as the wrong species or in the wrong unit
+
 ## v0.8.0 - 2026-07-28
 - **Breaking** :sparkles: New simulation interface :sparkles: [#114](https://github.com/egavazzi/AURORA.jl/pull/114) [#125](https://github.com/egavazzi/AURORA.jl/pull/125) [#126](https://github.com/egavazzi/AURORA.jl/pull/126) [#138](https://github.com/egavazzi/AURORA.jl/pull/138)
   - Simulations are now set up by building an `AuroraModel`, constructing an `AuroraSimulation`, and calling `run!(sim)`. The functions `calculate_e_transport()` and `calculate_e_transport_steady_state()` are removed.

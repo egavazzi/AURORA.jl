@@ -70,10 +70,11 @@ model.species[:N2].density_source = MSISDensity(msis_file, :N2)
 ### Densities from another atmospheric model (e.g. a CCMC ModelWeb run)
 
 For a whole atmosphere at once, [`NeutralProfile`](@ref) holds one [`VectorDensity`](@ref) per
-species and can be passed straight to [`AuroraModel`](@ref) in place of an MSIS file. Two
-readers build one for you:
+species and can be passed straight to [`AuroraModel`](@ref) in place of an MSIS file. Three
+functions build one for you:
 
 ```julia
+neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
 neutrals = read_msis_file(msis_file)            # AURORA-generated MSIS file
 neutrals = read_ccmc_msis("nrlmsis_output.txt") # CCMC ModelWeb NRLMSIS export
 
@@ -84,8 +85,13 @@ model.species[:N2].density_source = neutrals[:N2]
 ```
 
 `read_ccmc_msis` handles the CCMC quirks: the variable-length preamble, densities in cm⁻³, and
-the `9.999E-38` sentinel written where a species is not reported (those levels are dropped
-per species).
+the `9.999E-38` sentinel written where a species is not reported. Columns are matched by their
+header name rather than by position, so the export is read correctly whatever its column order,
+and a missing column is reported instead of silently misread.
+
+Whichever route you take, each species keeps only the altitudes where it is actually reported
+(MSIS gives no N below ~95 km, for instance), so a species defined over part of the column
+never drags a missing-value marker into the interpolation.
 
 For a model with no dedicated reader — DTM, WAM-IPE, a radar inversion — reduce the export to
 two vectors and wrap them yourself:
@@ -99,6 +105,11 @@ n_N2 = Float64.(rows[2:end, 2]) .* 1e6     # cm⁻³ → m⁻³
 
 model.species[:N2].density_source = VectorDensity(h_m, n_N2; source="some_model_output.txt")
 ```
+
+`VectorDensity` and [`ElectronProfile`](@ref) check their vectors as you build them — matching
+lengths, at least two strictly increasing altitudes, and finite positive values — so a mistake
+in the parsing above is reported right there rather than as a puzzling interpolation failure
+much later in the run.
 
 ### When a law needs parameters, use a functor
 

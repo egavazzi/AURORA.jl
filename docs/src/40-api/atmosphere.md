@@ -4,6 +4,7 @@
 ```@docs; canonical=false
 find_msis_file
 NeutralProfile
+run_msis
 read_msis_file
 read_ccmc_msis
 ```
