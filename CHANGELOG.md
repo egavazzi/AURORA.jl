@@ -7,7 +7,7 @@
   - `NeutralProfile` groups one density per species, each on its own altitude grid, so a species that the source only reports over part of the column (MSIS gives no N below ~95 km, CCMC writes a `9.999E-38` marker) keeps just the levels where it is defined.
   - `NeutralSpecies.density_profile` is renamed `density_source`.
   - `MSISDensity` is no longer a type: it is a constructor that reads the file and returns a `VectorDensity`, so `x isa MSISDensity` no longer works.
-  - `Ionosphere.msis_file` and `.iri_file` are replaced by `atmosphere_source` (a label, since the neutral densities live on the species) and `electron_source` (the profile itself).
+  - `Ionosphere.msis_file` and `.iri_file` are removed. Neutral provenance lives on each species' `density_source`; the electron profile is retained as `electron_source`.
   - Passing MSIS and IRI file paths to `AuroraModel` keeps working, and generating new files with `find_iri_file` now warns in favour of `run_iri`.
 - Fix `run_iri` storing IRI's -1 sentinel values, which made sampling the profile fail with a `DomainError` whenever the altitude range reached the D-region
 - Fix `read_msis_file` and `MSISDensity` returning `NaN` densities for the species MSIS does not report at low altitude (N and anomalous O)

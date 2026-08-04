@@ -70,7 +70,7 @@ function AuroraModel(altitude_lims, θ_lims, E_max, atmosphere, electron, B_angl
     altitude_grid    = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid      = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)
-    ionosphere       = Ionosphere(atmosphere_label(atmosphere), electron, altitude_grid.h)
+    ionosphere       = Ionosphere(electron, altitude_grid.h)
     species_tuple    = Tuple(species)
     scattering       = ScatteringData()
     s_field          = altitude_grid.h ./ cosd(B_angle_to_zenith)
@@ -115,9 +115,7 @@ function initialize!(model::AuroraModel;
                      verbose::Bool = true,
                      policy::CachePolicy = CachePolicy())
     model.s_field    = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
-    model.ionosphere = Ionosphere(model.ionosphere.atmosphere_source,
-                                  model.ionosphere.electron_source,
-                                  model.altitude_grid.h)
+    model.ionosphere = Ionosphere(model.ionosphere.electron_source, model.altitude_grid.h)
     model.scattering = ScatteringData(model.pitch_angle_grid; verbose, policy)
 
     h  = model.altitude_grid.h

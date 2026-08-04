@@ -1,8 +1,7 @@
 @testitem "Ionosphere construction" begin
     z = make_altitude_grid(50, 800)
-    msis_file = find_msis_file(; verbose=false)
     iri_file = find_iri_file(; verbose=false)
-    iono = Ionosphere(msis_file, iri_file, z)
+    iono = Ionosphere(iri_file, z)
 
     @test iono isa Ionosphere
     @test length(iono.Te) == length(z)
@@ -89,7 +88,7 @@ end
     pl = read_iri_file(iri_file)
     @test occursin("IRI file", pl.source)
     ne1, Te1 = pl(z)
-    iono = Ionosphere("label", iri_file, z)       # path → to_electron_source → read_iri_file
+    iono = Ionosphere(iri_file, z)
     @test iono.electron_source isa ElectronProfile
     @test ne1 ≈ iono.ne rtol=1e-9
     @test Te1 ≈ iono.Te rtol=1e-9
@@ -190,12 +189,12 @@ end
 
     # A bare anonymous function cannot be saved to physics_state.jld2, so it is rejected at
     # construction, exactly as a species' density_source is.
-    @test_throws ArgumentError Ionosphere("label", h -> (fill(1e11, length(h)),
-                                                         fill(200.0, length(h))), z)
+    @test_throws ArgumentError Ionosphere(h -> (fill(1e11, length(h)),
+                                                fill(200.0, length(h))), z)
 
     # A path and an ElectronProfile are both fine
-    @test Ionosphere("label", iri_file, z) isa Ionosphere
-    @test Ionosphere("label", read_iri_file(iri_file), z) isa Ionosphere
+    @test Ionosphere(iri_file, z) isa Ionosphere
+    @test Ionosphere(read_iri_file(iri_file), z) isa Ionosphere
 end
 
 @testitem "CCMC readers resolve columns by header name" begin
