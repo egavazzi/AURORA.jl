@@ -266,5 +266,14 @@ end
         no_species = joinpath(dir, "no_species.txt")
         write(no_species, "Heit(km) N2den(m-3)\n100.0 6.884E+18\n")
         @test_throws "no known species density column" read_ccmc_msis(no_species)
+
+        # An export in other units must be rejected rather than silently rescaled, and the
+        # error must name the unit mismatch — not imply the file is not a CCMC export.
+        iri_m3 = joinpath(dir, "iri_m3.txt")
+        write(iri_m3, "km Ne/m-3 Te/K\n100.0 4.8077E+10 159\n")
+        @test_throws "no \"Ne/cm-3\" column" read_ccmc_iri(iri_m3)
+
+        # A file with no Ne column at all is what "not a CCMC IRI export" is reserved for
+        @test_throws "Is this a CCMC ModelWeb IRI export?" read_ccmc_iri(no_species)
     end
 end

@@ -133,9 +133,9 @@ end
     read_ccmc_iri(file) -> ElectronProfile
 
 Read the electron background from a CCMC ModelWeb IRI text export and return it as an
-[`ElectronProfile`](@ref). The CCMC table has a variable-length preamble, a two-line column
+[`ElectronProfile`](@ref). The CCMC table has a variable-length preamble, a single column
 header, electron density in cm⁻³, and `-1` sentinels for missing levels; this reader locates the
-header (the line containing `Ne/cm-3`), converts cm⁻³ → m⁻³, and drops sentinel rows.
+header (the line naming an `Ne/…` column), converts cm⁻³ → m⁻³, and drops sentinel rows.
 
 Columns are resolved by their header name (`km`, `Ne/cm-3`, `Te/K`) rather than by position,
 so the export is read correctly whatever its column order, and an export missing one of them
@@ -149,10 +149,13 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 """
 function read_ccmc_iri(file::AbstractString)
     lines      = readlines(file)
-    header_idx = findfirst(l -> occursin("Ne/cm-3", l), lines)
+    # Match the header on the unit-free "Ne/" so that an export in other units still gets
+    # past detection and fails on the named-column check below, which says what is wrong.
+    # ("Ne/" alone is unambiguous; a bare "Ne" would also match preamble prose.)
+    header_idx = findfirst(l -> occursin("Ne/", l), lines)
     header_idx === nothing && throw(ArgumentError(
-        "read_ccmc_iri: could not find the CCMC column header (a line containing " *
-        "\"Ne/cm-3\") in $file. Is this a CCMC ModelWeb IRI export?"))
+        "read_ccmc_iri: could not find the CCMC column header (a line naming an \"Ne/…\" " *
+        "column) in $file. Is this a CCMC ModelWeb IRI export?"))
 
     # The header names its columns one-for-one with the data columns, so look up the ones we
     # need by name. The unit is part of the name, which keeps a change of unit from being
