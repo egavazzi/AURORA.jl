@@ -120,6 +120,10 @@ Read the electron background from a CCMC ModelWeb IRI text export and return it 
 header, electron density in cm⁻³, and `-1` sentinels for missing levels; this reader locates the
 header (the line containing `Ne/cm-3`), converts cm⁻³ → m⁻³, and drops sentinel rows.
 
+Columns are resolved by their header name (`km`, `Ne/cm-3`, `Te/K`) rather than by position,
+so the export is read correctly whatever its column order, and an export missing one of them
+is reported instead of silently misread.
+
 # Example
 ```julia
 iri   = read_ccmc_iri("iri_output.txt")
@@ -133,16 +137,28 @@ function read_ccmc_iri(file::AbstractString)
         "read_ccmc_iri: could not find the CCMC column header (a line containing " *
         "\"Ne/cm-3\") in $file. Is this a CCMC ModelWeb IRI export?"))
 
-    # Columns of the data block: 1=H/km, 2=Ne/cm-3, 3=Ne/NmF2, 4=Tn/K, 5=Ti/K, 6=Te/K, ...
+    # The header names its columns one-for-one with the data columns, so look up the ones we
+    # need by name. The unit is part of the name, which keeps a change of unit from being
+    # read as if it were cm⁻³.
+    header = split(lines[header_idx])
+    column = Dict(name => i for (i, name) in enumerate(header))
+    for name in ("km", "Ne/cm-3", "Te/K")
+        haskey(column, name) || throw(ArgumentError(
+            "read_ccmc_iri: no \"$name\" column in the header of $file.\n" *
+            "Columns found: " * join(header, ", ")))
+    end
+    h_col, ne_col, Te_col = column["km"], column["Ne/cm-3"], column["Te/K"]
+    n_cols = max(h_col, ne_col, Te_col)
+
     h_km = Float64[]
     ne   = Float64[]
     Te   = Float64[]
     for l in lines[(header_idx + 1):end]
         cols = split(l)
-        length(cols) >= 6 || continue
-        h  = tryparse(Float64, cols[1])
-        n  = tryparse(Float64, cols[2])
-        t  = tryparse(Float64, cols[6])
+        length(cols) >= n_cols || continue
+        h  = tryparse(Float64, cols[h_col])
+        n  = tryparse(Float64, cols[ne_col])
+        t  = tryparse(Float64, cols[Te_col])
         (h === nothing || n === nothing || t === nothing) && continue
         (n == -1 || t == -1) && continue           # drop sentinel levels
         push!(h_km, h); push!(ne, n); push!(Te, t)

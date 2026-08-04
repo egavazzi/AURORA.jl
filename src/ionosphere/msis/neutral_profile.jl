@@ -147,7 +147,10 @@ header, densities in cm⁻³, and a `9.999E-38` sentinel for species that the mo
 report at a given altitude; this reader locates the header (the line containing `N2den`),
 converts cm⁻³ → m⁻³, and drops sentinel levels per species.
 
-Works for both the NRLMSIS 2.x and NRLMSISE-00 exports, which share this column layout.
+Columns are resolved by their header name (`Heit(km)`, `N2den(cm-3)`, …) rather than by
+position, so any export using these names is read correctly whatever its column order, and a
+species absent from the export is simply not returned. This covers the NRLMSIS 2.x and
+NRLMSISE-00 exports, which use the same column names.
 
 # Example
 ```julia
@@ -162,23 +165,38 @@ function read_ccmc_msis(file::AbstractString)
         "read_ccmc_msis: could not find the CCMC column header (a line containing " *
         "\"N2den\") in $file. Is this a CCMC ModelWeb NRLMSIS export?"))
 
-    # Columns of the data block, 1-based: 6=Heit(km), 9=Oden, 10=N2den, 11=O2den, 12=NOden,
-    # 16=Heden, 17=Arden, 18=Hden, 19=Nden — all number densities in cm⁻³.
-    columns = (:O => 9, :N2 => 10, :O2 => 11, :NO => 12,
-               :He => 16, :Ar => 17, :H => 18, :N => 19)
-    n_cols  = maximum(last, columns)
+    # The header names its columns one-for-one with the data columns, so look up the ones we
+    # need by name. The unit is part of the name, which keeps a change of unit from being
+    # read as if it were cm⁻³.
+    header = split(lines[header_idx])
+    column = Dict(name => i for (i, name) in enumerate(header))
+    columns_found = "Columns found: " * join(header, ", ")
 
-    h_km = Float64[]
-    raw  = Dict(s => Float64[] for (s, _) in columns)
+    haskey(column, "Heit(km)") || throw(ArgumentError(
+        "read_ccmc_msis: no altitude column \"Heit(km)\" in the header of $file.\n" *
+        columns_found))
+    h_col = column["Heit(km)"]
+
+    species_columns = [s => column[name] for (s, name) in
+                       (:O  => "Oden(cm-3)",  :N2 => "N2den(cm-3)", :O2 => "O2den(cm-3)",
+                        :NO => "NOden(cm-3)", :He => "Heden(cm-3)", :Ar => "Arden(cm-3)",
+                        :H  => "Hden(cm-3)",  :N  => "Nden(cm-3)") if haskey(column, name)]
+    isempty(species_columns) && throw(ArgumentError(
+        "read_ccmc_msis: no known species density column (\"N2den(cm-3)\", \"Oden(cm-3)\", " *
+        "…) in the header of $file.\n" * columns_found))
+
+    n_cols = max(h_col, maximum(last, species_columns))
+    h_km   = Float64[]
+    raw    = Dict(s => Float64[] for (s, _) in species_columns)
     for l in lines[(header_idx + 1):end]
         cols = split(l)
         length(cols) >= n_cols || continue
-        h = tryparse(Float64, cols[6])
+        h = tryparse(Float64, cols[h_col])
         h === nothing && continue
-        values = map(((_, c),) -> tryparse(Float64, cols[c]), columns)
+        values = map(((_, c),) -> tryparse(Float64, cols[c]), species_columns)
         any(isnothing, values) && continue
         push!(h_km, h)
-        for ((s, _), v) in zip(columns, values)
+        for ((s, _), v) in zip(species_columns, values)
             push!(raw[s], v)
         end
     end
@@ -187,7 +205,7 @@ function read_ccmc_msis(file::AbstractString)
 
     label     = "CCMC NRLMSIS $(basename(file))"
     densities = Dict{Symbol, VectorDensity}()
-    for (species, _) in columns
+    for (species, _) in species_columns
         # Drop the levels CCMC fills with its missing-value sentinel (9.999E-38).
         valid = findall(>(1e-37), raw[species])
         isempty(valid) && continue

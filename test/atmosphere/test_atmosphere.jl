@@ -135,3 +135,49 @@ end
     # A non-CCMC file is rejected with a clear error
     @test_throws ArgumentError read_ccmc_msis(msis_file)
 end
+
+@testitem "CCMC readers resolve columns by header name" begin
+    mktempdir() do dir
+        # An export whose columns sit in a different order than the reference file, and
+        # which reports only some of the species, must still be read correctly.
+        msis = joinpath(dir, "shuffled_msis.txt")
+        write(msis, """
+            Heit(km) N2den(cm-3) Oden(cm-3) O2den(cm-3)
+            100.0    6.884E+12   4.793E+11  1.616E+12
+            150.0    2.690E+10   7.917E+09  1.965E+09
+            200.0    3.127E+09   2.100E+09  1.338E+08
+            """)
+        p = read_ccmc_msis(msis)
+        @test sort(collect(keys(p))) == [:N2, :O, :O2]
+        @test p[:N2].h ≈ [100e3, 150e3, 200e3]
+        @test p[:N2].n ≈ [6.884e18, 2.690e16, 3.127e15]
+        @test p[:O].n  ≈ [4.793e17, 7.917e15, 2.100e15]
+
+        # Same for the IRI table
+        iri = joinpath(dir, "shuffled_iri.txt")
+        write(iri, """
+              km   Te/K  Ne/cm-3
+             100.0  159    48077
+             200.0 1439   250319
+             300.0 1740  1011143
+            """)
+        e = read_ccmc_iri(iri)
+        @test e.h  ≈ [100e3, 200e3, 300e3]
+        @test e.ne ≈ [4.8077e10, 2.50319e11, 1.011143e12]
+        @test e.Te ≈ [159.0, 1439.0, 1740.0]
+
+        # A required column that is missing is reported, with the header listed
+        no_altitude = joinpath(dir, "no_altitude.txt")
+        write(no_altitude, "N2den(cm-3) Oden(cm-3)\n6.884E+12 4.793E+11\n")
+        @test_throws "Columns found: N2den(cm-3), Oden(cm-3)" read_ccmc_msis(no_altitude)
+
+        no_Te = joinpath(dir, "no_Te.txt")
+        write(no_Te, "km Ne/cm-3\n100.0 48077\n")
+        @test_throws "no \"Te/K\" column" read_ccmc_iri(no_Te)
+
+        # A header with no recognised species column is reported too
+        no_species = joinpath(dir, "no_species.txt")
+        write(no_species, "Heit(km) N2den(m-3)\n100.0 6.884E+18\n")
+        @test_throws "no known species density column" read_ccmc_msis(no_species)
+    end
+end
