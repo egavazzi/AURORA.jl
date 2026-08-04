@@ -23,7 +23,13 @@ function MSISDensity(msis_file::AbstractString, species::Symbol)
     raw        = load_msis(msis_file)
     h_native_m = raw.data.height_km .* 1e3
     n_native   = getproperty(raw.data, species)
-    return VectorDensity(h_native_m, n_native;
+    # Keep only the levels where the species is reported (MSIS writes NaN for N and
+    # anomalous O at low altitude), as read_msis_file does for the whole atmosphere.
+    valid = usable_levels(n_native)
+    length(valid) >= 2 || throw(ArgumentError(
+        "MSISDensity: $(basename(msis_file)) reports :$species at fewer than 2 altitude " *
+        "levels, so it cannot be interpolated."))
+    return VectorDensity(h_native_m[valid], n_native[valid];
                          source = "MSIS file $(basename(msis_file)) :$species")
 end
 

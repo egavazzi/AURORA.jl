@@ -1,4 +1,3 @@
-using DelimitedFiles: writedlm
 using Dates: DateTime
 
 # ======================================================================================== #
@@ -38,9 +37,11 @@ struct ElectronProfile
     source::String        # provenance label (free-form, may be empty)
 end
 
-ElectronProfile(h, ne, Te; source::AbstractString = "") =
-    ElectronProfile(collect(Float64, h), collect(Float64, ne), collect(Float64, Te),
-                    String(source))
+function ElectronProfile(h, ne, Te; source::AbstractString = "")
+    h, ne, Te = collect(Float64, h), collect(Float64, ne), collect(Float64, Te)
+    check_profile_grid("ElectronProfile", h, ("ne", ne), ("Te", Te))
+    return ElectronProfile(h, ne, Te, String(source))
+end
 
 function (p::ElectronProfile)(h_atm::AbstractVector)
     ne = interpolate_profile(p.ne, p.h ./ 1e3, h_atm; log_interpolation = true)
@@ -48,14 +49,30 @@ function (p::ElectronProfile)(h_atm::AbstractVector)
     return (ne, Te)
 end
 
+Base.show(io::IO, p::ElectronProfile) = print(io, electron_source_label(p))
+
+function Base.show(io::IO, ::MIME"text/plain", p::ElectronProfile)
+    println(io, "ElectronProfile:")
+    println(io, "├── Source:    ", isempty(p.source) ? "(unlabelled)" : p.source)
+    println(io, "├── Altitudes: ", length(p.h),
+                " ($(p.h[1] / 1e3) – $(p.h[end] / 1e3) km)")
+    println(io, "├── Max ne:    ", round(maximum(p.ne), sigdigits=3), " m⁻³")
+    print(io,   "└── Max Te:    ", round(maximum(p.Te), sigdigits=3), " K")
+end
+
 # Normalize whatever was passed as an electron source into a callable h_atm → (ne, Te).
 # A legacy IRI file path is read eagerly into an ElectronProfile so the result round-trips.
+# A custom callable is held to the same reproducibility bar as a species' density_source,
+# since it has to survive the round-trip through physics_state.jld2 just the same.
 to_electron_source(p::ElectronProfile)   = p
 to_electron_source(path::AbstractString) = read_iri_file(path)
-to_electron_source(f)                    = f
+to_electron_source(f)                    = require_reproducible(f, "electron_source")
 
-electron_source_label(p::ElectronProfile) = p.source
-electron_source_label(x)                  = string(typeof(x))
+function electron_source_label(p::ElectronProfile)
+    isempty(p.source) && return "ElectronProfile($(length(p.h)) points)"
+    return "ElectronProfile($(length(p.h)) points, source=$(p.source))"
+end
+electron_source_label(x) = string(typeof(x))
 
 
 # ======================================================================================== #
@@ -160,7 +177,9 @@ function read_ccmc_iri(file::AbstractString)
         n  = tryparse(Float64, cols[ne_col])
         t  = tryparse(Float64, cols[Te_col])
         (h === nothing || n === nothing || t === nothing) && continue
-        (n == -1 || t == -1) && continue           # drop sentinel levels
+        # Drop unusable levels. CCMC marks them with -1, but ne is interpolated in log-space
+        # downstream, so zero is just as fatal and is dropped the same way.
+        (n <= 0 || t <= 0) && continue
         push!(h_km, h); push!(ne, n); push!(Te, t)
     end
     isempty(h_km) && throw(ArgumentError(

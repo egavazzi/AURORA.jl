@@ -219,16 +219,18 @@ interpolation downstream.
 - `NamedTuple`: `iri_data` with the boundary sentinel levels removed
 """
 function trim_iri_sentinels(iri_data, origin::AbstractString)
-    # Validate: check that the data doesn't contain only -1 sentinel values
-    if all(iri_data.ne .== -1) && all(iri_data.Te .== -1)
-        error("The $(origin)" *
-              "contains only -1 sentinel values (no valid ionospheric profiles).\n" *
-              "You might want to try another date, location, or altitude range.")
-    end
+    # A level is unusable if ne or Te is not strictly positive. IRI marks these with -1, but
+    # ne is interpolated in log-space downstream, so zero is just as fatal and is treated the
+    # same way here.
+    sentinel_mask = (iri_data.ne .<= 0) .| (iri_data.Te .<= 0)
 
-    # Check for sentinel -1 values at the lowest and highest altitudes.
-    # If found, emit a warning, drop those and let the interpolator fill them.
-    sentinel_mask = (iri_data.ne .== -1) .| (iri_data.Te .== -1)
+    all(sentinel_mask) && error(
+        "The $(origin)" *
+        "contains no level with a valid ne and Te (no valid ionospheric profiles).\n" *
+        "You might want to try another date, location, or altitude range.")
+
+    # Drop the unusable levels at the lowest and highest altitudes, with a warning, and let
+    # the interpolator fill them.
     if any(sentinel_mask)
         first_valid = findfirst(!, sentinel_mask)
         last_valid  = findlast(!, sentinel_mask)
@@ -250,7 +252,7 @@ function trim_iri_sentinels(iri_data, origin::AbstractString)
                                "($(h[last_valid + 1]) – $(h[end]) km)"
             end
             @warn "$(origin)" *
-                  "has sentinel -1 values in ne or Te at $(location_str).\n" *
+                  "has sentinel values in ne or Te at $(location_str).\n" *
                   "These levels will be dropped and the interpolator will fill them " *
                   "through extrapolation."
 

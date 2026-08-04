@@ -136,6 +136,68 @@ end
     @test_throws ArgumentError read_ccmc_msis(msis_file)
 end
 
+@testitem "run_msis returns a NeutralProfile matching the file path" begin
+    z = make_altitude_grid(100, 500)
+    conditions = (; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
+                    lat = 69.58, lon = 19.23, height = 85:5:600)
+
+    np = run_msis(; conditions..., verbose = false)
+    @test np isa NeutralProfile
+    @test all(haskey(np, s) for s in (:N2, :O2, :O))
+    @test occursin("NRLMSIS 2.1", np.source)
+
+    # MSIS reports no N below ~95 km (NaN); those levels are dropped for that species only,
+    # so :N starts higher than :N2 instead of carrying NaN into the interpolation.
+    @test minimum(np[:N].h) > minimum(np[:N2].h)
+    for s in keys(np)
+        @test all(isfinite, np[s].n) && all(np[s].n .> 0)
+        @test all(isfinite, np[s](z))
+    end
+
+    # Same densities as going through a file, up to the ~7 significant digits a saved
+    # MSIS file keeps
+    msis_file = find_msis_file(; conditions..., verbose = false)
+    fp = read_msis_file(msis_file)
+    for s in (:N2, :O2, :O)
+        @test np[s](z) ≈ fp[s](z) rtol=1e-6
+    end
+end
+
+@testitem "Profile sources validate their vectors at construction" begin
+    h = [100e3, 200e3, 300e3]
+
+    # Length mismatch, too few levels, non-increasing altitudes, non-positive values
+    @test_throws "must have the same length" VectorDensity(h, [1e18, 1e17])
+    @test_throws "at least 2 altitude levels" VectorDensity([100e3], [1e18])
+    @test_throws "strictly increasing" VectorDensity([300e3, 100e3, 200e3], [1e18, 1e17, 1e16])
+    @test_throws "finite and strictly positive" VectorDensity(h, [1e18, 0.0, 1e16])
+    @test_throws "finite and strictly positive" VectorDensity(h, [1e18, NaN, 1e16])
+
+    @test_throws "must have the same length" ElectronProfile(h, [1e11, 1e12], [200.0, 300.0])
+    @test_throws "finite and strictly positive" ElectronProfile(h, [1e11, -1.0, 1e12],
+                                                                [200.0, 300.0, 400.0])
+    @test_throws "finite and strictly positive" ElectronProfile(h, [1e11, 1e12, 1e12],
+                                                                [200.0, 0.0, 400.0])
+
+    # A valid profile still builds, and reports where it came from
+    @test VectorDensity(h, [1e18, 1e17, 1e16]; source = "ok") isa VectorDensity
+    @test occursin("ok", sprint(show, VectorDensity(h, [1e18, 1e17, 1e16]; source = "ok")))
+end
+
+@testitem "An electron source must be reproducible" begin
+    z = make_altitude_grid(100, 200)
+    iri_file = find_iri_file(; verbose = false)
+
+    # A bare anonymous function cannot be saved to physics_state.jld2, so it is rejected at
+    # construction, exactly as a species' density_source is.
+    @test_throws ArgumentError Ionosphere("label", h -> (fill(1e11, length(h)),
+                                                         fill(200.0, length(h))), z)
+
+    # A path and an ElectronProfile are both fine
+    @test Ionosphere("label", iri_file, z) isa Ionosphere
+    @test Ionosphere("label", read_iri_file(iri_file), z) isa Ionosphere
+end
+
 @testitem "CCMC readers resolve columns by header name" begin
     mktempdir() do dir
         # An export whose columns sit in a different order than the reference file, and
