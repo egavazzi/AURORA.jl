@@ -120,6 +120,31 @@ function Base.show(io::IO, ::MIME"text/plain", p::NeutralProfile)
     print(io,   "└── Species: ", join(sort!(string.(keys(p.densities))), ", "))
 end
 
+# How many leading header names can be trusted to line up with their data column.
+#
+# Matching columns by name assumes the header tokenizes one-for-one with the data. CCMC's
+# NRLMSISE-00 export breaks that assumption: it writes "Heden(cm-3)Arden(cm-3)" with no
+# separating space, leaving the header one token short. Names before the run-together token
+# are still aligned; names at or after it address the wrong data column, and would hand back
+# a species holding its neighbour's density. Return the width of the aligned prefix so the
+# caller can drop the rest.
+function trusted_header_width(header, lines, header_idx, file)
+    first_data = findfirst(l -> !isempty(strip(l)), @view lines[(header_idx + 1):end])
+    first_data === nothing && return length(header)
+    n_data = length(split(lines[header_idx + first_data]))
+    n_data == length(header) && return length(header)
+
+    # A name with ')' before its last character is two names glued together.
+    glued = findfirst(t -> occursin(r"\)\S", t), header)
+    width = glued === nothing ? 0 : glued - 1
+    where = glued === nothing ? "" :
+            ", starting at the run-together name '" * header[glued] * "'"
+    @warn "read_ccmc_msis: $(basename(file)) has $(length(header)) header names for " *
+          "$n_data data columns$where. Columns from there on cannot be matched to their " *
+          "data and are ignored; the species named before it are read normally." maxlog = 1
+    return width
+end
+
 # Indices of the levels where a species is actually reported. Anything a source could not
 # give us is expected to arrive as NaN — pymsis (and so AURORA's own MSIS files) writes NaN
 # directly, while a format with its own missing-value marker translates it before getting
@@ -246,16 +271,21 @@ function read_ccmc_msis(file::AbstractString)
     header = split(lines[header_idx])
     column = Dict(name => i for (i, name) in enumerate(header))
     columns_found = "Columns found: " * join(header, ", ")
+    trusted = trusted_header_width(header, lines, header_idx, file)
 
     haskey(column, "Heit(km)") || throw(ArgumentError(
         "read_ccmc_msis: no altitude column \"Heit(km)\" in the header of $file.\n" *
         columns_found))
     h_col = column["Heit(km)"]
+    h_col <= trusted || throw(ArgumentError(
+        "read_ccmc_msis: the altitude column \"Heit(km)\" of $file sits past a run-together " *
+        "header name, so it cannot be matched to its data column.\n" * columns_found))
 
     species_columns = [s => column[name] for (s, name) in
                        (:O  => "Oden(cm-3)",  :N2 => "N2den(cm-3)", :O2 => "O2den(cm-3)",
                         :NO => "NOden(cm-3)", :He => "Heden(cm-3)", :Ar => "Arden(cm-3)",
-                        :H  => "Hden(cm-3)",  :N  => "Nden(cm-3)") if haskey(column, name)]
+                        :H  => "Hden(cm-3)",  :N  => "Nden(cm-3)")
+                       if haskey(column, name) && column[name] <= trusted]
     isempty(species_columns) && throw(ArgumentError(
         "read_ccmc_msis: no known species density column (\"N2den(cm-3)\", \"Oden(cm-3)\", " *
         "…) in the header of $file.\n" * columns_found))

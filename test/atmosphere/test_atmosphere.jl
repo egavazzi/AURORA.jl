@@ -277,3 +277,28 @@ end
         @test_throws "Is this a CCMC ModelWeb IRI export?" read_ccmc_iri(no_species)
     end
 end
+
+@testitem "read_ccmc_msis survives CCMC's run-together MSIS00 header" begin
+    # CCMC's NRLMSISE-00 export writes "Heden(cm-3)Arden(cm-3)" with no separating space, so
+    # the header has one fewer token than the data has columns. Names before the glued token
+    # still line up; names after it would return the neighbouring species' density.
+    file = joinpath(@__DIR__, "test_data", "msis00_ccmc_output.txt")
+    p = @test_warn "run-together name" read_ccmc_msis(file)
+
+    # The species AURORA uses sit before the defect and are read correctly
+    @test sort(collect(keys(p))) == [:N2, :O, :O2]
+    @test p[:N2].n[1] ≈ 2.103e19 * 1e6 rtol=1e-12
+    @test p[:O2].n[1] ≈ 5.641e18 * 1e6 rtol=1e-12
+    @test p[:O].n[1]  ≈ 5.698e11 * 1e6 rtol=1e-12
+
+    # Everything at or after the glued name is dropped rather than mislabelled. Without the
+    # guard, :H would hold argon (9.697E+10) and :N would hold hydrogen (2.494E+07).
+    for species in (:He, :Ar, :H, :N)
+        @test !haskey(p, species)
+    end
+
+    # This export marks missing values with 0.000E+00 rather than 9.999E-38; O is absent
+    # below 100 km either way
+    @test minimum(p[:O].h) == 100e3
+    @test minimum(p[:N2].h) == 0.0
+end
