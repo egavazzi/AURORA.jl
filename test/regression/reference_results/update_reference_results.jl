@@ -32,11 +32,17 @@ run!(sim)
 
 ## Analyze the results
 make_volume_excitation_file(sim)
+make_column_excitation_file(sim)
 
 ## Overwrite the reference results
 mkpath("test/regression/reference_results/SS")
 source_file = joinpath(savedir, "analysis", "volume_excitation.nc")
 dest_file = "test/regression/reference_results/SS/volume_excitation.nc"
+cp(source_file, dest_file; force = true)
+println("Saved SS reference to $dest_file")
+
+source_file = joinpath(savedir, "analysis", "column_excitation.nc")
+dest_file = "test/regression/reference_results/SS/column_excitation.nc"
 cp(source_file, dest_file; force = true)
 println("Saved SS reference to $dest_file")
 
@@ -75,10 +81,16 @@ run!(sim)
 
 ## Analyze the results
 make_volume_excitation_file(sim)
+make_column_excitation_file(sim)
 
 ## Overwrite the reference results
 mkpath("test/regression/reference_results/TD")
 source_file = joinpath(savedir, "analysis", "volume_excitation.nc")
 dest_file = "test/regression/reference_results/TD/volume_excitation.nc"
+cp(source_file, dest_file; force = true)
+println("Saved TD reference to $dest_file")
+
+source_file = joinpath(savedir, "analysis", "column_excitation.nc")
+dest_file = "test/regression/reference_results/TD/column_excitation.nc"
 cp(source_file, dest_file; force = true)
 println("Saved TD reference to $dest_file")

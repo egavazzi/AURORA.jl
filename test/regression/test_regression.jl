@@ -24,21 +24,55 @@
 
     ## Analyze the results
     make_volume_excitation_file(savedir)
+    make_column_excitation_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
     reference_file = joinpath(@__DIR__, "reference_results", "SS", "volume_excitation.nc")
     NCDataset(reference_file, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
-            QO1S_ref = Array(ds_ref["QO1S"])
-            QO1S_new = Array(ds_new["QO1S"])
-            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
+            channel_diffs = Tuple{String, Float64, String}[]
+            for name in filter(name -> startswith(name, "Q"), keys(ds_ref))
+                values_ref = Array(ds_ref[name])
+                values_new = Array(ds_new[name])
+                @test all(isapprox.(values_new, values_ref; rtol = 1e-4, atol = 1e-12))
 
-            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
-                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
-            idx = argmax(rel_diff)
-            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
-            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
-            println("  QO1S_new[idx] = ", QO1S_new[idx])
+                rel_diff = abs.(values_new .- values_ref) ./
+                           max.(abs.(values_new), abs.(values_ref), eps())
+                idx = argmax(rel_diff)
+                push!(channel_diffs, (String(name), rel_diff[idx], string(idx)))
+            end
+            println("\nVolume excitation maximum relative differences:")
+            println("Channel                  | Maximum relative difference | Index")
+            println("-------------------------|-----------------------------|------")
+            for (name, diff, idx) in sort(channel_diffs; by=first)
+                println(rpad(name, 24), " | ", lpad(string(diff), 27), " | ", idx)
+            end
+        end
+    end
+
+    column_reference = joinpath(@__DIR__, "reference_results", "SS", "column_excitation.nc")
+    NCDataset(column_reference, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "column_excitation.nc"), "r") do ds_new
+            @test Array(ds_new["time"]) == Array(ds_ref["time"])
+            channel_diffs = Tuple{String, Float64, String}[]
+            for name in ("I_4278", "I_6730", "I_7774", "I_7774_O", "I_7774_O2",
+                         "I_8446", "I_8446_O", "I_8446_O2", "I_O1D", "I_O1S")
+                values_new = Array(ds_new[name])
+                values_ref = Array(ds_ref[name])
+                @test size(values_new) == size(values_ref)
+                @test all(isapprox.(values_new, values_ref; rtol = 1e-4, atol = 1e-12))
+
+                rel_diff = abs.(values_new .- values_ref) ./
+                           max.(abs.(values_new), abs.(values_ref), eps())
+                idx = argmax(rel_diff)
+                push!(channel_diffs, (name, rel_diff[idx], string(idx)))
+            end
+            println("\nColumn excitation maximum relative differences:")
+            println("Channel                  | Maximum relative difference | Index")
+            println("-------------------------|-----------------------------|------")
+            for (name, diff, idx) in sort(channel_diffs; by=first)
+                println(rpad(name, 24), " | ", lpad(string(diff), 27), " | ", idx)
+            end
         end
     end
 end
@@ -73,21 +107,55 @@ end
 
     ## Analyze the results
     make_volume_excitation_file(savedir)
+    make_column_excitation_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
     reference_file = joinpath(@__DIR__, "reference_results", "TD", "volume_excitation.nc")
     NCDataset(reference_file, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
-            QO1S_ref = Array(ds_ref["QO1S"])
-            QO1S_new = Array(ds_new["QO1S"])
-            @test all(isapprox.(QO1S_new, QO1S_ref; rtol = 1e-4, atol = 1e-12))
+            channel_diffs = Tuple{String, Float64, String}[]
+            for name in filter(name -> startswith(name, "Q"), keys(ds_ref))
+                values_ref = Array(ds_ref[name])
+                values_new = Array(ds_new[name])
+                @test all(isapprox.(values_new, values_ref; rtol = 1e-4, atol = 1e-12))
 
-            rel_diff = abs.(QO1S_new .- QO1S_ref) ./
-                       max.(abs.(QO1S_new), abs.(QO1S_ref), eps())
-            idx = argmax(rel_diff)
-            println("Maximum relative difference: ", rel_diff[idx], " at index ", idx)
-            println("  QO1S_ref[idx] = ", QO1S_ref[idx])
-            println("  QO1S_new[idx] = ", QO1S_new[idx])
+                rel_diff = abs.(values_new .- values_ref) ./
+                           max.(abs.(values_new), abs.(values_ref), eps())
+                idx = argmax(rel_diff)
+                push!(channel_diffs, (String(name), rel_diff[idx], string(idx)))
+            end
+            println("\nVolume excitation maximum relative differences:")
+            println("Channel                  | Maximum relative difference | Index")
+            println("-------------------------|-----------------------------|------")
+            for (name, diff, idx) in sort(channel_diffs; by=first)
+                println(rpad(name, 24), " | ", lpad(string(diff), 27), " | ", idx)
+            end
+        end
+    end
+
+    column_reference = joinpath(@__DIR__, "reference_results", "TD", "column_excitation.nc")
+    NCDataset(column_reference, "r") do ds_ref
+        NCDataset(joinpath(savedir, "analysis", "column_excitation.nc"), "r") do ds_new
+            @test Array(ds_new["time"]) == Array(ds_ref["time"])
+            channel_diffs = Tuple{String, Float64, String}[]
+            for name in ("I_4278", "I_6730", "I_7774", "I_7774_O", "I_7774_O2",
+                         "I_8446", "I_8446_O", "I_8446_O2", "I_O1D", "I_O1S")
+                values_new = Array(ds_new[name])
+                values_ref = Array(ds_ref[name])
+                @test size(values_new) == size(values_ref)
+                @test all(isapprox.(values_new, values_ref; rtol = 1e-4, atol = 1e-12))
+
+                rel_diff = abs.(values_new .- values_ref) ./
+                           max.(abs.(values_new), abs.(values_ref), eps())
+                idx = argmax(rel_diff)
+                push!(channel_diffs, (name, rel_diff[idx], string(idx)))
+            end
+            println("\nColumn excitation maximum relative differences:")
+            println("Channel                  | Maximum relative difference | Index")
+            println("-------------------------|-----------------------------|------")
+            for (name, diff, idx) in sort(channel_diffs; by=first)
+                println(rpad(name, 24), " | ", lpad(string(diff), 27), " | ", idx)
+            end
         end
     end
 end
