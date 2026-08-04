@@ -12,7 +12,7 @@ include("ionosphere/iri/iri.jl")
 include("ionosphere/msis/msis.jl")
 include("ionosphere/msis/neutral_profile.jl")
 export find_msis_file, find_nrlmsis_file
-export NeutralProfile, VectorDensity, run_msis, read_msis_file, read_ccmc_msis
+export NeutralProfile, DensityProfile, run_msis, read_msis_file, read_ccmc_msis
 export find_iri_file
 export ElectronProfile, run_iri, read_iri_file, read_ccmc_iri
 
@@ -38,7 +38,7 @@ include("physics/cascading_cache.jl")
 export clear_cascading_cache!
 
 include("physics/species.jl")
-export NeutralSpecies, MSISDensity
+export NeutralSpecies
 export N2Species, O2Species, OSpecies
 
 include("model.jl")

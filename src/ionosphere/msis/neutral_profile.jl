@@ -6,7 +6,7 @@ using Dates: DateTime
 # ======================================================================================== #
 
 """
-    VectorDensity(h, n; source="")
+    DensityProfile(h, n; source="")
 
 Density source defined by user-supplied altitude (`h`, m) and density (`n`, m⁻³) vectors.
 Callable on any altitude grid (m); evaluates via PCHIP interpolation in log-space,
@@ -19,32 +19,32 @@ shown by `show` and written into `inputs/atmosphere.nc`.
 
 # Example
 ```julia
-profile = VectorDensity(h_msis_m, n_N2; source="ccmc_run_4321.txt")
+profile = DensityProfile(h_msis_m, n_N2; source="ccmc_run_4321.txt")
 n = profile(altitude_grid.h)
 ```
 """
-struct VectorDensity
+struct DensityProfile
     h::Vector{Float64}   # altitude (m)
     n::Vector{Float64}   # density (m⁻³)
     source::String       # provenance label (free-form, may be empty)
 end
 
-function VectorDensity(h, n; source::AbstractString = "")
+function DensityProfile(h, n; source::AbstractString = "")
     h, n = collect(Float64, h), collect(Float64, n)
-    check_profile_grid("VectorDensity", h, ("n", n))
-    return VectorDensity(h, n, String(source))
+    check_profile_grid("DensityProfile", h, ("n", n))
+    return DensityProfile(h, n, String(source))
 end
 
-function (d::VectorDensity)(h_atm::AbstractVector)
+function (d::DensityProfile)(h_atm::AbstractVector)
     itp = PCHIPInterpolation(log.(d.n), d.h ./ 1e3;
                              extrapolation = ExtrapolationType.Linear)
     return exp.(itp(collect(Float64, h_atm) ./ 1e3))
 end
 
-Base.show(io::IO, d::VectorDensity) = print(io, profile_label(d))
+Base.show(io::IO, d::DensityProfile) = print(io, profile_label(d))
 
-function Base.show(io::IO, ::MIME"text/plain", d::VectorDensity)
-    println(io, "VectorDensity:")
+function Base.show(io::IO, ::MIME"text/plain", d::DensityProfile)
+    println(io, "DensityProfile:")
     println(io, "├── Source:    ", isempty(d.source) ? "(unlabelled)" : d.source)
     println(io, "├── Altitudes: ", length(d.h),
                 " ($(d.h[1] / 1e3) – $(d.h[end] / 1e3) km)")
@@ -59,9 +59,9 @@ end
 """
     NeutralProfile(densities; source="")
 
-Neutral atmosphere holding one [`VectorDensity`](@ref) per species, keyed by symbol
+Neutral atmosphere holding one [`DensityProfile`](@ref) per species, keyed by symbol
 (`:N2`, `:O2`, `:O`, `:He`, `:H`, `:Ar`, `:N`, `:NO`). Index it to get a single species'
-density source (`neutrals[:N2]`), or pass it directly as the `atmosphere` argument of
+density source (`neutrals[:N2]`), or pass it directly as the `neutrals` argument of
 [`AuroraModel`](@ref) to build the three default species from it.
 
 This is the neutral analogue of [`ElectronProfile`](@ref): the universal interchange for a
@@ -72,29 +72,38 @@ file path), it round-trips through `physics_state.jld2` and reproduces on any ma
 no external file.
 
 Species are stored on their own native altitude grids, so a source that reports a species
-only over part of the column (CCMC writes a `9.999E-38` sentinel for these) keeps just the
-levels where that species is actually defined.
+only over part of the column keeps just the levels where that species is actually defined.
+Each reader translates its own missing-value marker before building the profile.
 
 # Example
 ```julia
 neutrals = read_ccmc_msis("nrlmsis_output.txt")
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 
 n_N2 = neutrals[:N2](altitude_grid.h)   # sample one species directly
 ```
 """
 struct NeutralProfile
-    densities::Dict{Symbol, VectorDensity}
+    densities::Dict{Symbol, DensityProfile}
     source::String
+    dropped::Vector{Symbol}   # species the source carried but never usably reported
 end
 
-NeutralProfile(densities::AbstractDict; source::AbstractString = "") =
-    NeutralProfile(Dict{Symbol, VectorDensity}(densities), String(source))
+NeutralProfile(densities::AbstractDict; source::AbstractString = "",
+               dropped = Symbol[]) =
+    NeutralProfile(Dict{Symbol, DensityProfile}(densities), String(source),
+                   collect(Symbol, dropped))
 
 function Base.getindex(p::NeutralProfile, species::Symbol)
-    haskey(p.densities, species) || throw(ArgumentError(
-        "NeutralProfile: no density for :$species. Available: " *
-        join(sort!(string.(keys(p.densities))), ", ")))
+    if !haskey(p.densities, species)
+        # Distinguish "your source never mentioned this" from "it did, but reported nothing
+        # usable" — otherwise a species silently dropped at read time looks like a typo.
+        hint = species in p.dropped ?
+            " It is present in the source but reported at fewer than 2 usable levels." : ""
+        throw(ArgumentError(
+            "NeutralProfile: no density for :$species.$hint Available: " *
+            join(sort!(string.(keys(p.densities))), ", ")))
+    end
     return p.densities[species]
 end
 
@@ -111,13 +120,6 @@ function Base.show(io::IO, ::MIME"text/plain", p::NeutralProfile)
     print(io,   "└── Species: ", join(sort!(string.(keys(p.densities))), ", "))
 end
 
-# Human-readable provenance label for the model's default atmosphere, stored on the
-# Ionosphere. Accepts whatever is passed as the `atmosphere` argument to AuroraModel.
-atmosphere_label(p::NeutralProfile)  = p.source
-atmosphere_label(x::AbstractString)  = basename(string(x))
-atmosphere_label(x)                  = string(typeof(x))
-
-
 # Indices of the levels where a species is actually reported. Anything a source could not
 # give us is expected to arrive as NaN — pymsis (and so AURORA's own MSIS files) writes NaN
 # directly, while a format with its own missing-value marker translates it before getting
@@ -127,13 +129,17 @@ usable_levels(n) = findall(x -> isfinite(x) && x > 0, n)
 # Build the per-species density sources of a NeutralProfile, keeping for each species only
 # the levels where it is reported. `densities` maps a species to its column on the grid `h_m`.
 function species_densities(h_m, densities, label)
-    out = Dict{Symbol, VectorDensity}()
+    out     = Dict{Symbol, DensityProfile}()
+    dropped = Symbol[]
     for (species, n) in densities
         valid = usable_levels(n)
-        length(valid) >= 2 || continue
-        out[species] = VectorDensity(h_m[valid], n[valid]; source = "$label :$species")
+        if length(valid) < 2
+            push!(dropped, species)
+            continue
+        end
+        out[species] = DensityProfile(h_m[valid], n[valid]; source = "$label :$species")
     end
-    return out
+    return out, dropped
 end
 
 
@@ -157,8 +163,8 @@ only, so each density keeps just the altitudes where it is defined.
 # Example
 ```julia
 neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
-electron = run_iri(;  year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function run_msis(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
@@ -175,7 +181,8 @@ function run_msis(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
                  :NO => 11)
     columns   = Dict(s => Float64.(data[:, c]) for (s, c) in densities)
 
-    return NeutralProfile(species_densities(h_m, columns, label); source = label)
+    densities, dropped = species_densities(h_m, columns, label)
+    return NeutralProfile(densities; source = label, dropped)
 end
 
 """
@@ -185,13 +192,13 @@ Read every species from an MSIS text file generated by AURORA and return them as
 [`NeutralProfile`](@ref) on the file's native altitude grid. The file is read once, here, so
 the result is self-contained and round-trips with no path dependency.
 
-This is the whole-atmosphere counterpart of [`MSISDensity`](@ref), which reads a single
-species. Kept for backward compatibility with existing MSIS files.
+Kept for backward compatibility with existing MSIS files; for new runs prefer
+[`run_msis`](@ref). Index the result to reach one species: `read_msis_file(f)[:N2]`.
 
 # Example
 ```julia
 neutrals = read_msis_file(msis_file)
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function read_msis_file(msis_file::AbstractString)
@@ -202,7 +209,8 @@ function read_msis_file(msis_file::AbstractString)
     columns = Dict(species => getproperty(raw.data, species)
                    for species in (:N2, :O2, :O, :He, :H, :Ar, :N, :NO)
                    if hasproperty(raw.data, species))
-    return NeutralProfile(species_densities(h_m, columns, label); source = label)
+    densities, dropped = species_densities(h_m, columns, label)
+    return NeutralProfile(densities; source = label, dropped)
 end
 
 """
@@ -222,7 +230,7 @@ NRLMSISE-00 exports, which use the same column names.
 # Example
 ```julia
 neutrals = read_ccmc_msis("nrlmsis_output.txt")
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electron)
+model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function read_ccmc_msis(file::AbstractString)
@@ -260,11 +268,12 @@ function read_ccmc_msis(file::AbstractString)
         length(cols) >= n_cols || continue
         h = tryparse(Float64, cols[h_col])
         h === nothing && continue
-        values = map(((_, c),) -> tryparse(Float64, cols[c]), species_columns)
-        any(isnothing, values) && continue
+        # An unparseable field costs that species this level, not the level for every
+        # species — the same per-species rule the sentinel handling below follows.
         push!(h_km, h)
-        for ((s, _), v) in zip(species_columns, values)
-            push!(raw[s], v)
+        for (s, c) in species_columns
+            v = tryparse(Float64, cols[c])
+            push!(raw[s], v === nothing ? NaN : v)
         end
     end
     isempty(h_km) && throw(ArgumentError(
@@ -275,5 +284,6 @@ function read_ccmc_msis(file::AbstractString)
     # are dropped per species, and convert the rest cm⁻³ → m⁻³.
     columns = Dict(species => [v > 1e-37 ? v * 1e6 : NaN for v in raw[species]]
                    for (species, _) in species_columns)
-    return NeutralProfile(species_densities(h_km .* 1e3, columns, label); source = label)
+    densities, dropped = species_densities(h_km .* 1e3, columns, label)
+    return NeutralProfile(densities; source = label, dropped)
 end

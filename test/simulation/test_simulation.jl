@@ -142,10 +142,10 @@ end
     iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-    # Default model from an MSIS file: MSISDensity reads the file eagerly and yields a
-    # VectorDensity (carrying a provenance source); density is empty before initialize!
+    # Default model from an MSIS file: read_msis_file reads the file eagerly and yields a
+    # DensityProfile (carrying a provenance source); density is empty before initialize!
     for sp in model.species
-        @test sp.density_source isa VectorDensity
+        @test sp.density_source isa DensityProfile
         @test occursin("MSIS file", sp.density_source.source)
     end
     @test isempty(model.species[1].density)
@@ -155,13 +155,13 @@ end
     ag = model.altitude_grid
     @test !isempty(model.species[1].density)
 
-    # A user VectorDensity built on the file's native grid reproduces the default density
+    # A user DensityProfile built on the file's native grid reproduces the default density
     raw = AURORA.load_msis(msis_file)
-    vd  = VectorDensity(raw.data.height_km .* 1e3, raw.data.N2; source="manual")
+    vd  = DensityProfile(raw.data.height_km .* 1e3, raw.data.N2; source="manual")
     model_vd = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
     model_vd.species[1].density_source = vd
     initialize!(model_vd; verbose=false)
-    @test model_vd.species[1].density_source isa VectorDensity
+    @test model_vd.species[1].density_source isa DensityProfile
     @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
     # A @law source is accepted, and density remains empty until initialize!
@@ -182,7 +182,7 @@ end
     neutrals = read_msis_file(msis_file)
     @test neutrals isa NeutralProfile
     @test all(haskey(neutrals, s) for s in (:N2, :O2, :O))
-    @test neutrals[:N2] isa VectorDensity
+    @test neutrals[:N2] isa DensityProfile
     @test_throws ArgumentError neutrals[:XX]
 
     # A NeutralProfile is accepted wherever an MSIS path is, and gives the same densities
@@ -467,7 +467,7 @@ end
     # Bare anonymous functions are rejected
     @test_throws ArgumentError AURORA.CascadingSpec("X", [1.0], (a, b) -> a)
     @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
-    @test_throws ArgumentError AURORA.NeutralSpecies(:G, MSISDensity(msis_file, :N2);
+    @test_throws ArgumentError AURORA.NeutralSpecies(:G, read_msis_file(msis_file)[:N2];
                                    cascading_spec      = AURORA.DefaultCascadingSpecN2(),
                                    phase_fcn_generator = (θ, E) -> θ)
 
@@ -478,8 +478,8 @@ end
 
     # @law, functors and named functions are all accepted
     @test (@law h -> fill(1e15, length(h))) isa ExprLaw
-    sp = AURORA.N2Species(MSISDensity(msis_file, :N2))
-    @test sp.density_source isa VectorDensity        # eager file read → VectorDensity
+    sp = AURORA.N2Species(read_msis_file(msis_file)[:N2])
+    @test sp.density_source isa DensityProfile        # eager file read → DensityProfile
     @test sp.phase_fcn_generator === phase_fcn_N2    # named function
 end
 

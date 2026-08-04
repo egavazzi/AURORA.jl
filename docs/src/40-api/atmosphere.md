@@ -20,8 +20,7 @@ read_ccmc_iri
 
 ## Species density profiles and laws
 ```@docs; canonical=false
-MSISDensity
-VectorDensity
+DensityProfile
 @law
 ExprLaw
 ```

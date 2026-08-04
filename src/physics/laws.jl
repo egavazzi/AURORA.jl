@@ -84,7 +84,7 @@ Base.convert(::Type{ExprLaw}, s::ExprLawSerialization) = ExprLaw(s.src)
 Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
 
 # A law is reproducible unless it is a bare anonymous function/closure. Functors (callable
-# structs, including ExprLaw, VectorDensity and ElectronProfile) and named functions all pass.
+# structs, including ExprLaw, DensityProfile and ElectronProfile) and named functions all pass.
 is_anonymous(f) = f isa Function && startswith(string(nameof(f)), "#")
 
 function require_reproducible(law, role::AbstractString)

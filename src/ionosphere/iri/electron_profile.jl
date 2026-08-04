@@ -11,7 +11,7 @@ Electron background (electron density `ne` and temperature `Te`) defined on a na
 grid. Callable on any altitude grid (m); returns the tuple `(ne, Te)` interpolated to that grid
 (`ne` in log-space, `Te` linearly — the same convention AURORA uses elsewhere).
 
-This is the electron analogue of [`VectorDensity`](@ref): the universal interchange for the
+This is the electron analogue of [`DensityProfile`](@ref): the universal interchange for the
 ionospheric electron background, whatever its origin. Build one from the IRI model with
 [`run_iri`](@ref), from a CCMC ModelWeb IRI download with [`read_ccmc_iri`](@ref), from a legacy
 AURORA IRI file with [`read_iri_file`](@ref), or directly from your own vectors. Because it
@@ -95,8 +95,8 @@ filled by extrapolation when the profile is sampled.
 
 # Example
 ```julia
-iri   = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
-model = AuroraModel(altitude_lims, θ_lims, E_max, atmosphere, iri)
+electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
@@ -143,8 +143,8 @@ is reported instead of silently misread.
 
 # Example
 ```julia
-iri   = read_ccmc_iri("iri_output.txt")
-model = AuroraModel(altitude_lims, θ_lims, E_max, atmosphere, iri)
+electrons = read_ccmc_iri("iri_output.txt")
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function read_ccmc_iri(file::AbstractString)

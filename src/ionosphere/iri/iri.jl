@@ -55,7 +55,7 @@ function find_iri_file(;
     find_iri_file() is generating a new IRI file via the Python `iri2020` package, which is \
     deprecated. Prefer run_iri for new runs, e.g.:
         iri   = run_iri(; year=$year, month=$month, day=$day, hour=$hour, minute=$minute, lat=$lat, lon=$lon)
-        model = AuroraModel(altitude_lims, θ_lims, E_max, atmosphere, iri)
+        model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
     Reading existing IRI files (via read_iri_file / AuroraModel) remains supported.""" maxlog = 1
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
                                               height, verbose)

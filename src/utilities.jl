@@ -352,7 +352,7 @@ end
 """
     check_profile_grid(type_name, h, (name, values)...)
 
-Validate the vectors backing a profile source ([`VectorDensity`](@ref),
+Validate the vectors backing a profile source ([`DensityProfile`](@ref),
 [`ElectronProfile`](@ref)) at construction, so that a malformed profile is reported where it
 is built rather than as a cryptic interpolation failure when it is first sampled.
 

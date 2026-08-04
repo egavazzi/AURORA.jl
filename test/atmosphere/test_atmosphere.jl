@@ -19,11 +19,12 @@ end
     z = make_altitude_grid(50, 800)
     msis_file = find_msis_file(; verbose=false)
 
-    # Production path: MSISDensity reads the file into a VectorDensity, which each species
-    # samples on the grid (as in initialize!(model)).
+    # Production path: read_msis_file reads the file into a DensityProfile per species, which
+    # each species samples on the grid (as in initialize!(model)).
+    neutrals = read_msis_file(msis_file)
     for species in (:N2, :O2, :O)
-        source = MSISDensity(msis_file, species)
-        @test source isa VectorDensity
+        source = neutrals[species]
+        @test source isa DensityProfile
         n = source(z)
         @test !any(isnan.(n))
         @test !any(isinf.(n))
@@ -123,16 +124,41 @@ end
     @test minimum(p[:O].h) > minimum(p[:N2].h)
     @test all(p[:O].n .> 1e-37)
 
-    # Legacy AURORA MSIS file: read_msis_file agrees with the per-species MSISDensity
+    # Legacy AURORA MSIS file: each species keeps the file's own native grid and values
     msis_file = find_msis_file(; verbose=false)
-    np = read_msis_file(msis_file)
+    np  = read_msis_file(msis_file)
+    raw = AURORA.load_msis(msis_file)
     @test occursin("MSIS file", np.source)
     for species in (:N2, :O2, :O)
-        @test np[species](z) ≈ MSISDensity(msis_file, species)(z) rtol=1e-12
+        valid = AURORA.usable_levels(getproperty(raw.data, species))
+        @test np[species].h ≈ raw.data.height_km[valid] .* 1e3 rtol=1e-12
+        @test np[species].n ≈ getproperty(raw.data, species)[valid] rtol=1e-12
     end
 
     # A non-CCMC file is rejected with a clear error
     @test_throws ArgumentError read_ccmc_msis(msis_file)
+end
+
+
+@testitem "NeutralProfile reports species it dropped" begin
+    # A species the source carries but never usably reports is dropped at read time. Asking
+    # for it later must say why, rather than looking like the species was never there.
+    densities, dropped = AURORA.species_densities(
+        [100e3, 200e3, 300e3],
+        Dict(:N2 => [1e18, 1e17, 1e16], :NO => [NaN, NaN, NaN]),
+        "test source")
+    np = NeutralProfile(densities; source="test source", dropped)
+
+    @test haskey(np, :N2)
+    @test !haskey(np, :NO)
+    @test np.dropped == [:NO]
+
+    unreported = sprint(showerror, try np[:NO] catch e; e end)
+    @test occursin("fewer than 2 usable levels", unreported)
+
+    # A species that was never in the source at all gets no such hint
+    absent = sprint(showerror, try np[:Ar] catch e; e end)
+    @test !occursin("fewer than 2 usable levels", absent)
 end
 
 @testitem "run_msis returns a NeutralProfile matching the file path" begin
@@ -166,11 +192,11 @@ end
     h = [100e3, 200e3, 300e3]
 
     # Length mismatch, too few levels, non-increasing altitudes, non-positive values
-    @test_throws "must have the same length" VectorDensity(h, [1e18, 1e17])
-    @test_throws "at least 2 altitude levels" VectorDensity([100e3], [1e18])
-    @test_throws "strictly increasing" VectorDensity([300e3, 100e3, 200e3], [1e18, 1e17, 1e16])
-    @test_throws "finite and strictly positive" VectorDensity(h, [1e18, 0.0, 1e16])
-    @test_throws "finite and strictly positive" VectorDensity(h, [1e18, NaN, 1e16])
+    @test_throws "must have the same length" DensityProfile(h, [1e18, 1e17])
+    @test_throws "at least 2 altitude levels" DensityProfile([100e3], [1e18])
+    @test_throws "strictly increasing" DensityProfile([300e3, 100e3, 200e3], [1e18, 1e17, 1e16])
+    @test_throws "finite and strictly positive" DensityProfile(h, [1e18, 0.0, 1e16])
+    @test_throws "finite and strictly positive" DensityProfile(h, [1e18, NaN, 1e16])
 
     @test_throws "must have the same length" ElectronProfile(h, [1e11, 1e12], [200.0, 300.0])
     @test_throws "finite and strictly positive" ElectronProfile(h, [1e11, -1.0, 1e12],
@@ -179,8 +205,8 @@ end
                                                                 [200.0, 0.0, 400.0])
 
     # A valid profile still builds, and reports where it came from
-    @test VectorDensity(h, [1e18, 1e17, 1e16]; source = "ok") isa VectorDensity
-    @test occursin("ok", sprint(show, VectorDensity(h, [1e18, 1e17, 1e16]; source = "ok")))
+    @test DensityProfile(h, [1e18, 1e17, 1e16]; source = "ok") isa DensityProfile
+    @test occursin("ok", sprint(show, DensityProfile(h, [1e18, 1e17, 1e16]; source = "ok")))
 end
 
 @testitem "An electron source must be reproducible" begin
