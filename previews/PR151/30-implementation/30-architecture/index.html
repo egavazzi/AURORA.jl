@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Architecture · AURORA.jl</title><meta name="title" content="Architecture · AURORA.jl"/><meta property="og:title" content="Architecture · AURORA.jl"/><meta property="twitter:title" content="Architecture · AURORA.jl"/><meta name="description" content="Documentation for AURORA.jl."/><meta property="og:description" content="Documentation for AURORA.jl."/><meta property="twitter:description" content="Documentation for AURORA.jl."/><meta property="og:url" content="https://egavazzi.github.io/AURORA.jl/30-implementation/30-architecture/"/><meta property="twitter:url" content="https://egavazzi.github.io/AURORA.jl/30-implementation/30-architecture/"/><link rel="canonical" href="https://egavazzi.github.io/AURORA.jl/30-implementation/30-architecture/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">AURORA.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">AURORA.jl</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../10-tutorials/10-installation/">Installation</a></li><li><a class="tocitem" href="../../10-tutorials/20-time-dependent/">Time-Dependent Simulation</a></li><li><a class="tocitem" href="../../10-tutorials/30-steady-state/">Steady-State Simulation</a></li><li><a class="tocitem" href="../../10-tutorials/40-input-flux/">Input Flux</a></li><li><a class="tocitem" href="../../10-tutorials/50-post-processing/">Post-Processing &amp; Analysis</a></li><li><a class="tocitem" href="../../10-tutorials/60-modifying-species-and-grids/">Modifying species and grids</a></li></ul></li><li><span class="tocitem">Physics</span><ul><li><a class="tocitem" href="../../20-physics/10-transport-equation/">Transport Equation</a></li><li><a class="tocitem" href="../../20-physics/20-cross-sections/">Cross Sections</a></li><li><a class="tocitem" href="../../20-physics/30-energy-degradation/">Energy Degradation</a></li><li><a class="tocitem" href="../../20-physics/35-visualizing-the-model/">Visualizing the Model</a></li></ul></li><li><span class="tocitem">Implementation</span><ul><li><a class="tocitem" href="../10-grids/">Discretization</a></li><li><a class="tocitem" href="../20-internals/">Internals</a></li><li class="is-active"><a class="tocitem" href>Architecture</a><ul class="internal"><li><a class="tocitem" href="#Project-layout"><span>Project layout</span></a></li><li><a class="tocitem" href="#Source-code-organization"><span>Source code organization</span></a></li><li><a class="tocitem" href="#Key-types"><span>Key types</span></a></li><li><a class="tocitem" href="#Execution-flow"><span>Execution flow</span></a></li><li><a class="tocitem" href="#Steady-state-vs.-time-dependent"><span>Steady-state vs. time-dependent</span></a></li></ul></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../40-api/analysis/">Analysis</a></li><li><a class="tocitem" href="../../40-api/atmosphere/">Ionospheric Background Models</a></li><li><a class="tocitem" href="../../40-api/grids/">Grids</a></li><li><a class="tocitem" href="../../40-api/input-flux/">Input Flux API</a></li><li><a class="tocitem" href="../../40-api/model/">Model/Simulation</a></li><li><a class="tocitem" href="../../40-api/visualization/">Visualization</a></li></ul></li><li><a class="tocitem" href="../../50-output-and-data/">Output &amp; data</a></li><li><a class="tocitem" href="../../85-troubleshooting/">Troubleshooting</a></li><li><a class="tocitem" href="../../95-reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Implementation</a></li><li class="is-active"><a href>Architecture</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Architecture</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/egavazzi/AURORA.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/egavazzi/AURORA.jl/blob/main/docs/src/30-implementation/30-architecture.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Architecture"><a class="docs-heading-anchor" href="#Architecture">Architecture</a><a id="Architecture-1"></a><a class="docs-heading-anchor-permalink" href="#Architecture" title="Permalink"></a></h1><p>This page gives a high-level overview of how AURORA is implemented: how the source code is organized, the main types involved, and the execution flow from <code>run!</code> to the solver.</p><h2 id="Project-layout"><a class="docs-heading-anchor" href="#Project-layout">Project layout</a><a id="Project-layout-1"></a><a class="docs-heading-anchor-permalink" href="#Project-layout" title="Permalink"></a></h2><pre><code class="nohighlight hljs">AURORA.jl/
+├── docs/                    # Documentation (Documenter.jl)
+│
+├── ext/
+│   ├── AURORA_viz.jl        # Makie extension (plotting &amp; animation)
+│   └── src/
+│
+├── internal_data/
+│   ├── data_electron/       # IRI electron density/temperature files
+│   ├── data_neutrals/       # MSIS neutral density/temperature files
+│   ├── e_cascading/         # Cached cascading transfer matrices (per species)
+│   │   ├── N2/
+│   │   ├── O2/
+│   │   └── O/
+│   └── e_scattering/        # Cached scattering probability matrices
+│
+├── scripts/                 # Example scripts (plotting, analysis)
+│
+├── src/                     # Source code (see below)
+│
+└── test/                    # Unit tests</code></pre><h2 id="Source-code-organization"><a class="docs-heading-anchor" href="#Source-code-organization">Source code organization</a><a id="Source-code-organization-1"></a><a class="docs-heading-anchor-permalink" href="#Source-code-organization" title="Permalink"></a></h2><pre><code class="nohighlight hljs">src/
+├── AURORA.jl                    # Module definition and exports
+├── model.jl                     # AuroraModel constructor
+│
+├── grids/
+│   ├── abstract_grid.jl         # AbstractGrid base type
+│   ├── altitude_grid.jl         # AltitudeGrid
+│   ├── energy_grid.jl           # EnergyGrid
+│   └── pitch_angle_grid.jl      # PitchAngleGrid
+│
+├── ionosphere/
+│   ├── ionosphere.jl            # Ionosphere struct (densities, temperatures)
+│   ├── iri/                     # IRI model interface (Python iri2020)
+│   └── msis/                    # MSIS model interface (Python pymsis)
+│
+├── input/
+│   ├── spectra.jl               # Spectrum types (Flat, Gaussian, Maxwellian, File)
+│   ├── modulations.jl           # Modulation types (Constant, Sinusoidal, Square, SmoothOnset)
+│   └── input_flux.jl            # InputFlux, compute_flux
+│
+├── physics/
+│   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section data
+│   ├── cascading.jl             # Ionization cascading transfer matrices
+│   ├── energy_degradation.jl    # Loss frequencies, scattering, source terms
+│   ├── phase_functions.jl       # Differential cross sections → 3D scattering
+│   └── scattering.jl            # Pitch-angle scattering matrices
+│
+├── solvers/
+│   ├── types.jl                 # AbstractMode, SteadyStateMode, TimeDependentMode
+│   ├── transport_matrices.jl    # TransportMatrices struct
+│   ├── matrix_building.jl       # update_A!, update_B! (collision operators)
+│   ├── sparse_indexing.jl       # Shared sparse infrastructure: BlockIndices, OperatorDiagonals, sparsity builders
+│   ├── steady_state.jl          # Steady-state solver (in-place, allocation-free)
+│   └── crank_nicolson.jl        # Crank-Nicolson time-dependent solver (in-place, allocation-free)
+│
+├── simulation/
+│   ├── types.jl                 # AuroraSimulation, AbstractTimeConfig, RefinedTimeGrid, UniformTimeGrid
+│   ├── cache.jl                 # SimulationCache, SolverCache, DegradationCache
+│   ├── initialize.jl            # initialize! — allocates cache
+│   └── run.jl                   # run!, solve!, energy_loop!, solve_energy_step!
+│
+├── output/
+│   ├── output_manager.jl        # AuroraOutputManager (output options)
+│   ├── write.jl                 # config.toml, atmosphere.nc, physics_state.jld2, simulation_data.nc
+│   └── read.jl                  # SimulationResult, load_results, read_atmosphere_nc
+│
+├── analysis/
+│   ├── analysis_types.jl        # Result types (VolumeExcitationResult, ColumnExcitationResult, IeTopResult)
+│   ├── emissions.jl             # Volume and column excitation rates
+│   ├── fluxes.jl                # Electron flux post-processing (top flux, currents)
+│   ├── heating.jl               # Electron heating rate
+│   └── psd.jl                   # Phase space density analysis
+│
+├── utilities.jl                 # Helpers (v_of_E, CFL_criteria, beam_weight, ...)
+└── precompiles.jl               # Precompilation workload</code></pre><h2 id="Key-types"><a class="docs-heading-anchor" href="#Key-types">Key types</a><a id="Key-types-1"></a><a class="docs-heading-anchor-permalink" href="#Key-types" title="Permalink"></a></h2><table><tr><th style="text-align: right">Type</th><th style="text-align: right">Role</th></tr><tr><td style="text-align: right"><a href="../../40-api/model/#AuroraModel"><code>AuroraModel</code></a></td><td style="text-align: right">Physical model: grids + atmosphere + cross sections</td></tr><tr><td style="text-align: right"><a href="../../40-api/input-flux/#InputFlux"><code>InputFlux</code></a></td><td style="text-align: right">Precipitating electron specification: spectrum x modulation</td></tr><tr><td style="text-align: right"><a href="../../40-api/model/#AuroraSimulation"><code>AuroraSimulation</code></a></td><td style="text-align: right">Complete simulation descriptor: model + flux + mode + output</td></tr><tr><td style="text-align: right"><a href="../../95-reference/#AURORA.AbstractMode"><code>AbstractMode</code></a></td><td style="text-align: right">Solver strategy: <a href="../../95-reference/#AURORA.SteadyStateMode"><code>SteadyStateMode</code></a> or <a href="../../95-reference/#AURORA.TimeDependentMode"><code>TimeDependentMode</code></a></td></tr><tr><td style="text-align: right"><code>SimulationCache</code></td><td style="text-align: right">Internal workspace: solver matrices, flux arrays, factorizations</td></tr><tr><td style="text-align: right"><code>SolverCache</code></td><td style="text-align: right">Per-energy sparse matrices <code>Mlhs</code>/<code>Mrhs</code>, KLU factorizations, <code>BlockIndices</code>, <code>OperatorDiagonals</code></td></tr><tr><td style="text-align: right"><code>TransportMatrices</code></td><td style="text-align: right">Matrices A (loss), B (scattering), D (diffusion), Q (source)</td></tr><tr><td style="text-align: right"><code>BlockIndices</code></td><td style="text-align: right">Pre-computed <code>nzval</code> index arrays for a single block (replaces <code>Dict</code>-based mapping)</td></tr><tr><td style="text-align: right"><code>OperatorDiagonals</code></td><td style="text-align: right">Dense diagonals of <code>Ddz_Up</code>, <code>Ddz_Down</code>, <code>Ddiffusion</code> (extracted once, reused each energy step)</td></tr><tr><td style="text-align: right"><a href="../../95-reference/#AURORA.RefinedTimeGrid"><code>RefinedTimeGrid</code></a></td><td style="text-align: right">Time discretization with CFL refinement and loop partitioning. Last loop may have fewer save points</td></tr><tr><td style="text-align: right">than earlier loops.</td><td style="text-align: right"></td></tr><tr><td style="text-align: right"><a href="../../95-reference/#AURORA.UniformTimeGrid"><code>UniformTimeGrid</code></a></td><td style="text-align: right">Simple uniform grid for multi-step steady-state simulations</td></tr></table><h2 id="Execution-flow"><a class="docs-heading-anchor" href="#Execution-flow">Execution flow</a><a id="Execution-flow-1"></a><a class="docs-heading-anchor-permalink" href="#Execution-flow" title="Permalink"></a></h2><p>The entry point for all simulations is <a href="../../40-api/model/#AURORA.run!-40-api-model"><code>run!</code></a>. Here is the complete call chain:</p><pre><code class="nohighlight hljs">run!(sim::AuroraSimulation)
+│
+├── initialize!(sim)                           # Allocate cache (if not done yet)
+│   ├── Build SimulationCache
+│   │   ├── Compute phase functions (once)
+│   │   ├── Compute beam-to-beam scattering geometry
+│   │   └── Load/compute cascading transfer matrices
+│   └── Compute input flux → Ie_top array
+│
+├── Write config.toml, inputs/ (atmosphere.nc + physics_state.jld2), and create
+│   simulation_data.nc (writing the Ie_input boundary flux)
+│
+└── solve!(sim)
+    │
+    ├─── [steady-state: SteadyStateMode, single-step]
+    │    └── energy_loop!(sim, Ie_top, 1, 1)
+    │
+    ├─── [steady-state: SteadyStateMode, multi-step]
+    │    └── for i_step in 1:n_steps
+    │        ├── Reset solver state
+    │        ├── Compute Ie_top for this time point
+    │        ├── energy_loop!(sim, Ie_top_step, 1, 1)
+    │        └── Accumulate results
+    │
+    └─── [time-dependent: TimeDependentMode]
+         └── for i_loop in 1:n_loop
+             ├── Extract Ie_top chunk for this time window
+             ├── energy_loop!(sim, Ie_top_chunk, i_loop, n_loop)
+             └── Save results to disk
+
+
+energy_loop!(sim, Ie_top, i_loop, n_loop)
+│   Iterates over energies from HIGH to LOW (descending)
+│
+└── for iE in n_E:-1:1
+    ├── update_matrices!(sim, iE)
+    │   ├── update_A!()    # Loss frequencies from collisions
+    │   ├── update_B!()    # Pitch-angle scattering probabilities
+    │   ├── update_D!()    # Diffusion coefficients
+    │   └── update_Ddiffusion!()  # Spatial diffusion operator
+    │
+    ├── solve_energy_step!(sim, iE, Ie_top)
+    │   ├── [steady-state] → steady_state_scheme!()
+    │   └── [time-dependent] → Crank_Nicolson!()
+    │
+    └── update_Q!(sim, iE)   # Source terms for lower energies
+        ├── e-e collision energy transfer
+        ├── Inelastic scattering contributions
+        └── Ionization fragments (primary + secondary electrons)</code></pre><p><strong>Note that the energy loop runs in descending order.</strong> Because when an electron at energy <span>$E$</span> undergoes ionization, it produces secondary electrons at <em>lower</em> energies. By solving from high to low, these secondary electron sources (stored in the Q matrix) are available when the solver reaches the lower energy levels. This is what we refer to as the  <em>cascading/degradation</em> in energy.</p><h2 id="Steady-state-vs.-time-dependent"><a class="docs-heading-anchor" href="#Steady-state-vs.-time-dependent">Steady-state vs. time-dependent</a><a id="Steady-state-vs.-time-dependent-1"></a><a class="docs-heading-anchor-permalink" href="#Steady-state-vs.-time-dependent" title="Permalink"></a></h2><p>The dispatch between steady-state and time-dependent is controlled by the <a href="../../95-reference/#AURORA.AbstractMode"><code>AbstractMode</code></a> type stored in <code>sim.mode</code>:</p><ul><li><p><strong>Steady-state</strong> (<a href="../../95-reference/#AURORA.SteadyStateMode"><code>SteadyStateMode</code></a>): No time stepping. The solver finds the equilibrium flux for each energy level by inverting a sparse linear system (<span>$M \cdot I_e = Q$</span>). With time parameters (<code>SteadyStateMode(duration=..., dt=...)</code>), each time point is solved independently (multi-step steady-state).</p></li><li><p><strong>Time-dependent</strong> (<a href="../../95-reference/#AURORA.TimeDependentMode"><code>TimeDependentMode</code></a>): The Crank-Nicolson scheme advances the solution in time at each energy level. The simulation may be split into multiple <em>loops</em> (time chunks) to fit within a memory budget, controlled by <code>max_memory_gb</code>.</p></li></ul><p>For more details on the transport equation, matrix construction, and solver internals, see <a href="../20-internals/#Internals">Solver Internals</a>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../20-internals/">« Internals</a><a class="docs-footer-nextpage" href="../../40-api/analysis/">Analysis »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 18 June 2026 11:49">Thursday 18 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
