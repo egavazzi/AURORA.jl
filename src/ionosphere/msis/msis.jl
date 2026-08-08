@@ -1,6 +1,5 @@
 include("calculation.jl")
 include("io.jl")
-include("interpolation.jl")
 
 """
     find_msis_file(; year=2018, month=12, day=7, hour=11, minute=15,

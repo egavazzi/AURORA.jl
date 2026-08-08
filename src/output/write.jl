@@ -60,18 +60,22 @@ function write_atmosphere_nc(sim::AuroraSimulation)
                        attrib=["units" => "m", "long_name" => "altitude"])
         alt_v[:] = model.altitude_grid.h
 
+        e_source = electron_source_label(ionosphere.electron_source)
         ne_v = defVar(ds, "ne", Float64, ("altitude",); deflatelevel=dl,
-                      attrib=["units" => "m-3", "long_name" => "electron number density"])
+                      attrib=["units" => "m-3", "long_name" => "electron number density",
+                              "source" => e_source])
         ne_v[:] = ionosphere.ne
 
         Te_v = defVar(ds, "Te", Float64, ("altitude",); deflatelevel=dl,
-                      attrib=["units" => "K", "long_name" => "electron temperature"])
+                      attrib=["units" => "K", "long_name" => "electron temperature",
+                              "source" => e_source])
         Te_v[:] = ionosphere.Te
 
         for sp in model.species
             nsp_v = defVar(ds, "n" * String(sp.name), Float64, ("altitude",); deflatelevel=dl,
                            attrib=["units" => "m-3",
-                                   "long_name" => String(sp.name) * " number density"])
+                                   "long_name" => String(sp.name) * " number density",
+                                   "source" => profile_label(sp.density_source)])
             nsp_v[:] = sp.density
         end
     end

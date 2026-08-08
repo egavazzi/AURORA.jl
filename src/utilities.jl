@@ -328,3 +328,42 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
 
     return interpolated
 end
+
+
+"""
+    check_profile_grid(type_name, h, (name, values)...)
+
+Validate the vectors backing a profile source ([`DensityProfile`](@ref),
+[`ElectronProfile`](@ref)) at construction, so that a malformed profile is reported where it
+is built rather than as a cryptic interpolation failure when it is first sampled.
+
+Checks that every value vector matches `h` in length, that `h` holds at least two strictly
+increasing altitudes, and that all values are strictly positive — densities are interpolated
+in log space, and neither a zero density nor a zero temperature is ever meaningful.
+
+# Arguments
+- `type_name`: name of the calling type, used in the error messages
+- `h`: altitude (m)
+- `(name, values)...`: one or more `(label, vector)` pairs to check against `h`
+"""
+function check_profile_grid(type_name, h, values...)
+    for (name, v) in values
+        length(v) == length(h) || throw(ArgumentError(
+            "$type_name: h and $name must have the same length, got $(length(h)) and " *
+            "$(length(v))."))
+    end
+    length(h) >= 2 || throw(ArgumentError(
+        "$type_name: at least 2 altitude levels are needed to interpolate, got $(length(h))."))
+    all(>(0), diff(h)) || throw(ArgumentError(
+        "$type_name: h must be sorted, with strictly increasing altitudes."))
+    for (name, v) in values
+        bad = findall(x -> !(isfinite(x) && x > 0), v)
+        isempty(bad) || throw(ArgumentError(
+            "$type_name: $name must be finite and strictly positive, got $(v[bad[1]]) at " *
+            "$(h[bad[1]] / 1e3) km ($(length(bad)) level(s) affected). Drop or replace the " *
+            "invalid levels before building the profile."))
+    end
+    return nothing
+end
+
+

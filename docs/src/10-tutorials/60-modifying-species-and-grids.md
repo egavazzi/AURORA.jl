@@ -40,11 +40,13 @@ model.energy_grid.n
 When a simulation already exists, just change the grid and call `run!(sim)` — it detects the
 change and rebuilds the model and its cache before solving.
 
-## Changing a species' density profile
+## Changing a species' density source
 
-Each species carries a `density_profile`: a callable mapping altitude (m) to density (m⁻³).
-`initialize!` samples it onto the altitude grid. Built-in options are [`MSISDensity`](@ref) and
-[`VectorDensity`](@ref) (your own altitude/density vectors, that will get pchip-interpolated in log-space).
+Each species carries a `density_source`: a callable mapping altitude (m) to density (m⁻³).
+`initialize!` samples it onto the altitude grid. The built-in option is [`DensityProfile`](@ref)
+(your own altitude/density vectors, pchip-interpolated in log-space). It is the universal way to
+bring densities from any external atmospheric model (CCMC ModelWeb runs — MSIS 2.1, DTM,
+WAM-IPE — radar inversions, …): reduce the source to two vectors and wrap it.
 
 For a custom analytic profile, wrap it in the [`@law`](@ref) macro. `@law` captures the law's
 source text so that it can be saved in `physics_state.jld2`. **Bare anonymous functions are rejected** 
@@ -52,18 +54,62 @@ as their source cannot be reconstructed when a saved model is reloaded.
 
 ```@example modular
 # An analytic profile for N₂ (altitude in m → density in m⁻³)
-model.species[:N2].density_profile = @law h -> 1e18 .* exp.(-(h .- 100e3) ./ 30e3)
+model.species[:N2].density_source = @law h -> 1e18 .* exp.(-(h .- 100e3) ./ 30e3)
 initialize!(model)
 model.species[:N2].density
 ```
 
 ```julia
-# Your own measured/downloaded profile, given as vectors:
-model.species[:N2].density_profile = VectorDensity(altitude_m, density_m3)
+# Your own measured/downloaded profile, given as vectors (optionally tag its provenance):
+model.species[:N2].density_source = DensityProfile(altitude_m, density_m3; source="ccmc_run.txt")
 
-# Or the default MSIS-backed profile, found/created by find_msis_file():
-model.species[:N2].density_profile = MSISDensity(msis_file, :N2)
+# Or read an existing AURORA-generated MSIS file (returns a DensityProfile):
+model.species[:N2].density_source = read_msis_file(msis_file)[:N2]
 ```
+
+### Densities from another atmospheric model (e.g. a CCMC ModelWeb run)
+
+For a whole atmosphere at once, [`NeutralProfile`](@ref) holds one [`DensityProfile`](@ref) per
+species and can be passed straight to [`AuroraModel`](@ref) in place of an MSIS file. Three
+functions build one for you:
+
+```julia
+neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+neutrals = read_msis_file(msis_file)            # AURORA-generated MSIS file
+neutrals = read_ccmc_msis("nrlmsis_output.txt") # CCMC ModelWeb NRLMSIS export
+
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+
+# Index it to reach a single species
+model.species[:N2].density_source = neutrals[:N2]
+```
+
+`read_ccmc_msis` handles the CCMC quirks: the variable-length preamble, densities in cm⁻³, and
+the `9.999E-38` sentinel written where a species is not reported. Columns are matched by their
+header name rather than by position, so the export is read correctly whatever its column order,
+and a missing column is reported instead of silently misread.
+
+Whichever route you take, each species keeps only the altitudes where it is actually reported
+(MSIS gives no N below ~95 km, for instance), so a species defined over part of the column
+never drags a missing-value marker into the interpolation.
+
+For a model with no dedicated reader — DTM, WAM-IPE, a radar inversion — reduce the export to
+two vectors and wrap them yourself:
+
+```julia
+using DelimitedFiles, AURORA
+
+rows = readdlm("some_model_output.txt")
+h_m  = Float64.(rows[2:end, 1]) .* 1e3     # km  → m
+n_N2 = Float64.(rows[2:end, 2]) .* 1e6     # cm⁻³ → m⁻³
+
+model.species[:N2].density_source = DensityProfile(h_m, n_N2; source="some_model_output.txt")
+```
+
+`DensityProfile` and [`ElectronProfile`](@ref) check their vectors as you build them — matching
+lengths, at least two strictly increasing altitudes, and finite positive values — so a mistake
+in the parsing above is reported right there rather than as a puzzling interpolation failure
+much later in the run.
 
 ### When a law needs parameters, use a functor
 
@@ -81,12 +127,40 @@ struct ExponentialDensity      # parameters live in fields → can round-trip th
 end
 (d::ExponentialDensity)(z) = d.n0 .* exp.(-(z .- d.z_ref) ./ d.H)
 
-model.species[:N2].density_profile = ExponentialDensity(1e18, 100e3, 30e3)
+model.species[:N2].density_source = ExponentialDensity(1e18, 100e3, 30e3)
 ```
 
 The same pattern applies to a parameterized cascading law or phase-function generator.
 (If you dig into the source code you might find out that this is how the default 
 atomic-oxygen cascading law is built in order to carry some tabulated coefficients)
+
+## Changing the electron background (IRI)
+
+The electron density and temperature (`ne`, `Te`) are the fifth argument to
+[`AuroraModel`](@ref), supplied as an [`ElectronProfile`](@ref) — the electron analogue of
+[`DensityProfile`](@ref). Like the density sources, it stores data (not a file path), so it
+round-trips through `physics_state.jld2` and reproduces with no external file. Build one in any
+of these ways:
+
+```julia
+# Run IRI-2020 for a date and position (via the bundled python iri2020; nothing written to disk):
+electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+
+# From a CCMC ModelWeb IRI download:
+electrons = read_ccmc_iri("iri_output.txt")
+
+# From an existing AURORA-generated IRI file (a bare path string also works as the 5th argument):
+electrons = read_iri_file(iri_file)
+
+# Or your own vectors (altitude m, ne m⁻³, Te K):
+electrons = ElectronProfile(h_m, ne_m3, Te_K; source="my profile")
+
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+```
+
+`read_ccmc_iri` handles the CCMC table directly (variable preamble, `Ne` in cm⁻³, `-1`
+sentinels). For other electron-density sources, reduce them to `(h, ne, Te)` vectors and wrap
+them in `ElectronProfile`, exactly as `DensityProfile` does for neutrals.
 
 ## Overriding cross-sections, phase functions, or cascading
 
@@ -125,7 +199,7 @@ excitation levels for a new gas in the interception window:
 ```julia
 law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
 spec = AURORA.CascadingSpec("Ar", [15.76, 27.63], law)
-argon = NeutralSpecies(:Ar, MSISDensity(msis_file, :Ar);
+argon = NeutralSpecies(:Ar, read_msis_file(msis_file)[:Ar];
                        cascading_spec = spec, phase_fcn_generator = phase_fcn_N2)
 
 model = AuroraModel(alt_lims, θ_lims, E_max, msis_file, iri_file;
