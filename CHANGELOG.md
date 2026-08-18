@@ -1,7 +1,9 @@
 # Changelog
 
 ## Unreleased
-- **Numerical Breaking (small)** Single-ionization cascading integrals now use `rtol = 1e-4`, building matrices ~1.1–1.3x faster with final analysis results changing by <4e-6 (relative). Also better cascading matrix calculations report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
+- **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
+- **Numerical Breaking (small)** Remove the ad-hoc spatial diffusion operator (`D·∂²Ie/∂z²`) from both the steady-state and time-dependent solvers [#168](https://github.com/egavazzi/AURORA.jl/pull/168)
+  - The operator was meant to model the spread in arrival times of electrons within a finite (E, μ) bin, but in its current form it contributed nothing measurable, and it did not belong in the steady-state equations in the first place. The numerical diffusion of the advection scheme already produces a comparable spread at default resolution.
 - **Breaking** Rename `AuroraSimulation.cache` to `AuroraSimulation.workspace`, and replace `cache_initialized` with `workspace.initialized`.
   The simulation working-state types are also renamed from cache to workspace, e.g. `SolverCache` → `SolverWorkspace`, `DegradationCache` → `DegradationWorkspace` [#161](https://github.com/egavazzi/AURORA.jl/pull/161)
 

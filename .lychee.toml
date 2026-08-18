@@ -4,6 +4,7 @@ exclude = [
   "^https://github.com/.*/releases/tag/v.*$",
   "^https://egavazzi.github.io/AURORA.jl/stable$",
   "https://doi.org/10.1029/2019JA027608",
+  "https://doi.org/10.5281/zenodo.11238620",
 ]
 
 exclude_path = [

@@ -29,9 +29,7 @@ The independent variables are altitude ``z``, pitch-angle cosine ``\mu``, time `
 energy ``E``. The loss and source terms couple the solution across the energy grid because
 higher-energy electrons can degrade and produce lower-energy secondaries.
 
-For how this equation is discretized and solved in AURORA, see [Internals](@ref). The
-numerical implementation also includes a spatial diffusion term arising from the finite
-pitch-angle bin width, described in the [Diffusion coefficient D](@ref) section.
+For how this equation is discretized and solved in AURORA, see [Internals](@ref).
 
 ## References
 

@@ -21,7 +21,7 @@ allocations on the hot path).
 
 The time-dependent electron transport equation is:
 ```
-∂Ie/∂t + μ·v ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ − D·∇²Ie = Q
+∂Ie/∂t + μ·v ∂Ie/∂z + A·Ie − ∫B·Ie′ dΩ′ = Q
 ```
 
 Crank-Nicolson gives second-order accuracy in time:
@@ -31,8 +31,8 @@ Mlhs · Ie^(n+1)  =  Mrhs · Ie^n  +  (Q^(n+1) + Q^n)/2
 
 with
 ```
-Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2 − D·Ddiffusion
-Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2 + D·Ddiffusion
+Mlhs = 1/(v·Δt) + μ·Ddz/2 + A/2 − B/2
+Mrhs = 1/(v·Δt) − μ·Ddz/2 − A/2 + B/2
 ```
 
 Both matrices share the same block structure as the steady-state system:
@@ -44,7 +44,7 @@ Both matrices share the same block structure as the steady-state system:
 │ Block   │ Block   │ Block   │  Off-diagonal: angular scattering
 │ (2,1)   │ (2,2)   │ (2,3)   │
 ├─────────┼─────────┼─────────┤
-│ Block   │ Block   │ Block   │  Diagonal: transport + diffusion
+│ Block   │ Block   │ Block   │  Diagonal: transport + loss
 │ (3,1)   │ (3,2)   │ (3,3)   │
 └─────────┴─────────┴─────────┘
 ```
@@ -54,7 +54,7 @@ Both matrices share the same block structure as the steady-state system:
 - `t`: time grid [s]
 - `model`: `AuroraModel` (`s_field` and `pitch_angle_grid.μ_center` are used)
 - `v`: electron velocity [km/s]
-- `matrices::TransportMatrices`: container with `A`, `B`, `D`, `Q`, `Ddiffusion`
+- `matrices::TransportMatrices`: container with `A`, `B`, `Q`
 - `iE`: current energy index
 - `Ie_top`: boundary condition at top [m⁻² s⁻¹] at each time step
 - `I0`: initial condition [m⁻² s⁻¹]
@@ -70,9 +70,7 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     # Extract physics data for this energy level
     A = matrices.A
     B = matrices.B
-    D = @view(matrices.D[iE, :])
     Q_slice = @view(matrices.Q[:, :, iE])
-    Ddiffusion = matrices.Ddiffusion
 
     # Temporal coefficient (scalar — all altitudes have the same 1/(v·Δt))
     dt = t[2] - t[1]
@@ -82,17 +80,17 @@ function Crank_Nicolson!(Ie, t, model::AuroraModel, v, matrices, iE, Ie_top, I0,
     if !workspace.initialized
         Ddz_Up, Ddz_Down = build_spatial_operators(z; half_weight = true)
         workspace.Mlhs, workspace.Mrhs = create_transport_sparsity_pattern(
-            n_z, n_angle, μ, D, Ddiffusion; include_rhs = true)
+            n_z, n_angle, μ; include_rhs = true)
         workspace.indices_lhs = extract_nzval_indices(workspace.Mlhs, n_z, n_angle)
         workspace.indices_rhs = extract_nzval_indices(workspace.Mrhs, n_z, n_angle)
-        workspace.op_diags = extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+        workspace.op_diags = extract_operator_diagonals(Ddz_Up, Ddz_Down)
         workspace.rhs = Vector{Float64}(undef, n_z * n_angle)
     end
 
     # ── Update matrix values (fast, no allocations) ──
     update_crank_nicolson_matrices!(workspace.Mlhs, workspace.Mrhs,
                                     workspace.indices_lhs, workspace.indices_rhs,
-                                    A, B, D, ddt, workspace.op_diags, μ, n_z)
+                                    A, B, ddt, workspace.op_diags, μ, n_z)
 
     # ── Boundary indices ──
     index_bottom = 1:n_z:(n_angle * n_z)
@@ -153,7 +151,7 @@ end
 
 """
     update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
-                                    A, B, D, ddt, op, μ, n_z)
+                                    A, B, ddt, op, μ, n_z)
 
 Fill both `Mlhs` and `Mrhs` with the Crank-Nicolson operator values using the
 pre-computed `BlockIndices` arrays and dense `OperatorDiagonals`.
@@ -162,13 +160,13 @@ pre-computed `BlockIndices` arrays and dense `OperatorDiagonals`.
 
 The physics formulas (per stream direction) are:
 ```
-Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2  −  D·Ddiffusion
-Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2  +  D·Ddiffusion
+Mlhs =  ddt  +  μ·Ddz  +  A/2  −  B/2
+Mrhs =  ddt  −  μ·Ddz  −  A/2  +  B/2
 ```
 where `Ddz` already contains the `/2` factor (built with `half_weight=true`).
 """
 function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
-                                         A, B, D, ddt::Float64,
+                                         A, B, ddt::Float64,
                                          op::OperatorDiagonals, μ, n_z)
     n_angle = length(μ)
     nz_lhs = Mlhs.nzval
@@ -187,36 +185,25 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
                 @views nz_lhs[bl.diag] .= .-B_tmp[interior] ./ 2
                 @views nz_rhs[br.diag] .=   B_tmp[interior] ./ 2
             else
-                # ── Diagonal blocks: transport + loss + diffusion ── #
+                # ── Diagonal blocks: transport + loss ── #
                 nz_lhs[bl.bc_first] = 1.0           # bottom boundary
 
                 μ_i = μ[i1]
-                D_i = D[i1]
                 A_half = @view A[interior]           # used as A/2 below
 
                 if μ_i < 0   # ── downward streams ──
 
                     # Main diagonal
-                    #   Mlhs: ddt + μ·Ddz + A/2 - B/2 - D·Ddiff
-                    #   Mrhs: ddt - μ·Ddz - A/2 + B/2 + D·Ddiff
+                    #   Mlhs: ddt + μ·Ddz + A/2 - B/2
+                    #   Mrhs: ddt - μ·Ddz - A/2 + B/2
                     @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Down_diag[interior]
-                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
-                                               .- D_i .* op.Ddiff_diag[interior])
+                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2)
                     @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Down_diag[interior]
-                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
-                                               .+ D_i .* op.Ddiff_diag[interior])
+                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2)
 
-                    # Super-diagonal: μ·Ddz_super - D·Ddiff_super  /  negated
-                    @views nz_lhs[bl.super] .= ( μ_i .* op.Ddz_Down_super[interior]
-                                                .- D_i .* op.Ddiff_super[interior])
-                    @views nz_rhs[br.super] .= (-μ_i .* op.Ddz_Down_super[interior]
-                                                .+ D_i .* op.Ddiff_super[interior])
-
-                    # Sub-diagonal (diffusion only, may be empty)
-                    if !isempty(bl.sub)
-                        @views nz_lhs[bl.sub] .= .- D_i .* op.Ddiff_sub[interior .- 1]
-                        @views nz_rhs[br.sub] .=    D_i .* op.Ddiff_sub[interior .- 1]
-                    end
+                    # Super-diagonal: μ·Ddz_super  /  negated
+                    @views nz_lhs[bl.super] .=  μ_i .* op.Ddz_Down_super[interior]
+                    @views nz_rhs[br.super] .= .-μ_i .* op.Ddz_Down_super[interior]
 
                     # Top boundary
                     nz_lhs[bl.bc_last] = 1.0
@@ -225,23 +212,13 @@ function update_crank_nicolson_matrices!(Mlhs, Mrhs, idx_lhs, idx_rhs,
 
                     # Main diagonal
                     @views nz_lhs[bl.diag] .= (ddt .+ μ_i .* op.Ddz_Up_diag[interior]
-                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2
-                                               .- D_i .* op.Ddiff_diag[interior])
+                                               .+ A_half ./ 2 .- B_tmp[interior] ./ 2)
                     @views nz_rhs[br.diag] .= (ddt .- μ_i .* op.Ddz_Up_diag[interior]
-                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2
-                                               .+ D_i .* op.Ddiff_diag[interior])
+                                               .- A_half ./ 2 .+ B_tmp[interior] ./ 2)
 
-                    # Sub-diagonal: μ·Ddz_sub - D·Ddiff_sub  /  negated
-                    @views nz_lhs[bl.sub] .= ( μ_i .* op.Ddz_Up_sub[interior .- 1]
-                                              .- D_i .* op.Ddiff_sub[interior .- 1])
-                    @views nz_rhs[br.sub] .= (-μ_i .* op.Ddz_Up_sub[interior .- 1]
-                                              .+ D_i .* op.Ddiff_sub[interior .- 1])
-
-                    # Super-diagonal (diffusion only, may be empty)
-                    if !isempty(bl.super)
-                        @views nz_lhs[bl.super] .= .- D_i .* op.Ddiff_super[interior]
-                        @views nz_rhs[br.super] .=    D_i .* op.Ddiff_super[interior]
-                    end
+                    # Sub-diagonal: μ·Ddz_sub  /  negated
+                    @views nz_lhs[bl.sub] .=  μ_i .* op.Ddz_Up_sub[interior .- 1]
+                    @views nz_rhs[br.sub] .= .-μ_i .* op.Ddz_Up_sub[interior .- 1]
 
                     # Top boundary: ∂Ie/∂z = 0  →  [-1, 1]
                     nz_lhs[bl.bc_last_sub] = -1.0

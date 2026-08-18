@@ -1,4 +1,3 @@
-using SparseArrays: SparseArrays, spdiagm
 using LinearAlgebra: mul!
 using LoopVectorization: @tturbo
 
@@ -184,70 +183,6 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kern
     return B2B_inelastic_neutrals
 end
 
-# `D` and `Ddiffusion` are used together in the solvers as `D[iE, iμ] * Ddiffusion`,
-# forming the full spatial diffusion term of the transport equation.
-# `D` provides the scalar coefficient for each (energy, pitch-angle) bin,
-# while `Ddiffusion` provides the ∂²/∂z² operator along the field line.
-function update_D!(D, model::AuroraModel)
-    energy_grid = model.energy_grid
-    pitch_angle_grid = model.pitch_angle_grid
-    E_edges = energy_grid.E_edges
-    ΔE = energy_grid.ΔE
-    θ_lims = pitch_angle_grid.θ_lims
-    θ_lims_rad = deg2rad.(θ_lims)
-    nE = 3
-    nθ = 3
-    for iE in energy_grid.n:-1:1
-        v = range(v_of_E(E_edges[iE]), v_of_E(E_edges[iE+1]), length=nE)
-        for iθ in 1:(length(θ_lims_rad) - 1)
-            θa = θ_lims_rad[iθ]
-            θb = θ_lims_rad[iθ + 1]
-            if θ_lims_rad[iθ] == π/2
-                θa = θ_lims_rad[iθ] * 0.8 + 0.2 * θ_lims_rad[iθ + 1]
-            end
-            if θ_lims_rad[iθ + 1] == π/2
-                θb = θ_lims_rad[iθ] * 0.2 + 0.8 * θ_lims_rad[iθ + 1]
-            end
-            θ = range(θa, θb, length=nθ)
-            v_par = [A * cos(B) for A in v, B in θ]
-            # Use a standard 100–600 km model span as a representative propagation distance.
-            # TODO: We should use a more realistic propagation distance that depends on the
-            #       actual simulation model geometry
-            t_arrival = 500e3 ./ v_par
-            at_a = (maximum(t_arrival) + minimum(t_arrival)) / 2
-            dt_a = (maximum(t_arrival) - minimum(t_arrival))
-            D_val = (dt_a / 4)^2 / at_a
-
-            D[iE, iθ] = abs(D_val)
-        end
-    end
-    return nothing
-end
-
-# See comment above `update_D!`: `Ddiffusion` is the ∂²/∂z² finite-difference operator
-# and is always multiplied by the scalar `D[iE, iμ]` in the solvers.
-function update_Ddiffusion!(Ddiffusion, model::AuroraModel)
-    z = model.s_field
-    dzd = z[2:end-1] - z[1:end-2]
-    dzu = z[3:end]   - z[2:end-1]
-
-    dsup  = [2 ./ (dzd .* (dzd + dzu)) ; 0]
-    dMain = [0 ; -2 ./ (dzd .* dzu) ; 0]
-    dsub  = [0 ; 2 ./ (dzu .* (dzd + dzu))]
-
-    # Update the sparse matrix in place by rebuilding it
-    # Note: SparseArrays don't support true in-place modification of structure
-    D2M = spdiagm( -1 => dsup,
-                    0 => dMain,
-                    1 => dsub)
-    D2M[1, 1] = 0.0
-
-    # Copy the new matrix structure into the existing one
-    copyto!(Ddiffusion, D2M)
-
-    return nothing
-end
-
 """
     update_matrices!(matrices, model, iE, B2B_kernel)
 
@@ -271,7 +206,7 @@ end
 """
     initialize_transport_matrices(model, t)
 
-Create a `TransportMatrices` container initialized with zeros for A, B, D, Q and Ddiffusion.
+Create a `TransportMatrices` container initialized with zeros for A, B and Q.
 """
 function initialize_transport_matrices(model::AuroraModel, t)
     n_altitude = length(model.altitude_grid.h)

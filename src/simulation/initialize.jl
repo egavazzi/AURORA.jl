@@ -71,8 +71,6 @@ function build_simulation_workspace(sim::AuroraSimulation, time::AbstractTimeCon
     solver = SolverWorkspace()
     degradation = DegradationWorkspace{N_neutrals}(length(μ_center), n_t, length(z), n_E)
     matrices = initialize_transport_matrices(model, t_loop)
-    update_D!(matrices.D, model)
-    update_Ddiffusion!(matrices.Ddiffusion, model)
 
     # Pre-compute the beam-to-beam scattering kernel
     B2B_kernel = beams2beams_kernel(model.scattering.Ω_subbeam_relative, model.scattering.P_scatter)
