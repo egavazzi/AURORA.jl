@@ -22,7 +22,6 @@ function v_of_E(E)
 end
 
 
-using HCubature: hcubature
 """
     mu_avg(θ_lims)
 
@@ -41,14 +40,12 @@ for isotropically distributed fluxes within each beam, i.e the fluxes are weight
 function mu_avg(θ_lims)
     μ_center = zeros(length(θ_lims) - 1)
     for i in eachindex(μ_center)
-        μ_center[i] = hcubature(x -> cosd.(x) .* sind.(x), [θ_lims[i]], [θ_lims[i + 1]])[1][1] ./
-                      hcubature(x -> sind.(x), [θ_lims[i]], [θ_lims[i + 1]])[1][1]
+        μ_center[i] = (cosd(θ_lims[i]) + cosd(θ_lims[i + 1])) / 2
     end
     return μ_center
 end
 
 
-using QuadGK: quadgk
 """
     beam_weight(θ_lims)
 
@@ -66,7 +63,7 @@ Return the beam weights of the pitch-angle beams delimited by θ_lims.
 function beam_weight(θ_lims)
     BeamW = Vector{Float64}(undef, length(θ_lims) - 1)
     for i_μ in eachindex(BeamW)
-        BeamW[i_μ] = 2 * π * abs(quadgk(sin, deg2rad(θ_lims[i_μ]), deg2rad(θ_lims[i_μ + 1]))[1])
+        BeamW[i_μ] = 2 * π * abs(cosd(θ_lims[i_μ]) - cosd(θ_lims[i_μ + 1]))
     end
     return BeamW
 end
