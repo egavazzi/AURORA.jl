@@ -179,8 +179,8 @@ function estimate_simulation_memory(n_z::Int, n_μ::Int, n_E::Int, n_t::Int,
     # ── Arrays independent of the loop split ──
     Ie_top   = n_μ * n_t * n_E                  # workspace.Ie_top — full flux, never split
     I0       = n_zμ * n_E                       # workspace.I0
-    # Transport matrices: A (n_z) + B (n_z·n_μ²) + D (n_E·n_μ) + Ddiffusion (≈3·n_z stored)
-    matrices = n_z + n_z * n_μ^2 + n_E * n_μ + 3 * n_z
+    # Transport matrices: A (n_z) + B (n_z·n_μ²)
+    matrices = n_z + n_z * n_μ^2
     # Degradation energy spectra (2·N·n_E) + thermal-loss vector (n_z)
     misc     = 2 * N_neutrals * n_E + n_z
     # Sparse solver (Mlhs, Mrhs and the KLU factorisation). Both matrices share a block

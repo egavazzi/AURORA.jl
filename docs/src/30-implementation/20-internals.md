@@ -17,7 +17,6 @@ discrete in ``\mu`` and ``E``):
 ```math
 \frac{\partial I_e}{\partial t} =
     \underbrace{-\mu \, v \, \frac{\partial I_e}{\partial z}}_{\text{streaming}}
-    + \underbrace{\frac{\partial}{\partial z}\left(D \frac{\partial I_e}{\partial z}\right)}_{\text{diffusion}}
     - \underbrace{A \cdot I_e}_{\text{losses}}
     + \underbrace{B \cdot I_e}_{\text{pitch-angle scattering}}
     + \underbrace{Q}_{\text{sources}}
@@ -29,14 +28,11 @@ where:
 - ``A(z, E)`` contains the total loss frequency from collisions with neutrals and thermal
   electrons
 - ``B(z, E, \mu \to \mu')`` is the pitch-angle scattering matrix
-- ``D(z, E, \mu)`` is the spatial diffusion coefficient (due to finite pitch-angle widths)
 - ``Q(z, \mu, t, E)`` is the source term from energy cascading (ionization secondaries and
   degraded primaries from higher energies)
 
 The spatial domain is discretized on a non-uniform altitude grid with ``I_e`` defined at
-cell centers. Different finite difference schemes are used depending on the nature of each
-term: the streaming term uses directional (upwind) differences, while the diffusion term
-uses central differences.
+cell centers. The streaming term uses directional (upwind) finite differences.
 
 ## Matrix representation
 
@@ -44,8 +40,8 @@ The state vector at a given energy ``E`` is the flux flattened over altitude and
 angle: ``\vec{I_e} \in \mathbb{R}^{n_z \times n_\mu}``. The spatial operator is assembled
 as a block matrix of size ``(n_z n_\mu) \times (n_z n_\mu)``:
 
-- **Diagonal blocks** (one per beam ``\mu_i``): tridiagonal in the altitude dimension,
-  containing the streaming, diffusion, and loss terms.
+- **Diagonal blocks** (one per beam ``\mu_i``): bidiagonal in the altitude dimension,
+  containing the streaming and loss terms.
 - **Off-diagonal blocks**: sparse, connecting different pitch-angle beams via the
   scattering matrix ``B``.
 
@@ -67,9 +63,6 @@ The **streaming term** ``-\mu v \, \partial I_e / \partial z`` uses directional
 and a forward difference for downward-going beams (``\mu < 0``). This choice is dictated
 by the physics — the derivative should be evaluated using information from the direction
 the beam is coming from.
-
-The **diffusion term** ``\partial_z(D \, \partial_z I_e)`` uses central differences,
-as diffusion spreads information symmetrically in both directions.
 
 ## Crank-Nicolson discretization
 
@@ -132,20 +125,6 @@ B(\mu_i \to \mu_j) = \sum_s n_s(z) \cdot v(E) \sum_k \sigma_k^s(E) \cdot P_k(\mu
 
 where ``P_k`` is the scattering probability for collision process ``k``.
 
-### Diffusion coefficient D
-
-`update_D!(D, model)` computes the spatial diffusion coefficient for each energy and
-pitch-angle bin. Within a discrete bin, electrons span a range of parallel velocities
-``v\cos\theta``. This spread causes electrons in the same beam to arrive at different
-altitudes at different times. The diffusion coefficient D models this spread of travel times:
-
-```math
-D[iE, i\mu] = \frac{(\Delta t_{\text{arrival}} / 4)^2}{\bar{t}_{\text{arrival}}}
-```
-
-where ``\Delta t_{\text{arrival}}`` is the range of arrival times across the bin and
-``\bar{t}_{\text{arrival}}`` is the mean. ``D`` vanishes for infinitely narrow bins.
-
 ### Source term Q
 
 `update_Q!(Q, iE, ...)` accumulates contributions from higher energies into the source
@@ -176,7 +155,7 @@ low, these contributions are fully computed before they are needed.
 
 At each energy step:
 
-1. **Update matrices** — recompute A, B, D for the current energy (cross sections are
+1. **Update matrices** — recompute A and B for the current energy (cross sections are
    energy-dependent).
 2. **Solve** — advance the Crank-Nicolson scheme (time-dependent) or invert the system
    (steady-state) to obtain ``I_e`` at this energy.

@@ -8,7 +8,7 @@ mutable struct SolverWorkspace
     Mrhs::SparseArrays.SparseMatrixCSC{Float64, Int64}
     indices_lhs::Matrix{BlockIndices}     # nzval index map for Mlhs  (SS + CN)
     indices_rhs::Matrix{BlockIndices}     # nzval index map for Mrhs  (CN only)
-    op_diags::OperatorDiagonals           # dense diagonals of Ddz_Up, Ddz_Down, Ddiffusion
+    op_diags::OperatorDiagonals           # dense diagonals of Ddz_Up, Ddz_Down
     rhs::Vector{Float64}                  # reusable RHS buffer for Crank-Nicolson time-stepping
 end
 
@@ -19,8 +19,7 @@ function SolverWorkspace()
     dummy_bi = BlockIndices(Int[], Int[], Int[], 0, 0, 0)
     indices_lhs = fill(dummy_bi, 1, 1)
     indices_rhs = fill(dummy_bi, 1, 1)
-    op_diags = OperatorDiagonals(
-        [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0])
+    op_diags = OperatorDiagonals([0.0], [0.0], [0.0], [0.0])
     rhs = Float64[]
 
     return SolverWorkspace(KLU_factorization, false, Mlhs, Mrhs, indices_lhs, indices_rhs,
