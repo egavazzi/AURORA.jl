@@ -48,7 +48,6 @@ function mu_avg(θ_lims)
 end
 
 
-using QuadGK: quadgk
 """
     beam_weight(θ_lims)
 
@@ -66,7 +65,7 @@ Return the beam weights of the pitch-angle beams delimited by θ_lims.
 function beam_weight(θ_lims)
     BeamW = Vector{Float64}(undef, length(θ_lims) - 1)
     for i_μ in eachindex(BeamW)
-        BeamW[i_μ] = 2 * π * abs(quadgk(sin, deg2rad(θ_lims[i_μ]), deg2rad(θ_lims[i_μ + 1]))[1])
+        BeamW[i_μ] = 2 * π * abs(cosd(θ_lims[i_μ]) - cosd(θ_lims[i_μ + 1]))
     end
     return BeamW
 end
