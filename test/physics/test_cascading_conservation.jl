@@ -432,7 +432,6 @@ end
 
         # Coarse and rebinned-fine entries each carry quadrature error at rtol = 1e-4
         # (see fill_single_ionization_bin!), so they agree only to a few 1e-4
-        # (measured max ≈ 3.8e-4 on this grid).
         @test isapprox(coarse_primary, rebinned_primary; rtol = 1e-3)
         @test isapprox(coarse_secondary, rebinned_secondary; rtol = 1e-3)
     end

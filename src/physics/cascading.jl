@@ -362,11 +362,8 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
-    # Progress reporting: at most one status update every `progress_interval` seconds, so
-    # small grids that finish quickly print nothing extra (a live progress bar breaks there).
-    # On a terminal the update rewrites its line in place and each threshold pass ends as a
-    # single completed line; when stdout is redirected (log files) every update is a plain
-    # appended line instead, since carriage returns would garble the log.
+    # Throttle progress updates. Rewrite a TTY line in place, but append log-friendly lines
+    # when stdout is redirected.
     t_start = time()
     last_report = Threads.Atomic{Float64}(t_start)
     printed_progress = Threads.Atomic{Bool}(false)
@@ -415,7 +412,7 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
             if verbose
                 t_now = time()
                 t_last = last_report[]
-                # Only one thread wins the compare-and-swap, so at most one update per interval.
+                # Report at most once per interval.
                 if t_now - t_last >= progress_interval &&
                    Threads.atomic_cas!(last_report, t_last, t_now) === t_last
                     # The opening "Calculating..." print has no newline; break it once.
@@ -479,11 +476,6 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
         E_degraded_upper = min(E_degraded_bin_max, E_primary_bin_max - threshold)
         # Integrate only if limits are physical
         if E_degraded_upper > E_degraded_lower
-            # rtol = 1e-4 keeps every entry within ~2e-4 of its value at the hcubature
-            # default rtol (~1.5e-8) and the spectrum row sums within ~1.2e-4, while
-            # bounding the subdivision depth and building full-grid matrices ~1.1-1.3x
-            # faster. It is in line with the rtol = 1e-3 already used for the 3-D
-            # double-ionization integrals below.
             result, _ = hcubature(degraded_integrand, (E_degraded_lower, 0.0),
                                  (E_degraded_upper, 1.0);
                                  rtol = 1e-4, buffer = primary_buf)
@@ -504,7 +496,6 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
         E_secondary_upper = min(E_secondary_bin_max, E_secondary_boundary_upper)
         # Integrate only if limits are physical
         if E_secondary_upper > E_secondary_bin_min
-            # See the tolerance comment on the degraded-primary integral above.
             result, _ = hcubature(secondary_integrand, (E_secondary_bin_min, 0.0),
                                  (E_secondary_upper, 1.0);
                                  rtol = 1e-4, buffer = secondary_buf)
