@@ -44,8 +44,8 @@ end
 """
     OperatorDiagonals
 
-Dense vectors extracted once from the sparse finite-difference operators `Ddz_Up`,
-`Ddz_Down` and `Ddiffusion`.  Storing them avoids repeated CSC look-ups during the
+Dense vectors extracted once from the sparse finite-difference operators `Ddz_Up`
+and `Ddz_Down`.  Storing them avoids repeated CSC look-ups during the
 value-update phase.
 
 Fields with suffix `_diag` hold the main diagonal, `_sub` the sub-diagonal
@@ -59,24 +59,18 @@ struct OperatorDiagonals
     # Ddz_Down (used for downward streams, μ < 0)
     Ddz_Down_diag::Vector{Float64}  # length n_z
     Ddz_Down_super::Vector{Float64} # length n_z−1
-
-    # Ddiffusion (pitch-angle diffusion ∂²/∂z²)
-    Ddiff_diag::Vector{Float64}     # length n_z
-    Ddiff_sub::Vector{Float64}      # length n_z−1
-    Ddiff_super::Vector{Float64}    # length n_z−1
 end
 
 """
-    extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+    extract_operator_diagonals(Ddz_Up, Ddz_Down)
 
-Extract the tridiagonal entries of the three finite-difference operators into
+Extract the tridiagonal entries of the finite-difference operators into
 dense vectors for fast element-wise access.
 """
-function extract_operator_diagonals(Ddz_Up, Ddz_Down, Ddiffusion)
+function extract_operator_diagonals(Ddz_Up, Ddz_Down)
     return OperatorDiagonals(
         diag(Ddz_Up, 0),  diag(Ddz_Up, -1),
         diag(Ddz_Down, 0), diag(Ddz_Down, 1),
-        diag(Ddiffusion, 0), diag(Ddiffusion, -1), diag(Ddiffusion, 1),
     )
 end
 
@@ -85,7 +79,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion; include_rhs=false)
+    create_transport_sparsity_pattern(n_z, n_angle, μ; include_rhs=false)
 
 Build the sparse matrix with the correct sparsity structure for the transport
 system.  The returned matrix contains placeholder values; the actual physics
@@ -96,7 +90,7 @@ boundary rows) is also returned – used by Crank-Nicolson.
 
 Returns `Mlhs` or `(Mlhs, Mrhs)`.
 """
-function create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion; include_rhs::Bool = false)
+function create_transport_sparsity_pattern(n_z, n_angle, μ; include_rhs::Bool = false)
     max_nnz = n_angle * n_angle * 3 * n_z
     row_l, col_l, val_l = alloc_coo(max_nnz)
     row_r, col_r, val_r = include_rhs ? alloc_coo(max_nnz) : (Int[], Int[], Float64[])
@@ -107,8 +101,8 @@ function create_transport_sparsity_pattern(n_z, n_angle, μ, D, Ddiffusion; incl
                 add_offdiagonal_block!(row_l, col_l, val_l, i1, i2, n_z)
                 include_rhs && add_offdiagonal_block!(row_r, col_r, val_r, i1, i2, n_z)
             else
-                add_diagonal_block_lhs!(row_l, col_l, val_l, i1, n_z, μ, D, Ddiffusion)
-                include_rhs && add_diagonal_block_rhs!(row_r, col_r, val_r, i1, n_z, μ, D, Ddiffusion)
+                add_diagonal_block_lhs!(row_l, col_l, val_l, i1, n_z, μ)
+                include_rhs && add_diagonal_block_rhs!(row_r, col_r, val_r, i1, n_z, μ)
             end
         end
     end
@@ -139,7 +133,7 @@ function add_offdiagonal_block!(rows, cols, vals, i1, i2, n_z)
     end
 end
 
-function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
+function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ)
     offset = (i1 - 1) * n_z
 
     # First row boundary condition
@@ -149,9 +143,6 @@ function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
         for i in 2:(n_z - 1)
             push!(rows, offset + i); push!(cols, offset + i);     push!(vals, 0.0)  # diag
             push!(rows, offset + i); push!(cols, offset + i + 1); push!(vals, 0.0)  # super
-            if D[i1] != 0 && Ddiffusion[i, i - 1] != 0                              # sub (diffusion)
-                push!(rows, offset + i); push!(cols, offset + i - 1); push!(vals, 0.0)
-            end
         end
         # Last row boundary
         push!(rows, offset + n_z); push!(cols, offset + n_z); push!(vals, 1.0)
@@ -159,9 +150,6 @@ function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
         for i in 2:(n_z - 1)
             push!(rows, offset + i); push!(cols, offset + i);     push!(vals, 0.0)  # diag
             push!(rows, offset + i); push!(cols, offset + i - 1); push!(vals, 0.0)  # sub
-            if D[i1] != 0 && Ddiffusion[i, i + 1] != 0                              # super (diffusion)
-                push!(rows, offset + i); push!(cols, offset + i + 1); push!(vals, 0.0)
-            end
         end
         # Last row boundary
         push!(rows, offset + n_z); push!(cols, offset + n_z - 1); push!(vals, -1.0)
@@ -169,7 +157,7 @@ function add_diagonal_block_lhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
     end
 end
 
-function add_diagonal_block_rhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
+function add_diagonal_block_rhs!(rows, cols, vals, i1, n_z, μ)
     offset = (i1 - 1) * n_z
     # No boundary rows in Mrhs
 
@@ -177,17 +165,11 @@ function add_diagonal_block_rhs!(rows, cols, vals, i1, n_z, μ, D, Ddiffusion)
         for i in 2:(n_z - 1)
             push!(rows, offset + i); push!(cols, offset + i);     push!(vals, 0.0)  # diag
             push!(rows, offset + i); push!(cols, offset + i + 1); push!(vals, 0.0)  # super
-            if D[i1] != 0 && Ddiffusion[i, i - 1] != 0                              # sub (diffusion)
-                push!(rows, offset + i); push!(cols, offset + i - 1); push!(vals, 0.0)
-            end
         end
     else             # upward fluxes
         for i in 2:(n_z - 1)
             push!(rows, offset + i); push!(cols, offset + i);     push!(vals, 0.0)  # diag
             push!(rows, offset + i); push!(cols, offset + i - 1); push!(vals, 0.0)  # sub
-            if D[i1] != 0 && Ddiffusion[i, i + 1] != 0                              # super (diffusion)
-                push!(rows, offset + i); push!(cols, offset + i + 1); push!(vals, 0.0)
-            end
         end
     end
 end
