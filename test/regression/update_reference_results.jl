@@ -6,9 +6,10 @@
 #
 # It reruns the reference simulations, packages the results as a tarball, uploads it as a
 # new asset on the "test-data" GitHub release (requires the `gh` CLI, authenticated with
-# push access), and rewrites test/regression/Artifacts.toml to point at it. Commit the
-# Artifacts.toml change to make the new baselines effective. Assets are append-only: never
-# overwrite an existing one, or older commits will fail their checksum.
+# push access, i.e. must be done by a maintainer), and rewrites/updates the
+# test/regression/Artifacts.toml to point at it. Commit the Artifacts.toml change to make
+# the new baselines effective. Assets are append-only: never overwrite an existing one,
+# or older commits will fail their checksum.
 
 using AURORA
 using Dates
