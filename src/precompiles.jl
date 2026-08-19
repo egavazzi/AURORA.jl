@@ -5,9 +5,9 @@ let
         energy_grid = EnergyGrid(3000)
         θ_lims = 180:-45:0
 
-        msis_file = joinpath(pkgdir(AURORA), "test", "regression", "reference_results",
+        msis_file = joinpath(pkgdir(AURORA), "test", "regression", "input_data",
                              "msis_20051008-2200_70N-19E.txt")
-        iri_file = joinpath(pkgdir(AURORA), "test", "regression", "reference_results",
+        iri_file = joinpath(pkgdir(AURORA), "test", "regression", "input_data",
                             "iri_20051008-2200_70N-19E.txt")
 
         @compile_workload begin
