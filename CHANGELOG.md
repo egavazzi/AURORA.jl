@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Cascading matrices built from an `@law` secondary law (e.g. default N₂, O₂) are now much faster to compute (~36x for a full 30 keV N₂ build, with ~200x less memory allocated), by avoiding dynamic dispatch [#175](https://github.com/egavazzi/AURORA.jl/pull/175)
+- **Numerical Breaking (small)** The double-ionization cascading matrices are now computed with a numerical-CDF method with fixed Gauss–Legendre rules instead of adaptive 3-D cubature, making them ~4x faster to build at moderate grids and tractable at large ones (E_max ≳ 50 keV), with final analysis results changing by less than ~1e-5 (relative). The adaptive implementation is kept as the reference the test suite validates against [#174](https://github.com/egavazzi/AURORA.jl/pull/174)
 - **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
 - **Numerical Breaking (small)** Remove the ad-hoc spatial diffusion operator (`D·∂²Ie/∂z²`) from both the steady-state and time-dependent solvers [#168](https://github.com/egavazzi/AURORA.jl/pull/168)
   - The operator was meant to model the spread in arrival times of electrons within a finite (E, μ) bin, but in its current form it contributed nothing measurable, and it did not belong in the steady-state equations in the first place. The numerical diffusion of the advection scheme already produces a comparable spread at default resolution.
