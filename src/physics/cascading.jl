@@ -593,19 +593,19 @@ end
 # primary/output-bin integrations use the four-point rule.  The cumulative-law table uses
 # the eight-point rule, and the constrained self-convolution uses sixteen points because it
 # may span the sharp low-energy part of a secondary law.
-const _GL4_X = (-0.8611363115940526, -0.3399810435848563,
+const GL4_X = (-0.8611363115940526, -0.3399810435848563,
                  0.3399810435848563,  0.8611363115940526)
-const _GL4_W = ( 0.3478548451374539,  0.6521451548625461,
+const GL4_W = ( 0.3478548451374539,  0.6521451548625461,
                  0.6521451548625461,  0.3478548451374539)
-const _GL8_X = (-0.9602898564975363, -0.7966664774136267,
+const GL8_X = (-0.9602898564975363, -0.7966664774136267,
                 -0.5255324099163290, -0.1834346424956498,
                  0.1834346424956498,  0.5255324099163290,
                  0.7966664774136267,  0.9602898564975363)
-const _GL8_W = ( 0.1012285362903763,  0.2223810344533745,
+const GL8_W = ( 0.1012285362903763,  0.2223810344533745,
                  0.3137066458778873,  0.3626837833783620,
                  0.3626837833783620,  0.3137066458778873,
                  0.2223810344533745,  0.1012285362903763)
-const _GL16_X = (-0.9894009349916499, -0.9445750230732326,
+const GL16_X = (-0.9894009349916499, -0.9445750230732326,
                  -0.8656312023878318, -0.7554044083550030,
                  -0.6178762444026438, -0.4580167776572274,
                  -0.2816035507792589, -0.0950125098376374,
@@ -613,7 +613,7 @@ const _GL16_X = (-0.9894009349916499, -0.9445750230732326,
                   0.4580167776572274,  0.6178762444026438,
                   0.7554044083550030,  0.8656312023878318,
                   0.9445750230732326,  0.9894009349916499)
-const _GL16_W = ( 0.0271524594117541,  0.0622535239386479,
+const GL16_W = ( 0.0271524594117541,  0.0622535239386479,
                   0.0951585116824928,  0.1246289712555339,
                   0.1495959888165767,  0.1691565193950025,
                   0.1826034150449236,  0.1894506104550685,
@@ -622,14 +622,14 @@ const _GL16_W = ( 0.0271524594117541,  0.0622535239386479,
                   0.1246289712555339,  0.0951585116824928,
                   0.0622535239386479,  0.0271524594117541)
 
-@inline function _checked_secondary_law(law, E_secondary, E_primary)
+@inline function checked_secondary_law(law, E_secondary, E_primary)
     value = law(E_secondary, E_primary)
     isfinite(value) || throw(DomainError(value, "secondary law must be finite"))
     value >= 0 || throw(DomainError(value, "secondary law must be nonnegative"))
     return value
 end
 
-@inline function _gauss(f, a, b, X, W)
+@inline function gauss_legendre(f, a, b, X, W)
     b > a || return 0.0
     midpoint = (a + b) / 2
     halfwidth = (b - a) / 2
@@ -639,9 +639,9 @@ end
     end
     return halfwidth * result
 end
-_gauss4(f, a, b) = _gauss(f, a, b, _GL4_X, _GL4_W)
-_gauss8(f, a, b) = _gauss(f, a, b, _GL8_X, _GL8_W)
-_gauss16(f, a, b) = _gauss(f, a, b, _GL16_X, _GL16_W)
+gauss_legendre4(f, a, b) = gauss_legendre(f, a, b, GL4_X, GL4_W)
+gauss_legendre8(f, a, b) = gauss_legendre(f, a, b, GL8_X, GL8_W)
+gauss_legendre16(f, a, b) = gauss_legendre(f, a, b, GL16_X, GL16_W)
 
 """
 Numerical cumulative integral of a custom secondary law at one fixed primary energy.
@@ -676,8 +676,8 @@ function build_secondary_cdf(E_edges, E_max, E_primary, law)
 
     cumulative = zeros(length(edges))
     for i in 1:(length(edges) - 1)
-        mass = _gauss8(edges[i], edges[i + 1]) do E_secondary
-            _checked_secondary_law(law, E_secondary, E_primary)
+        mass = gauss_legendre8(edges[i], edges[i + 1]) do E_secondary
+            checked_secondary_law(law, E_secondary, E_primary)
         end
         cumulative[i + 1] = cumulative[i] + mass
     end
@@ -691,8 +691,8 @@ end
     energy >= cdf.edges[end] && return cdf.cumulative[end]
     i = searchsortedlast(cdf.edges, energy)
     prefix = cdf.cumulative[i]
-    partial = _gauss8(cdf.edges[i], energy) do E_secondary
-        _checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
+    partial = gauss_legendre8(cdf.edges[i], energy) do E_secondary
+        checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
     end
     return prefix + partial
 end
@@ -729,7 +729,7 @@ end
     (0 <= E_secondary <= W / 2) || return 0.0
     partner_upper = min(W - 2 * E_secondary, (W - E_secondary) / 2)
     partner_upper > 0 || return 0.0
-    return _checked_secondary_law(cdf.law, E_secondary, cdf.E_primary) *
+    return checked_secondary_law(cdf.law, E_secondary, cdf.E_primary) *
            cumulative_law(cdf, partner_upper)
 end
 
@@ -745,10 +745,10 @@ end
 
     # The convolution interval is symmetric about secondary_sum/2: integrate its lower
     # half in the numerical cumulative coordinate and double it.
-    integral = _gauss16(C_lower, C_mid) do C
+    integral = gauss_legendre16(C_lower, C_mid) do C
         E_secondary, map_density = inverse_cumulative_map(cdf, C)
-        physical_density = _checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
-        partner_density = _checked_secondary_law(cdf.law, secondary_sum - E_secondary,
+        physical_density = checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
+        partner_density = checked_secondary_law(cdf.law, secondary_sum - E_secondary,
                                                  cdf.E_primary)
         physical_density * partner_density / map_density
     end
@@ -779,9 +779,9 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
     # across the bin. Measured worst per-row degraded-primary sum error is ~1.3e-3 vs the
     # rtol=1e-3 hcubature reference on the standard 3 keV grid — physically negligible, since
     # those rows carry little weight.
-    for k_primary in eachindex(_GL4_X)
-        E_primary = E_primary_mid + E_primary_halfwidth * _GL4_X[k_primary]
-        primary_weight = E_primary_halfwidth * _GL4_W[k_primary]
+    for k_primary in eachindex(GL4_X)
+        E_primary = E_primary_mid + E_primary_halfwidth * GL4_X[k_primary]
+        primary_weight = E_primary_halfwidth * GL4_W[k_primary]
         W = E_primary - threshold
         W > 0 || continue
         cdf = build_secondary_cdf(E_edges, W / 2, E_primary, law)
@@ -799,7 +799,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             lower = max(E_edges[i_degraded], W / 3)
             upper = min(E_edges[i_degraded + 1], W)
             upper > lower || continue
-            value = _gauss4(lower, upper) do E_degraded
+            value = gauss_legendre4(lower, upper) do E_degraded
                 double_primary_density_cdf(E_degraded, threshold, cdf)
             end
             primary_transfer_matrix[i_primary, i_degraded, i_threshold] +=
@@ -814,7 +814,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             lower = E_edges[i_secondary]
             upper = min(E_edges[i_secondary + 1], W / 2)
             upper > lower || continue
-            value = _gauss4(lower, upper) do E_secondary
+            value = gauss_legendre4(lower, upper) do E_secondary
                 double_secondary_density(E_secondary, threshold, cdf)
             end
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] +=
