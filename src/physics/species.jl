@@ -107,7 +107,7 @@ end
 
 """
     N2Species(density_source)
-    N2Species(neutrals::NeutralProfile)
+    N2Species(neutrals::NeutralAtmosphere)
     N2Species(msis_file::AbstractString)
 
 Construct the default N₂ species with cross sections from the built-in `e_N2_*` library,
@@ -115,11 +115,11 @@ phase function from [`phase_fcn_N2`](@ref), and cascading described by
 [`DefaultCascadingSpecN2`](@ref).
 
 `density_source` can be a [`DensityProfile`](@ref) or any callable `h_atm (m) → density
-(m⁻³)`. Passing a [`NeutralProfile`](@ref) is shorthand for `neutrals[:N2]`; passing an MSIS
+(m⁻³)`. Passing a [`NeutralAtmosphere`](@ref) is shorthand for `neutrals[:N2]`; passing an MSIS
 file path string is shorthand for `read_msis_file(msis_file)[:N2]`. Grid-dependent fields are
 populated later by `initialize!(model)`.
 """
-function N2Species(neutrals::NeutralProfile)
+function N2Species(neutrals::NeutralAtmosphere)
     return N2Species(neutrals[:N2])
 end
 function N2Species(msis_file::AbstractString)
@@ -133,12 +133,12 @@ end
 
 """
     O2Species(density_source)
-    O2Species(neutrals::NeutralProfile)
+    O2Species(neutrals::NeutralAtmosphere)
     O2Species(msis_file::AbstractString)
 
 Default O₂ species, analogous to [`N2Species`](@ref).
 """
-function O2Species(neutrals::NeutralProfile)
+function O2Species(neutrals::NeutralAtmosphere)
     return O2Species(neutrals[:O2])
 end
 function O2Species(msis_file::AbstractString)
@@ -152,12 +152,12 @@ end
 
 """
     OSpecies(density_source)
-    OSpecies(neutrals::NeutralProfile)
+    OSpecies(neutrals::NeutralAtmosphere)
     OSpecies(msis_file::AbstractString)
 
 Default O species, analogous to [`N2Species`](@ref).
 """
-function OSpecies(neutrals::NeutralProfile)
+function OSpecies(neutrals::NeutralAtmosphere)
     return OSpecies(neutrals[:O])
 end
 function OSpecies(msis_file::AbstractString)

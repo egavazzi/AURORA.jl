@@ -3,15 +3,16 @@
 ## Unreleased
 - **Breaking** Bring your own neutral and electron profiles [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - `AuroraModel` now takes the neutral atmosphere and electron background as in-memory
-    profiles (`NeutralProfile`, `ElectronProfile`) instead of MSIS/IRI file paths. Profiles
+    data (`NeutralAtmosphere`, `ElectronProfile`) instead of MSIS/IRI file paths. These
     store the data itself, so a model saved to `physics_state.jld2` reloads on any machine
     without the original files. Passing file paths still works; they are read once, at
     construction.
-  - Profiles can come from a live model run (`run_msis`, `run_iri`), a CCMC ModelWeb export
+  - They can come from a live model run (`run_msis`, `run_iri`), a CCMC ModelWeb export
     (`read_ccmc_msis`, `read_ccmc_iri`), an AURORA-generated file (`read_msis_file`,
-    `read_iri_file`), or your own vectors (`DensityProfile`, `ElectronProfile`).
+    `read_iri_file`), or your own vectors (`DensityProfile`, `ElectronProfile`). All carry
+    a free-form `origin` string recording provenance, written into `inputs/atmosphere.nc`.
   - Sampling a profile outside its native altitude range now warns, since the values there
-    are extrapolated. Passing anything other than a `NeutralProfile` or an MSIS file path as
+    are extrapolated. Passing anything other than a `NeutralAtmosphere` or an MSIS file path as
     the model's `neutrals` argument is an error (a single density source cannot describe the
     whole atmosphere).
   - **Breaking** `NeutralSpecies.density_profile` is renamed `density_source`. `MSISDensity`

@@ -93,8 +93,8 @@ function require_reproducible(law, role::AbstractString)
         "$role is a bare anonymous function and cannot be saved for reproducibility. \
          Wrap it with @law (e.g. `@law $role`), or pass a functor or named function."))
     if isempty(methods(law))
-        hint = law isa NeutralProfile ?
-            " A NeutralProfile holds one density per species; index it, e.g. `neutrals[:N2]`." : ""
+        hint = law isa NeutralAtmosphere ?
+            " A NeutralAtmosphere holds one density per species; index it, e.g. `neutrals[:N2]`." : ""
         throw(ArgumentError("$role must be callable, got a $(typeof(law)).$hint"))
     end
     return law

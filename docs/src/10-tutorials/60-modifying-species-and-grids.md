@@ -61,7 +61,7 @@ model.species[:N2].density
 
 ```julia
 # Your own measured/downloaded profile, given as vectors (optionally tag its provenance):
-model.species[:N2].density_source = DensityProfile(altitude_m, density_m3; source="ccmc_run.txt")
+model.species[:N2].density_source = DensityProfile(altitude_m, density_m3; origin="ccmc_run.txt")
 
 # Or read an existing AURORA-generated MSIS file (returns a DensityProfile):
 model.species[:N2].density_source = read_msis_file(msis_file)[:N2]
@@ -69,7 +69,7 @@ model.species[:N2].density_source = read_msis_file(msis_file)[:N2]
 
 ### Densities from another atmospheric model (e.g. a CCMC ModelWeb run)
 
-For a whole atmosphere at once, [`NeutralProfile`](@ref) holds one [`DensityProfile`](@ref) per
+For a whole atmosphere at once, [`NeutralAtmosphere`](@ref) holds one [`DensityProfile`](@ref) per
 species and can be passed straight to [`AuroraModel`](@ref) in place of an MSIS file. Three
 functions build one for you:
 
@@ -103,7 +103,7 @@ rows = readdlm("some_model_output.txt")
 h_m  = Float64.(rows[2:end, 1]) .* 1e3     # km  → m
 n_N2 = Float64.(rows[2:end, 2]) .* 1e6     # cm⁻³ → m⁻³
 
-model.species[:N2].density_source = DensityProfile(h_m, n_N2; source="some_model_output.txt")
+model.species[:N2].density_source = DensityProfile(h_m, n_N2; origin="some_model_output.txt")
 ```
 
 `DensityProfile` and [`ElectronProfile`](@ref) check their vectors as you build them — matching
@@ -153,7 +153,7 @@ electrons = read_ccmc_iri("iri_output.txt")
 electrons = read_iri_file(iri_file)
 
 # Or your own vectors (altitude m, ne m⁻³, Te K):
-electrons = ElectronProfile(h_m, ne_m3, Te_K; source="my profile")
+electrons = ElectronProfile(h_m, ne_m3, Te_K; origin="my profile")
 
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
@@ -184,7 +184,7 @@ model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], la
 
 Pass an explicit `species` tuple to the constructor. The defaults are
 `N2Species`/`O2Species`/`OSpecies`, which are helper functions accepting a density source
-(a whole [`NeutralProfile`](@ref), a single [`DensityProfile`](@ref), or an MSIS file path).
+(a whole [`NeutralAtmosphere`](@ref), a single [`DensityProfile`](@ref), or an MSIS file path).
 
 ```julia
 # Two species only:

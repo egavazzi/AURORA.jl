@@ -3,7 +3,7 @@
 ## MSIS (Neutral Atmosphere)
 ```@docs; canonical=false
 find_msis_file
-NeutralProfile
+NeutralAtmosphere
 run_msis
 read_msis_file
 read_ccmc_msis

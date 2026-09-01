@@ -48,7 +48,7 @@ function find_msis_file(;
     end
 
     # Otherwise, calculate and save new MSIS data. Generating files is deprecated: prefer
-    # run_msis, which returns a NeutralProfile stored in (and round-tripped with) the model
+    # run_msis, which returns a NeutralAtmosphere stored in (and round-tripped with) the model
     # rather than written to disk.
     @warn """
     find_msis_file() is generating a new MSIS file via the Python `pymsis` package, which is \

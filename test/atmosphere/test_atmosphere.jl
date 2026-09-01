@@ -76,7 +76,7 @@ end
     ccmc_file = joinpath(@__DIR__, "test_data", "iri_ccmc_output.txt")
     p = read_ccmc_iri(ccmc_file)
     @test p isa ElectronProfile
-    @test occursin("CCMC IRI", p.source)
+    @test occursin("CCMC IRI", p.origin)
     @test all(p.ne .> 0) && all(p.Te .> 0)        # sentinel rows dropped
     @test 1e11 < maximum(p.ne) < 1e13             # m⁻³ (cm⁻³ × 1e6), F-peak ~1e12
     ne, Te = p(z)
@@ -86,7 +86,7 @@ end
     # Legacy AURORA IRI file: read_iri_file matches the Ionosphere-via-path result exactly
     iri_file = joinpath(@__DIR__, "test_data", "iri_20051008-2200_70N-19E.txt")
     pl = read_iri_file(iri_file)
-    @test occursin("IRI file", pl.source)
+    @test occursin("IRI file", pl.origin)
     ne1, Te1 = pl(z)
     iono = Ionosphere(iri_file, z)
     @test iono.electron_source isa ElectronProfile
@@ -95,7 +95,7 @@ end
 
     # Bring-your-own vectors
     e = ElectronProfile([40e3, 100e3, 300e3, 850e3], [1e10, 1e11, 8e11, 5e10],
-                        [250.0, 400.0, 1000.0, 1400.0]; source="byo")
+                        [250.0, 400.0, 1000.0, 1400.0]; origin="byo")
     ne2, Te2 = e(z)
     @test length(ne2) == length(z) && all(ne2 .> 0) && all(Te2 .> 0)
 
@@ -103,14 +103,14 @@ end
     @test_throws ArgumentError read_ccmc_iri(iri_file)
 end
 
-@testitem "NeutralProfile sources (CCMC, legacy file)" begin
+@testitem "NeutralAtmosphere sources (CCMC, legacy file)" begin
     z = make_altitude_grid(100, 600)
 
     # CCMC ModelWeb NRLMSIS export: preamble note, densities in cm⁻³, 9.999E-38 sentinels
     ccmc_file = joinpath(@__DIR__, "test_data", "msis_ccmc_output.txt")
     p = read_ccmc_msis(ccmc_file)
-    @test p isa NeutralProfile
-    @test occursin("CCMC NRLMSIS", p.source)
+    @test p isa NeutralAtmosphere
+    @test occursin("CCMC NRLMSIS", p.origin)
     @test all(haskey(p, s) for s in (:N2, :O2, :O))
 
     n_N2 = p[:N2](z)
@@ -127,7 +127,7 @@ end
     msis_file = find_msis_file(; verbose=false)
     np  = read_msis_file(msis_file)
     raw = AURORA.load_msis(msis_file)
-    @test occursin("MSIS file", np.source)
+    @test occursin("MSIS file", np.origin)
     for species in (:N2, :O2, :O)
         valid = AURORA.usable_levels(getproperty(raw.data, species))
         @test np[species].h ≈ raw.data.height_km[valid] .* 1e3 rtol=1e-12
@@ -139,14 +139,14 @@ end
 end
 
 
-@testitem "NeutralProfile reports species it dropped" begin
+@testitem "NeutralAtmosphere reports species it dropped" begin
     # A species the source carries but never usably reports is dropped at read time. Asking
     # for it later must say why, rather than looking like the species was never there.
     densities, dropped = AURORA.species_densities(
         [100e3, 200e3, 300e3],
         Dict(:N2 => [1e18, 1e17, 1e16], :NO => [NaN, NaN, NaN]),
         "test source")
-    np = NeutralProfile(densities; source="test source", dropped)
+    np = NeutralAtmosphere(densities; origin="test source", dropped)
 
     @test haskey(np, :N2)
     @test !haskey(np, :NO)
@@ -160,15 +160,15 @@ end
     @test !occursin("fewer than 2 usable levels", absent)
 end
 
-@testitem "run_msis returns a NeutralProfile matching the file path" begin
+@testitem "run_msis returns a NeutralAtmosphere matching the file path" begin
     z = make_altitude_grid(100, 500)
     conditions = (; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
                     lat = 69.58, lon = 19.23, height = 85:5:600)
 
     np = run_msis(; conditions..., verbose = false)
-    @test np isa NeutralProfile
+    @test np isa NeutralAtmosphere
     @test all(haskey(np, s) for s in (:N2, :O2, :O))
-    @test occursin("NRLMSIS 2.1", np.source)
+    @test occursin("NRLMSIS 2.1", np.origin)
 
     # MSIS reports no N below ~95 km (NaN); those levels are dropped for that species only,
     # so :N starts higher than :N2 instead of carrying NaN into the interpolation.
@@ -204,14 +204,14 @@ end
                                                                 [200.0, 0.0, 400.0])
 
     # A valid profile still builds, and reports where it came from
-    @test DensityProfile(h, [1e18, 1e17, 1e16]; source = "ok") isa DensityProfile
-    @test occursin("ok", sprint(show, DensityProfile(h, [1e18, 1e17, 1e16]; source = "ok")))
+    @test DensityProfile(h, [1e18, 1e17, 1e16]; origin = "ok") isa DensityProfile
+    @test occursin("ok", sprint(show, DensityProfile(h, [1e18, 1e17, 1e16]; origin = "ok")))
 end
 
 @testitem "Sampling outside a profile's native range warns" begin
     h = [100e3, 200e3, 300e3]
-    d = DensityProfile(h, [1e18, 1e17, 1e16]; source = "narrow")
-    e = ElectronProfile(h, [1e10, 1e11, 1e12], [200.0, 300.0, 400.0]; source = "narrow")
+    d = DensityProfile(h, [1e18, 1e17, 1e16]; origin = "narrow")
+    e = ElectronProfile(h, [1e10, 1e11, 1e12], [200.0, 300.0, 400.0]; origin = "narrow")
 
     # Sampling within the native range is silent
     @test_nowarn d([150e3, 250e3])
@@ -228,7 +228,7 @@ end
 
     # A single density source is rejected: it would otherwise silently become the density of
     # N2, O2, and O alike.
-    @test_throws "neutrals must be a NeutralProfile" AuroraModel(
+    @test_throws "neutrals must be a NeutralAtmosphere" AuroraModel(
         [100, 200], 180:-90:0, 100, @law(h -> fill(1e18, length(h))), electrons)
 
     # The swapped-arguments mistake keeps its dedicated hint
@@ -318,7 +318,7 @@ end
             200.0    3.127E+09   2.100E+09  1.338E+08
             """)
         p = read_ccmc_msis(file)
-        @test p isa NeutralProfile
+        @test p isa NeutralAtmosphere
         @test sort(collect(keys(p))) == [:N2, :O, :O2]
         # The short (100 km) row has too few tokens to parse any column and is dropped
         @test minimum(p[:N2].h) == 150e3

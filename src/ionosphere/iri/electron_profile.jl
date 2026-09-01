@@ -5,7 +5,7 @@ using Dates: DateTime
 # ======================================================================================== #
 
 """
-    ElectronProfile(h, ne, Te; source="")
+    ElectronProfile(h, ne, Te; origin="")
 
 Electron background (electron density `ne` and temperature `Te`) defined on a native altitude
 grid. Callable on any altitude grid (m); returns the tuple `(ne, Te)` interpolated to that grid
@@ -22,11 +22,11 @@ machine with no external file.
 - `h`: native altitude (m)
 - `ne`: electron number density (m⁻³)
 - `Te`: electron temperature (K)
-- `source`: free-form provenance label, shown by `show` and written into `inputs/atmosphere.nc`
+- `origin`: free-form provenance label, shown by `show` and written into `inputs/atmosphere.nc`
 
 # Example
 ```julia
-profile = ElectronProfile(h_m, ne_m3, Te_K; source="my measurement")
+profile = ElectronProfile(h_m, ne_m3, Te_K; origin="my measurement")
 ne, Te  = profile(altitude_grid.h)
 ```
 """
@@ -34,13 +34,13 @@ struct ElectronProfile
     h::Vector{Float64}    # native altitude (m)
     ne::Vector{Float64}   # electron density (m⁻³)
     Te::Vector{Float64}   # electron temperature (K)
-    source::String        # provenance label (free-form, may be empty)
+    origin::String        # provenance label (free-form, may be empty)
 end
 
-function ElectronProfile(h, ne, Te; source::AbstractString = "")
+function ElectronProfile(h, ne, Te; origin::AbstractString = "")
     h, ne, Te = collect(Float64, h), collect(Float64, ne), collect(Float64, Te)
     check_profile_grid("ElectronProfile", h, ("ne", ne), ("Te", Te))
-    return ElectronProfile(h, ne, Te, String(source))
+    return ElectronProfile(h, ne, Te, String(origin))
 end
 
 function (p::ElectronProfile)(h_atm::AbstractVector)
@@ -54,7 +54,7 @@ Base.show(io::IO, p::ElectronProfile) = print(io, profile_label(p))
 
 function Base.show(io::IO, ::MIME"text/plain", p::ElectronProfile)
     println(io, "ElectronProfile:")
-    println(io, "├── Source:    ", isempty(p.source) ? "(unlabelled)" : p.source)
+    println(io, "├── Origin:    ", isempty(p.origin) ? "(unlabelled)" : p.origin)
     println(io, "├── Altitudes: ", length(p.h),
                 " ($(p.h[1] / 1e3) – $(p.h[end] / 1e3) km)")
     println(io, "├── Max ne:    ", round(maximum(p.ne), sigdigits=3), " m⁻³")
@@ -91,14 +91,14 @@ function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     iri_data, _ = calculate_iri_data(; year, month, day, hour, minute, lat, lon, height, verbose)
     data        = iri_data[2:end, :]               # drop the header row
     instant     = DateTime(year, month, day, hour, minute)
-    source      = "IRI-2020 $instant $(lat)N/$(lon)E"
+    origin      = "IRI-2020 $instant $(lat)N/$(lon)E"
 
     raw = (height_km = Float64.(data[:, 1]),
            ne        = Float64.(data[:, 2]),       # electron density (m⁻³)
            Te        = Float64.(data[:, 5]))       # electron temperature (K)
     trimmed = trim_iri_sentinels(raw, "IRI-2020 run for $instant at $(lat)N/$(lon)E\n")
 
-    return ElectronProfile(trimmed.height_km .* 1e3, trimmed.ne, trimmed.Te; source)
+    return ElectronProfile(trimmed.height_km .* 1e3, trimmed.ne, trimmed.Te; origin)
 end
 
 """
@@ -113,7 +113,7 @@ Kept for backward compatibility with existing IRI files; for new runs prefer [`r
 function read_iri_file(iri_file::AbstractString)
     raw = load_iri(iri_file)
     return ElectronProfile(raw.data.height_km .* 1e3, raw.data.ne, raw.data.Te;
-                           source = "IRI file $(basename(iri_file))")
+                           origin = "IRI file $(basename(iri_file))")
 end
 
 """
@@ -174,5 +174,5 @@ function read_ccmc_iri(file::AbstractString)
         "read_ccmc_iri: no valid (non-sentinel) data rows parsed from $file"))
 
     return ElectronProfile(h_km .* 1e3, ne .* 1e6, Te;   # km→m, cm⁻³→m⁻³
-                           source = "CCMC IRI $(basename(file))")
+                           origin = "CCMC IRI $(basename(file))")
 end
