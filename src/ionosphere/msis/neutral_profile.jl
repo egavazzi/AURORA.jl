@@ -1,4 +1,3 @@
-using DataInterpolations: PCHIPInterpolation, ExtrapolationType
 using Dates: DateTime
 
 # ======================================================================================== #
@@ -36,9 +35,7 @@ function DensityProfile(h, n; source::AbstractString = "")
 end
 
 function (d::DensityProfile)(h_atm::AbstractVector)
-    itp = PCHIPInterpolation(log.(d.n), d.h ./ 1e3;
-                             extrapolation = ExtrapolationType.Linear)
-    return exp.(itp(collect(Float64, h_atm) ./ 1e3))
+    return interpolate_profile(d.n, d.h ./ 1e3, h_atm; log_interpolation = true)
 end
 
 Base.show(io::IO, d::DensityProfile) = print(io, profile_label(d))
@@ -128,10 +125,20 @@ end
 # are still aligned; names at or after it address the wrong data column, and would hand back
 # a species holding its neighbour's density. Return the width of the aligned prefix so the
 # caller can drop the rest.
+#
+# The data column count is the modal token count across data rows (rows whose first token
+# parses as a number), not just the first one: a single short or non-numeric row after the
+# header would otherwise be mistaken for the run-together shape of every row.
 function trusted_header_width(header, lines, header_idx, file)
-    first_data = findfirst(l -> !isempty(strip(l)), @view lines[(header_idx + 1):end])
-    first_data === nothing && return length(header)
-    n_data = length(split(lines[header_idx + first_data]))
+    token_counts = Int[]
+    for l in @view lines[(header_idx + 1):end]
+        isempty(strip(l)) && continue
+        tokens = split(l)
+        tryparse(Float64, tokens[1]) === nothing && continue
+        push!(token_counts, length(tokens))
+    end
+    isempty(token_counts) && return length(header)
+    n_data = argmax(n -> count(==(n), token_counts), unique(token_counts))
     n_data == length(header) && return length(header)
 
     # A name with ')' before its last character is two names glued together.
@@ -166,6 +173,21 @@ function species_densities(h_m, densities, label)
     end
     return out, dropped
 end
+
+# Normalize whatever was passed as the model's neutrals argument. A legacy MSIS file path is
+# read eagerly, once, so the default species do not each re-read the file.
+to_neutral_source(p::NeutralProfile)    = p
+to_neutral_source(path::AbstractString) = read_msis_file(path)
+to_neutral_source(x)                    = x
+to_neutral_source(p::ElectronProfile)   = throw(ArgumentError(
+    "neutrals must provide neutral densities; got an ElectronProfile, which holds the " *
+    "electron background. Did you swap the neutrals and electrons arguments?"))
+
+# The mirror-image mistake, caught here (rather than in to_electron_source) because
+# NeutralProfile is not yet defined when electron_profile.jl is included.
+to_electron_source(p::NeutralProfile) = throw(ArgumentError(
+    "electrons must provide (ne, Te); got a NeutralProfile, which holds neutral densities. " *
+    "Pass an ElectronProfile instead (e.g. from run_iri, read_iri_file, or read_ccmc_iri)."))
 
 
 # ======================================================================================== #
@@ -259,18 +281,12 @@ model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function read_ccmc_msis(file::AbstractString)
-    lines      = readlines(file)
-    header_idx = findfirst(l -> occursin("N2den", l), lines)
-    header_idx === nothing && throw(ArgumentError(
-        "read_ccmc_msis: could not find the CCMC column header (a line containing " *
-        "\"N2den\") in $file. Is this a CCMC ModelWeb NRLMSIS export?"))
-
+    lines = readlines(file)
     # The header names its columns one-for-one with the data columns, so look up the ones we
     # need by name. The unit is part of the name, which keeps a change of unit from being
     # read as if it were cm⁻³.
-    header = split(lines[header_idx])
-    column = Dict(name => i for (i, name) in enumerate(header))
-    columns_found = "Columns found: " * join(header, ", ")
+    header_idx, header, column, columns_found = locate_ccmc_header(
+        lines, l -> occursin("N2den", l), file, "read_ccmc_msis", "a line containing \"N2den\"")
     trusted = trusted_header_width(header, lines, header_idx, file)
 
     haskey(column, "Heit(km)") || throw(ArgumentError(

@@ -60,7 +60,7 @@ function write_atmosphere_nc(sim::AuroraSimulation)
                        attrib=["units" => "m", "long_name" => "altitude"])
         alt_v[:] = model.altitude_grid.h
 
-        e_source = electron_source_label(ionosphere.electron_source)
+        e_source = profile_label(ionosphere.electron_source)
         ne_v = defVar(ds, "ne", Float64, ("altitude",); deflatelevel=dl,
                       attrib=["units" => "m-3", "long_name" => "electron number density",
                               "source" => e_source])

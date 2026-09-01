@@ -47,7 +47,15 @@ function find_msis_file(;
         return file_to_load
     end
 
-    # Otherwise, calculate and save new MSIS data
+    # Otherwise, calculate and save new MSIS data. Generating files is deprecated: prefer
+    # run_msis, which returns a NeutralProfile stored in (and round-tripped with) the model
+    # rather than written to disk.
+    @warn """
+    find_msis_file() is generating a new MSIS file via the Python `pymsis` package, which is \
+    deprecated. Prefer run_msis for new runs, e.g.:
+        neutrals = run_msis(; year=$year, month=$month, day=$day, hour=$hour, minute=$minute, lat=$lat, lon=$lon)
+        model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+    Reading existing MSIS files (via read_msis_file / AuroraModel) remains supported.""" maxlog = 1
     msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon,
                                                 height, verbose)
     file_to_load = save_msis_data(msis_data, parameters; verbose)

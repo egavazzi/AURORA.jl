@@ -509,6 +509,12 @@ end
         @law h -> fill(n0, length(h))
     end)
 
+    # A non-callable object is rejected too — the realistic mistake of assigning a whole
+    # NeutralProfile as density_source instead of indexing it (neutrals[:N2])
+    @test_throws "must be callable" AURORA.NeutralSpecies(:G, read_msis_file(msis_file);
+                                   cascading_spec      = AURORA.DefaultCascadingSpecN2(),
+                                   phase_fcn_generator = AURORA.phase_fcn_N2)
+
     # @law, functors and named functions are all accepted
     @test (@law h -> fill(1e15, length(h))) isa ExprLaw
     sp = AURORA.N2Species(read_msis_file(msis_file)[:N2])

@@ -272,8 +272,29 @@ end
         write(iri_m3, "km Ne/m-3 Te/K\n100.0 4.8077E+10 159\n")
         @test_throws "no \"Ne/cm-3\" column" read_ccmc_iri(iri_m3)
 
-        # A file with no Ne column at all is what "not a CCMC IRI export" is reserved for
-        @test_throws "Is this a CCMC ModelWeb IRI export?" read_ccmc_iri(no_species)
+        # A file with no Ne column at all is what "not a CCMC ModelWeb export" is reserved for
+        @test_throws "Is this a CCMC ModelWeb export?" read_ccmc_iri(no_species)
+    end
+end
+
+@testitem "read_ccmc_msis survives a short first data row" begin
+    # The data column count must come from the modal token count across data rows, not just
+    # the first one: a single short row after the header (e.g. a truncated first altitude)
+    # must not make the reader think every row is that short and reject the whole file.
+    mktempdir() do dir
+        file = joinpath(dir, "short_first_row.txt")
+        write(file, """
+            Preamble line, not data
+            Heit(km) N2den(cm-3) Oden(cm-3) O2den(cm-3)
+            100.0    6.884E+12   4.793E+11
+            150.0    2.690E+10   7.917E+09  1.965E+09
+            200.0    3.127E+09   2.100E+09  1.338E+08
+            """)
+        p = read_ccmc_msis(file)
+        @test p isa NeutralProfile
+        @test sort(collect(keys(p))) == [:N2, :O, :O2]
+        # The short (100 km) row has too few tokens to parse any column and is dropped
+        @test minimum(p[:N2].h) == 150e3
     end
 end
 

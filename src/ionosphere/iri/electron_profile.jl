@@ -49,7 +49,7 @@ function (p::ElectronProfile)(h_atm::AbstractVector)
     return (ne, Te)
 end
 
-Base.show(io::IO, p::ElectronProfile) = print(io, electron_source_label(p))
+Base.show(io::IO, p::ElectronProfile) = print(io, profile_label(p))
 
 function Base.show(io::IO, ::MIME"text/plain", p::ElectronProfile)
     println(io, "ElectronProfile:")
@@ -68,11 +68,10 @@ to_electron_source(p::ElectronProfile)   = p
 to_electron_source(path::AbstractString) = read_iri_file(path)
 to_electron_source(f)                    = require_reproducible(f, "electron_source")
 
-function electron_source_label(p::ElectronProfile)
+function profile_label(p::ElectronProfile)
     isempty(p.source) && return "ElectronProfile($(length(p.h)) points)"
     return "ElectronProfile($(length(p.h)) points, source=$(p.source))"
 end
-electron_source_label(x) = string(typeof(x))
 
 
 # ======================================================================================== #
@@ -148,24 +147,22 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function read_ccmc_iri(file::AbstractString)
-    lines      = readlines(file)
-    # Match the header on the unit-free "Ne/" so that an export in other units still gets
-    # past detection and fails on the named-column check below, which says what is wrong.
-    # ("Ne/" alone is unambiguous; a bare "Ne" would also match preamble prose.)
-    header_idx = findfirst(l -> occursin("Ne/", l), lines)
-    header_idx === nothing && throw(ArgumentError(
-        "read_ccmc_iri: could not find the CCMC column header (a line naming an \"Ne/…\" " *
-        "column) in $file. Is this a CCMC ModelWeb IRI export?"))
-
+    lines = readlines(file)
+    # Match the header on the unit-free "Ne/" so that an export in other units still gets past
+    # detection and fails on the named-column check below, which says what is wrong ("Ne/"
+    # alone is unambiguous; a bare "Ne" would also match preamble prose). Also require the "km"
+    # altitude token, needed later anyway, so that preamble prose mentioning "Ne/" in passing
+    # cannot be mistaken for the header.
+    #
     # The header names its columns one-for-one with the data columns, so look up the ones we
     # need by name. The unit is part of the name, which keeps a change of unit from being
     # read as if it were cm⁻³.
-    header = split(lines[header_idx])
-    column = Dict(name => i for (i, name) in enumerate(header))
+    header_idx, header, column, columns_found = locate_ccmc_header(
+        lines, l -> occursin("Ne/", l) && "km" in split(l), file, "read_ccmc_iri",
+        "a line naming an \"Ne/…\" column")
     for name in ("km", "Ne/cm-3", "Te/K")
         haskey(column, name) || throw(ArgumentError(
-            "read_ccmc_iri: no \"$name\" column in the header of $file.\n" *
-            "Columns found: " * join(header, ", ")))
+            "read_ccmc_iri: no \"$name\" column in the header of $file.\n" * columns_found))
     end
     h_col, ne_col, Te_col = column["km"], column["Ne/cm-3"], column["Te/K"]
     n_cols = max(h_col, ne_col, Te_col)

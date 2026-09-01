@@ -26,7 +26,7 @@ function Base.show(io::IO, ::MIME"text/plain", iono::Ionosphere)
     nz = length(iono.ne)
     println(io, "Ionosphere:")
     println(io, "├── Altitudes: $(nz)")
-    println(io, "├── Electrons: $(electron_source_label(iono.electron_source))")
+    println(io, "├── Electrons: $(profile_label(iono.electron_source))")
     println(io, "├── Max Te:    $(round(maximum(iono.Te), sigdigits=3)) K")
     print(io,   "└── Max ne:    $(round(maximum(iono.ne), sigdigits=3)) m⁻³")
 end

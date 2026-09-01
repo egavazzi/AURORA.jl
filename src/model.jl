@@ -65,8 +65,11 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
 An uninitialized `AuroraModel`. Call `initialize!(model)` or `run!(sim)` to complete setup.
 """
 function AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons, B_angle_to_zenith=0;
-                     species = (N2Species(neutrals), O2Species(neutrals),
-                                OSpecies(neutrals)))
+                     species = nothing)
+    if species === nothing
+        neutrals = to_neutral_source(neutrals)
+        species  = (N2Species(neutrals), O2Species(neutrals), OSpecies(neutrals))
+    end
     altitude_grid    = AltitudeGrid(altitude_lims[1], altitude_lims[2])
     energy_grid      = EnergyGrid(E_max)
     pitch_angle_grid = PitchAngleGrid(θ_lims)

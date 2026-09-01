@@ -367,3 +367,26 @@ function check_profile_grid(type_name, h, values...)
 end
 
 
+"""
+    locate_ccmc_header(lines, ismarker, file, reader, kind)
+
+Locate the single-line column header of a CCMC ModelWeb export and index its names.
+
+`ismarker` is applied to each line to find the header line (e.g. a line containing a
+species column name). `reader` and `kind` are used only to word the error message when no
+line matches. Returns `(header_idx, header, column, columns_found)`, where `header` is the
+header line split on whitespace, `column` maps each header name to its 1-based token index,
+and `columns_found` is a ready-to-append `"Columns found: ..."` string for error messages
+about missing or misplaced columns.
+"""
+function locate_ccmc_header(lines, ismarker, file, reader, kind)
+    header_idx = findfirst(ismarker, lines)
+    header_idx === nothing && throw(ArgumentError(
+        "$reader: could not find the CCMC column header ($kind) in $file. " *
+        "Is this a CCMC ModelWeb export?"))
+    header = split(lines[header_idx])
+    column = Dict(name => i for (i, name) in enumerate(header))
+    return header_idx, header, column, "Columns found: " * join(header, ", ")
+end
+
+
