@@ -40,6 +40,36 @@ model.energy_grid.n
 When a simulation already exists, just change the grid and call `run!(sim)` — it detects the
 change and rebuilds the model and its cache before solving.
 
+## How the background atmosphere lives on the model
+
+The types around the background atmosphere follow a small vocabulary:
+
+- A **profile** is one quantity versus altitude, callable on any altitude grid:
+  [`DensityProfile`](@ref) (one species' density) and [`ElectronProfile`](@ref) (`ne` and
+  `Te` together, which share a grid). Both validate their vectors at construction.
+- [`NeutralAtmosphere`](@ref) is a **collection**: one `DensityProfile` per species, keyed
+  by symbol (`neutrals[:N2]`). It is what `run_msis` / `read_msis_file` / `read_ccmc_msis`
+  return and what the model's `neutrals` argument expects.
+- A `*_source` field names the **role** "where a sampled quantity comes from". Any
+  reproducible callable can fill it; the profile types are the standard fillers.
+- `origin` is the free-form **provenance** string inside a profile, shown by `show` and
+  written into `inputs/atmosphere.nc`.
+
+On the model itself, every sampled quantity sits next to the source it was sampled from, so
+`initialize!` can re-sample after a grid change and a saved model reloads without external
+files:
+
+| Sampled on the model grid | Sampled from |
+| --- | --- |
+| `model.species[:N2].density` | `model.species[:N2].density_source` |
+| `model.ionosphere.ne`, `model.ionosphere.Te` | `model.ionosphere.electron_source` |
+
+The two sides are stored differently on purpose: electron data is centralized on
+`model.ionosphere`, while neutral densities live on the individual species — each species
+needs its density next to its cross sections and cascading data. There is no
+`model.atmosphere`; the `NeutralAtmosphere` you pass in is unpacked into the species at
+construction.
+
 ## Changing a species' density source
 
 Each species carries a `density_source`: a callable mapping altitude (m) to density (m⁻³).
