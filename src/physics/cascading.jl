@@ -342,11 +342,13 @@ The outer loop structure is identical for all species. The only species-specific
 
 Single-ionization channels are integrated with adaptive cubature (`rtol = 1e-4`).
 Double-ionization channels use the numerical-CDF method with fixed Gauss-Legendre rules
-(see `fill_double_ionization_bin_cdf!`): on rows carrying real weight it agrees with a
-tight adaptive reference to a few 1e-4, and its cost stays bounded on large grids where
-adaptive integration of the 3-D integrands becomes intractable (E_max ≳ 50 keV). Rows just
-above the threshold (~1e-5 of the weight) are less accurate (up to ~1e-1); the test suite
-validates the method against the adaptive reference implementation.
+(see `fill_double_ionization_bin_cdf!`), whose cost per row stays bounded on large grids
+where adaptive integration of the 3-D integrands becomes intractable (E_max ≳ 50 keV).
+On rows carrying real weight, its row sums agree with the adaptive reference
+(`rtol = 1e-3`) to a few 1e-3, and individual matrix entries to ~1e-2 away from the bins
+clipped by the kinematic boundaries; those clipped bins and the rows just above the
+threshold (~1e-5 of the weight) are less accurate (up to ~1e-1). The test suite validates
+the method against the adaptive reference implementation.
 
 # Arguments
 - `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
@@ -632,13 +634,14 @@ end
     midpoint = (a + b) / 2
     halfwidth = (b - a) / 2
     result = 0.0
-    @inbounds for k in eachindex(X)
-        result += W[k] * f(midpoint + halfwidth * X[k])
+    for (x, w) in zip(X, W)
+        result += w * f(midpoint + halfwidth * x)
     end
     return halfwidth * result
 end
 _gauss4(f, a, b) = _gauss(f, a, b, _GL4_X, _GL4_W)
 _gauss8(f, a, b) = _gauss(f, a, b, _GL8_X, _GL8_W)
+_gauss16(f, a, b) = _gauss(f, a, b, _GL16_X, _GL16_W)
 
 """
 Numerical cumulative integral of a custom secondary law at one fixed primary energy.
@@ -694,77 +697,62 @@ end
     return prefix + partial
 end
 
-# Piecewise-linear cumulative coordinate used solely as an importance map.  Returning its
-# local slope makes the subsequent change of variables exact for this map: the physical law
-# is still evaluated explicitly and divided by dC/dE.
-@inline function cumulative_map(cdf::NumericalSecondaryCDF, energy)
-    energy <= 0 && return 0.0
-    energy >= cdf.edges[end] && return cdf.cumulative[end]
-    i = searchsortedlast(cdf.edges, energy)
-    fraction = (energy - cdf.edges[i]) / (cdf.edges[i + 1] - cdf.edges[i])
-    return cdf.cumulative[i] +
-           fraction * (cdf.cumulative[i + 1] - cdf.cumulative[i])
-end
+# Piecewise-linear cumulative coordinate used solely as an importance map: the physical law
+# is still evaluated explicitly and divided by the map's local slope dC/dE, which makes the
+# change of variables exact for this map.  `edges[1] == 0.0`, so `interp_flat`'s flat
+# extrapolation clamps to 0 below the support and to the total mass above it.
+@inline cumulative_map(cdf::NumericalSecondaryCDF, energy) =
+    interp_flat(cdf.edges, cdf.cumulative, energy)
 
+# Inverse of the piecewise-linear cumulative map, returning the pre-image energy and the
+# local slope dC/dE (the change-of-variables density).  `cumulative` is nondecreasing and
+# `searchsortedlast` returns the last knot at or below the query, so zero-mass (flat) runs
+# below the query are stepped over by construction; a flat run at the very top is stepped
+# over backwards so the returned slope is that of the last positive-mass interval.  The
+# query is clamped to the map's range to absorb floating-point rounding at the endpoints.
 @inline function inverse_cumulative_map(cdf::NumericalSecondaryCDF, cumulative_value)
-    cumulative_value <= 0 && return (0.0, Inf)
-    cumulative_value >= cdf.cumulative[end] && return (cdf.edges[end], Inf)
-
-    i = searchsortedlast(cdf.cumulative, cumulative_value)
-    i = min(i, length(cdf.cumulative) - 1)
-    # Flat cumulative intervals represent zero-mass bins.  Interior Gauss nodes should not
-    # land there, but skip them defensively for custom laws with compact/disjoint support.
-    while i < length(cdf.cumulative) && cdf.cumulative[i + 1] <= cumulative_value
-        i += 1
+    C = clamp(cumulative_value, 0.0, cdf.cumulative[end])
+    i = min(searchsortedlast(cdf.cumulative, C), length(cdf.cumulative) - 1)
+    while i >= 1 && cdf.cumulative[i + 1] <= cdf.cumulative[i]
+        i -= 1
     end
-    i >= length(cdf.cumulative) && return (cdf.edges[end], Inf)
-
+    i >= 1 || throw(DomainError(cumulative_value,
+        "secondary law has zero total mass on the CDF support; its cumulative map has no inverse"))
     mass = cdf.cumulative[i + 1] - cdf.cumulative[i]
-    mass > 0 || return (cdf.edges[i], Inf)
     width = cdf.edges[i + 1] - cdf.edges[i]
-    fraction = (cumulative_value - cdf.cumulative[i]) / mass
+    fraction = (C - cdf.cumulative[i]) / mass
     return cdf.edges[i] + fraction * width, mass / width
 end
 
-@inline function double_secondary_density(E_secondary, E_primary, threshold,
-                                           law, cdf::NumericalSecondaryCDF)
-    W = E_primary - threshold
+@inline function double_secondary_density(E_secondary, threshold, cdf::NumericalSecondaryCDF)
+    W = cdf.E_primary - threshold
     (0 <= E_secondary <= W / 2) || return 0.0
     partner_upper = min(W - 2 * E_secondary, (W - E_secondary) / 2)
     partner_upper > 0 || return 0.0
-    return _checked_secondary_law(law, E_secondary, E_primary) *
+    return _checked_secondary_law(cdf.law, E_secondary, cdf.E_primary) *
            cumulative_law(cdf, partner_upper)
 end
 
-@inline function double_primary_density_cdf(E_degraded, E_primary, threshold,
-                                             law, cdf::NumericalSecondaryCDF)
-    W = E_primary - threshold
+@inline function double_primary_density_cdf(E_degraded, threshold, cdf::NumericalSecondaryCDF)
+    W = cdf.E_primary - threshold
     (W / 3 <= E_degraded <= W) || return 0.0
     secondary_sum = W - E_degraded
     secondary_sum > 0 || return 0.0
 
     E_lower = max(0.0, secondary_sum - E_degraded)
-    E_mid = secondary_sum / 2
     C_lower = cumulative_map(cdf, E_lower)
-    C_mid = cumulative_map(cdf, E_mid)
-    C_width = C_mid - C_lower
-    C_width > 0 || return 0.0
+    C_mid = cumulative_map(cdf, secondary_sum / 2)
 
-    # The convolution interval is symmetric about secondary_sum/2.  Integrate its lower
-    # half in the numerical cumulative coordinate and double it.  Mapping y from [-1,1]
-    # to [C_lower,C_mid] and applying the symmetry factor leaves the prefactor C_width.
-    result = 0.0
-    @inbounds for k in eachindex(_GL16_X)
-        C = (C_lower + C_mid) / 2 + (C_width / 2) * _GL16_X[k]
+    # The convolution interval is symmetric about secondary_sum/2: integrate its lower
+    # half in the numerical cumulative coordinate and double it.
+    integral = _gauss16(C_lower, C_mid) do C
         E_secondary, map_density = inverse_cumulative_map(cdf, C)
-        isfinite(map_density) || continue
-        physical_density = _checked_secondary_law(law, E_secondary, E_primary)
-        partner_density = _checked_secondary_law(law,
-                                                  secondary_sum - E_secondary,
-                                                  E_primary)
-        result += _GL16_W[k] * physical_density * partner_density / map_density
+        physical_density = _checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
+        partner_density = _checked_secondary_law(cdf.law, secondary_sum - E_secondary,
+                                                 cdf.E_primary)
+        physical_density * partner_density / map_density
     end
-    return C_width * result
+    return 2 * integral
 end
 
 """
@@ -791,14 +779,20 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
     # across the bin. Measured worst per-row degraded-primary sum error is ~1.3e-3 vs the
     # rtol=1e-3 hcubature reference on the standard 3 keV grid — physically negligible, since
     # those rows carry little weight.
-    @inbounds for k_primary in eachindex(_GL4_X)
+    for k_primary in eachindex(_GL4_X)
         E_primary = E_primary_mid + E_primary_halfwidth * _GL4_X[k_primary]
         primary_weight = E_primary_halfwidth * _GL4_W[k_primary]
         W = E_primary - threshold
         W > 0 || continue
         cdf = build_secondary_cdf(E_edges, W / 2, E_primary, law)
 
-        # Degraded primary marginal: d in [W/3, W].
+        # Degraded primary marginal: d in [W/3, W]. The upper clamp can reach i_primary
+        # itself only when a bin is wider than the ionization threshold (W ≥
+        # E_edges[i_primary]); such a diagonal entry would be counted in the normalization
+        # of `compute_ionization_spectra!` but never deposited by
+        # `add_ionization_collisions!`. Energy grids must keep ΔE below the ionization
+        # thresholds (the standard grid caps ΔE at 11.65 eV, and
+        # `warn_if_bins_wider_than_ionization_threshold` warns on grids that do not).
         i_min_degraded = max(1, searchsortedlast(E_left, W / 3))
         i_max_degraded = min(i_primary, searchsortedlast(E_left, W))
         for i_degraded in i_min_degraded:i_max_degraded
@@ -806,7 +800,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             upper = min(E_edges[i_degraded + 1], W)
             upper > lower || continue
             value = _gauss4(lower, upper) do E_degraded
-                double_primary_density_cdf(E_degraded, E_primary, threshold, law, cdf)
+                double_primary_density_cdf(E_degraded, threshold, cdf)
             end
             primary_transfer_matrix[i_primary, i_degraded, i_threshold] +=
                 primary_weight * value
@@ -821,7 +815,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             upper = min(E_edges[i_secondary + 1], W / 2)
             upper > lower || continue
             value = _gauss4(lower, upper) do E_secondary
-                double_secondary_density(E_secondary, E_primary, threshold, law, cdf)
+                double_secondary_density(E_secondary, threshold, cdf)
             end
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] +=
                 primary_weight * value

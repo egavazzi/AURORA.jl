@@ -546,65 +546,93 @@ end
 # The production double-ionization path (numerical-CDF + fixed Gauss-Legendre rules,
 # `fill_double_ionization_bin_cdf!`) has no built-in error estimate, so validate it here
 # against the adaptive-cubature reference (`fill_double_ionization_bin!`, rtol = 1e-3),
-# which has a controlled error for any secondary law. Tolerances cover both methods'
-# quadrature errors: on rows carrying real weight both agree to a few 1e-3; rows just above
-# the threshold carry ~1e-5 of the weight and are allowed a looser bound (the fixed
-# primary-bin rule does not resolve the kinematic-clamp kinks there).
+# which has a controlled error for any secondary law. Two laws of different regularity are
+# checked: the smooth Lorentzian-like N2/O2 shape and the atomic-O law, whose
+# piecewise-linear E_p-dependence has kinks at its parameter knots. Tolerances cover both
+# methods' quadrature errors: on rows carrying real weight the row sums agree to a few
+# 1e-3 and individual entries to ~1e-2; rows just above the threshold carry ~1e-5 of the
+# weight and are allowed a looser bound (the fixed primary-bin rule does not resolve the
+# kinematic-clamp kinks there).
 @testitem "Cascading double-ionization CDF matches adaptive reference" begin
     using AURORA
     using HCubature: hcubature_buffer
 
-    law = AURORA.@law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-    threshold = 42.0
-    spec = AURORA.CascadingSpec("TEST", [threshold], law; n_secondaries = [2])
+    smooth_law = AURORA.@law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+    o_law = AURORA.OSecondaryLaw([100.0, 200, 500, 1000, 2000],
+                                 [12.6, 13.7, 14.1, 14.0, 13.7],
+                                 [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22)
+
     E_edges, _, _ = AURORA.make_energy_grid(1500.0)
     E_left = E_edges[1:end-1]
     n_E = length(E_left)
-    i_first = searchsortedfirst(E_left, threshold)
+    # Grid for the event-count consistency check: subdivide [0, grid floor) into thirds so
+    # no secondary energy falls below the lowest edge.
+    zero_floor_edges = vcat(range(0.0, E_edges[1]; length = 4)[1:end-1], E_edges)
 
-    # Production path
-    Qp, Qs, _, _ = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+    for (law, threshold) in ((smooth_law, 42.0), (o_law, 28.5))
+        spec = AURORA.CascadingSpec("TEST", [threshold], law; n_secondaries = [2])
+        i_first = searchsortedfirst(E_left, threshold)
 
-    # Adaptive reference, on every active row
-    P = zeros(n_E, n_E, 1)
-    S = zeros(n_E, n_E, 1)
-    pbuf = hcubature_buffer(AURORA.DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, law),
-                            (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
-    sbuf = hcubature_buffer(AURORA.DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, law),
-                            (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
-    for i_p in i_first:n_E
-        AURORA.fill_double_ionization_bin!(P, S, E_edges, E_left, threshold, i_p, 1,
-                                           law, pbuf, sbuf)
-    end
+        # Production path
+        Qp, Qs, _, _ = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
 
-    for (ref, cdf) in ((P, Qp), (S, Qs))
-        row_ref = vec(sum(ref[:, :, 1]; dims = 2))
-        row_cdf = vec(sum(cdf[:, :, 1]; dims = 2))
-        w_max = maximum(row_ref)
-        for i in i_first:n_E
-            row_ref[i] > 0 || continue
-            rel = abs(row_cdf[i] - row_ref[i]) / max(row_ref[i], row_cdf[i])
-            if row_ref[i] > 0.01 * w_max
-                @test rel < 2e-2       # rows that matter: both methods within a few 1e-3
-            else
-                @test rel < 2e-1       # near-threshold rows: negligible weight, loose bound
+        # Adaptive reference, on every active row
+        P = zeros(n_E, n_E, 1)
+        S = zeros(n_E, n_E, 1)
+        pbuf = hcubature_buffer(AURORA.DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, law),
+                                (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        sbuf = hcubature_buffer(AURORA.DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, law),
+                                (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        for i_p in i_first:n_E
+            AURORA.fill_double_ionization_bin!(P, S, E_edges, E_left, threshold, i_p, 1,
+                                               law, pbuf, sbuf)
+        end
+
+        for (ref, cdf) in ((P, Qp), (S, Qs))
+            row_ref = vec(sum(ref[:, :, 1]; dims = 2))
+            row_cdf = vec(sum(cdf[:, :, 1]; dims = 2))
+            w_max = maximum(row_ref)
+            for i in i_first:n_E
+                row_ref[i] > 0 || continue
+                rel = abs(row_cdf[i] - row_ref[i]) / max(row_ref[i], row_cdf[i])
+                if row_ref[i] > 0.01 * w_max
+                    @test rel < 2e-2   # rows that matter: both methods within a few 1e-3
+                    # The solver consumes the spectra bin by bin, so the row's shape matters
+                    # too: check entries carrying at least 1 % of the row's largest entry.
+                    # The bins clipped by the kinematic boundaries and the rows just above
+                    # the threshold see the clamp kinks the fixed rules do not resolve
+                    # (measured up to ~1.2e-1); everywhere else both methods agree to ~1e-2.
+                    e_max = maximum(@view ref[i, :, 1])
+                    jlo, jhi = extrema(findall(>(0), @view ref[i, :, 1]))
+                    for j in 1:n_E
+                        ref[i, j, 1] > 0.01 * e_max || continue
+                        rel_entry = abs(cdf[i, j, 1] - ref[i, j, 1]) /
+                                    max(ref[i, j, 1], cdf[i, j, 1])
+                        if j <= jlo + 1 || j >= jhi - 1 || E_left[i] < 4 * threshold
+                            @test rel_entry < 2e-1
+                        else
+                            @test rel_entry < 3e-2
+                        end
+                    end
+                else
+                    @test rel < 2e-1   # near-threshold rows: negligible weight, loose bound
+                end
             end
         end
-    end
 
-    # Internal consistency: both marginals count the same double-ionization events (Z₂), so
-    # their row sums must agree wherever all three outgoing electrons land on-grid. On the
-    # standard grid the secondary marginal loses the below-floor part of the law (~12 % for
-    # the ~1.9 eV floor) by design, so run this check on a zero-floor grid, where the two
-    # sums agree to a few 1e-4.
-    zero_floor_edges = vcat(0.0, 0.63, 1.27, E_edges)
-    Qp0, Qs0, _, _ = AURORA.calculate_cascading_matrices(spec, zero_floor_edges; verbose = false)
-    E_left0 = zero_floor_edges[1:end-1]
-    row_p = vec(sum(Qp0[:, :, 1]; dims = 2))
-    row_s = vec(sum(Qs0[:, :, 1]; dims = 2))
-    i_hi = searchsortedfirst(E_left0, 10 * threshold)
-    for i in i_hi:length(E_left0)
-        row_p[i] > 0 || continue
-        @test isapprox(row_p[i], row_s[i]; rtol = 5e-3)
+        # Internal consistency: both marginals count the same double-ionization events
+        # (Z₂), so their row sums must agree wherever all three outgoing electrons land
+        # on-grid. On the standard grid the secondary marginal loses the below-floor part
+        # of the law by design, so run this check on the zero-floor grid.
+        Qp0, Qs0, _, _ = AURORA.calculate_cascading_matrices(spec, zero_floor_edges;
+                                                             verbose = false)
+        E_left0 = zero_floor_edges[1:end-1]
+        row_p = vec(sum(Qp0[:, :, 1]; dims = 2))
+        row_s = vec(sum(Qs0[:, :, 1]; dims = 2))
+        i_hi = searchsortedfirst(E_left0, 10 * threshold)
+        for i in i_hi:length(E_left0)
+            row_p[i] > 0 || continue
+            @test isapprox(row_p[i], row_s[i]; rtol = 5e-3)
+        end
     end
 end
