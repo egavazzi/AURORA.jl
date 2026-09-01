@@ -208,6 +208,33 @@ end
     @test occursin("ok", sprint(show, DensityProfile(h, [1e18, 1e17, 1e16]; source = "ok")))
 end
 
+@testitem "Sampling outside a profile's native range warns" begin
+    h = [100e3, 200e3, 300e3]
+    d = DensityProfile(h, [1e18, 1e17, 1e16]; source = "narrow")
+    e = ElectronProfile(h, [1e10, 1e11, 1e12], [200.0, 300.0, 400.0]; source = "narrow")
+
+    # Sampling within the native range is silent
+    @test_nowarn d([150e3, 250e3])
+    @test_nowarn e([150e3, 250e3])
+
+    # Sampling past either end is extrapolation and must say so
+    @test_logs (:warn, r"outside its native altitude range") d([50e3, 150e3])
+    @test_logs (:warn, r"outside its native altitude range") e([150e3, 400e3])
+end
+
+@testitem "The model's neutrals argument must describe a whole atmosphere" begin
+    electrons = ElectronProfile([90e3, 200e3, 400e3], [1e10, 1e11, 1e12],
+                                [200.0, 500.0, 1500.0])
+
+    # A single density source is rejected: it would otherwise silently become the density of
+    # N2, O2, and O alike.
+    @test_throws "neutrals must be a NeutralProfile" AuroraModel(
+        [100, 200], 180:-90:0, 100, @law(h -> fill(1e18, length(h))), electrons)
+
+    # The swapped-arguments mistake keeps its dedicated hint
+    @test_throws "Did you swap" AuroraModel([100, 200], 180:-90:0, 100, electrons, electrons)
+end
+
 @testitem "An electron source must be reproducible" begin
     z = make_altitude_grid(100, 200)
     iri_file = find_iri_file(; verbose = false)

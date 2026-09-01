@@ -44,6 +44,7 @@ function ElectronProfile(h, ne, Te; source::AbstractString = "")
 end
 
 function (p::ElectronProfile)(h_atm::AbstractVector)
+    warn_extrapolation(p, h_atm)
     ne = interpolate_profile(p.ne, p.h ./ 1e3, h_atm; log_interpolation = true)
     Te = interpolate_profile(p.Te, p.h ./ 1e3, h_atm; log_interpolation = false)
     return (ne, Te)
@@ -58,19 +59,6 @@ function Base.show(io::IO, ::MIME"text/plain", p::ElectronProfile)
                 " ($(p.h[1] / 1e3) – $(p.h[end] / 1e3) km)")
     println(io, "├── Max ne:    ", round(maximum(p.ne), sigdigits=3), " m⁻³")
     print(io,   "└── Max Te:    ", round(maximum(p.Te), sigdigits=3), " K")
-end
-
-# Normalize whatever was passed as an electron source into a callable h_atm → (ne, Te).
-# A legacy IRI file path is read eagerly into an ElectronProfile so the result round-trips.
-# A custom callable is held to the same reproducibility bar as a species' density_source,
-# since it has to survive the round-trip through physics_state.jld2 just the same.
-to_electron_source(p::ElectronProfile)   = p
-to_electron_source(path::AbstractString) = read_iri_file(path)
-to_electron_source(f)                    = require_reproducible(f, "electron_source")
-
-function profile_label(p::ElectronProfile)
-    isempty(p.source) && return "ElectronProfile($(length(p.h)) points)"
-    return "ElectronProfile($(length(p.h)) points, source=$(p.source))"
 end
 
 

@@ -13,6 +13,7 @@ export Ionosphere
 include("ionosphere/iri/iri.jl")
 include("ionosphere/msis/msis.jl")
 include("ionosphere/msis/neutral_profile.jl")
+include("ionosphere/profile_sources.jl")
 export find_msis_file, find_nrlmsis_file
 export NeutralProfile, DensityProfile, run_msis, read_msis_file, read_ccmc_msis
 export find_iri_file

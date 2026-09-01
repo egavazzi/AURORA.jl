@@ -19,10 +19,10 @@ re-initialization needed.
 
 ```@example modular
 using AURORA
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
+neutrals  = run_msis()
+electrons = run_iri()
 
-model = AuroraModel([100, 300], 180:-90:0, 100, msis_file, iri_file)
+model = AuroraModel([100, 300], 180:-90:0, 100, neutrals, electrons)
 initialize!(model)
 model.initialized
 ```
@@ -183,13 +183,13 @@ model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], la
 ## Adding, removing, or replacing species
 
 Pass an explicit `species` tuple to the constructor. The defaults are
-`N2Species`/`O2Species`/`OSpecies`, which are helper functions accepting
-a density source (i.e. msis_file).
+`N2Species`/`O2Species`/`OSpecies`, which are helper functions accepting a density source
+(a whole [`NeutralProfile`](@ref), a single [`DensityProfile`](@ref), or an MSIS file path).
 
 ```julia
 # Two species only:
-model = AuroraModel(alt_lims, θ_lims, E_max, msis_file, iri_file;
-                    species = (O2Species(msis_file), OSpecies(msis_file)))
+model = AuroraModel(alt_lims, θ_lims, E_max, neutrals, electrons;
+                    species = (O2Species(neutrals), OSpecies(neutrals)))
 ```
 
 A completely custom species needs its cascading law and a phase-function generator. Because the
@@ -199,12 +199,12 @@ excitation levels for a new gas in the interception window:
 ```julia
 law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
 spec = AURORA.CascadingSpec("Ar", [15.76, 27.63], law)
-argon = NeutralSpecies(:Ar, read_msis_file(msis_file)[:Ar];
+argon = NeutralSpecies(:Ar, neutrals[:Ar];
                        cascading_spec = spec, phase_fcn_generator = phase_fcn_N2)
 
-model = AuroraModel(alt_lims, θ_lims, E_max, msis_file, iri_file;
-                    species = (N2Species(msis_file), O2Species(msis_file),
-                               OSpecies(msis_file), argon))
+model = AuroraModel(alt_lims, θ_lims, E_max, neutrals, electrons;
+                    species = (N2Species(neutrals), O2Species(neutrals),
+                               OSpecies(neutrals), argon))
 
 model.species[:Ar].cross_sections    = my_sigma_matrix   # [n_levels × n_E]
 model.species[:Ar].excitation_levels = my_levels_matrix  # [n_levels × 2]

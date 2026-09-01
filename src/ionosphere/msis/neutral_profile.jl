@@ -35,6 +35,7 @@ function DensityProfile(h, n; source::AbstractString = "")
 end
 
 function (d::DensityProfile)(h_atm::AbstractVector)
+    warn_extrapolation(d, h_atm)
     return interpolate_profile(d.n, d.h ./ 1e3, h_atm; log_interpolation = true)
 end
 
@@ -144,10 +145,10 @@ function trusted_header_width(header, lines, header_idx, file)
     # A name with ')' before its last character is two names glued together.
     glued = findfirst(t -> occursin(r"\)\S", t), header)
     width = glued === nothing ? 0 : glued - 1
-    where = glued === nothing ? "" :
+    loc   = glued === nothing ? "" :
             ", starting at the run-together name '" * header[glued] * "'"
     @warn "read_ccmc_msis: $(basename(file)) has $(length(header)) header names for " *
-          "$n_data data columns$where. Columns from there on cannot be matched to their " *
+          "$n_data data columns$loc. Columns from there on cannot be matched to their " *
           "data and are ignored; the species named before it are read normally." maxlog = 1
     return width
 end
@@ -173,21 +174,6 @@ function species_densities(h_m, densities, label)
     end
     return out, dropped
 end
-
-# Normalize whatever was passed as the model's neutrals argument. A legacy MSIS file path is
-# read eagerly, once, so the default species do not each re-read the file.
-to_neutral_source(p::NeutralProfile)    = p
-to_neutral_source(path::AbstractString) = read_msis_file(path)
-to_neutral_source(x)                    = x
-to_neutral_source(p::ElectronProfile)   = throw(ArgumentError(
-    "neutrals must provide neutral densities; got an ElectronProfile, which holds the " *
-    "electron background. Did you swap the neutrals and electrons arguments?"))
-
-# The mirror-image mistake, caught here (rather than in to_electron_source) because
-# NeutralProfile is not yet defined when electron_profile.jl is included.
-to_electron_source(p::NeutralProfile) = throw(ArgumentError(
-    "electrons must provide (ne, Te); got a NeutralProfile, which holds neutral densities. " *
-    "Pass an ElectronProfile instead (e.g. from run_iri, read_iri_file, or read_ccmc_iri)."))
 
 
 # ======================================================================================== #
@@ -224,9 +210,9 @@ function run_msis(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
     label   = "NRLMSIS 2.1 $instant $(lat)N/$(lon)E"
 
     # Columns of calculate_msis_data, all number densities in m⁻³
-    densities = (:N2 => 3, :O2 => 4, :O => 5, :He => 6, :H => 7, :Ar => 8, :N => 9,
-                 :NO => 11)
-    columns   = Dict(s => Float64.(data[:, c]) for (s, c) in densities)
+    column_spec = (:N2 => 3, :O2 => 4, :O => 5, :He => 6, :H => 7, :Ar => 8, :N => 9,
+                   :NO => 11)
+    columns     = Dict(s => Float64.(data[:, c]) for (s, c) in column_spec)
 
     densities, dropped = species_densities(h_m, columns, label)
     return NeutralProfile(densities; source = label, dropped)

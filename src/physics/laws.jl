@@ -82,6 +82,7 @@ Base.convert(::Type{ExprLawSerialization}, l::ExprLaw) = ExprLawSerialization(l.
 Base.convert(::Type{ExprLaw}, s::ExprLawSerialization) = ExprLaw(s.src)
 
 Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
+profile_label(l::ExprLaw) = "@law $(l.src)"
 
 # A law is reproducible unless it is a bare anonymous function/closure. Functors (callable
 # structs, including ExprLaw, DensityProfile and ElectronProfile) and named functions all pass.

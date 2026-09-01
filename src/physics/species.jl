@@ -193,10 +193,3 @@ function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
     print(io,   "└── Cascading:        ", sp.cascading_spec.name,
                 " (", length(sp.cascading_spec.ionization_thresholds), " thresholds)")
 end
-
-function profile_label(d::DensityProfile)
-    isempty(d.source) && return "DensityProfile($(length(d.h)) points)"
-    return "DensityProfile($(length(d.h)) points, source=$(d.source))"
-end
-profile_label(l::ExprLaw)      = "@law $(l.src)"
-profile_label(d)               = string(typeof(d))
