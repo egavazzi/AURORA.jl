@@ -629,19 +629,31 @@ const GL16_W = ( 0.0271524594117541,  0.0622535239386479,
     return value
 end
 
-@inline function gauss_legendre(f, a, b, X, W)
+# `ctx` (context) is the state an integrand needs besides the integration variable — what a
+# closure would otherwise capture. It is passed explicitly and handed back as `f(ctx, x)` so
+# that every integrand can be a plain top-level function: a closure capturing a non-isbits
+# object (such as a NumericalSecondaryCDF) is heap-allocated at each creation, and these
+# integrands are created millions of times per transfer-matrix row.
+# The f::F/where {F} signatures force specialization on the integrand: the wrappers only
+# pass `f` along without calling it, and Julia does not specialize pass-through Function
+# arguments by default.
+@inline function gauss_legendre(f::F, ctx, a, b, X, W) where {F}
     b > a || return 0.0
     midpoint = (a + b) / 2
     halfwidth = (b - a) / 2
     result = 0.0
     for (x, w) in zip(X, W)
-        result += w * f(midpoint + halfwidth * x)
+        result += w * f(ctx, midpoint + halfwidth * x)
     end
     return halfwidth * result
 end
-gauss_legendre4(f, a, b) = gauss_legendre(f, a, b, GL4_X, GL4_W)
-gauss_legendre8(f, a, b) = gauss_legendre(f, a, b, GL8_X, GL8_W)
-gauss_legendre16(f, a, b) = gauss_legendre(f, a, b, GL16_X, GL16_W)
+gauss_legendre4(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL4_X, GL4_W)
+gauss_legendre8(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL8_X, GL8_W)
+gauss_legendre16(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL16_X, GL16_W)
+
+# Secondary-law value at one energy, as a gauss_legendre integrand.
+secondary_law_density((law, E_primary), E_secondary) =
+    checked_secondary_law(law, E_secondary, E_primary)
 
 """
 Numerical cumulative integral of a custom secondary law at one fixed primary energy.
@@ -676,9 +688,8 @@ function build_secondary_cdf(E_edges, E_max, E_primary, law)
 
     cumulative = zeros(length(edges))
     for i in 1:(length(edges) - 1)
-        mass = gauss_legendre8(edges[i], edges[i + 1]) do E_secondary
-            checked_secondary_law(law, E_secondary, E_primary)
-        end
+        mass = gauss_legendre8(secondary_law_density, (law, E_primary),
+                               edges[i], edges[i + 1])
         cumulative[i + 1] = cumulative[i] + mass
     end
     return NumericalSecondaryCDF(edges, cumulative, Float64(E_primary), law)
@@ -691,9 +702,8 @@ end
     energy >= cdf.edges[end] && return cdf.cumulative[end]
     i = searchsortedlast(cdf.edges, energy)
     prefix = cdf.cumulative[i]
-    partial = gauss_legendre8(cdf.edges[i], energy) do E_secondary
-        checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
-    end
+    partial = gauss_legendre8(secondary_law_density, (cdf.law, cdf.E_primary),
+                              cdf.edges[i], energy)
     return prefix + partial
 end
 
@@ -724,7 +734,9 @@ end
     return cdf.edges[i] + fraction * width, mass / width
 end
 
-@inline function double_secondary_density(E_secondary, threshold, cdf::NumericalSecondaryCDF)
+# The double-ionization marginals take their gauss_legendre context (threshold and the
+# per-primary-energy CDF) first, the binned output energy second.
+@inline function double_secondary_density((threshold, cdf), E_secondary)
     W = cdf.E_primary - threshold
     (0 <= E_secondary <= W / 2) || return 0.0
     partner_upper = min(W - 2 * E_secondary, (W - E_secondary) / 2)
@@ -733,7 +745,7 @@ end
            cumulative_law(cdf, partner_upper)
 end
 
-@inline function double_primary_density_cdf(E_degraded, threshold, cdf::NumericalSecondaryCDF)
+@inline function double_primary_density_cdf((threshold, cdf), E_degraded)
     W = cdf.E_primary - threshold
     (W / 3 <= E_degraded <= W) || return 0.0
     secondary_sum = W - E_degraded
@@ -745,14 +757,17 @@ end
 
     # The convolution interval is symmetric about secondary_sum/2: integrate its lower
     # half in the numerical cumulative coordinate and double it.
-    integral = gauss_legendre16(C_lower, C_mid) do C
-        E_secondary, map_density = inverse_cumulative_map(cdf, C)
-        physical_density = checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
-        partner_density = checked_secondary_law(cdf.law, secondary_sum - E_secondary,
-                                                 cdf.E_primary)
-        physical_density * partner_density / map_density
-    end
+    integral = gauss_legendre16(convolution_density, (cdf, secondary_sum), C_lower, C_mid)
     return 2 * integral
+end
+
+# Integrand of the degraded-primary self-convolution, in the cumulative coordinate.
+function convolution_density((cdf, secondary_sum), C)
+    E_secondary, map_density = inverse_cumulative_map(cdf, C)
+    physical_density = checked_secondary_law(cdf.law, E_secondary, cdf.E_primary)
+    partner_density = checked_secondary_law(cdf.law, secondary_sum - E_secondary,
+                                            cdf.E_primary)
+    return physical_density * partner_density / map_density
 end
 
 """
@@ -799,9 +814,8 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             lower = max(E_edges[i_degraded], W / 3)
             upper = min(E_edges[i_degraded + 1], W)
             upper > lower || continue
-            value = gauss_legendre4(lower, upper) do E_degraded
-                double_primary_density_cdf(E_degraded, threshold, cdf)
-            end
+            value = gauss_legendre4(double_primary_density_cdf, (threshold, cdf),
+                                    lower, upper)
             primary_transfer_matrix[i_primary, i_degraded, i_threshold] +=
                 primary_weight * value
         end
@@ -814,9 +828,8 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             lower = E_edges[i_secondary]
             upper = min(E_edges[i_secondary + 1], W / 2)
             upper > lower || continue
-            value = gauss_legendre4(lower, upper) do E_secondary
-                double_secondary_density(E_secondary, threshold, cdf)
-            end
+            value = gauss_legendre4(double_secondary_density, (threshold, cdf),
+                                    lower, upper)
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] +=
                 primary_weight * value
         end
