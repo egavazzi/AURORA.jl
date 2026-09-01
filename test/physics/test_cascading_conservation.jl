@@ -542,6 +542,7 @@ end
     @test Qs_src == Qs_fn
     @test Qp_src == UniformSetup.Q_PRIMARY
     @test Qs_src == UniformSetup.Q_SECONDARY
+end
 
 # The production double-ionization path (numerical-CDF + fixed Gauss-Legendre rules,
 # `fill_double_ionization_bin_cdf!`) has no built-in error estimate, so validate it here
