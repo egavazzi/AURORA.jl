@@ -102,9 +102,9 @@ src/
 | `SimulationWorkspace` | Internal working state: solver matrices, flux arrays, factorizations |
 | `SolverWorkspace` | Per-energy sparse matrices `Mlhs`/`Mrhs`, KLU factorizations, `BlockIndices`, `OperatorDiagonals` |
 | `DegradationWorkspace` | Reusable flux and spectrum arrays for energy degradation and ionization |
-| `TransportMatrices` | Matrices A (loss), B (scattering), D (diffusion), Q (source) |
+| `TransportMatrices` | Matrices A (loss), B (scattering), Q (source) |
 | `BlockIndices` | Pre-computed `nzval` index arrays for a single block (replaces `Dict`-based mapping) |
-| `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down`, `Ddiffusion` (extracted once, reused each energy step) |
+| `OperatorDiagonals` | Dense diagonals of `Ddz_Up`, `Ddz_Down` (extracted once, reused each energy step) |
 | [`RefinedTimeGrid`](@ref) | Time discretization with CFL refinement and loop partitioning. Last loop may have fewer save points 
 than earlier loops. |
 | [`UniformTimeGrid`](@ref) | Simple uniform grid for multi-step steady-state simulations |
@@ -151,9 +151,7 @@ energy_loop!(sim, Ie_top, i_loop, n_loop)
 └── for iE in n_E:-1:1
     ├── update_matrices!(sim, iE)
     │   ├── update_A!()    # Loss frequencies from collisions
-    │   ├── update_B!()    # Pitch-angle scattering probabilities
-    │   ├── update_D!()    # Diffusion coefficients
-    │   └── update_Ddiffusion!()  # Spatial diffusion operator
+    │   └── update_B!()    # Pitch-angle scattering probabilities
     │
     ├── solve_energy_step!(sim, iE, Ie_top)
     │   ├── [steady-state] → steady_state_scheme!()

@@ -349,7 +349,8 @@ The outer loop structure is identical for all species. The only species-specific
     degraded-primary transfer matrix [n_E, n_E, n_thresholds], secondary transfer matrix
     [n_E, n_E, n_thresholds], energy grid edges, and ionization thresholds
 """
-function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true)
+function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true,
+                                       progress_interval::Real = 10)
     E_left = @view(E_edges[1:end-1])
     n_E = length(E_left) # number of energy bins is one less than number of edges
 
@@ -360,6 +361,13 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
     secondary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
+
+    # Throttle progress updates. Rewrite a TTY line in place, but append log-friendly lines
+    # when stdout is redirected.
+    t_start = time()
+    last_report = Threads.Atomic{Float64}(t_start)
+    printed_progress = Threads.Atomic{Bool}(false)
+    use_tty = stdout isa Base.TTY
 
     # Pre-allocate hcubature work buffers, one per thread (heap located). Single-ionization
     # integrands are 2-D. Double ionization integrands are 3-D.
@@ -373,13 +381,19 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
                                               (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
 
     # Loop over ionization thresholds
-    for i_threshold in n_thresholds:-1:1
+    for (i_pass, i_threshold) in enumerate(n_thresholds:-1:1)
         threshold = ionization_thresholds[i_threshold]
         single_secondary = n_secondaries[i_threshold] == 1
 
         # Find the first primary bin whose left edge is above the threshold and can
         # therefore contribute to ionization collisions.
         i_min_primary = searchsortedfirst(E_left, threshold)
+        n_bins = n_E - i_min_primary + 1
+        bins_done = Threads.Atomic{Int}(0)
+        pass_printed = Threads.Atomic{Bool}(false)
+        status(done, t_now) = "  $(spec.name) cascading: threshold pass $(i_pass)/$(n_thresholds), " *
+                              "$(done)/$(n_bins) primary bins ($(round(Int, 100 * done / n_bins)) %), " *
+                              "$(round(Int, t_now - t_start)) s elapsed"
 
         # Loop over primary electron energy bins
         Threads.@threads :static for i_primary in i_min_primary:n_E
@@ -394,10 +408,41 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
                                             spec.secondary_law, double_primary_bufs[tid],
                                             double_secondary_bufs[tid])
             end
+            done = Threads.atomic_add!(bins_done, 1) + 1
+            if verbose
+                t_now = time()
+                t_last = last_report[]
+                # Report at most once per interval.
+                if t_now - t_last >= progress_interval &&
+                   Threads.atomic_cas!(last_report, t_last, t_now) === t_last
+                    # The opening "Calculating..." print has no newline; break it once.
+                    prefix = Threads.atomic_xchg!(printed_progress, true) ? "" : "\n"
+                    Threads.atomic_xchg!(pass_printed, true)
+                    if use_tty
+                        # \r + clear-line: rewrite the status in place
+                        print(prefix * "\r\e[2K" * status(done, t_now))
+                    else
+                        println(prefix * status(done, t_now))
+                    end
+                    flush(stdout)
+                end
+            end
+        end
+
+        # Finalize this pass's status as a single completed line (on a TTY this overwrites
+        # the in-place updates, leaving exactly one line per threshold pass).
+        if verbose && pass_printed[]
+            line = status(n_bins, time())
+            println(use_tty ? "\r\e[2K" * line : line)
+            flush(stdout)
         end
     end
 
-    verbose && println(" done.")
+    if verbose
+        # If progress lines were printed, the opening print was already line-broken.
+        closing = printed_progress[] ? "  $(spec.name) cascading done" : " done"
+        println("$closing ($(round(time() - t_start; digits = 1)) s).")
+    end
     return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds
 end
 
@@ -432,7 +477,8 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
         # Integrate only if limits are physical
         if E_degraded_upper > E_degraded_lower
             result, _ = hcubature(degraded_integrand, (E_degraded_lower, 0.0),
-                                 (E_degraded_upper, 1.0); buffer = primary_buf)
+                                 (E_degraded_upper, 1.0);
+                                 rtol = 1e-4, buffer = primary_buf)
             primary_transfer_matrix[i_primary, i_degraded, i_threshold] = result
         end
     end
@@ -451,7 +497,8 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
         # Integrate only if limits are physical
         if E_secondary_upper > E_secondary_bin_min
             result, _ = hcubature(secondary_integrand, (E_secondary_bin_min, 0.0),
-                                 (E_secondary_upper, 1.0); buffer = secondary_buf)
+                                 (E_secondary_upper, 1.0);
+                                 rtol = 1e-4, buffer = secondary_buf)
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
         end
     end

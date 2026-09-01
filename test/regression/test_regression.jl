@@ -1,12 +1,13 @@
 @testitem "AURORA steady-state results" begin
     using NCDatasets
+    using LazyArtifacts
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-    msis_file = joinpath(@__DIR__, "reference_results", "msis_20051008-2200_70N-19E.txt")
-    iri_file = joinpath(@__DIR__,  "reference_results", "iri_20051008-2200_70N-19E.txt")
+    msis_file = joinpath(@__DIR__, "input_data", "msis_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "input_data", "iri_20051008-2200_70N-19E.txt")
 
     ## Build the model
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -27,7 +28,7 @@
     make_column_excitation_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "SS", "volume_excitation.nc")
+    reference_file = joinpath(artifact"reference_results", "SS", "volume_excitation.nc")
     NCDataset(reference_file, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
             channel_diffs = Tuple{String, Float64, String}[]
@@ -50,7 +51,7 @@
         end
     end
 
-    column_reference = joinpath(@__DIR__, "reference_results", "SS", "column_excitation.nc")
+    column_reference = joinpath(artifact"reference_results", "SS", "column_excitation.nc")
     NCDataset(column_reference, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "column_excitation.nc"), "r") do ds_new
             @test Array(ds_new["time"]) == Array(ds_ref["time"])
@@ -80,13 +81,14 @@ end
 
 @testitem "AURORA time-dependent results" begin
     using NCDatasets
+    using LazyArtifacts
     altitude_lims = [100, 400];     # (km) altitude limits of the ionosphere
     θ_lims = 180:-30:0;             # (°) angle-limits for the electron beams
     E_max = 500;                   # (eV) upper limit to the energy grid
     B_angle_to_zenith = 13;         # (°) angle between the B-field line and the zenith
 
-    msis_file = joinpath(@__DIR__, "reference_results", "msis_20051008-2200_70N-19E.txt")
-    iri_file = joinpath(@__DIR__, "reference_results", "iri_20051008-2200_70N-19E.txt")
+    msis_file = joinpath(@__DIR__, "input_data", "msis_20051008-2200_70N-19E.txt")
+    iri_file = joinpath(@__DIR__, "input_data", "iri_20051008-2200_70N-19E.txt")
 
     ## Build the model
     model = AuroraModel(altitude_lims, θ_lims, E_max, msis_file, iri_file, B_angle_to_zenith)
@@ -110,7 +112,7 @@ end
     make_column_excitation_file(savedir)
 
     ## Compare the results, allowing a relative difference of 1e-4 (= 0.01%)
-    reference_file = joinpath(@__DIR__, "reference_results", "TD", "volume_excitation.nc")
+    reference_file = joinpath(artifact"reference_results", "TD", "volume_excitation.nc")
     NCDataset(reference_file, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"), "r") do ds_new
             channel_diffs = Tuple{String, Float64, String}[]
@@ -133,7 +135,7 @@ end
         end
     end
 
-    column_reference = joinpath(@__DIR__, "reference_results", "TD", "column_excitation.nc")
+    column_reference = joinpath(artifact"reference_results", "TD", "column_excitation.nc")
     NCDataset(column_reference, "r") do ds_ref
         NCDataset(joinpath(savedir, "analysis", "column_excitation.nc"), "r") do ds_new
             @test Array(ds_new["time"]) == Array(ds_ref["time"])

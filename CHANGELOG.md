@@ -10,6 +10,10 @@
   - Profiles can come from a live model run (`run_msis`, `run_iri`), a CCMC ModelWeb export
     (`read_ccmc_msis`, `read_ccmc_iri`), an AURORA-generated file (`read_msis_file`,
     `read_iri_file`), or your own vectors (`DensityProfile`, `ElectronProfile`).
+  - Sampling a profile outside its native altitude range now warns, since the values there
+    are extrapolated. Passing anything other than a `NeutralProfile` or an MSIS file path as
+    the model's `neutrals` argument is an error (a single density source cannot describe the
+    whole atmosphere).
   - **Breaking** `NeutralSpecies.density_profile` is renamed `density_source`. `MSISDensity`
     and `VectorDensity` are removed; use `read_msis_file(file)[:N2]` or `DensityProfile(h, n)`.
   - **Breaking** `Ionosphere` is now `Ionosphere(electron_source, h_atm)` and no longer
@@ -17,6 +21,9 @@
   - Species that MSIS does not report at low altitude (N, anomalous O) no longer produce
     `NaN` densities: each species keeps only the levels where it is defined. `find_msis_file`
     and `find_iri_file` now warn in favour of `run_msis` / `run_iri`.
+- **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
+- **Numerical Breaking (small)** Remove the ad-hoc spatial diffusion operator (`D·∂²Ie/∂z²`) from both the steady-state and time-dependent solvers [#168](https://github.com/egavazzi/AURORA.jl/pull/168)
+  - The operator was meant to model the spread in arrival times of electrons within a finite (E, μ) bin, but in its current form it contributed nothing measurable, and it did not belong in the steady-state equations in the first place. The numerical diffusion of the advection scheme already produces a comparable spread at default resolution.
 - **Breaking** Rename `AuroraSimulation.cache` to `AuroraSimulation.workspace`, and replace `cache_initialized` with `workspace.initialized`.
   The simulation working-state types are also renamed from cache to workspace, e.g. `SolverCache` → `SolverWorkspace`, `DegradationCache` → `DegradationWorkspace` [#161](https://github.com/egavazzi/AURORA.jl/pull/161)
 

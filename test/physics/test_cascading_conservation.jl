@@ -400,8 +400,10 @@ end
         rebinned_primary = HelperFunc.rebin_weights(fine_primary, fine_edges, coarse_edges)
         rebinned_secondary = HelperFunc.rebin_weights(fine_secondary, fine_edges, coarse_edges)
 
-        @test isapprox(coarse_primary, rebinned_primary; rtol = 1e-4)
-        @test isapprox(coarse_secondary, rebinned_secondary; rtol = 1e-4)
+        # Coarse and rebinned-fine entries each carry quadrature error at rtol = 1e-4
+        # (see fill_single_ionization_bin!), so they agree only to a few 1e-4.
+        @test isapprox(coarse_primary, rebinned_primary; rtol = 1e-3)
+        @test isapprox(coarse_secondary, rebinned_secondary; rtol = 1e-3)
     end
 end
 @testitem "Cascading nonuniform grid convergence" setup=[HelperFunc, NonUniformSetup] begin
@@ -428,8 +430,10 @@ end
         rebinned_primary = HelperFunc.rebin_weights(fine_primary, fine_edges, coarse_edges)
         rebinned_secondary = HelperFunc.rebin_weights(fine_secondary, fine_edges, coarse_edges)
 
-        @test isapprox(coarse_primary, rebinned_primary; rtol = 1e-4)
-        @test isapprox(coarse_secondary, rebinned_secondary; rtol = 1e-4)
+        # Coarse and rebinned-fine entries each carry quadrature error at rtol = 1e-4
+        # (see fill_single_ionization_bin!), so they agree only to a few 1e-4
+        @test isapprox(coarse_primary, rebinned_primary; rtol = 1e-3)
+        @test isapprox(coarse_secondary, rebinned_secondary; rtol = 1e-3)
     end
 end
 
