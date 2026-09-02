@@ -801,15 +801,13 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
         W > 0 || continue
         cdf = build_secondary_cdf(E_edges, W / 2, E_primary, law)
 
-        # Degraded primary marginal: d in [W/3, W]. The upper clamp can reach i_primary
-        # itself only when a bin is wider than the ionization threshold (W ≥
-        # E_edges[i_primary]); such a diagonal entry would be counted in the normalization
-        # of `compute_ionization_spectra!` but never deposited by
-        # `add_ionization_collisions!`. Energy grids must keep ΔE below the ionization
-        # thresholds (the standard grid caps ΔE at 11.65 eV, and
-        # `warn_if_bins_wider_than_ionization_threshold` warns on grids that do not).
+        # Degraded primary marginal: d in [W/3, W]. The diagonal bin is excluded, as in the
+        # adaptive reference: a diagonal entry would be counted in the normalization of
+        # `compute_ionization_spectra!` but never deposited by `add_ionization_collisions!`.
+        # The clamp W reaches the diagonal only when a bin is wider than the ionization
+        # threshold; `warn_if_bins_wider_than_ionization_threshold` warns on such grids.
         i_min_degraded = max(1, searchsortedlast(E_left, W / 3))
-        i_max_degraded = min(i_primary, searchsortedlast(E_left, W))
+        i_max_degraded = min(i_primary - 1, searchsortedlast(E_left, W))
         for i_degraded in i_min_degraded:i_max_degraded
             lower = max(E_edges[i_degraded], W / 3)
             upper = min(E_edges[i_degraded + 1], W)
