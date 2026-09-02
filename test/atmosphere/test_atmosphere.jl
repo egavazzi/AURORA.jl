@@ -178,8 +178,8 @@ end
         @test all(isfinite, np[s](z))
     end
 
-    # Same densities as going through a file, up to the ~7 significant digits a saved
-    # MSIS file keeps
+    # Same densities as going through a file. find_msis_file may return a file already in
+    # the package store, and older stored files keep only ~7 significant digits.
     msis_file = find_msis_file(; conditions..., verbose = false)
     fp = read_msis_file(msis_file)
     for s in (:N2, :O2, :O)
