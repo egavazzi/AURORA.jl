@@ -268,7 +268,7 @@ end
 # Saving to file
 ############################################################################################
 """
-    save_iri_data(iri_data, parameters)
+    save_iri_data(iri_data, parameters; directory=pkgdir(AURORA, "internal_data", "data_electron"))
 
 Save IRI model data to a text file with metadata header.
 
@@ -283,6 +283,10 @@ input parameters, and if a file with the same name exists, a unique name is crea
   - `lat`, `lon`: Location (degrees)
   - `height`: Altitude range (km)
 
+# Keyword Arguments
+- `directory`: Directory to write the file into. It is created if it does not exist.
+  Defaults to `internal_data/data_electron/`, where [`find_iri_file`](@ref) looks.
+
 # Returns
 - `String`: Full path to the created file
 
@@ -296,10 +300,11 @@ The file contains:
 `iri_YYYYMMDD-HHMM_LATN-LONE.txt`
 
 # Notes
-- Files are saved to `internal_data/data_electron/` directory
 - Existing files are not overwritten; a suffix is added to the filename
 """
-function save_iri_data(iri_data, parameters; verbose=true)
+function save_iri_data(iri_data, parameters;
+                       directory = pkgdir(AURORA, "internal_data", "data_electron"),
+                       verbose = true)
     # Unpack the parameters
     year = parameters.year
     month = parameters.month
@@ -317,7 +322,7 @@ function save_iri_data(iri_data, parameters; verbose=true)
 
     # Make filename
     filename = "iri_$year$month_str$day_str-$(hour_str)$(minute_str)_$(lat)N-$(lon)E.txt"
-    directory = pkgdir(AURORA, "internal_data", "data_electron")
+    mkpath(directory)
     fullpath = joinpath(directory, filename)
     fullpath = rename_if_exists(fullpath) # to avoid writing over files
     filename = splitpath(fullpath)[end]

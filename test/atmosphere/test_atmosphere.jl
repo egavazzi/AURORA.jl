@@ -187,6 +187,44 @@ end
     end
 end
 
+@testitem "run_msis save_to writes a file that reads back identically" begin
+    z = make_altitude_grid(100, 400)
+    dir = mktempdir()
+    np = run_msis(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
+                    lat = 69.58, lon = 19.23, height = 85:5:600,
+                    save_to = dir, verbose = false)
+
+    files = readdir(dir)
+    @test length(files) == 1
+    @test startswith(files[1], "msis_") && endswith(files[1], ".txt")
+
+    fp = read_msis_file(joinpath(dir, files[1]))
+    @test fp isa NeutralAtmosphere
+    @test sort(collect(keys(fp))) == sort(collect(keys(np)))
+    for s in (:N2, :O2, :O)
+        @test fp[s](z) ≈ np[s](z) rtol=1e-12
+    end
+end
+
+@testitem "run_iri save_to writes a file that reads back identically" begin
+    z = make_altitude_grid(100, 400)
+    dir = mktempdir()
+    p = run_iri(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
+                  lat = 69.58, lon = 19.23, height = 85:5:600,
+                  save_to = dir, verbose = false)
+
+    files = readdir(dir)
+    @test length(files) == 1
+    @test startswith(files[1], "iri_") && endswith(files[1], ".txt")
+
+    fp = read_iri_file(joinpath(dir, files[1]))
+    @test fp isa ElectronProfile
+    ne, Te = p(z)
+    ne_file, Te_file = fp(z)
+    @test ne_file ≈ ne rtol=1e-12
+    @test Te_file ≈ Te rtol=1e-12
+end
+
 @testitem "Profile sources validate their vectors at construction" begin
     h = [100e3, 200e3, 300e3]
 

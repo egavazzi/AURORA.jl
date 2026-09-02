@@ -8,10 +8,15 @@ include("electron_profile.jl")
 
 Find or create an IRI model data file for the specified conditions.
 
-It first searches for an existing IRI file matching the given parameters.
-If no matching file is found, it calculates new IRI data using the Python iri2020 package
-and saves it to a file. The iri2020 package will compile and run some fortran code under
-the hood.
+This is the cached, file-based route to the IRI-2020 model. It first searches
+`internal_data/data_electron/` for an existing IRI file matching the given parameters. If no
+matching file is found, it calculates new IRI data using the Python iri2020 package and saves
+it there, so that a later call with the same parameters reuses the file instead of running the
+model again. The iri2020 package will compile and run some fortran code under the hood.
+
+`read_iri_file(find_iri_file(; ...))` turns the result into an [`ElectronProfile`](@ref).
+[`run_iri`](@ref) runs the model directly and returns that profile, writing a file only if
+asked to.
 
 # Keyword Arguments
 - `year::Int=2018`: Year
@@ -48,15 +53,8 @@ function find_iri_file(;
         return file_to_load
     end
 
-    # Otherwise, calculate and save new IRI data. Generating files is deprecated: prefer
-    # run_iri, which returns an ElectronProfile stored in (and round-tripped with) the model
-    # rather than written to disk.
-    @warn """
-    find_iri_file() is generating a new IRI file via the Python `iri2020` package, which is \
-    deprecated. Prefer run_iri for new runs, e.g.:
-        iri   = run_iri(; year=$year, month=$month, day=$day, hour=$hour, minute=$minute, lat=$lat, lon=$lon)
-        model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
-    Reading existing IRI files (via read_iri_file / AuroraModel) remains supported.""" maxlog = 1
+    # Otherwise, calculate new IRI data and save it, so that the next call with these
+    # parameters finds it.
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
                                               height, verbose)
     file_to_load = save_iri_data(iri_data, parameters; verbose)

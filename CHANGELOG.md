@@ -20,8 +20,11 @@
   - **Breaking** `Ionosphere` is now `Ionosphere(electron_source, h_atm)` and no longer
     stores `msis_file`/`iri_file`.
   - Species that MSIS does not report at low altitude (N, anomalous O) no longer produce
-    `NaN` densities: each species keeps only the levels where it is defined. `find_msis_file`
-    and `find_iri_file` now warn in favour of `run_msis` / `run_iri`.
+    `NaN` densities: each species keeps only the levels where it is defined.
+  - `run_msis` and `run_iri` take a `save_to` directory in which to also write the model output
+    as an AURORA text file, read back with `read_msis_file` / `read_iri_file`. `find_msis_file`
+    and `find_iri_file` remain the cached file-based route: they reuse a matching file from the
+    package's own file store, and compute and write one when there is none.
 - **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
 - **Numerical Breaking (small)** Remove the ad-hoc spatial diffusion operator (`D·∂²Ie/∂z²`) from both the steady-state and time-dependent solvers [#168](https://github.com/egavazzi/AURORA.jl/pull/168)
   - The operator was meant to model the spread in arrival times of electrons within a finite (E, μ) bin, but in its current form it contributed nothing measurable, and it did not belong in the steady-state equations in the first place. The numerical diffusion of the advection scheme already produces a comparable spread at default resolution.

@@ -114,6 +114,20 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 model.species[:N2].density_source = neutrals[:N2]
 ```
 
+Each `run_msis` call runs the Python model again. To reuse one run across sessions, hand it a
+directory to write to:
+
+```julia
+neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23,
+                      save_to="my_atmospheres")
+neutrals = read_msis_file("my_atmospheres/msis_20051008-2200_69.58N-19.23E.txt")
+
+# Or let AURORA manage the file store itself: find_msis_file reuses a matching file if it has
+# one, and runs the model and saves the file when it does not
+neutrals = read_msis_file(find_msis_file(; year=2005, month=10, day=8, hour=22, minute=0,
+                                           lat=69.58, lon=19.23))
+```
+
 `read_ccmc_msis` handles the CCMC quirks: the variable-length preamble, densities in cm⁻³, and
 the `9.999E-38` sentinel written where a species is not reported. Columns are matched by their
 header name rather than by position, so the export is read correctly whatever its column order,
@@ -173,7 +187,7 @@ round-trips through `physics_state.jld2` and reproduces with no external file. B
 of these ways:
 
 ```julia
-# Run IRI-2020 for a date and position (via the bundled python iri2020; nothing written to disk):
+# Run IRI-2020 for a date and position (via the bundled python iri2020):
 electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
 
 # From a CCMC ModelWeb IRI download:
@@ -187,6 +201,11 @@ electrons = ElectronProfile(h_m, ne_m3, Te_K; origin="my profile")
 
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
+
+As for the neutrals, `run_iri(; ..., save_to="my_ionospheres")` also writes the run as an AURORA
+IRI text file that `read_iri_file` reads back, and
+`read_iri_file(find_iri_file(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23))`
+is the cached route that reuses the package's own file store.
 
 `read_ccmc_iri` handles the CCMC table directly (variable preamble, `Ne` in cm⁻³, `-1`
 sentinels). For other electron-density sources, reduce them to `(h, ne, Te)` vectors and wrap

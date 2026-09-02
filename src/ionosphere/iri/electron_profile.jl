@@ -68,17 +68,24 @@ end
 
 """
     run_iri(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
-             height=85:1:700, verbose=true) -> ElectronProfile
+             height=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
 
 Run the IRI-2020 model (via the Python `iri2020` package) for the given conditions and return
-the electron background as an [`ElectronProfile`](@ref). Unlike [`find_iri_file`](@ref), nothing
-is written to disk — the computed profile lives in the returned struct and round-trips through
-`physics_state.jld2`.
+the electron background as an [`ElectronProfile`](@ref). The computed profile lives in the
+returned struct and round-trips through `physics_state.jld2`, so nothing on disk is needed to
+reproduce the model. [`find_iri_file`](@ref) is the cached, file-based route to the same model.
 
 Only `ne` and `Te` (the quantities AURORA uses) are kept; the other IRI outputs are discarded.
 As when reading a file, the -1 sentinel levels that IRI returns where it has no valid profile
 (typically the D-region, at the bottom of the requested range) are dropped with a warning, and
 filled by extrapolation when the profile is sampled.
+
+`save_to` is a directory in which to also write the raw model output as an AURORA IRI text file
+(the directory is created if needed, and an existing file of the same name is kept, the new one
+getting a suffix). [`read_iri_file`](@ref) reads such a file back into an `ElectronProfile`.
+Saving into `pkgdir(AURORA, "internal_data", "data_electron")` puts the file where
+[`find_iri_file`](@ref) looks, so a later call with the same parameters finds it instead of
+running the model again.
 
 # Example
 ```julia
@@ -87,8 +94,12 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                 lat = 76, lon = 5, height = 85:1:700, verbose = true)
-    iri_data, _ = calculate_iri_data(; year, month, day, hour, minute, lat, lon, height, verbose)
+                 lat = 76, lon = 5, height = 85:1:700, save_to = nothing, verbose = true)
+    iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
+                                               height, verbose)
+    if save_to !== nothing
+        save_iri_data(iri_data, parameters; directory = save_to, verbose)
+    end
     data        = iri_data[2:end, :]               # drop the header row
     instant     = DateTime(year, month, day, hour, minute)
     origin      = "IRI-2020 $instant $(lat)N/$(lon)E"

@@ -183,16 +183,24 @@ end
 
 """
     run_msis(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
-              height=85:1:700, verbose=true) -> NeutralAtmosphere
+              height=85:1:700, save_to=nothing, verbose=true) -> NeutralAtmosphere
 
 Run the NRLMSIS 2.1 model (via the Python `pymsis` package) for the given conditions and
-return the neutral atmosphere as a [`NeutralAtmosphere`](@ref). Unlike [`find_msis_file`](@ref),
-nothing is written to disk — the computed profile lives in the returned struct and round-trips
-through `physics_state.jld2`.
+return the neutral atmosphere as a [`NeutralAtmosphere`](@ref). The computed profile lives in
+the returned struct and round-trips through `physics_state.jld2`, so nothing on disk is needed
+to reproduce the model. [`find_msis_file`](@ref) is the cached, file-based route to the same
+model.
 
 This is the neutral counterpart of [`run_iri`](@ref). Levels where the model does not report a
 species (it returns `NaN` for N and anomalous O at low altitude) are dropped for that species
 only, so each density keeps just the altitudes where it is defined.
+
+`save_to` is a directory in which to also write the raw model output as an AURORA MSIS text
+file (the directory is created if needed, and an existing file of the same name is kept, the
+new one getting a suffix). [`read_msis_file`](@ref) reads such a file back into a
+`NeutralAtmosphere`. Saving into `pkgdir(AURORA, "internal_data", "data_neutrals")` puts the
+file where [`find_msis_file`](@ref) looks, so a later call with the same parameters finds it
+instead of running the model again.
 
 # Example
 ```julia
@@ -202,9 +210,12 @@ model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
 """
 function run_msis(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                  lat = 76, lon = 5, height = 85:1:700, verbose = true)
-    msis_data, _ = calculate_msis_data(; year, month, day, hour, minute, lat, lon, height,
-                                        verbose)
+                  lat = 76, lon = 5, height = 85:1:700, save_to = nothing, verbose = true)
+    msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon,
+                                                 height, verbose)
+    if save_to !== nothing
+        save_msis_data(msis_data, parameters; directory = save_to, verbose)
+    end
     data    = msis_data[2:end, :]                  # drop the header row
     h_m     = Float64.(data[:, 1]) .* 1e3          # height(km) → m
     instant = DateTime(year, month, day, hour, minute)
