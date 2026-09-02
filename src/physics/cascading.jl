@@ -353,8 +353,8 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
                                        progress_interval::Real = 10)
     # An ExprLaw's callable is evaluated code (possibly in a newer world age than this
     # frame, e.g. rebuilt during a JLD2 cache reload) behind an untyped field, so calling
-    # it through the ExprLaw wrapper is a dynamic call with boxed arguments — ruinous at
-    # the billions of evaluations the integrations below perform. Unwrap it once and enter
+    # it through the ExprLaw wrapper is a dynamic call with boxed arguments — very bad with
+    # the billions of evaluations the integrations below perform. We unwrap it once and enter
     # the loop body through a single invokelatest: the body runs in the latest world age
     # (where the law's method exists) and every inner law call dispatches statically.
     law = runtime_law(spec.secondary_law)

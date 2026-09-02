@@ -46,8 +46,8 @@ ExprLaw(src::AbstractString) = ExprLaw(src, build_law(src))
 build_law(src::AbstractString) = Core.eval(@__MODULE__, Meta.parse(src))
 
 # invokelatest keeps calls valid after a reload, where `f` is eval'd in a newer world age
-# than the calling code. Fine for laws evaluated a handful of times (densities, phase
-# functions); hot loops must use runtime_law below instead.
+# than the calling code. It is fine for laws evaluated a handful of times (e.g. densities,
+# phase functions), but hot loops should use the runtime_law below instead.
 (l::ExprLaw)(args...) = Base.invokelatest(l.f, args...)
 
 # Hot loops must not pay a dynamic call per law evaluation: unwrap the underlying
