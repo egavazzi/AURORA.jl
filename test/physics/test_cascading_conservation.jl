@@ -518,3 +518,28 @@ end
     # confirming the two secondaries are actually deposited rather than dropped.
     @test maximum(ratios) >= 0.95
 end
+
+# A law rebuilt from its source (as happens when a saved model is reloaded) is evaluated in a
+# newer world age than the frame that goes on to use it. Building the matrices from inside a
+# single function reproduces that situation; at top level each statement starts a new world,
+# so the failure only shows up here. The result must match a plain functor law exactly.
+@testitem "Cascading matrices from a law rebuilt in a newer world age" setup=[UniformSetup] begin
+    using AURORA
+    struct FlatLaw end
+    (::FlatLaw)(E_s, E_p) = 1.0
+
+    function build_from_source()
+        law = AURORA.ExprLaw("(E_s, E_p) -> 1.0")
+        spec = AURORA.CascadingSpec("TEST", [UniformSetup.THRESHOLD], law)
+        return AURORA.calculate_cascading_matrices(spec, UniformSetup.E_EDGES; verbose = false)
+    end
+    Qp_src, Qs_src, _, _ = build_from_source()
+
+    spec_functor = AURORA.CascadingSpec("TEST", [UniformSetup.THRESHOLD], FlatLaw())
+    Qp_fn, Qs_fn, _, _ = AURORA.calculate_cascading_matrices(spec_functor, UniformSetup.E_EDGES; verbose = false)
+
+    @test Qp_src == Qp_fn
+    @test Qs_src == Qs_fn
+    @test Qp_src == UniformSetup.Q_PRIMARY
+    @test Qs_src == UniformSetup.Q_SECONDARY
+end
