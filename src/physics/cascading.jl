@@ -351,6 +351,21 @@ The outer loop structure is identical for all species. The only species-specific
 """
 function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true,
                                        progress_interval::Real = 10)
+    # An ExprLaw's callable is evaluated code (possibly in a newer world age than this
+    # frame, e.g. rebuilt during a JLD2 cache reload) behind an untyped field, so calling
+    # it through the ExprLaw wrapper is a dynamic call with boxed arguments — very bad with
+    # the billions of evaluations the integrations below perform. We unwrap it once and enter
+    # the loop body through a single invokelatest: the body runs in the latest world age
+    # (where the law's method exists) and every inner law call dispatches statically.
+    law = runtime_law(spec.secondary_law)
+    return Base.invokelatest(calculate_cascading_matrices, spec, law, E_edges;
+                             verbose, progress_interval)
+end
+
+# Barrier method: `law` is `spec.secondary_law` with any ExprLaw wrapper already removed,
+# so it has a concrete type and the integration loops below specialize on it.
+function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose = true,
+                                      progress_interval::Real = 10)
     E_left = @view(E_edges[1:end-1])
     n_E = length(E_left) # number of energy bins is one less than number of edges
 
@@ -371,13 +386,13 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
 
     # Pre-allocate hcubature work buffers, one per thread (heap located). Single-ionization
     # integrands are 2-D. Double ionization integrands are 3-D.
-    primary_bufs = [hcubature_buffer(DegradedCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+    primary_bufs = [hcubature_buffer(DegradedCascadingIntegrand(0.0, 1.0, 0.0, law),
                                      (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
-    secondary_bufs = [hcubature_buffer(SecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+    secondary_bufs = [hcubature_buffer(SecondaryCascadingIntegrand(0.0, 1.0, 0.0, law),
                                        (0.0, 0.0), (1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
-    double_primary_bufs = [hcubature_buffer(DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+    double_primary_bufs = [hcubature_buffer(DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, law),
                                             (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
-    double_secondary_bufs = [hcubature_buffer(DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, spec.secondary_law),
+    double_secondary_bufs = [hcubature_buffer(DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, law),
                                               (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)) for _ in 1:Threads.maxthreadid()]
 
     # Loop over ionization thresholds
@@ -401,11 +416,11 @@ function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = tr
             if single_secondary
                 fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
                                             E_edges, E_left, threshold, i_primary, i_threshold,
-                                            spec.secondary_law, primary_bufs[tid], secondary_bufs[tid])
+                                            law, primary_bufs[tid], secondary_bufs[tid])
             else
                 fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
                                             E_edges, E_left, threshold, i_primary, i_threshold,
-                                            spec.secondary_law, double_primary_bufs[tid],
+                                            law, double_primary_bufs[tid],
                                             double_secondary_bufs[tid])
             end
             done = Threads.atomic_add!(bins_done, 1) + 1

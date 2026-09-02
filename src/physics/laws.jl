@@ -46,9 +46,17 @@ ExprLaw(src::AbstractString) = ExprLaw(src, build_law(src))
 build_law(src::AbstractString) = Core.eval(@__MODULE__, Meta.parse(src))
 
 # invokelatest keeps calls valid after a reload, where `f` is eval'd in a newer world age
-# than the calling code. Laws run only at initialize! (densities/phase once, the cascading
-# law inside a disk-cached integration), so the dynamic-dispatch cost is negligible.
+# than the calling code. It is fine for laws evaluated a handful of times (e.g. densities,
+# phase functions), but hot loops should use the runtime_law below instead.
 (l::ExprLaw)(args...) = Base.invokelatest(l.f, args...)
+
+# Hot loops must not pay a dynamic call per law evaluation: unwrap the underlying
+# callable once and hand it to the loop through a single `Base.invokelatest` function
+# barrier, so every inner call dispatches statically while the loop body still runs in
+# the latest world age (see `calculate_cascading_matrices`). Non-ExprLaw laws (functor
+# structs like `OSecondaryLaw`) are already concretely typed and pass through unchanged.
+runtime_law(law) = law
+runtime_law(law::ExprLaw) = law.f
 
 # Render a captured law expression as clean source: strip line-number metadata and unwrap the
 # single-statement block that `->` wraps its body in, so `@law z -> exp(-z)` is stored as
