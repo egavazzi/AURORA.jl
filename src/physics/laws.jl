@@ -90,14 +90,20 @@ Base.convert(::Type{ExprLawSerialization}, l::ExprLaw) = ExprLawSerialization(l.
 Base.convert(::Type{ExprLaw}, s::ExprLawSerialization) = ExprLaw(s.src)
 
 Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
+profile_label(l::ExprLaw) = "@law $(l.src)"
 
 # A law is reproducible unless it is a bare anonymous function/closure. Functors (callable
-# structs, including ExprLaw), named functions, MSISDensity and VectorDensity all pass.
+# structs, including ExprLaw, DensityProfile and ElectronProfile) and named functions all pass.
 is_anonymous(f) = f isa Function && startswith(string(nameof(f)), "#")
 
 function require_reproducible(law, role::AbstractString)
     is_anonymous(law) && throw(ArgumentError(
         "$role is a bare anonymous function and cannot be saved for reproducibility. \
          Wrap it with @law (e.g. `@law $role`), or pass a functor or named function."))
+    if isempty(methods(law))
+        hint = law isa NeutralAtmosphere ?
+            " A NeutralAtmosphere holds one density per species; index it, e.g. `neutrals[:N2]`." : ""
+        throw(ArgumentError("$role must be callable, got a $(typeof(law)).$hint"))
+    end
     return law
 end

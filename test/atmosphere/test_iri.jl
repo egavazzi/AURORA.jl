@@ -10,7 +10,7 @@
     iri_file = joinpath(@__DIR__, "test_data/", "iri_20221102-1700_70N-19E.txt")
 
     # A warning must be emitted
-    @test_logs (:warn, r"sentinel -1") AURORA.load_iri_data(iri_file)
+    @test_logs (:warn, r"sentinel values") AURORA.load_iri_data(iri_file)
 
     data = AURORA.load_iri_data(iri_file) # (will throw a warning in REPL, nothing to worry)
 
@@ -29,4 +29,24 @@ end
 
     # No warning expected for a file without boundary sentinels
     @test_nowarn AURORA.load_iri_data(iri_file)
+end
+
+@testitem "run_iri: sentinel levels are trimmed, not stored" begin
+    z = make_altitude_grid(80, 600)
+
+    # Reaching into the D-region makes IRI return -1 for the lowest levels. They must be
+    # dropped before they reach the log-space interpolation, exactly as when reading a file.
+    p = @test_logs (:warn, r"sentinel values") match_mode = :any begin
+        run_iri(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
+                  lat = 69.58, lon = 19.23, height = 50:5:700, verbose = false)
+    end
+
+    @test !any(p.ne .== -1)
+    @test !any(p.Te .== -1)
+    @test all(p.ne .> 0) && all(p.Te .> 0)
+    @test p.h[1] > 50e3           # the sentinel levels at the bottom were removed
+
+    ne, Te = p(z)
+    @test all(isfinite, ne) && all(ne .> 0)
+    @test all(isfinite, Te) && all(Te .> 0)
 end

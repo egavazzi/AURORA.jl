@@ -50,7 +50,11 @@ The returned matrix contains the following columns:
 """
 function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
                 lat = 76, lon = 5, height = 85:1:700, verbose=true)
-  verbose && print("Calculating msis data...")
+  # Spell out the conditions: they all have defaults, so a run with an unintended
+  # date/position should at least be visible.
+  verbose && print("Calculating msis data for $year-$(lpad(month, 2, '0'))-" *
+                   "$(lpad(day, 2, '0')) $(lpad(hour, 2, '0')):$(lpad(minute, 2, '0')), " *
+                   "lat $(lat)°, lon $(lon)°...")
 
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
@@ -73,8 +77,10 @@ function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minu
 
     # run the model
     nrlmsis_data = msis.run(time, Py(lon), Py(lat), Py(height), geomagnetic_activity=Py(-1))
-    # convert from Python array to Julia array
-    nrlmsis_data = pyconvert(Array, nrlmsis_data) # array of size (1, 1, 1, n_z, 11)
+    # Convert from Python array to Julia array. pymsis returns Float32; widen to Float64 here
+    # so that the text file written by save_msis_data holds every digit of each value and
+    # reads back exactly.
+    nrlmsis_data = pyconvert(Array{Float64}, nrlmsis_data) # array of size (1, 1, 1, n_z, 11)
     nrlmsis_data = dropdims(nrlmsis_data; dims = (1, 2, 3)) # convert to size (n_z, 11)
     # add a column with the altitude
     nrlmsis_data = hcat(Vector(height), nrlmsis_data)

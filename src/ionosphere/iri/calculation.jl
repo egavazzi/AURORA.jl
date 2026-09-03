@@ -40,7 +40,11 @@ The returned matrix contains the following columns:
 """
 function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
                lat = 76, lon = 5, height = 85:1:700, verbose=true)
-    verbose && print("Calculating iri data...")
+    # Spell out the conditions: they all have defaults, so a run with an unintended
+    # date/position should at least be visible.
+    verbose && print("Calculating iri data for $year-$(lpad(month, 2, '0'))-" *
+                     "$(lpad(day, 2, '0')) $(lpad(hour, 2, '0')):$(lpad(minute, 2, '0')), " *
+                     "lat $(lat)°, lon $(lon)°...")
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 

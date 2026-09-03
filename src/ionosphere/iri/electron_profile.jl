@@ -1,0 +1,189 @@
+using Dates: DateTime
+
+# ======================================================================================== #
+#                           ElectronProfile (electron source)                              #
+# ======================================================================================== #
+
+"""
+    ElectronProfile(h, ne, Te; origin="")
+
+Electron background (electron density `ne` and temperature `Te`) defined on a native altitude
+grid. Callable on any altitude grid (m); returns the tuple `(ne, Te)` interpolated to that grid
+(`ne` in log-space, `Te` linearly — the same convention AURORA uses elsewhere).
+
+This is the electron analogue of [`DensityProfile`](@ref): the universal interchange for the
+ionospheric electron background, whatever its origin. Build one from the IRI model with
+[`run_iri`](@ref), from a CCMC ModelWeb IRI download with [`read_ccmc_iri`](@ref), from a legacy
+AURORA IRI file with [`read_iri_file`](@ref), or directly from your own vectors. Because it
+stores data (not a file path), it round-trips through `physics_state.jld2` and reproduces on any
+machine with no external file.
+
+# Arguments
+- `h`: native altitude (m)
+- `ne`: electron number density (m⁻³)
+- `Te`: electron temperature (K)
+- `origin`: free-form provenance label, shown by `show` and written into `inputs/atmosphere.nc`
+
+# Example
+```julia
+profile = ElectronProfile(h_m, ne_m3, Te_K; origin="my measurement")
+ne, Te  = profile(altitude_grid.h)
+```
+"""
+struct ElectronProfile
+    h::Vector{Float64}    # native altitude (m)
+    ne::Vector{Float64}   # electron density (m⁻³)
+    Te::Vector{Float64}   # electron temperature (K)
+    origin::String        # provenance label (free-form, may be empty)
+end
+
+function ElectronProfile(h, ne, Te; origin::AbstractString = "")
+    h, ne, Te = collect(Float64, h), collect(Float64, ne), collect(Float64, Te)
+    check_profile_grid("ElectronProfile", h, ("ne", ne), ("Te", Te))
+    return ElectronProfile(h, ne, Te, String(origin))
+end
+
+function (p::ElectronProfile)(h_atm::AbstractVector)
+    warn_extrapolation(p, h_atm)
+    ne = interpolate_profile(p.ne, p.h ./ 1e3, h_atm; log_interpolation = true)
+    Te = interpolate_profile(p.Te, p.h ./ 1e3, h_atm; log_interpolation = false)
+    return (ne, Te)
+end
+
+Base.show(io::IO, p::ElectronProfile) = print(io, profile_label(p))
+
+function Base.show(io::IO, ::MIME"text/plain", p::ElectronProfile)
+    println(io, "ElectronProfile:")
+    println(io, "├── Origin:    ", isempty(p.origin) ? "(unlabelled)" : p.origin)
+    println(io, "├── Altitudes: ", length(p.h),
+                " ($(p.h[1] / 1e3) – $(p.h[end] / 1e3) km)")
+    println(io, "├── Max ne:    ", round(maximum(p.ne), sigdigits=3), " m⁻³")
+    print(io,   "└── Max Te:    ", round(maximum(p.Te), sigdigits=3), " K")
+end
+
+
+# ======================================================================================== #
+#                              Producers                                                   #
+# ======================================================================================== #
+
+"""
+    run_iri(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
+             height=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
+
+Run the IRI-2020 model (via the Python `iri2020` package) for the given conditions and return
+the electron background as an [`ElectronProfile`](@ref). The computed profile lives in the
+returned struct and round-trips through `physics_state.jld2`, so nothing on disk is needed to
+reproduce the model. [`find_iri_file`](@ref) is the cached, file-based route to the same model.
+
+Only `ne` and `Te` (the quantities AURORA uses) are kept; the other IRI outputs are discarded.
+As when reading a file, the -1 sentinel levels that IRI returns where it has no valid profile
+(typically the D-region, at the bottom of the requested range) are dropped with a warning, and
+filled by extrapolation when the profile is sampled.
+
+`save_to` is a directory in which to also write the raw model output as an AURORA IRI text file
+(the directory is created if needed, and an existing file of the same name is kept, the new one
+getting a suffix). [`read_iri_file`](@ref) reads such a file back into an `ElectronProfile`.
+Saving into `pkgdir(AURORA, "internal_data", "data_electron")` puts the file where
+[`find_iri_file`](@ref) looks, so a later call with the same parameters finds it instead of
+running the model again.
+
+# Example
+```julia
+electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+```
+"""
+function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
+                 lat = 76, lon = 5, height = 85:1:700, save_to = nothing, verbose = true)
+    iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
+                                               height, verbose)
+    if save_to !== nothing
+        save_iri_data(iri_data, parameters; directory = save_to, verbose)
+    end
+    data        = iri_data[2:end, :]               # drop the header row
+    instant     = DateTime(year, month, day, hour, minute)
+    origin      = "IRI-2020 $instant $(lat)N/$(lon)E"
+
+    raw = (height_km = Float64.(data[:, 1]),
+           ne        = Float64.(data[:, 2]),       # electron density (m⁻³)
+           Te        = Float64.(data[:, 5]))       # electron temperature (K)
+    trimmed = trim_iri_sentinels(raw, "IRI-2020 run for $instant at $(lat)N/$(lon)E\n")
+
+    return ElectronProfile(trimmed.height_km .* 1e3, trimmed.ne, trimmed.Te; origin)
+end
+
+"""
+    read_iri_file(iri_file) -> ElectronProfile
+
+Read `ne` and `Te` from an IRI text file generated by AURORA and return them as an
+[`ElectronProfile`](@ref) on the file's native altitude grid. The file is read once, here, so
+the resulting source is self-contained and round-trips with no path dependency.
+
+Kept for backward compatibility with existing IRI files; for new runs prefer [`run_iri`](@ref).
+"""
+function read_iri_file(iri_file::AbstractString)
+    raw = load_iri(iri_file)
+    return ElectronProfile(raw.data.height_km .* 1e3, raw.data.ne, raw.data.Te;
+                           origin = "IRI file $(basename(iri_file))")
+end
+
+"""
+    read_ccmc_iri(file) -> ElectronProfile
+
+Read the electron background from a CCMC ModelWeb IRI text export and return it as an
+[`ElectronProfile`](@ref). The CCMC table has a variable-length preamble, a single column
+header, electron density in cm⁻³, and `-1` sentinels for missing levels; this reader locates the
+header (the line naming an `Ne/…` column), converts cm⁻³ → m⁻³, and drops sentinel rows.
+
+Columns are resolved by their header name (`km`, `Ne/cm-3`, `Te/K`) rather than by position,
+so the export is read correctly whatever its column order, and an export missing one of them
+is reported instead of silently misread.
+
+# Example
+```julia
+electrons = read_ccmc_iri("iri_output.txt")
+model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+```
+"""
+function read_ccmc_iri(file::AbstractString)
+    lines = readlines(file)
+    # Match the header on the unit-free "Ne/" so that an export in other units still gets past
+    # detection and fails on the named-column check below, which says what is wrong ("Ne/"
+    # alone is unambiguous; a bare "Ne" would also match preamble prose). Also require the "km"
+    # altitude token, needed later anyway, so that preamble prose mentioning "Ne/" in passing
+    # cannot be mistaken for the header.
+    #
+    # The header names its columns one-for-one with the data columns, so look up the ones we
+    # need by name. The unit is part of the name, which keeps a change of unit from being
+    # read as if it were cm⁻³.
+    header_idx, header, column, columns_found = locate_ccmc_header(
+        lines, l -> occursin("Ne/", l) && "km" in split(l), file, "read_ccmc_iri",
+        "a line naming an \"Ne/…\" column")
+    for name in ("km", "Ne/cm-3", "Te/K")
+        haskey(column, name) || throw(ArgumentError(
+            "read_ccmc_iri: no \"$name\" column in the header of $file.\n" * columns_found))
+    end
+    h_col, ne_col, Te_col = column["km"], column["Ne/cm-3"], column["Te/K"]
+    n_cols = max(h_col, ne_col, Te_col)
+
+    h_km = Float64[]
+    ne   = Float64[]
+    Te   = Float64[]
+    for l in lines[(header_idx + 1):end]
+        cols = split(l)
+        length(cols) >= n_cols || continue
+        h  = tryparse(Float64, cols[h_col])
+        n  = tryparse(Float64, cols[ne_col])
+        t  = tryparse(Float64, cols[Te_col])
+        (h === nothing || n === nothing || t === nothing) && continue
+        # Drop unusable levels. CCMC marks them with -1, but ne is interpolated in log-space
+        # downstream, so zero is just as fatal and is dropped the same way.
+        (n <= 0 || t <= 0) && continue
+        push!(h_km, h); push!(ne, n); push!(Te, t)
+    end
+    isempty(h_km) && throw(ArgumentError(
+        "read_ccmc_iri: no valid (non-sentinel) data rows parsed from $file"))
+
+    return ElectronProfile(h_km .* 1e3, ne .* 1e6, Te;   # km→m, cm⁻³→m⁻³
+                           origin = "CCMC IRI $(basename(file))")
+end

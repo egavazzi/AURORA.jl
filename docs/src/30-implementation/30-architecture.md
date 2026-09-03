@@ -43,9 +43,10 @@ src/
 │   └── pitch_angle_grid.jl      # PitchAngleGrid
 │
 ├── ionosphere/
-│   ├── ionosphere.jl            # Ionosphere struct (densities, temperatures)
-│   ├── iri/                     # IRI model interface (Python iri2020)
-│   └── msis/                    # MSIS model interface (Python pymsis)
+│   ├── ionosphere.jl            # Ionosphere struct (electron background: ne, Te + source)
+│   ├── profile_sources.jl       # Shared profile glue (labels, input normalization)
+│   ├── iri/                     # IRI interface (Python iri2020), ElectronProfile
+│   └── msis/                    # MSIS interface (Python pymsis), NeutralAtmosphere, DensityProfile
 │
 ├── input/
 │   ├── spectra.jl               # Spectrum types (Flat, Gaussian, Maxwellian, File)

@@ -15,18 +15,18 @@ the background ionosphere (neutral and electron densities from MSIS/IRI), and
 collision cross-section data.
 
 ```@example time_dep
-# Find (or generate) MSIS and IRI data files
+# Run MSIS (neutral atmosphere) and IRI (electron background)
 # Default parameters: VISIONS-2 rocket launch conditions
 # (2018-12-07 11:15 UTC, 76°N 5°E)
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
+neutrals  = run_msis()
+electrons = run_iri()
 
 model = AuroraModel(
     [100, 500],    # altitude limits [km]
     180:-30:0,     # pitch-angle bin edges [°] → 6 beams
     1000,          # maximum energy [eV]
-    msis_file,
-    iri_file,
+    neutrals,
+    electrons,
     13             # magnetic field angle to zenith [°]
 )
 ```

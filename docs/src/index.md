@@ -14,10 +14,10 @@ the electron precipitation varies rapidly, typically on sub-second timescales.
 ```@example quick-start
 using AURORA
 
-# Set up the physical model
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
-model = AuroraModel([100, 600], 180:-10:0, 1000, msis_file, iri_file, 13)
+# Set up the physical model (neutral atmosphere from MSIS, electron background from IRI)
+neutrals  = run_msis()
+electrons = run_iri()
+model = AuroraModel([100, 600], 180:-10:0, 1000, neutrals, electrons, 13)
 
 # Define a flickering input flux
 flux = InputFlux(

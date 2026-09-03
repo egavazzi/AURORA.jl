@@ -1,6 +1,30 @@
 # Changelog
 
 ## Unreleased
+- **Breaking** Bring your own neutral and electron profiles [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
+  - `AuroraModel` now takes the neutral atmosphere and electron background as in-memory
+    data (`NeutralAtmosphere`, `ElectronProfile`) instead of MSIS/IRI file paths. These
+    store the data itself, so a model saved to `physics_state.jld2` reloads on any machine
+    without the original files. Passing file paths still works; they are read once, at
+    construction.
+  - They can come from a live model run (`run_msis`, `run_iri`), a CCMC ModelWeb export
+    (`read_ccmc_msis`, `read_ccmc_iri`), an AURORA-generated file (`read_msis_file`,
+    `read_iri_file`), or your own vectors (`DensityProfile`, `ElectronProfile`). All carry
+    a free-form `origin` string recording provenance, written into `inputs/atmosphere.nc`.
+  - Sampling a profile outside its native altitude range now warns, since the values there
+    are extrapolated. Passing anything other than a `NeutralAtmosphere` or an MSIS file path as
+    the model's `neutrals` argument is an error (a single density source cannot describe the
+    whole atmosphere).
+  - **Breaking** `NeutralSpecies.density_profile` is renamed `density_source`. `MSISDensity`
+    and `VectorDensity` are removed; use `read_msis_file(file)[:N2]` or `DensityProfile(h, n)`.
+  - **Breaking** `Ionosphere` is now `Ionosphere(electron_source, h_atm)` and no longer
+    stores `msis_file`/`iri_file`.
+  - Species that MSIS does not report at low altitude (N, anomalous O) no longer produce
+    `NaN` densities: each species keeps only the levels where it is defined.
+  - `run_msis` and `run_iri` take a `save_to` directory in which to also write the model output
+    as an AURORA text file, read back with `read_msis_file` / `read_iri_file`. `find_msis_file`
+    and `find_iri_file` remain the cached file-based route: they reuse a matching file from the
+    package's own file store, and compute and write one when there is none.
 - Cascading matrices built from an `@law` secondary law (e.g. default N₂, O₂) are now much faster to compute (~36x for a full 30 keV N₂ build, with ~200x less memory allocated), by avoiding dynamic dispatch [#175](https://github.com/egavazzi/AURORA.jl/pull/175)
 - **Numerical Breaking (small)** Compute the double-ionization cascading matrices with a numerical-CDF method with fixed Gauss–Legendre rules instead of adaptive 3-D cubature. Make it possible to use very large energy grids (> 100 keV) [#174](https://github.com/egavazzi/AURORA.jl/pull/174)
 - **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)
