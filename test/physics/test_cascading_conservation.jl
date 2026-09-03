@@ -549,11 +549,8 @@ end
 # against the adaptive-cubature reference (`fill_double_ionization_bin!`, rtol = 1e-3),
 # which has a controlled error for any secondary law. Two laws of different regularity are
 # checked: the smooth Lorentzian-like N2/O2 shape and the atomic-O law, whose
-# piecewise-linear E_p-dependence has kinks at its parameter knots. Tolerances cover both
-# methods' quadrature errors: on rows carrying real weight the row sums agree to a few
-# 1e-3 and individual entries to ~1e-2; rows just above the threshold carry ~1e-5 of the
-# weight and are allowed a looser bound (the fixed primary-bin rule does not resolve the
-# kinematic-clamp kinks there).
+# piecewise-linear E_p-dependence has kinks at its parameter knots. The tolerances at each
+# assertion cover both methods' quadrature errors.
 @testitem "Cascading double-ionization CDF matches adaptive reference" begin
     using AURORA
     using HCubature: hcubature_buffer
@@ -597,7 +594,7 @@ end
                 row_ref[i] > 0 || continue
                 rel = abs(row_cdf[i] - row_ref[i]) / max(row_ref[i], row_cdf[i])
                 if row_ref[i] > 0.01 * w_max
-                    @test rel < 2e-2   # rows that matter: both methods within a few 1e-3
+                    @test rel < 2e-2   # rows that matter: measured agreement a few 1e-3
                     # The solver consumes the spectra bin by bin, so the row's shape matters
                     # too: check entries carrying at least 1 % of the row's largest entry.
                     # The bins clipped by the kinematic boundaries and the rows just above
@@ -616,7 +613,9 @@ end
                         end
                     end
                 else
-                    @test rel < 2e-1   # near-threshold rows: negligible weight, loose bound
+                    # Near-threshold rows carry ~1e-5 of the weight, and the fixed
+                    # primary-bin rule does not resolve the kinematic-clamp kinks there.
+                    @test rel < 2e-1
                 end
             end
         end

@@ -342,13 +342,8 @@ The outer loop structure is identical for all species. The only species-specific
 
 Single-ionization channels are integrated with adaptive cubature (`rtol = 1e-4`).
 Double-ionization channels use the numerical-CDF method with fixed Gauss-Legendre rules
-(see `fill_double_ionization_bin_cdf!`), whose cost per row stays bounded on large grids
-where adaptive integration of the 3-D integrands becomes intractable (E_max ≳ 50 keV).
-On rows carrying real weight, its row sums agree with the adaptive reference
-(`rtol = 1e-3`) to a few 1e-3, and individual matrix entries to ~1e-2 away from the bins
-clipped by the kinematic boundaries; those clipped bins and the rows just above the
-threshold (~1e-5 of the weight) are less accurate (up to ~1e-1). The test suite validates
-the method against the adaptive reference implementation.
+(`fill_double_ionization_bin_cdf!`), whose cost per row stays bounded on large grids
+(E_max ≳ 50 keV) where adaptive cubature of the 3-D integrands does not.
 
 # Arguments
 - `spec::CascadingSpec` contains species name, ionization thresholds and secondary distribution law
@@ -629,31 +624,30 @@ const GL16_W = ( 0.0271524594117541,  0.0622535239386479,
     return value
 end
 
-# `ctx` (context) is the state an integrand needs besides the integration variable — what a
-# closure would otherwise capture. It is passed explicitly and handed back as `f(ctx, x)` so
-# that every integrand can be a plain top-level function: a closure capturing a non-isbits
-# object (such as a NumericalSecondaryCDF) is heap-allocated at each creation, and these
-# integrands are created millions of times per transfer-matrix row.
-# The f::F/where {F} signatures force specialization on the integrand: the wrappers only
-# pass `f` along without calling it, and Julia does not specialize pass-through Function
-# arguments by default.
-@inline function gauss_legendre(f::F, ctx, a, b, X, W) where {F}
+# `context` is the state an integrand needs besides the integration variable, passed
+# explicitly as `f(context, x)` so that every integrand can be a plain top-level function.
+# A closure capturing a NumericalSecondaryCDF would be heap-allocated at each creation, and
+# these integrands are created millions of times per transfer-matrix row. The `f::F`
+# signatures force specialization on the integrand, which Julia does not do by default for
+# function arguments that are only passed along.
+@inline function gauss_legendre(f::F, context, a, b, X, W) where {F}
     b > a || return 0.0
     midpoint = (a + b) / 2
     halfwidth = (b - a) / 2
     result = 0.0
     for (x, w) in zip(X, W)
-        result += w * f(ctx, midpoint + halfwidth * x)
+        result += w * f(context, midpoint + halfwidth * x)
     end
     return halfwidth * result
 end
-gauss_legendre4(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL4_X, GL4_W)
-gauss_legendre8(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL8_X, GL8_W)
-gauss_legendre16(f::F, ctx, a, b) where {F} = gauss_legendre(f, ctx, a, b, GL16_X, GL16_W)
+gauss_legendre4(f::F, context, a, b) where {F} = gauss_legendre(f, context, a, b, GL4_X, GL4_W)
+gauss_legendre8(f::F, context, a, b) where {F} = gauss_legendre(f, context, a, b, GL8_X, GL8_W)
+gauss_legendre16(f::F, context, a, b) where {F} = gauss_legendre(f, context, a, b, GL16_X, GL16_W)
 
 # Secondary-law value at one energy, as a gauss_legendre integrand.
-secondary_law_density((law, E_primary), E_secondary) =
-    checked_secondary_law(law, E_secondary, E_primary)
+function secondary_law_density((law, E_primary), E_secondary)
+    return checked_secondary_law(law, E_secondary, E_primary)
+end
 
 """
 Numerical cumulative integral of a custom secondary law at one fixed primary energy.
@@ -673,9 +667,6 @@ end
 """
 Build a `NumericalSecondaryCDF` for one fixed primary energy, using the energy-grid edges (up
 to `E_max`) as CDF knots and eight-point Gauss-Legendre quadrature for each knot-interval mass.
-
-Named separately from the struct's implicit field constructor (which has the same arity) so
-that call sites unambiguously request the built-from-scratch cumulative table.
 """
 function build_secondary_cdf(E_edges, E_max, E_primary, law)
     edges = Float64[0.0]
@@ -709,8 +700,8 @@ end
 
 # Piecewise-linear cumulative coordinate used solely as an importance map: the physical law
 # is still evaluated explicitly and divided by the map's local slope dC/dE, which makes the
-# change of variables exact for this map.  `edges[1] == 0.0`, so `interp_flat`'s flat
-# extrapolation clamps to 0 below the support and to the total mass above it.
+# change of variables exact for this map. `interp_flat` clamps to 0 below the support and
+# to the total mass above it.
 @inline cumulative_map(cdf::NumericalSecondaryCDF, energy) =
     interp_flat(cdf.edges, cdf.cumulative, energy)
 
@@ -734,8 +725,6 @@ end
     return cdf.edges[i] + fraction * width, mass / width
 end
 
-# The double-ionization marginals take their gauss_legendre context (threshold and the
-# per-primary-energy CDF) first, the binned output energy second.
 @inline function double_secondary_density((threshold, cdf), E_secondary)
     W = cdf.E_primary - threshold
     (0 <= E_secondary <= W / 2) || return 0.0
@@ -791,9 +780,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
     # (max(edge, W/3), min(edge, W) for the degraded primary) introduce kinks in the
     # integrand as E_primary sweeps the bin, which the four-point Gauss rule does not resolve.
     # The least accurate rows are therefore the near-threshold ones, where W varies strongly
-    # across the bin. Measured worst per-row degraded-primary sum error is ~1.3e-3 vs the
-    # rtol=1e-3 hcubature reference on the standard 3 keV grid — physically negligible, since
-    # those rows carry little weight.
+    # across the bin.
     for k_primary in eachindex(GL4_X)
         E_primary = E_primary_mid + E_primary_halfwidth * GL4_X[k_primary]
         primary_weight = E_primary_halfwidth * GL4_W[k_primary]
@@ -801,11 +788,11 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
         W > 0 || continue
         cdf = build_secondary_cdf(E_edges, W / 2, E_primary, law)
 
-        # Degraded primary marginal: d in [W/3, W]. The diagonal bin is excluded, as in the
-        # adaptive reference: a diagonal entry would be counted in the normalization of
-        # `compute_ionization_spectra!` but never deposited by `add_ionization_collisions!`.
+        # Degraded primary marginal: d in [W/3, W]. The diagonal bin is excluded: a diagonal
+        # entry would be counted in the normalization of `compute_ionization_spectra!` but
+        # never deposited by `add_ionization_collisions!`.
         # The clamp W reaches the diagonal only when a bin is wider than the ionization
-        # threshold; `warn_if_bins_wider_than_ionization_threshold` warns on such grids.
+        # threshold, and `warn_if_bins_wider_than_ionization_threshold` warns on such grids.
         i_min_degraded = max(1, searchsortedlast(E_left, W / 3))
         i_max_degraded = min(i_primary - 1, searchsortedlast(E_left, W))
         for i_degraded in i_min_degraded:i_max_degraded
@@ -819,8 +806,8 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
         end
 
         # Per-secondary marginal: s in [0, W/2].  Energies below the grid floor remain
-        # unbinned exactly as in the HCubature implementation, but they are retained in the
-        # partner CDF and therefore still influence the on-grid marginal.
+        # unbinned, but they are retained in the partner CDF and therefore still influence
+        # the on-grid marginal.
         i_max_secondary = min(i_primary - 1, searchsortedlast(E_left, W / 2))
         for i_secondary in 1:i_max_secondary
             lower = E_edges[i_secondary]
