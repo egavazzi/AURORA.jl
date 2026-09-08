@@ -2,6 +2,22 @@
 # Lives in its own file, included after all three types, so that methods referencing several
 # of them do not depend on the include order of the iri/ and msis/ subtrees.
 
+# Resolve the altitude-grid keyword of the model-running and file-finding entry points.
+# `height_km` is the current spelling; `height` is the deprecated one. Both are in km, and
+# `nothing` marks a keyword that was not given. `fname` names the calling function in the
+# messages.
+function resolve_height_km(height_km, height, fname::Symbol)
+    if height !== nothing
+        height_km === nothing || throw(ArgumentError(
+            "$fname: `height` and `height_km` are the same keyword, given in km. " *
+            "Pass only `height_km`."))
+        @warn "$fname: the keyword `height` is renamed `height_km` (unchanged meaning: " *
+              "altitude levels in km). `height` is still accepted, but will be removed." maxlog = 1
+        return height
+    end
+    return height_km === nothing ? (85:1:700) : height_km
+end
+
 # One-line provenance label, used by the show methods and written as the "source" attribute
 # of the variables in inputs/atmosphere.nc.
 function profile_label(p::Union{DensityProfile, ElectronProfile})

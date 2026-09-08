@@ -183,7 +183,7 @@ end
 @testitem "run_msis returns a NeutralAtmosphere matching the file path" begin
     z = make_altitude_grid(100, 500)
     conditions = (; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
-                    lat = 69.58, lon = 19.23, height = 85:5:600)
+                    lat = 69.58, lon = 19.23, height_km = 85:5:600)
 
     np = run_msis(; conditions..., verbose = false)
     @test np isa NeutralAtmosphere
@@ -211,7 +211,7 @@ end
     z = make_altitude_grid(100, 400)
     dir = mktempdir()
     np = run_msis(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
-                    lat = 69.58, lon = 19.23, height = 85:5:600,
+                    lat = 69.58, lon = 19.23, height_km = 85:5:600,
                     save_to = dir, verbose = false)
 
     files = readdir(dir)
@@ -230,7 +230,7 @@ end
     z = make_altitude_grid(100, 400)
     dir = mktempdir()
     p = run_iri(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
-                  lat = 69.58, lon = 19.23, height = 85:5:600,
+                  lat = 69.58, lon = 19.23, height_km = 85:5:600,
                   save_to = dir, verbose = false)
 
     files = readdir(dir)
@@ -546,4 +546,20 @@ end
     @test three[:O] === p_O
 
     @test_throws MethodError NeutralAtmosphere()
+end
+
+@testitem "height_km keyword resolution" begin
+    using AURORA: resolve_height_km
+
+    # Neither keyword given falls back to the documented default.
+    @test resolve_height_km(nothing, nothing, :f) == 85:1:700
+    @test resolve_height_km(100:200, nothing, :f) == 100:200
+
+    # The deprecated spelling still works, with a warning.
+    @test_logs (:warn, r"height_km") match_mode=:any begin
+        @test resolve_height_km(nothing, 100:200, :f) == 100:200
+    end
+
+    # Giving both is a mistake, not a silent preference for one of them.
+    @test_throws ArgumentError resolve_height_km(1:2, 3:4, :f)
 end

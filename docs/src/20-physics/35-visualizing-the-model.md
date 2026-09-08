@@ -16,9 +16,9 @@ altitude_lims = [100, 600]
 E_max = 3000
 
 neutrals  = run_msis(; year=2005, month=10, day=8, hour=22, minute=0,
-                       lat=70, lon=19, height=85:1:700)
+                       lat=70, lon=19, height_km=85:1:700)
 electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0,
-                      lat=70, lon=19, height=85:1:700)
+                      lat=70, lon=19, height_km=85:1:700)
 
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 initialize!(model)   # build densities, cross-sections, phase functions, and scattering data

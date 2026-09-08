@@ -4,7 +4,7 @@ include("electron_profile.jl")
 
 """
     find_iri_file(; year=2018, month=12, day=7, hour=11, minute=15,
-                    lat=76, lon=5, height=85:1:700)
+                    lat=76, lon=5, height_km=85:1:700)
 
 Find or create an IRI model data file for the specified conditions.
 
@@ -26,7 +26,8 @@ asked to.
 - `minute::Int=15`: Minute (0-59)
 - `lat::Real=76`: Geographic latitude in degrees North
 - `lon::Real=5`: Geographic longitude in degrees East
-- `height::AbstractRange=85:1:700`: Altitude range in km
+- `height_km::AbstractRange=85:1:700`: Altitude levels, in km, at which the model is
+  evaluated. The former spelling `height` is also accepted, with a warning.
 
 # Returns
 - `String`: Full path to the IRI data file
@@ -43,12 +44,14 @@ function find_iri_file(;
                        minute = 15,
                        lat = 76,
                        lon = 5,
-                       height = 85:1:700,
+                       height_km = nothing,
+                       height = nothing,
                        verbose = true)
+    height_km = resolve_height_km(height_km, height, :find_iri_file)
 
     # First check if we have an iri file with these parameters
-    file_to_load = search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height,
-                                            verbose)
+    file_to_load = search_existing_iri_file(; year, month, day, hour, minute, lat, lon,
+                                            height_km, verbose)
     if !isnothing(file_to_load)
         return file_to_load
     end
@@ -56,7 +59,7 @@ function find_iri_file(;
     # Otherwise, calculate new IRI data and save it, so that the next call with these
     # parameters finds it.
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
-                                              height, verbose)
+                                              height_km, verbose)
     file_to_load = save_iri_data(iri_data, parameters; verbose)
 
     return file_to_load

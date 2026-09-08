@@ -6,7 +6,7 @@ using StyledStrings: @styled_str
 # Looking for files
 ############################################################################################
 """
-    search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height)
+    search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height_km)
 
 Search for an existing MSIS data file matching the specified parameters.
 
@@ -22,12 +22,12 @@ pre-check on filenames before loading and comparing full parameters.
 - `minute::Int`: Minute (0-59)
 - `lat::Real`: Geographic latitude in degrees North
 - `lon::Real`: Geographic longitude in degrees East
-- `height::AbstractRange`: Altitude range in km
+- `height_km::AbstractRange`: Altitude levels in km
 
 # Returns
 - `Union{String, Nothing}`: Full path to matching file, or `nothing` if not found
 """
-function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height,
+function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height_km,
                                     verbose=true)
     data_neutrals_directory = pkgdir(AURORA, "internal_data", "data_neutrals")
     data_neutrals_files = readdir(data_neutrals_directory)
@@ -45,7 +45,7 @@ function search_existing_msis_file(; year, month, day, hour, minute, lat, lon, h
             # First we do a pre-check, to avoid loading files unnecessarily
             if all([year_file, month_file, day_file, hour_file, minute_file] .==
                    [year, month, day, hour, minute])
-                parameters = (; year, month, day, hour, minute, lat, lon, height)
+                parameters = (; year, month, day, hour, minute, lat, lon, height = height_km)
                 parameters_file = load_parameters_msis(file)
                 # Now we check if all the parameters are the same
                 if parameters == parameters_file

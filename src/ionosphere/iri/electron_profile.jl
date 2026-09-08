@@ -86,7 +86,7 @@ end
 
 """
     run_iri(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
-             height=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
+             height_km=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
 
 Run the IRI-2020 model (via the Python `iri2020` package) for the given conditions and return
 the electron background as an [`ElectronProfile`](@ref). The computed profile lives in the
@@ -110,11 +110,16 @@ running the model again.
 electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
+
+`height_km` is the altitude levels, in km, at which the model is evaluated. The former
+spelling `height` is also accepted, with a warning.
 """
 function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                 lat = 76, lon = 5, height = 85:1:700, save_to = nothing, verbose = true)
+                 lat = 76, lon = 5, height_km = nothing, height = nothing,
+                 save_to = nothing, verbose = true)
+    height_km = resolve_height_km(height_km, height, :run_iri)
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
-                                               height, verbose)
+                                               height_km, verbose)
     if save_to !== nothing
         save_iri_data(iri_data, parameters; directory = save_to, verbose)
     end

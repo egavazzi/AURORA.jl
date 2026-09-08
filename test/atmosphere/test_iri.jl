@@ -38,7 +38,7 @@ end
     # dropped before they reach the log-space interpolation, exactly as when reading a file.
     p = @test_logs (:warn, r"sentinel values") match_mode = :any begin
         run_iri(; year = 2005, month = 10, day = 8, hour = 22, minute = 0,
-                  lat = 69.58, lon = 19.23, height = 50:5:700, verbose = false)
+                  lat = 69.58, lon = 19.23, height_km = 50:5:700, verbose = false)
     end
 
     @test !any(p.ne .== -1)

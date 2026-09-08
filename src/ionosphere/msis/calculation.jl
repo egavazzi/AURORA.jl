@@ -4,7 +4,7 @@ using DelimitedFiles: writedlm
 
 """
     calculate_msis_data(; year=2018, month=12, day=7, hour=11, minute=15,
-                         lat=76, lon=5, height=85:1:700)
+                         lat=76, lon=5, height_km=85:1:700)
 
 Calculate NRLMSIS 2.1 atmospheric model data using Python interface.
 
@@ -21,7 +21,7 @@ containing column names.
 - `minute::Int=15`: Minute (0-59)
 - `lat::Real=76`: Geographic latitude in degrees North
 - `lon::Real=5`: Geographic longitude in degrees East
-- `height::AbstractRange=85:1:700`: Altitude range in km
+- `height_km::AbstractRange=85:1:700`: Altitude levels, in km, at which the model is evaluated
 
 # Returns
 - `Tuple{Matrix, NamedTuple}`:
@@ -49,7 +49,7 @@ The returned matrix contains the following columns:
 - The geomagnetic activity parameter is set to -1 (use observational data)
 """
 function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                lat = 76, lon = 5, height = 85:1:700, verbose=true)
+                lat = 76, lon = 5, height_km = 85:1:700, verbose=true)
   # Spell out the conditions: they all have defaults, so a run with an unintended
   # date/position should at least be visible.
   verbose && print("Calculating msis data for $year-$(lpad(month, 2, '0'))-" *
@@ -76,19 +76,19 @@ function calculate_msis_data(; year = 2018, month = 12, day = 7, hour = 11, minu
     end
 
     # run the model
-    nrlmsis_data = msis.run(time, Py(lon), Py(lat), Py(height), geomagnetic_activity=Py(-1))
+    nrlmsis_data = msis.run(time, Py(lon), Py(lat), Py(height_km), geomagnetic_activity=Py(-1))
     # Convert from Python array to Julia array. pymsis returns Float32; widen to Float64 here
     # so that the text file written by save_msis_data holds every digit of each value and
     # reads back exactly.
     nrlmsis_data = pyconvert(Array{Float64}, nrlmsis_data) # array of size (1, 1, 1, n_z, 11)
     nrlmsis_data = dropdims(nrlmsis_data; dims = (1, 2, 3)) # convert to size (n_z, 11)
     # add a column with the altitude
-    nrlmsis_data = hcat(Vector(height), nrlmsis_data)
+    nrlmsis_data = hcat(Vector(height_km), nrlmsis_data)
     # add a header with the name of columns
     nrlmsis_data = vcat(["height(km)" "air(kg/m3)" "N2(m-3)" "O2(m-3)" "O(m-3)" "He(m-3)" "H(m-3)" "Ar(m-3)" "N(m-3)" "anomalousO(m-3)" "NO(m-3)" "T(K)"], nrlmsis_data)
 
     verbose && println(" done.")
 
-    parameters = (; year, month, day, hour, minute, lat, lon, height)
+    parameters = (; year, month, day, hour, minute, lat, lon, height = height_km)
     return nrlmsis_data, parameters
 end
