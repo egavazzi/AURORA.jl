@@ -15,6 +15,17 @@
     are extrapolated. Passing anything other than a `NeutralAtmosphere` or an MSIS file path as
     the model's `neutrals` argument is an error (a single density source cannot describe the
     whole atmosphere).
+  - **Breaking** `AuroraModel` requires exactly one of `neutrals` or `species`: with an
+    explicit `species` tuple, pass `nothing` in the `neutrals` position. Passing both, or
+    neither, is an `ArgumentError`.
+  - **Breaking** The altitude keyword of `run_msis`, `run_iri`, `find_msis_file`,
+    `find_iri_file` and `find_nrlmsis_file` is renamed `height_km` (it is in km, while profiles
+    store metres). `height` is still accepted with a warning for one release.
+  - `DensityProfile` and `ElectronProfile` are parametric in their element type
+    (`DensityProfile{T<:Real}`), following the inputs; all constructor forms validate the grid.
+    A sampled `ElectronProfile` returns the named tuple `(; ne, Te)`.
+  - `NeutralAtmosphere` can be built from `species => profile` pairs and supports the read-only
+    collection operations (`length`, `keys`, `values`, `pairs`, `get`, iteration).
   - **Breaking** `NeutralSpecies.density_profile` is renamed `density_source`. `MSISDensity`
     and `VectorDensity` are removed; use `read_msis_file(file)[:N2]` or `DensityProfile(h, n)`.
   - **Breaking** `Ionosphere` is now `Ionosphere(electron_source, h_atm)` and no longer
