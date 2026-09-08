@@ -110,7 +110,6 @@ deploydocs(;
     repo = "github.com/egavazzi/AURORA.jl",
     push_preview = (
         get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request" &&
-        !isempty(strip(get(ENV, "DOCUMENTER_KEY", ""))) &&
-        get(ENV, "GITHUB_ACTOR", "") != "dependabot[bot]"
-    ), # deploy PR previews only in trusted contexts with usable write credentials
+        !isempty(strip(get(ENV, "DOCUMENTER_KEY", "")))
+    ), # deploy PR previews only when PR context has usable write credentials
 )
