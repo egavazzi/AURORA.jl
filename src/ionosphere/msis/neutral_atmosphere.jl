@@ -8,18 +8,13 @@ using Dates: DateTime
     DensityProfile(h, n; origin="")
     DensityProfile{T}(h, n; origin="")
 
-Density source defined by user-supplied altitude (`h`, m) and density (`n`, m⁻³) vectors.
-Callable on any altitude grid (m); evaluates via PCHIP interpolation in log-space,
-consistent with AURORA's MSIS interpolation convention.
+Density `n` (m⁻³) on the altitude grid `h` (m). Callable on any altitude grid (m); evaluates
+via PCHIP interpolation in log-space. This is the density source of a [`NeutralSpecies`](@ref)
+and the per-species content of a [`NeutralAtmosphere`](@ref).
 
-This is the universal interchange for densities produced outside AURORA (CCMC ModelWeb runs,
-radar inversions, any external atmospheric model): reduce the source to an altitude vector and
-a density vector, then wrap it here. The optional `origin` string records provenance; it is
-shown by `show` and written into `inputs/atmosphere.nc`.
-
-The stored element type `T` follows the inputs: it is the promotion of their element types,
-floated, so integer input is stored as `Float64` and `Float32` input stays `Float32`. The
-`DensityProfile{T}` form converts both vectors to `T` instead.
+`T` is the floated promotion of the input element types; `DensityProfile{T}` converts the
+inputs to `T` instead. `origin` is a free-form provenance label, shown by `show` and written
+into `inputs/atmosphere.nc`.
 
 # Example
 ```julia
@@ -65,48 +60,31 @@ end
 
 
 # ======================================================================================== #
-#                           NeutralAtmosphere (neutral atmosphere)                             #
+#                              NeutralAtmosphere                                           #
 # ======================================================================================== #
 
 """
     NeutralAtmosphere(densities; origin="", dropped=Symbol[])
     NeutralAtmosphere(:N2 => profile, :O2 => profile, ...; origin="", dropped=Symbol[])
 
-Neutral atmosphere holding one [`DensityProfile`](@ref) per species, keyed by symbol
-(`:N2`, `:O2`, `:O`, `:He`, `:H`, `:Ar`, `:N`, `:NO`). Index it to get a single species'
-density source (`neutrals[:N2]`), or pass it directly as the `neutrals` argument of
-[`AuroraModel`](@ref) to build the three default species from it. Build it from a dictionary
-of species to profiles, or from `species => profile` pairs (at least one).
+One [`DensityProfile`](@ref) per species, keyed by symbol (`:N2`, `:O2`, `:O`, `:He`, `:H`,
+`:Ar`, `:N`, `:NO`). Pass it as the `neutrals` argument of [`AuroraModel`](@ref), or index it
+(`neutrals[:N2]`) to get one species' density source. Produced by [`run_msis`](@ref),
+[`read_msis_file`](@ref) and [`read_ccmc_msis`](@ref), or built from a dictionary or from
+`species => profile` pairs.
 
-It is a read-only collection: `neutrals[:N2]`, `haskey`, `get`, `keys`, `values`, `pairs`,
-`length`, and iteration, which visits `species => profile` pairs as a `Dict` does. It is not
-an `AbstractDict`, and its contents cannot be changed after construction.
-
-Where [`DensityProfile`](@ref) and [`ElectronProfile`](@ref) are single altitude profiles,
-this is a *collection*: the universal interchange for a full set of neutral densities,
-whatever their origin. Build one with [`run_msis`](@ref), from a legacy AURORA MSIS file
-with [`read_msis_file`](@ref), from a CCMC ModelWeb NRLMSIS download with
-[`read_ccmc_msis`](@ref), or directly from your own vectors. Because it stores data (not a
-file path), it round-trips through `physics_state.jld2` and reproduces on any machine with
-no external file.
-
-Species are stored on their own native altitude grids, so a source that reports a species
-only over part of the column keeps just the levels where that species is actually defined.
-Each reader translates its own missing-value marker before building the profile.
+Read-only collection interface: `getindex`, `haskey`, `get`, `keys`, `values`, `pairs`,
+`length`, and iteration over `species => profile` pairs. Each species keeps its own altitude
+grid, restricted to the levels where the source reports it.
 
 # Example
 ```julia
 neutrals = read_ccmc_msis("nrlmsis_output.txt")
 model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+n_N2     = neutrals[:N2](altitude_grid.h)
 
-n_N2 = neutrals[:N2](altitude_grid.h)   # sample one species directly
-
-# From your own profiles
 neutrals = NeutralAtmosphere(:N2 => DensityProfile(h, n_N2), :O2 => DensityProfile(h, n_O2);
                              origin = "my radar inversion")
-for (species, profile) in neutrals
-    @show species, profile
-end
 ```
 """
 struct NeutralAtmosphere
@@ -132,8 +110,6 @@ NeutralAtmosphere(first_pair::Pair{Symbol, <:DensityProfile},
 
 function Base.getindex(p::NeutralAtmosphere, species::Symbol)
     if !haskey(p.densities, species)
-        # Distinguish "your source never mentioned this" from "it did, but reported nothing
-        # usable" — otherwise a species silently dropped at read time looks like a typo.
         hint = species in p.dropped ?
             " It is present in the source but reported at fewer than 2 usable levels." : ""
         throw(ArgumentError(
@@ -163,18 +139,10 @@ function Base.show(io::IO, ::MIME"text/plain", p::NeutralAtmosphere)
     print(io,   "└── Species: ", join(sort!(string.(keys(p.densities))), ", "))
 end
 
-# How many leading header names can be trusted to line up with their data column.
-#
-# Matching columns by name assumes the header tokenizes one-for-one with the data. CCMC's
-# NRLMSISE-00 export breaks that assumption: it writes "Heden(cm-3)Arden(cm-3)" with no
-# separating space, leaving the header one token short. Names before the run-together token
-# are still aligned; names at or after it address the wrong data column, and would hand back
-# a species holding its neighbour's density. Return the width of the aligned prefix so the
-# caller can drop the rest.
-#
-# The data column count is the modal token count across data rows (rows whose first token
-# parses as a number), not just the first one: a single short or non-numeric row after the
-# header would otherwise be mistaken for the run-together shape of every row.
+# Number of leading header names that line up with their data column. CCMC's NRLMSISE-00
+# export writes "Heden(cm-3)Arden(cm-3)" without a space, so names from that token on would
+# address the wrong data column. The data column count is the modal token count over the
+# numeric rows, so that one malformed row does not decide the shape.
 function trusted_header_width(header, lines, header_idx, file)
     token_counts = Int[]
     for l in @view lines[(header_idx + 1):end]
@@ -198,10 +166,8 @@ function trusted_header_width(header, lines, header_idx, file)
     return width
 end
 
-# Indices of the levels where a species is actually reported. Anything a source could not
-# give us is expected to arrive as NaN — pymsis (and so AURORA's own MSIS files) writes NaN
-# directly, while a format with its own missing-value marker translates it before getting
-# here. None of these can go through the log-space interpolation.
+# Levels where a species is reported. Unreported levels arrive as NaN (pymsis writes NaN;
+# other readers translate their own marker); non-positive values cannot be log-interpolated.
 usable_levels(n) = findall(x -> isfinite(x) && x > 0, n)
 
 # Build the per-species density sources of a NeutralAtmosphere, keeping for each species only
@@ -227,41 +193,30 @@ end
 
 """
     run_msis(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
-              height_km=85:1:700, save_to=nothing, verbose=true) -> NeutralAtmosphere
+              height=85:1:700, save_to=nothing, verbose=true) -> NeutralAtmosphere
 
-Run the NRLMSIS 2.1 model (via the Python `pymsis` package) for the given conditions and
-return the neutral atmosphere as a [`NeutralAtmosphere`](@ref). The computed profile lives in
-the returned struct and round-trips through `physics_state.jld2`, so nothing on disk is needed
-to reproduce the model. [`find_msis_file`](@ref) is the cached, file-based route to the same
-model.
+Run the NRLMSIS 2.1 model (Python `pymsis` package) for the given conditions and return the
+species densities as a [`NeutralAtmosphere`](@ref). Levels where the model does not report a
+species (`NaN`, e.g. N at low altitude) are dropped for that species only.
 
-This is the neutral counterpart of [`run_iri`](@ref). Levels where the model does not report a
-species (it returns `NaN` for N and anomalous O at low altitude) are dropped for that species
-only, so each density keeps just the altitudes where it is defined.
-
-`save_to` is a directory in which to also write the raw model output as an AURORA MSIS text
-file (the directory is created if needed, and an existing file of the same name is kept, the
-new one getting a suffix). [`read_msis_file`](@ref) reads such a file back into a
-`NeutralAtmosphere`. Saving into `pkgdir(AURORA, "internal_data", "data_neutrals")` puts the
-file where [`find_msis_file`](@ref) looks, so a later call with the same parameters finds it
-instead of running the model again.
+# Keyword Arguments
+- `height`: altitude levels (km) at which the model is evaluated.
+- `save_to`: directory in which to also write the model output as an AURORA MSIS text file,
+  readable with [`read_msis_file`](@ref). Saving into `internal_data/data_neutrals/` makes the
+  file visible to [`find_msis_file`](@ref).
 
 # Example
 ```julia
-neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
+neutrals  = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
 electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
+model     = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
-
-`height_km` is the altitude levels, in km, at which the model is evaluated. The former
-spelling `height` is also accepted, with a warning.
 """
 function run_msis(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                  lat = 76, lon = 5, height_km = nothing, height = nothing,
+                  lat = 76, lon = 5, height = 85:1:700,
                   save_to = nothing, verbose = true)
-    height_km = resolve_height_km(height_km, height, :run_msis)
     msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon,
-                                                 height_km, verbose)
+                                                 height, verbose)
     if save_to !== nothing
         save_msis_data(msis_data, parameters; directory = save_to, verbose)
     end
@@ -282,18 +237,8 @@ end
 """
     read_msis_file(msis_file) -> NeutralAtmosphere
 
-Read every species from an MSIS text file generated by AURORA and return them as a
-[`NeutralAtmosphere`](@ref) on the file's native altitude grid. The file is read once, here, so
-the result is self-contained and round-trips with no path dependency.
-
-Kept for backward compatibility with existing MSIS files; for new runs prefer
-[`run_msis`](@ref). Index the result to reach one species: `read_msis_file(f)[:N2]`.
-
-# Example
-```julia
-neutrals = read_msis_file(msis_file)
-model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
-```
+Read every species from an MSIS text file generated by AURORA (see [`find_msis_file`](@ref))
+and return them as a [`NeutralAtmosphere`](@ref) on the file's altitude grid.
 """
 function read_msis_file(msis_file::AbstractString)
     raw   = load_msis(msis_file)
@@ -310,16 +255,10 @@ end
 """
     read_ccmc_msis(file) -> NeutralAtmosphere
 
-Read the neutral atmosphere from a CCMC ModelWeb NRLMSIS text export and return it as a
-[`NeutralAtmosphere`](@ref). The CCMC table has a variable-length preamble, a single-line column
-header, densities in cm⁻³, and a `9.999E-38` sentinel for species that the model does not
-report at a given altitude; this reader locates the header (the line containing `N2den`),
-converts cm⁻³ → m⁻³, and drops sentinel levels per species.
-
-Columns are resolved by their header name (`Heit(km)`, `N2den(cm-3)`, …) rather than by
-position, so any export using these names is read correctly whatever its column order, and a
-species absent from the export is simply not returned. This covers the NRLMSIS 2.x and
-NRLMSISE-00 exports, which use the same column names.
+Read the species densities from a CCMC ModelWeb NRLMSIS text export (NRLMSIS 2.x or
+NRLMSISE-00) and return them as a [`NeutralAtmosphere`](@ref), converted to m⁻³, with the
+`9.999E-38` sentinel levels dropped per species. Columns (`Heit(km)`, `N2den(cm-3)`, …) are
+located by header name; species absent from the export are not returned.
 
 # Example
 ```julia
@@ -329,9 +268,7 @@ model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 """
 function read_ccmc_msis(file::AbstractString)
     lines = readlines(file)
-    # The header names its columns one-for-one with the data columns, so look up the ones we
-    # need by name. The unit is part of the name, which keeps a change of unit from being
-    # read as if it were cm⁻³.
+    # Columns are matched by full header name, unit included, so a change of unit is an error.
     header_idx, header, column, columns_found = locate_ccmc_header(
         lines, l -> occursin("N2den", l), file, "read_ccmc_msis", "a line containing \"N2den\"")
     trusted = trusted_header_width(header, lines, header_idx, file)
@@ -361,8 +298,7 @@ function read_ccmc_msis(file::AbstractString)
         length(cols) >= n_cols || continue
         h = tryparse(Float64, cols[h_col])
         h === nothing && continue
-        # An unparseable field costs that species this level, not the level for every
-        # species — the same per-species rule the sentinel handling below follows.
+        # An unparseable field drops this level for that species only.
         push!(h_km, h)
         for (s, c) in species_columns
             v = tryparse(Float64, cols[c])

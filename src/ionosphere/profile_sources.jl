@@ -1,22 +1,4 @@
-# Glue shared by the profile-source types (DensityProfile, ElectronProfile, NeutralAtmosphere).
-# Lives in its own file, included after all three types, so that methods referencing several
-# of them do not depend on the include order of the iri/ and msis/ subtrees.
-
-# Resolve the altitude-grid keyword of the model-running and file-finding entry points.
-# `height_km` is the current spelling; `height` is the deprecated one. Both are in km, and
-# `nothing` marks a keyword that was not given. `fname` names the calling function in the
-# messages.
-function resolve_height_km(height_km, height, fname::Symbol)
-    if height !== nothing
-        height_km === nothing || throw(ArgumentError(
-            "$fname: `height` and `height_km` are the same keyword, given in km. " *
-            "Pass only `height_km`."))
-        @warn "$fname: the keyword `height` is renamed `height_km` (unchanged meaning: " *
-              "altitude levels in km). `height` is still accepted, but will be removed." maxlog = 1
-        return height
-    end
-    return height_km === nothing ? (85:1:700) : height_km
-end
+# Helpers shared by the profile-source types (DensityProfile, ElectronProfile, NeutralAtmosphere).
 
 # One-line provenance label, used by the show methods and written as the "source" attribute
 # of the variables in inputs/atmosphere.nc.
@@ -26,9 +8,7 @@ function profile_label(p::Union{DensityProfile, ElectronProfile})
 end
 profile_label(d) = string(typeof(d))
 
-# Warn when a profile is sampled outside its native altitude range: the PCHIP interpolation
-# extrapolates there (log-space for densities), which can drift far from reality over a few
-# tens of km with no other sign that anything is off.
+# Sampling outside the native altitude range extrapolates silently; warn.
 function warn_extrapolation(p, h_atm::AbstractVector)
     isempty(h_atm) && return nothing
     lo, hi = extrema(h_atm)
@@ -41,10 +21,8 @@ function warn_extrapolation(p, h_atm::AbstractVector)
     return nothing
 end
 
-# Normalize whatever was passed as the model's electrons argument into a callable
-# h_atm → (; ne, Te). A legacy IRI file path is read eagerly into an ElectronProfile so the
-# result round-trips through physics_state.jld2. A custom callable is held to the same
-# reproducibility bar as a species' density_source, for the same reason.
+# The model's electrons argument as a callable h_atm → (; ne, Te). A file path is read here,
+# once, so the result is saved by value in physics_state.jld2.
 to_electron_source(p::ElectronProfile)   = p
 to_electron_source(path::AbstractString) = read_iri_file(path)
 to_electron_source(p::NeutralAtmosphere)    = throw(ArgumentError(
@@ -52,11 +30,10 @@ to_electron_source(p::NeutralAtmosphere)    = throw(ArgumentError(
     "Pass an ElectronProfile instead (e.g. from run_iri, read_iri_file, or read_ccmc_iri)."))
 to_electron_source(f)                    = require_reproducible(f, "electron_source")
 
-# Normalize whatever was passed as the model's neutrals argument. A legacy MSIS file path is
-# read eagerly, once, so the default species do not each re-read the file. Anything else is
-# rejected: the argument describes the whole atmosphere, and a single density source silently
-# becoming the density of every default species is exactly the kind of mistake this guards.
-to_neutral_source(p::NeutralAtmosphere)    = p
+# The model's neutrals argument as a NeutralAtmosphere. A file path is read here, once, rather
+# than by each default species. A single density source is rejected: it would silently become
+# the density of every species.
+to_neutral_source(p::NeutralAtmosphere) = p
 to_neutral_source(path::AbstractString) = read_msis_file(path)
 to_neutral_source(p::ElectronProfile)   = throw(ArgumentError(
     "neutrals must provide neutral densities; got an ElectronProfile, which holds the " *

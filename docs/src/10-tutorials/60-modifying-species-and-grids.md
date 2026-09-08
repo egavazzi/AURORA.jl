@@ -40,43 +40,34 @@ model.energy_grid.n
 When a simulation already exists, just change the grid and call `run!(sim)` — it detects the
 change and rebuilds the model and its cache before solving.
 
-## How the background atmosphere lives on the model
+## The background atmosphere on the model
 
-The types around the background atmosphere follow a small vocabulary:
+A **profile** is one quantity versus altitude, callable on any altitude grid:
+[`DensityProfile`](@ref) holds one species' density, [`ElectronProfile`](@ref) holds `ne` and
+`Te` on a shared grid. [`NeutralAtmosphere`](@ref) is a collection of one `DensityProfile` per
+species, keyed by symbol (e.g. `neutrals[:N2]`). It is what `run_msis`, `read_msis_file` and
+`read_ccmc_msis` return, and what the model's `neutrals` argument expects. Each profile carries
+a free-form `origin` string, shown by `show` and written into `inputs/atmosphere.nc`.
 
-- A **profile** is one quantity versus altitude, callable on any altitude grid:
-  [`DensityProfile`](@ref) (one species' density) and [`ElectronProfile`](@ref) (`ne` and
-  `Te` together, which share a grid). Both validate their vectors at construction.
-- [`NeutralAtmosphere`](@ref) is a **collection**: one `DensityProfile` per species, keyed
-  by symbol (`neutrals[:N2]`). It is what `run_msis` / `read_msis_file` / `read_ccmc_msis`
-  return and what the model's `neutrals` argument expects.
-- A `*_source` field names the **role** "where a sampled quantity comes from". Any
-  reproducible callable can fill it; the profile types are the standard fillers.
-- `origin` is the free-form **provenance** string inside a profile, shown by `show` and
-  written into `inputs/atmosphere.nc`.
+These types store the data itself rather than a file path, so a model saved to
+`physics_state.jld2` reloads and can reproduce on any machine without the original MSIS/IRI files.
 
-On the model itself, every sampled quantity sits next to the source it was sampled from, so
-`initialize!` can re-sample after a grid change and a saved model reloads without external
-files:
+Every sampled quantity on the model sits next to the source it was sampled from, so
+`initialize!` can re-sample it after a grid change:
 
 | Sampled on the model grid | Sampled from |
 | --- | --- |
 | `model.species[:N2].density` | `model.species[:N2].density_source` |
 | `model.ionosphere.ne`, `model.ionosphere.Te` | `model.ionosphere.electron_source` |
 
-The two sides are stored differently on purpose: electron data is centralized on
-`model.ionosphere`, while neutral densities live on the individual species — each species
-needs its density next to its cross sections and cascading data. There is no
-`model.atmosphere`; the `NeutralAtmosphere` you pass in is unpacked into the species at
-construction.
+There is no `model.atmosphere`: the `NeutralAtmosphere` you pass in is unpacked into the
+individual species at construction.
 
 ## Changing a species' density source
 
 Each species carries a `density_source`: a callable mapping altitude (m) to density (m⁻³).
-`initialize!` samples it onto the altitude grid. The built-in option is [`DensityProfile`](@ref)
-(your own altitude/density vectors, pchip-interpolated in log-space). It is the universal way to
-bring densities from any external atmospheric model (CCMC ModelWeb runs — MSIS 2.1, DTM,
-WAM-IPE — radar inversions, …): reduce the source to two vectors and wrap it.
+`initialize!` samples it onto the altitude grid. [`DensityProfile`](@ref) wraps your own
+altitude/density vectors, pchip-interpolated in log-space.
 
 For a custom analytic profile, wrap it in the [`@law`](@ref) macro. `@law` captures the law's
 source text so that it can be saved in `physics_state.jld2`. **Bare anonymous functions are rejected** 
@@ -97,11 +88,10 @@ model.species[:N2].density_source = DensityProfile(altitude_m, density_m3; origi
 model.species[:N2].density_source = read_msis_file(msis_file)[:N2]
 ```
 
-### Densities from another atmospheric model (e.g. a CCMC ModelWeb run)
+### A whole neutral atmosphere
 
-For a whole atmosphere at once, [`NeutralAtmosphere`](@ref) holds one [`DensityProfile`](@ref) per
-species and can be passed straight to [`AuroraModel`](@ref) in place of an MSIS file. Three
-functions build one for you:
+A [`NeutralAtmosphere`](@ref) supplies the neutral-density background passed to
+[`AuroraModel`](@ref). Three functions build one:
 
 ```julia
 neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
@@ -109,25 +99,19 @@ neutrals = read_msis_file(msis_file)            # AURORA-generated MSIS file
 neutrals = read_ccmc_msis("nrlmsis_output.txt") # CCMC ModelWeb NRLMSIS export
 
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
-
-# Index it to reach a single species
-model.species[:N2].density_source = neutrals[:N2]
 ```
 
-You can also assemble one from your own profiles, either as `species => profile` pairs or from
-a dictionary:
+You can also assemble one from your own profiles, given as `species => profile` pairs:
 
 ```julia
 neutrals = NeutralAtmosphere(:N2 => DensityProfile(altitude_m, n_N2),
                              :O2 => DensityProfile(altitude_m, n_O2),
                              :O  => DensityProfile(altitude_m, n_O);
                              origin = "my radar inversion")
-
-neutrals = NeutralAtmosphere(Dict(:N2 => DensityProfile(altitude_m, n_N2)))  # also accepted
 ```
 
-It behaves as a read-only collection: `length`, `keys`, `values`, `pairs`, `get`, and
-iteration over `species => profile` pairs all work.
+Each species keeps only the altitudes where the source actually reports it (MSIS 
+gives no N below ~95 km, for instance).
 
 Each `run_msis` call runs the Python model again. To reuse one run across sessions, hand it a
 directory to write to:
@@ -137,23 +121,15 @@ neutrals = run_msis(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, 
                       save_to="my_atmospheres")
 neutrals = read_msis_file("my_atmospheres/msis_20051008-2200_69.58N-19.23E.txt")
 
-# Or let AURORA manage the file store itself: find_msis_file reuses a matching file if it has
+# Or let AURORA manage the file storage itself: find_msis_file reuses a matching file if it has
 # one, and runs the model and saves the file when it does not
 neutrals = read_msis_file(find_msis_file(; year=2005, month=10, day=8, hour=22, minute=0,
                                            lat=69.58, lon=19.23))
 ```
 
-`read_ccmc_msis` handles the CCMC quirks: the variable-length preamble, densities in cm⁻³, and
-the `9.999E-38` sentinel written where a species is not reported. Columns are matched by their
-header name rather than by position, so the export is read correctly whatever its column order,
-and a missing column is reported instead of silently misread.
-
-Whichever route you take, each species keeps only the altitudes where it is actually reported
-(MSIS gives no N below ~95 km, for instance), so a species defined over part of the column
-never drags a missing-value marker into the interpolation.
-
-For a model with no dedicated reader — DTM, WAM-IPE, a radar inversion — reduce the export to
-two vectors and wrap them yourself:
+For a source or model with no dedicated reader, reduce the export to
+two vectors and wrap them yourself. Make sure that units are correct (AURORA
+works with m for altitudes and m⁻³ for densities):
 
 ```julia
 using DelimitedFiles, AURORA
@@ -165,10 +141,8 @@ n_N2 = Float64.(rows[2:end, 2]) .* 1e6     # cm⁻³ → m⁻³
 model.species[:N2].density_source = DensityProfile(h_m, n_N2; origin="some_model_output.txt")
 ```
 
-`DensityProfile` and [`ElectronProfile`](@ref) check their vectors as you build them — matching
-lengths, at least two strictly increasing altitudes, and finite positive values — so a mistake
-in the parsing above is reported right there rather than as a puzzling interpolation failure
-much later in the run.
+`DensityProfile` and [`ElectronProfile`](@ref) validate their vectors at construction: matching
+lengths, at least two strictly increasing altitudes, and finite positive values.
 
 ### When a law needs parameters, use a functor
 
@@ -196,10 +170,8 @@ atomic-oxygen cascading law is built in order to carry some tabulated coefficien
 ## Changing the electron background (IRI)
 
 The electron density and temperature (`ne`, `Te`) are the fifth argument to
-[`AuroraModel`](@ref), supplied as an [`ElectronProfile`](@ref) — the electron analogue of
-[`DensityProfile`](@ref). Like the density sources, it stores data (not a file path), so it
-round-trips through `physics_state.jld2` and reproduces with no external file. Build one in any
-of these ways:
+[`AuroraModel`](@ref), supplied as an [`ElectronProfile`](@ref). Build one in any of these
+ways:
 
 ```julia
 # Run IRI-2020 for a date and position (via the bundled python iri2020):
@@ -220,11 +192,7 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 As for the neutrals, `run_iri(; ..., save_to="my_ionospheres")` also writes the run as an AURORA
 IRI text file that `read_iri_file` reads back, and
 `read_iri_file(find_iri_file(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23))`
-is the cached route that reuses the package's own file store.
-
-`read_ccmc_iri` handles the CCMC table directly (variable preamble, `Ne` in cm⁻³, `-1`
-sentinels). For other electron-density sources, reduce them to `(h, ne, Te)` vectors and wrap
-them in `ElectronProfile`, exactly as `DensityProfile` does for neutrals.
+is the cached route that reuses the package's own file storage.
 
 ## Overriding cross-sections, phase functions, or cascading
 

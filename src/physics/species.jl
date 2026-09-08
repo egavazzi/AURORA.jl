@@ -129,7 +129,7 @@ phase function from [`phase_fcn_N2`](@ref), and cascading described by
 [`DefaultCascadingSpecN2`](@ref).
 
 `density_source` can be a [`DensityProfile`](@ref) or any callable `h_atm (m) → density
-(m⁻³)`. Passing a [`NeutralAtmosphere`](@ref) is shorthand for `neutrals[:N2]`; passing an MSIS
+(m⁻³)`. Passing a [`NeutralAtmosphere`](@ref) is shorthand for `neutrals[:N2]`. Passing an MSIS
 file path string is shorthand for `read_msis_file(msis_file)[:N2]`. Grid-dependent fields are
 populated later by `initialize!(model)`.
 """

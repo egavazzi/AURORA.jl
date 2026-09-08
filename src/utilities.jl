@@ -327,22 +327,9 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
 end
 
 
-"""
-    check_profile_grid(type_name, h, (name, values)...)
-
-Validate the vectors backing a profile source ([`DensityProfile`](@ref),
-[`ElectronProfile`](@ref)) at construction, so that a malformed profile is reported where it
-is built rather than as a cryptic interpolation failure when it is first sampled.
-
-Checks that every value vector matches `h` in length, that `h` holds at least two strictly
-increasing altitudes, and that all values are strictly positive — densities are interpolated
-in log space, and neither a zero density nor a zero temperature is ever meaningful.
-
-# Arguments
-- `type_name`: name of the calling type, used in the error messages
-- `h`: altitude (m)
-- `(name, values)...`: one or more `(label, vector)` pairs to check against `h`
-"""
+# Validate the vectors of a DensityProfile/ElectronProfile at construction: each (name, values)
+# pair matches `h` in length, `h` has ≥ 2 strictly increasing levels, and all values are finite
+# and strictly positive (they are log-interpolated). `type_name` is used in the messages.
 function check_profile_grid(type_name, h, values...)
     for (name, v) in values
         length(v) == length(h) || throw(ArgumentError(
@@ -364,18 +351,9 @@ function check_profile_grid(type_name, h, values...)
 end
 
 
-"""
-    locate_ccmc_header(lines, ismarker, file, reader, kind)
-
-Locate the single-line column header of a CCMC ModelWeb export and index its names.
-
-`ismarker` is applied to each line to find the header line (e.g. a line containing a
-species column name). `reader` and `kind` are used only to word the error message when no
-line matches. Returns `(header_idx, header, column, columns_found)`, where `header` is the
-header line split on whitespace, `column` maps each header name to its 1-based token index,
-and `columns_found` is a ready-to-append `"Columns found: ..."` string for error messages
-about missing or misplaced columns.
-"""
+# Find the column header of a CCMC ModelWeb export: the first line satisfying `ismarker`.
+# Returns (header_idx, header tokens, name => token index, "Columns found: ..." for messages).
+# `reader` and `kind` only word the error when no line matches.
 function locate_ccmc_header(lines, ismarker, file, reader, kind)
     header_idx = findfirst(ismarker, lines)
     header_idx === nothing && throw(ArgumentError(

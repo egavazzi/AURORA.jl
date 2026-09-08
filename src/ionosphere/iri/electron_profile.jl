@@ -8,32 +8,18 @@ using Dates: DateTime
     ElectronProfile(h, ne, Te; origin="")
     ElectronProfile{T}(h, ne, Te; origin="")
 
-Electron background (electron density `ne` and temperature `Te`) defined on a native altitude
-grid. Callable on any altitude grid (m); returns the named tuple `(; ne, Te)` interpolated to
-that grid (`ne` in log-space, `Te` linearly — the same convention AURORA uses elsewhere).
+Electron density `ne` (m⁻³) and temperature `Te` (K) on the altitude grid `h` (m). Callable on
+any altitude grid (m); returns `(; ne, Te)` interpolated to that grid (`ne` in log-space, `Te`
+linearly). Produced by [`run_iri`](@ref), [`read_iri_file`](@ref) and [`read_ccmc_iri`](@ref).
 
-This is the electron analogue of [`DensityProfile`](@ref): the universal interchange for the
-ionospheric electron background, whatever its origin. Build one from the IRI model with
-[`run_iri`](@ref), from a CCMC ModelWeb IRI download with [`read_ccmc_iri`](@ref), from a legacy
-AURORA IRI file with [`read_iri_file`](@ref), or directly from your own vectors. Because it
-stores data (not a file path), it round-trips through `physics_state.jld2` and reproduces on any
-machine with no external file.
-
-The stored element type `T` follows the inputs: it is the promotion of their element types,
-floated, so integer input is stored as `Float64` and `Float32` input stays `Float32`. The
-`ElectronProfile{T}` form converts all three vectors to `T` instead.
-
-# Arguments
-- `h`: native altitude (m)
-- `ne`: electron number density (m⁻³)
-- `Te`: electron temperature (K)
-- `origin`: free-form provenance label, shown by `show` and written into `inputs/atmosphere.nc`
+`T` is the floated promotion of the input element types; `ElectronProfile{T}` converts the
+inputs to `T` instead. `origin` is a free-form provenance label, shown by `show` and written
+into `inputs/atmosphere.nc`.
 
 # Example
 ```julia
 profile = ElectronProfile(h_m, ne_m3, Te_K; origin="my measurement")
 ne, Te  = profile(altitude_grid.h)
-Te      = profile(altitude_grid.h).Te
 ```
 """
 struct ElectronProfile{T<:Real}
@@ -86,40 +72,29 @@ end
 
 """
     run_iri(; year=2018, month=12, day=7, hour=11, minute=15, lat=76, lon=5,
-             height_km=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
+             height=85:1:700, save_to=nothing, verbose=true) -> ElectronProfile
 
-Run the IRI-2020 model (via the Python `iri2020` package) for the given conditions and return
-the electron background as an [`ElectronProfile`](@ref). The computed profile lives in the
-returned struct and round-trips through `physics_state.jld2`, so nothing on disk is needed to
-reproduce the model. [`find_iri_file`](@ref) is the cached, file-based route to the same model.
+Run the IRI-2020 model (Python `iri2020` package) for the given conditions and return `ne` and
+`Te` as an [`ElectronProfile`](@ref). Levels where IRI reports the -1 sentinel (no valid
+profile, typically at the bottom of the range) are dropped with a warning.
 
-Only `ne` and `Te` (the quantities AURORA uses) are kept; the other IRI outputs are discarded.
-As when reading a file, the -1 sentinel levels that IRI returns where it has no valid profile
-(typically the D-region, at the bottom of the requested range) are dropped with a warning, and
-filled by extrapolation when the profile is sampled.
-
-`save_to` is a directory in which to also write the raw model output as an AURORA IRI text file
-(the directory is created if needed, and an existing file of the same name is kept, the new one
-getting a suffix). [`read_iri_file`](@ref) reads such a file back into an `ElectronProfile`.
-Saving into `pkgdir(AURORA, "internal_data", "data_electron")` puts the file where
-[`find_iri_file`](@ref) looks, so a later call with the same parameters finds it instead of
-running the model again.
+# Keyword Arguments
+- `height`: altitude levels (km) at which the model is evaluated.
+- `save_to`: directory in which to also write the model output as an AURORA IRI text file,
+  readable with [`read_iri_file`](@ref). Saving into `internal_data/data_electron/` makes the
+  file visible to [`find_iri_file`](@ref).
 
 # Example
 ```julia
 electrons = run_iri(; year=2005, month=10, day=8, hour=22, minute=0, lat=69.58, lon=19.23)
 model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 ```
-
-`height_km` is the altitude levels, in km, at which the model is evaluated. The former
-spelling `height` is also accepted, with a warning.
 """
 function run_iri(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-                 lat = 76, lon = 5, height_km = nothing, height = nothing,
+                 lat = 76, lon = 5, height = 85:1:700,
                  save_to = nothing, verbose = true)
-    height_km = resolve_height_km(height_km, height, :run_iri)
     iri_data, parameters = calculate_iri_data(; year, month, day, hour, minute, lat, lon,
-                                               height_km, verbose)
+                                               height, verbose)
     if save_to !== nothing
         save_iri_data(iri_data, parameters; directory = save_to, verbose)
     end
@@ -138,11 +113,8 @@ end
 """
     read_iri_file(iri_file) -> ElectronProfile
 
-Read `ne` and `Te` from an IRI text file generated by AURORA and return them as an
-[`ElectronProfile`](@ref) on the file's native altitude grid. The file is read once, here, so
-the resulting source is self-contained and round-trips with no path dependency.
-
-Kept for backward compatibility with existing IRI files; for new runs prefer [`run_iri`](@ref).
+Read `ne` and `Te` from an IRI text file generated by AURORA (see [`find_iri_file`](@ref))
+and return them as an [`ElectronProfile`](@ref) on the file's altitude grid.
 """
 function read_iri_file(iri_file::AbstractString)
     raw = load_iri(iri_file)
@@ -153,14 +125,9 @@ end
 """
     read_ccmc_iri(file) -> ElectronProfile
 
-Read the electron background from a CCMC ModelWeb IRI text export and return it as an
-[`ElectronProfile`](@ref). The CCMC table has a variable-length preamble, a single column
-header, electron density in cm⁻³, and `-1` sentinels for missing levels; this reader locates the
-header (the line naming an `Ne/…` column), converts cm⁻³ → m⁻³, and drops sentinel rows.
-
-Columns are resolved by their header name (`km`, `Ne/cm-3`, `Te/K`) rather than by position,
-so the export is read correctly whatever its column order, and an export missing one of them
-is reported instead of silently misread.
+Read `ne` and `Te` from a CCMC ModelWeb IRI text export and return them as an
+[`ElectronProfile`](@ref) (converted to m⁻³, `-1` sentinel levels dropped). The columns
+`km`, `Ne/cm-3` and `Te/K` are located by header name; a missing one is an error.
 
 # Example
 ```julia
@@ -170,15 +137,8 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 """
 function read_ccmc_iri(file::AbstractString)
     lines = readlines(file)
-    # Match the header on the unit-free "Ne/" so that an export in other units still gets past
-    # detection and fails on the named-column check below, which says what is wrong ("Ne/"
-    # alone is unambiguous; a bare "Ne" would also match preamble prose). Also require the "km"
-    # altitude token, needed later anyway, so that preamble prose mentioning "Ne/" in passing
-    # cannot be mistaken for the header.
-    #
-    # The header names its columns one-for-one with the data columns, so look up the ones we
-    # need by name. The unit is part of the name, which keeps a change of unit from being
-    # read as if it were cm⁻³.
+    # Detect the header on the unit-free "Ne/" (plus a "km" token, so preamble prose does not
+    # match), then check the exact names. An export in other units fails here.
     header_idx, header, column, columns_found = locate_ccmc_header(
         lines, l -> occursin("Ne/", l) && "km" in split(l), file, "read_ccmc_iri",
         "a line naming an \"Ne/…\" column")

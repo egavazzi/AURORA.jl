@@ -3,20 +3,15 @@ include("io.jl")
 
 """
     find_msis_file(; year=2018, month=12, day=7, hour=11, minute=15,
-                    lat=76, lon=5, height_km=85:1:700)
+                    lat=76, lon=5, height=85:1:700)
 
 Find or create a MSIS model data file for the specified conditions.
 
-This is the cached, file-based route to the NRLMSIS 2.1 model. It first searches
-`internal_data/data_neutrals/` for an existing MSIS file matching the given parameters. If no
-matching file is found, it calculates new MSIS data using the Python pymsis package and saves
-it there, so that a later call with the same parameters reuses the file instead of running the
-model again. The pymsis package will download, compile and run some fortran code under the
-hood.
-
-`read_msis_file(find_msis_file(; ...))` turns the result into a [`NeutralAtmosphere`](@ref).
-[`run_msis`](@ref) runs the model directly and returns that atmosphere, writing a file only if
-asked to.
+It first searches `internal_data/data_neutrals/` for an existing MSIS file matching the given
+parameters. If none is found, it calculates new MSIS data using the Python pymsis package
+(which downloads, compiles and runs Fortran code under the hood) and saves it there for later
+calls. [`read_msis_file`](@ref) turns the file into a [`NeutralAtmosphere`](@ref);
+[`run_msis`](@ref) returns one directly without the file cache.
 
 # Keyword Arguments
 - `year::Int=2018`: Year
@@ -26,8 +21,7 @@ asked to.
 - `minute::Int=15`: Minute (0-59)
 - `lat::Real=76`: Geographic latitude in degrees North
 - `lon::Real=5`: Geographic longitude in degrees East
-- `height_km::AbstractRange=85:1:700`: Altitude levels, in km, at which the model is
-  evaluated. The former spelling `height` is also accepted, with a warning.
+- `height::AbstractRange=85:1:700`: Altitude range in km
 
 # Returns
 - `String`: Full path to the MSIS data file
@@ -44,22 +38,19 @@ function find_msis_file(;
                         minute = 15,
                         lat = 76,
                         lon = 5,
-                        height_km = nothing,
-                        height = nothing,
+                        height = 85:1:700,
                         verbose = true)
-    height_km = resolve_height_km(height_km, height, :find_msis_file)
 
     # First check if we have a msis file with these parameters
-    file_to_load = search_existing_msis_file(; year, month, day, hour, minute, lat, lon,
-                                             height_km, verbose)
+    file_to_load = search_existing_msis_file(; year, month, day, hour, minute, lat, lon, height,
+                                             verbose)
     if !isnothing(file_to_load)
         return file_to_load
     end
 
-    # Otherwise, calculate new MSIS data and save it, so that the next call with these
-    # parameters finds it.
+    # Otherwise, calculate and save new MSIS data
     msis_data, parameters = calculate_msis_data(; year, month, day, hour, minute, lat, lon,
-                                                height_km, verbose)
+                                                height, verbose)
     file_to_load = save_msis_data(msis_data, parameters; verbose)
 
     return file_to_load
@@ -74,10 +65,8 @@ function find_nrlmsis_file(;
                            minute = 15,
                            lat = 76,
                            lon = 5,
-                           height_km = nothing,
-                           height = nothing,
+                           height = 85:1:700,
                            verbose = true)
     @warn "find_nrlmsis_file() is deprecated, use find_msis_file() instead" maxlog = 1
-    height_km = resolve_height_km(height_km, height, :find_nrlmsis_file)
-    return find_msis_file(; year, month, day, hour, minute, lat, lon, height_km, verbose)
+    return find_msis_file(; year, month, day, hour, minute, lat, lon, height, verbose)
 end

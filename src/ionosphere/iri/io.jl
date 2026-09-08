@@ -6,7 +6,7 @@ using StyledStrings: @styled_str
 # Looking for files
 ############################################################################################
 """
-    search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height_km)
+    search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height)
 
 Search for an existing IRI data file matching the specified parameters.
 
@@ -22,12 +22,12 @@ pre-check on filenames before loading and comparing full parameters.
 - `minute::Int`: Minute (0-59)
 - `lat::Real`: Geographic latitude in degrees North
 - `lon::Real`: Geographic longitude in degrees East
-- `height_km::AbstractRange`: Altitude levels in km
+- `height::AbstractRange`: Altitude range in km
 
 # Returns
 - `Union{String, Nothing}`: Full path to matching file, or `nothing` if not found
 """
-function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height_km,
+function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, height,
                                    verbose=true)
     data_electron_directory = pkgdir(AURORA, "internal_data", "data_electron")
     data_electron_files = readdir(data_electron_directory)
@@ -45,7 +45,7 @@ function search_existing_iri_file(; year, month, day, hour, minute, lat, lon, he
             # First we do a pre-check, to avoid loading files unnecessarily
             if all([year_file, month_file, day_file, hour_file, minute_file] .==
                    [year, month, day, hour, minute])
-                parameters = (; year, month, day, hour, minute, lat, lon, height = height_km)
+                parameters = (; year, month, day, hour, minute, lat, lon, height)
                 parameters_file = load_parameters_iri(file)
                 # Now we check if all the parameters are the same
                 if parameters == parameters_file
@@ -200,28 +200,12 @@ function load_iri_data(iri_file)
     return trim_iri_sentinels(iri_data, "IRI file at\n  $(iri_file)\n")
 end
 
-"""
-    trim_iri_sentinels(iri_data, origin)
-
-Drop the -1 sentinel levels that IRI writes where it has no valid profile, at the bottom
-and top of the altitude column, and let the interpolator fill them by extrapolation.
-
-Shared by every entry point into IRI data (`load_iri_data` for files, [`run_iri`](@ref) for
-a live model run), so that no source of `ne`/`Te` can hand -1 values to the log-space
-interpolation downstream.
-
-# Arguments
-- `iri_data`: NamedTuple with at least `height_km`, `ne` and `Te`. Scalar fields are left
-    untouched; every vector field is trimmed to the same valid range.
-- `origin`: description of where the data came from, used in the error/warning messages
-
-# Returns
-- `NamedTuple`: `iri_data` with the boundary sentinel levels removed
-"""
+# Drop the levels at the bottom and top of the column where IRI writes -1 (no valid profile)
+# in ne or Te, with a warning. The interpolator fills them by extrapolation. `iri_data` is a
+# NamedTuple with at least `height_km`, `ne`, `Te`. Every vector field is trimmed alike and
+# scalar fields are kept. `origin` describes the data in the messages.
 function trim_iri_sentinels(iri_data, origin::AbstractString)
-    # A level is unusable if ne or Te is not strictly positive. IRI marks these with -1, but
-    # ne is interpolated in log-space downstream, so zero is just as fatal and is treated the
-    # same way here.
+    # Zero is as fatal as -1 for the log-space interpolation of ne, so treat it the same.
     sentinel_mask = (iri_data.ne .<= 0) .| (iri_data.Te .<= 0)
 
     all(sentinel_mask) && error(
@@ -229,8 +213,6 @@ function trim_iri_sentinels(iri_data, origin::AbstractString)
         "contains no level with a valid ne and Te (no valid ionospheric profiles).\n" *
         "You might want to try another date, location, or altitude range.")
 
-    # Drop the unusable levels at the lowest and highest altitudes, with a warning, and let
-    # the interpolator fill them.
     if any(sentinel_mask)
         first_valid = findfirst(!, sentinel_mask)
         last_valid  = findlast(!, sentinel_mask)

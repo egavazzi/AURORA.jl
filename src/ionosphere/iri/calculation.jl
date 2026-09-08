@@ -2,7 +2,7 @@ using PythonCall: pyimport, pyconvert, Py
 
 """
     calculate_iri_data(; year=2018, month=12, day=7, hour=11, minute=15,
-                        lat=76, lon=5, height_km=85:1:700)
+                        lat=76, lon=5, height=85:1:700)
 
 Calculate IRI-2020 ionospheric model data using Python interface.
 
@@ -18,7 +18,7 @@ is returned as a matrix with a header row containing column names.
 - `minute::Int=15`: Minute (0-59)
 - `lat::Real=76`: Geographic latitude in degrees North
 - `lon::Real=5`: Geographic longitude in degrees East
-- `height_km::AbstractRange=85:1:700`: Altitude levels, in km, at which the model is evaluated
+- `height::AbstractRange=85:1:700`: Altitude range in km
 
 # Returns
 - `Tuple{Matrix, NamedTuple}`:
@@ -39,9 +39,7 @@ The returned matrix contains the following columns:
 21. foF2: F2 critical frequency
 """
 function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minute = 15,
-               lat = 76, lon = 5, height_km = 85:1:700, verbose=true)
-    # Spell out the conditions: they all have defaults, so a run with an unintended
-    # date/position should at least be visible.
+               lat = 76, lon = 5, height = 85:1:700, verbose=true)
     verbose && print("Calculating iri data for $year-$(lpad(month, 2, '0'))-" *
                      "$(lpad(day, 2, '0')) $(lpad(hour, 2, '0')):$(lpad(minute, 2, '0')), " *
                      "lat $(lat)°, lon $(lon)°...")
@@ -53,7 +51,7 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
         # import iri2020 model from the Python package 'iri2020'
         iri2020 = pyimport("iri2020")
         # run the model and return result
-        iri2020.IRI(time, Py([height_km[1], height_km[end], step(height_km)]), Py(lat), Py(lon))
+        iri2020.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
     end
 
     # convert the Python Dataset to a DataArray
@@ -63,7 +61,7 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     # change shape from (20, n_z, 1) to (n_z, 20)
     iri_data = iri_data[:, :, 1]'
     # add a column with the altitude
-    iri_data = hcat(Vector(height_km), iri_data)
+    iri_data = hcat(Vector(height), iri_data)
 
     # Validate: check that IRI didn't return all -1 sentinel values
     # (this happens when iri2020's solar index data files don't cover the requested date)
@@ -77,7 +75,7 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
 
     # add a header with the name of columns
     iri_data = vcat(["height(km)" "ne(m-3)" "Tn(K)" "Ti(K)" "Te(K)" "nO+(m-3)" "nH+(m-3)" "nHe+(m-3)" "nO2+(m-3)" "nNO+(m-3)" "nCI(m-3)" "nN+(m-3)" "NmF2" "hmF2" "NmF1" "hmF1" "NmE" "hmE" "TEC" "EqVertIonDrift" "foF2"], iri_data)
-    parameters = (; year, month, day, hour, minute, lat, lon, height = height_km)
+    parameters = (; year, month, day, hour, minute, lat, lon, height)
     verbose && println(" done.")
     return iri_data, parameters
 end

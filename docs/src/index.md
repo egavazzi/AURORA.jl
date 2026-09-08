@@ -14,7 +14,7 @@ the electron precipitation varies rapidly, typically on sub-second timescales.
 ```@example quick-start
 using AURORA
 
-# Set up the physical model (neutral atmosphere from MSIS, electron background from IRI)
+# Set up the physical model
 neutrals  = run_msis()
 electrons = run_iri()
 model = AuroraModel([100, 600], 180:-10:0, 1000, neutrals, electrons, 13)
