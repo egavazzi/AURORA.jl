@@ -228,10 +228,29 @@ end
 @testitem "Species Symbol indexing rejects duplicate names" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
-    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+    model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                         species = (N2Species(msis_file), N2Species(msis_file)))
 
     @test_throws ArgumentError model.species[:N2]
+end
+
+@testitem "AuroraModel requires exactly one of neutrals or species" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    # Neither given: the model has no way to build the default species.
+    @test_throws "either a neutral atmosphere" AuroraModel(
+        [100, 200], 180:-90:0, 100, nothing, iri_file, 0)
+
+    # Both given: neutrals would be silently ignored.
+    @test_throws "not used when `species`" AuroraModel(
+        [100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        species = (N2Species(msis_file),))
+
+    # neutrals = nothing with an explicit species tuple constructs fine.
+    model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
+                        species = (N2Species(msis_file),))
+    @test model isa AuroraModel
 end
 
 @testitem "AuroraModel is uninitialized before initialize!" begin
@@ -271,7 +290,7 @@ end
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
 
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                             species = (O2Species(msis_file), OSpecies(msis_file)))
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
@@ -294,7 +313,7 @@ end
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)
 
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                             species = (N2Species(msis_file), O2Species(msis_file),
                                        OSpecies(msis_file), custom_sp))
 

@@ -249,10 +249,12 @@ model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], la
 Pass an explicit `species` tuple to the constructor. The defaults are
 `N2Species`/`O2Species`/`OSpecies`, which are helper functions accepting a density source
 (a whole [`NeutralAtmosphere`](@ref), a single [`DensityProfile`](@ref), or an MSIS file path).
+The constructor's `neutrals` positional argument builds only the default species, so pass
+`nothing` for it when `species` is given explicitly.
 
 ```julia
 # Two species only:
-model = AuroraModel(alt_lims, θ_lims, E_max, neutrals, electrons;
+model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
                     species = (O2Species(neutrals), OSpecies(neutrals)))
 ```
 
@@ -266,7 +268,7 @@ spec = AURORA.CascadingSpec("Ar", [15.76, 27.63], law)
 argon = NeutralSpecies(:Ar, neutrals[:Ar];
                        cascading_spec = spec, phase_fcn_generator = phase_fcn_N2)
 
-model = AuroraModel(alt_lims, θ_lims, E_max, neutrals, electrons;
+model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
                     species = (N2Species(neutrals), O2Species(neutrals),
                                OSpecies(neutrals), argon))
 
