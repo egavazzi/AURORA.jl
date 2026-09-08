@@ -45,6 +45,22 @@ mutable struct NeutralSpecies{S<:CascadingSpec, C<:SpeciesCascadingCache, P}
     phase_fcn::P
     cascading_spec::S
     cascading_data::C
+
+    function NeutralSpecies{S,C,P}(name, density_source, density, cross_sections,
+                                   excitation_levels, phase_fcn_generator, phase_fcn,
+                                   cascading_spec, cascading_data) where {S,C,P}
+        require_reproducible(density_source, "density_source")
+        require_reproducible(phase_fcn_generator, "phase_fcn_generator")
+        return new{S,C,P}(name, density_source, density, cross_sections, excitation_levels,
+                          phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
+    end
+end
+
+function NeutralSpecies(name, density_source, density, cross_sections, excitation_levels,
+                        phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
+    return NeutralSpecies{typeof(cascading_spec), typeof(cascading_data), typeof(phase_fcn)}(
+        name, density_source, density, cross_sections, excitation_levels,
+        phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
 end
 
 """
@@ -55,8 +71,6 @@ Build a lightweight `NeutralSpecies`. All grid-dependent fields (`density`, `cro
 """
 function NeutralSpecies(name::Symbol, density_source;
                         cascading_spec::CascadingSpec, phase_fcn_generator)
-    require_reproducible(density_source, "density_source")
-    require_reproducible(phase_fcn_generator, "phase_fcn_generator")
     empty_mat = Matrix{Float64}(undef, 0, 0)
     return NeutralSpecies(
         name,

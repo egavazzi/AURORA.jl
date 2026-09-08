@@ -387,3 +387,85 @@ end
     @test minimum(p[:O].h) == 100e3
     @test minimum(p[:N2].h) == 0.0
 end
+
+@testitem "Profile call forms agree" begin
+    same(a, b) = all(f -> getfield(a, f) == getfield(b, f), fieldnames(typeof(a)))
+
+    h, n = [100e3, 200e3, 300e3], [1e18, 1e17, 1e16]
+    forms = (DensityProfile(h, n; origin = "x"), DensityProfile(h, n, "x"),
+             DensityProfile{Float64}(h, n, "x"), DensityProfile{Float64}(h, n; origin = "x"))
+    @test all(p -> same(p, forms[1]), forms)
+
+    ne, Te = [1e10, 1e11, 1e12], [200.0, 300.0, 400.0]
+    eforms = (ElectronProfile(h, ne, Te; origin = "x"), ElectronProfile(h, ne, Te, "x"),
+              ElectronProfile{Float64}(h, ne, Te, "x"),
+              ElectronProfile{Float64}(h, ne, Te; origin = "x"))
+    @test all(p -> same(p, eforms[1]), eforms)
+
+    densities = Dict(:N2 => forms[1])
+    a1 = NeutralAtmosphere(densities; origin = "x", dropped = [:O])
+    a2 = NeutralAtmosphere(densities, "x", [:O])
+    @test keys(a1) == keys(a2)
+    @test same(a1[:N2], a2[:N2])
+    @test a1.origin == a2.origin && a1.dropped == a2.dropped
+end
+
+@testitem "Positional profile constructors validate too" begin
+    h = [100e3, 200e3, 300e3]
+
+    @test_throws "must have the same length" DensityProfile(h, [1e18, 1e17], "x")
+    @test_throws "at least 2 altitude levels" DensityProfile([100e3], [1e18], "x")
+    @test_throws "strictly increasing" DensityProfile([300e3, 100e3, 200e3],
+                                                      [1e18, 1e17, 1e16], "x")
+    @test_throws "finite and strictly positive" DensityProfile(h, [1e18, 0.0, 1e16], "x")
+    @test_throws "at least 2 altitude levels" DensityProfile{Float64}([100e3], [1e18], "x")
+
+    @test_throws "must have the same length" ElectronProfile(h, [1e11, 1e12],
+                                                             [200.0, 300.0], "x")
+    @test_throws "strictly increasing" ElectronProfile([300e3, 100e3, 200e3],
+                                                       [1e11, 1e12, 1e13],
+                                                       [200.0, 300.0, 400.0], "x")
+    @test_throws "finite and strictly positive" ElectronProfile{Float64}(
+        h, [1e11, 1e12, 1e13], [200.0, 0.0, 400.0], "x")
+end
+
+@testitem "Profile element type follows the inputs" begin
+    h, n   = [100e3, 200e3, 300e3], [1e18, 1e17, 1e16]
+    ne, Te = [1e10, 1e11, 1e12], [200.0, 300.0, 400.0]
+
+    @test DensityProfile(Float32.(h), Float32.(n)) isa DensityProfile{Float32}
+    @test DensityProfile([100, 200, 300], [10, 9, 8]) isa DensityProfile{Float64}
+    @test DensityProfile(Float32.(h), n) isa DensityProfile{Float64}
+    @test DensityProfile{Float64}(Float32.(h), Float32.(n)) isa DensityProfile{Float64}
+
+    ranged = DensityProfile(100e3:100e3:300e3, n)
+    @test ranged isa DensityProfile{Float64}
+    @test ranged.h isa Vector{Float64}
+
+    @test ElectronProfile(Float32.(h), Float32.(ne), Float32.(Te)) isa ElectronProfile{Float32}
+    @test ElectronProfile([100, 200, 300], [10, 11, 12], [200, 300, 400]) isa
+          ElectronProfile{Float64}
+    @test ElectronProfile(Float32.(h), ne, Float32.(Te)) isa ElectronProfile{Float64}
+    @test ElectronProfile{Float64}(Float32.(h), Float32.(ne), Float32.(Te)) isa
+          ElectronProfile{Float64}
+
+    # A Float32 profile samples to the same values as its Float64 twin
+    grid = [150e3, 250e3]
+    @test DensityProfile(Float32.(h), Float32.(n))(grid) ≈ DensityProfile(h, n)(grid) rtol=1e-5
+    ne32, Te32 = ElectronProfile(Float32.(h), Float32.(ne), Float32.(Te))(grid)
+    ne64, Te64 = ElectronProfile(h, ne, Te)(grid)
+    @test ne32 ≈ ne64 rtol=1e-5
+    @test Te32 ≈ Te64 rtol=1e-5
+end
+
+@testitem "NeutralAtmosphere holds profiles of different element types" begin
+    h, n = [100e3, 200e3, 300e3], [1e18, 1e17, 1e16]
+    neutrals = NeutralAtmosphere(Dict(:N2 => DensityProfile(h, n),
+                                      :O2 => DensityProfile(Float32.(h), Float32.(n)));
+                                 origin = "mixed")
+
+    @test neutrals[:N2] isa DensityProfile{Float64}
+    @test neutrals[:O2] isa DensityProfile{Float32}
+    @test occursin("N2, O2", sprint(show, neutrals))
+    @test occursin("mixed", sprint(show, MIME"text/plain"(), neutrals))
+end

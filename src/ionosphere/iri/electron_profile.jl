@@ -6,6 +6,7 @@ using Dates: DateTime
 
 """
     ElectronProfile(h, ne, Te; origin="")
+    ElectronProfile{T}(h, ne, Te; origin="")
 
 Electron background (electron density `ne` and temperature `Te`) defined on a native altitude
 grid. Callable on any altitude grid (m); returns the tuple `(ne, Te)` interpolated to that grid
@@ -17,6 +18,10 @@ ionospheric electron background, whatever its origin. Build one from the IRI mod
 AURORA IRI file with [`read_iri_file`](@ref), or directly from your own vectors. Because it
 stores data (not a file path), it round-trips through `physics_state.jld2` and reproduces on any
 machine with no external file.
+
+The stored element type `T` follows the inputs: it is the promotion of their element types,
+floated, so integer input is stored as `Float64` and `Float32` input stays `Float32`. The
+`ElectronProfile{T}` form converts all three vectors to `T` instead.
 
 # Arguments
 - `h`: native altitude (m)
@@ -30,18 +35,30 @@ profile = ElectronProfile(h_m, ne_m3, Te_K; origin="my measurement")
 ne, Te  = profile(altitude_grid.h)
 ```
 """
-struct ElectronProfile
-    h::Vector{Float64}    # native altitude (m)
-    ne::Vector{Float64}   # electron density (m⁻³)
-    Te::Vector{Float64}   # electron temperature (K)
+struct ElectronProfile{T<:Real}
+    h::Vector{T}          # native altitude (m)
+    ne::Vector{T}         # electron density (m⁻³)
+    Te::Vector{T}         # electron temperature (K)
     origin::String        # provenance label (free-form, may be empty)
+
+    function ElectronProfile{T}(h, ne, Te, origin) where {T<:Real}
+        # Convert before validating so the checks see the values that will be stored.
+        h  = convert(Vector{T}, h)
+        ne = convert(Vector{T}, ne)
+        Te = convert(Vector{T}, Te)
+        check_profile_grid("ElectronProfile", h, ("ne", ne), ("Te", Te))
+        return new{T}(h, ne, Te, String(origin))
+    end
 end
 
-function ElectronProfile(h, ne, Te; origin::AbstractString = "")
-    h, ne, Te = collect(Float64, h), collect(Float64, ne), collect(Float64, Te)
-    check_profile_grid("ElectronProfile", h, ("ne", ne), ("Te", Te))
-    return ElectronProfile(h, ne, Te, String(origin))
-end
+ElectronProfile{T}(h, ne, Te; origin::AbstractString = "") where {T<:Real} =
+    ElectronProfile{T}(h, ne, Te, origin)
+
+ElectronProfile(h, ne, Te, origin) =
+    ElectronProfile{promote_type(float(eltype(h)), float(eltype(ne)),
+                                 float(eltype(Te)))}(h, ne, Te, origin)
+ElectronProfile(h, ne, Te; origin::AbstractString = "") =
+    ElectronProfile(h, ne, Te, origin)
 
 function (p::ElectronProfile)(h_atm::AbstractVector)
     warn_extrapolation(p, h_atm)

@@ -6,6 +6,7 @@ using Dates: DateTime
 
 """
     DensityProfile(h, n; origin="")
+    DensityProfile{T}(h, n; origin="")
 
 Density source defined by user-supplied altitude (`h`, m) and density (`n`, m⁻³) vectors.
 Callable on any altitude grid (m); evaluates via PCHIP interpolation in log-space,
@@ -16,23 +17,36 @@ radar inversions, any external atmospheric model): reduce the source to an altit
 a density vector, then wrap it here. The optional `origin` string records provenance; it is
 shown by `show` and written into `inputs/atmosphere.nc`.
 
+The stored element type `T` follows the inputs: it is the promotion of their element types,
+floated, so integer input is stored as `Float64` and `Float32` input stays `Float32`. The
+`DensityProfile{T}` form converts both vectors to `T` instead.
+
 # Example
 ```julia
 profile = DensityProfile(h_msis_m, n_N2; origin="ccmc_run_4321.txt")
 n = profile(altitude_grid.h)
 ```
 """
-struct DensityProfile
-    h::Vector{Float64}   # altitude (m)
-    n::Vector{Float64}   # density (m⁻³)
+struct DensityProfile{T<:Real}
+    h::Vector{T}         # altitude (m)
+    n::Vector{T}         # density (m⁻³)
     origin::String       # provenance label (free-form, may be empty)
+
+    function DensityProfile{T}(h, n, origin) where {T<:Real}
+        # Convert before validating so the checks see the values that will be stored.
+        h = convert(Vector{T}, h)
+        n = convert(Vector{T}, n)
+        check_profile_grid("DensityProfile", h, ("n", n))
+        return new{T}(h, n, String(origin))
+    end
 end
 
-function DensityProfile(h, n; origin::AbstractString = "")
-    h, n = collect(Float64, h), collect(Float64, n)
-    check_profile_grid("DensityProfile", h, ("n", n))
-    return DensityProfile(h, n, String(origin))
-end
+DensityProfile{T}(h, n; origin::AbstractString = "") where {T<:Real} =
+    DensityProfile{T}(h, n, origin)
+
+DensityProfile(h, n, origin) =
+    DensityProfile{promote_type(float(eltype(h)), float(eltype(n)))}(h, n, origin)
+DensityProfile(h, n; origin::AbstractString = "") = DensityProfile(h, n, origin)
 
 function (d::DensityProfile)(h_atm::AbstractVector)
     warn_extrapolation(d, h_atm)
@@ -83,15 +97,20 @@ n_N2 = neutrals[:N2](altitude_grid.h)   # sample one species directly
 ```
 """
 struct NeutralAtmosphere
+    # Abstract value type on purpose: species may carry different element types.
     densities::Dict{Symbol, DensityProfile}
     origin::String
     dropped::Vector{Symbol}   # species the source carried but never usably reported
+
+    function NeutralAtmosphere(densities, origin, dropped)
+        return new(Dict{Symbol, DensityProfile}(densities), String(origin),
+                   collect(Symbol, dropped))
+    end
 end
 
 NeutralAtmosphere(densities::AbstractDict; origin::AbstractString = "",
                   dropped = Symbol[]) =
-    NeutralAtmosphere(Dict{Symbol, DensityProfile}(densities), String(origin),
-                      collect(Symbol, dropped))
+    NeutralAtmosphere(densities, origin, dropped)
 
 function Base.getindex(p::NeutralAtmosphere, species::Symbol)
     if !haskey(p.densities, species)

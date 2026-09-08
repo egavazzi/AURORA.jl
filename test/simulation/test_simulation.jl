@@ -522,6 +522,25 @@ end
     @test sp.phase_fcn_generator === phase_fcn_N2    # named function
 end
 
+@testitem "The positional NeutralSpecies constructor enforces reproducibility" begin
+    empty_mat = Matrix{Float64}(undef, 0, 0)
+    spec      = AURORA.DefaultCascadingSpecN2()
+    cache     = AURORA.SpeciesCascadingCache(spec)
+
+    @test_throws "bare anonymous function" AURORA.NeutralSpecies(
+        :G, h -> fill(1e18, length(h)), Float64[], empty_mat, empty_mat,
+        AURORA.phase_fcn_N2, (empty_mat, copy(empty_mat)), spec, cache)
+
+    @test_throws "bare anonymous function" AURORA.NeutralSpecies(
+        :G, @law(h -> fill(1e18, length(h))), Float64[], empty_mat, empty_mat,
+        (θ, E) -> θ, (empty_mat, copy(empty_mat)), spec, cache)
+
+    sp = AURORA.NeutralSpecies(:G, @law(h -> fill(1e18, length(h))), Float64[], empty_mat,
+                               empty_mat, AURORA.phase_fcn_N2,
+                               (empty_mat, copy(empty_mat)), spec, cache)
+    @test sp.name === :G
+end
+
 @testitem "@law density round-trips through physics_state.jld2" begin
     using JLD2
     mktempdir() do savedir
