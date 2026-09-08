@@ -114,6 +114,21 @@ model = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 model.species[:N2].density_source = neutrals[:N2]
 ```
 
+You can also assemble one from your own profiles, either as `species => profile` pairs or from
+a dictionary:
+
+```julia
+neutrals = NeutralAtmosphere(:N2 => DensityProfile(altitude_m, n_N2),
+                             :O2 => DensityProfile(altitude_m, n_O2),
+                             :O  => DensityProfile(altitude_m, n_O);
+                             origin = "my radar inversion")
+
+neutrals = NeutralAtmosphere(Dict(:N2 => DensityProfile(altitude_m, n_N2)))  # also accepted
+```
+
+It behaves as a read-only collection: `length`, `keys`, `values`, `pairs`, `get`, and
+iteration over `species => profile` pairs all work.
+
 Each `run_msis` call runs the Python model again. To reuse one run across sessions, hand it a
 directory to write to:
 

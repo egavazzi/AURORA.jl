@@ -69,12 +69,18 @@ end
 # ======================================================================================== #
 
 """
-    NeutralAtmosphere(densities; origin="")
+    NeutralAtmosphere(densities; origin="", dropped=Symbol[])
+    NeutralAtmosphere(:N2 => profile, :O2 => profile, ...; origin="", dropped=Symbol[])
 
 Neutral atmosphere holding one [`DensityProfile`](@ref) per species, keyed by symbol
 (`:N2`, `:O2`, `:O`, `:He`, `:H`, `:Ar`, `:N`, `:NO`). Index it to get a single species'
 density source (`neutrals[:N2]`), or pass it directly as the `neutrals` argument of
-[`AuroraModel`](@ref) to build the three default species from it.
+[`AuroraModel`](@ref) to build the three default species from it. Build it from a dictionary
+of species to profiles, or from `species => profile` pairs (at least one).
+
+It is a read-only collection: `neutrals[:N2]`, `haskey`, `get`, `keys`, `values`, `pairs`,
+`length`, and iteration, which visits `species => profile` pairs as a `Dict` does. It is not
+an `AbstractDict`, and its contents cannot be changed after construction.
 
 Where [`DensityProfile`](@ref) and [`ElectronProfile`](@ref) are single altitude profiles,
 this is a *collection*: the universal interchange for a full set of neutral densities,
@@ -94,6 +100,13 @@ neutrals = read_ccmc_msis("nrlmsis_output.txt")
 model    = AuroraModel(altitude_lims, θ_lims, E_max, neutrals, electrons)
 
 n_N2 = neutrals[:N2](altitude_grid.h)   # sample one species directly
+
+# From your own profiles
+neutrals = NeutralAtmosphere(:N2 => DensityProfile(h, n_N2), :O2 => DensityProfile(h, n_O2);
+                             origin = "my radar inversion")
+for (species, profile) in neutrals
+    @show species, profile
+end
 ```
 """
 struct NeutralAtmosphere
@@ -112,6 +125,11 @@ NeutralAtmosphere(densities::AbstractDict; origin::AbstractString = "",
                   dropped = Symbol[]) =
     NeutralAtmosphere(densities, origin, dropped)
 
+NeutralAtmosphere(first_pair::Pair{Symbol, <:DensityProfile},
+                  rest::Pair{Symbol, <:DensityProfile}...;
+                  origin::AbstractString = "", dropped = Symbol[]) =
+    NeutralAtmosphere(Dict{Symbol, DensityProfile}(first_pair, rest...), origin, dropped)
+
 function Base.getindex(p::NeutralAtmosphere, species::Symbol)
     if !haskey(p.densities, species)
         # Distinguish "your source never mentioned this" from "it did, but reported nothing
@@ -126,7 +144,14 @@ function Base.getindex(p::NeutralAtmosphere, species::Symbol)
 end
 
 Base.haskey(p::NeutralAtmosphere, species::Symbol) = haskey(p.densities, species)
+Base.get(p::NeutralAtmosphere, species::Symbol, default) = get(p.densities, species, default)
 Base.keys(p::NeutralAtmosphere) = keys(p.densities)
+Base.values(p::NeutralAtmosphere) = values(p.densities)
+Base.pairs(p::NeutralAtmosphere) = pairs(p.densities)
+Base.length(p::NeutralAtmosphere) = length(p.densities)
+Base.eltype(::Type{NeutralAtmosphere}) = Pair{Symbol, DensityProfile}
+Base.iterate(p::NeutralAtmosphere) = iterate(p.densities)
+Base.iterate(p::NeutralAtmosphere, state) = iterate(p.densities, state)
 
 function Base.show(io::IO, p::NeutralAtmosphere)
     print(io, "NeutralAtmosphere(", join(sort!(string.(keys(p.densities))), ", "), ")")

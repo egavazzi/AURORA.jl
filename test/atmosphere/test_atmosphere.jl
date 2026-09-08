@@ -469,3 +469,61 @@ end
     @test occursin("N2, O2", sprint(show, neutrals))
     @test occursin("mixed", sprint(show, MIME"text/plain"(), neutrals))
 end
+
+@testitem "NeutralAtmosphere collection interface" begin
+    h, n = [100e3, 200e3, 300e3], [1e18, 1e17, 1e16]
+    p_N2 = DensityProfile(h, n)
+    p_O2 = DensityProfile(h, n ./ 4)
+    neutrals = NeutralAtmosphere(Dict(:N2 => p_N2, :O2 => p_O2); origin = "test source")
+
+    @test length(neutrals) == 2
+    @test eltype(neutrals) == Pair{Symbol, DensityProfile}
+
+    collected = collect(neutrals)
+    @test collected isa Vector{<:Pair{Symbol, <:DensityProfile}}
+    @test Set(collected) == Set(collect(neutrals.densities))
+
+    visited = Symbol[]
+    for (species, profile) in neutrals
+        push!(visited, species)
+        @test profile === neutrals[species]
+    end
+    @test Set(visited) == Set([:N2, :O2])
+
+    @test Set(values(neutrals)) == Set([p_N2, p_O2])
+    @test Set(keys(neutrals)) == Set([:N2, :O2])
+    @test Set(pairs(neutrals)) == Set([:N2 => p_N2, :O2 => p_O2])
+
+    @test get(neutrals, :N2, nothing) === p_N2
+    @test get(neutrals, :He, nothing) === nothing
+
+    # Indexing a missing species still explains itself rather than returning a default
+    @test_throws ArgumentError neutrals[:He]
+    missing_msg = sprint(showerror, try neutrals[:He] catch e; e end)
+    @test occursin("no density for :He", missing_msg)
+    @test occursin("Available: N2, O2", missing_msg)
+end
+
+@testitem "NeutralAtmosphere from species => profile pairs" begin
+    h, n = [100e3, 200e3, 300e3], [1e18, 1e17, 1e16]
+    p_N2 = DensityProfile(h, n)
+    p_O2 = DensityProfile(h, n ./ 4)
+    p_O  = DensityProfile(h, n ./ 8)
+
+    from_pairs = NeutralAtmosphere(:N2 => p_N2, :O2 => p_O2; origin = "x")
+    from_dict  = NeutralAtmosphere(Dict(:N2 => p_N2, :O2 => p_O2); origin = "x")
+    @test Set(keys(from_pairs)) == Set(keys(from_dict))
+    @test from_pairs[:N2] === from_dict[:N2] === p_N2
+    @test from_pairs[:O2] === from_dict[:O2] === p_O2
+    @test from_pairs.origin == from_dict.origin == "x"
+
+    single = NeutralAtmosphere(:N2 => p_N2)
+    @test collect(keys(single)) == [:N2]
+
+    # Three pairs dispatch to the pairs method, not the untyped 3-argument constructor
+    three = NeutralAtmosphere(:N2 => p_N2, :O2 => p_O2, :O => p_O)
+    @test length(three) == 3
+    @test three[:O] === p_O
+
+    @test_throws MethodError NeutralAtmosphere()
+end
