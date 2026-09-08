@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
+  - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.
+  - New functions `run_msis`, `read_msis_file`, `read_ccmc_msis` (returning a `NeutralAtmosphere`) and `run_iri`, `read_iri_file`, `read_ccmc_iri` (returning an `ElectronProfile`).
+  - `run_msis` and `run_iri` take a `save_to` directory in which to write the model output as an AURORA text file. `find_msis_file` / `find_iri_file` remain the cached route: they reuse a matching file from the package's file store, and compute and write one when there is none.
+  - **Breaking** `NeutralSpecies.density_profile` is renamed `density_source`. `MSISDensity` and `VectorDensity` are removed; use `read_msis_file(file)[:N2]` or `DensityProfile(h, n)`.
+  - **Breaking** `Ionosphere` is now `Ionosphere(electron_source, h_atm)` and no longer stores `msis_file`/`iri_file`.
+  - Sampling a profile outside its native altitude range now warns that the values there are extrapolated.
+  - Species that MSIS does not report at low altitude (N, anomalous O) no longer produce `NaN` densities: each species keeps only the levels where it is defined.
 - Cascading matrices built from an `@law` secondary law (e.g. default N₂, O₂) are now much faster to compute (~36x for a full 30 keV N₂ build, with ~200x less memory allocated), by avoiding dynamic dispatch [#175](https://github.com/egavazzi/AURORA.jl/pull/175)
 - **Numerical Breaking (small)** Compute the double-ionization cascading matrices with a numerical-CDF method with fixed Gauss–Legendre rules instead of adaptive 3-D cubature. Make it possible to use very large energy grids (> 100 keV) [#174](https://github.com/egavazzi/AURORA.jl/pull/174)
 - **Numerical Breaking (small)** Faster single-ionization cascading matrix calculations and better report progress [#169](https://github.com/egavazzi/AURORA.jl/pull/169)

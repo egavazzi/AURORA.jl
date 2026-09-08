@@ -167,11 +167,11 @@ for the simulation, then read the grids from it:
 using MAT
 
 # Build the model (same settings as the simulation that will use the file)
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
+neutrals  = run_msis()
+electrons = run_iri()
 θ_lims = 180:-10:0
 E_max  = 1000.0
-model  = AuroraModel([100, 600], θ_lims, E_max, msis_file, iri_file, 13)
+model  = AuroraModel([100, 600], θ_lims, E_max, neutrals, electrons, 13)
 
 # Extract the grids your file must be aligned to
 μ_center = model.pitch_angle_grid.μ_center  # length n_μ

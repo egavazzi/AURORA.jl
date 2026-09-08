@@ -120,7 +120,7 @@ end
     custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
     custom_spec = AURORA.CascadingSpec("N2variant", [15.581, 16.73, 18.75], custom_law)
 
-    sp = AURORA.NeutralSpecies(:N2, AURORA.MSISDensity(msis_file, :N2);
+    sp = AURORA.NeutralSpecies(:N2, read_msis_file(msis_file)[:N2];
                                cascading_spec      = custom_spec,
                                phase_fcn_generator = AURORA.phase_fcn_N2)
 

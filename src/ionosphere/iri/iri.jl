@@ -1,6 +1,6 @@
 include("calculation.jl")
 include("io.jl")
-include("interpolation.jl")
+include("electron_profile.jl")
 
 """
     find_iri_file(; year=2018, month=12, day=7, hour=11, minute=15,
@@ -8,10 +8,11 @@ include("interpolation.jl")
 
 Find or create an IRI model data file for the specified conditions.
 
-It first searches for an existing IRI file matching the given parameters.
-If no matching file is found, it calculates new IRI data using the Python iri2020 package
-and saves it to a file. The iri2020 package will compile and run some fortran code under
-the hood.
+It first searches `internal_data/data_electron/` for an existing IRI file matching the given
+parameters. If none is found, it calculates new IRI data using the Python iri2020 package
+(which compiles and runs Fortran code under the hood) and saves it there for later calls.
+[`read_iri_file`](@ref) turns the file into an [`ElectronProfile`](@ref); [`run_iri`](@ref)
+returns one directly without the file cache.
 
 # Keyword Arguments
 - `year::Int=2018`: Year

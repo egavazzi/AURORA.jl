@@ -156,14 +156,16 @@ end
     @test time_dependent.dt == 0.01
 end
 
-@testitem "NeutralSpecies density_profile types" begin
+@testitem "NeutralSpecies density_source types" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
-    # Default model: all species backed by MSISDensity; density is empty before initialize!
+    # Default model from an MSIS file: read_msis_file reads the file eagerly and yields a
+    # DensityProfile (carrying a provenance origin); density is empty before initialize!
     for sp in model.species
-        @test sp.density_profile isa MSISDensity
+        @test sp.density_source isa DensityProfile
+        @test occursin("MSIS file", sp.density_source.origin)
     end
     @test isempty(model.species[1].density)
 
@@ -172,24 +174,44 @@ end
     ag = model.altitude_grid
     @test !isempty(model.species[1].density)
 
-    # VectorDensity round-trip: PCHIP through exact sample points → same density as MSISDensity
-    raw_n2 = AURORA.load_msis_density(msis_file, :N2, ag.h)
-    vd = VectorDensity(ag.h, raw_n2)
+    # A user DensityProfile built on the file's native grid reproduces the default density
+    raw = AURORA.load_msis(msis_file)
+    vd  = DensityProfile(raw.data.height_km .* 1e3, raw.data.N2; origin="manual")
     model_vd = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-    model_vd.species[1].density_profile = vd
+    model_vd.species[1].density_source = vd
     initialize!(model_vd; verbose=false)
-    @test model_vd.species[1].density_profile isa VectorDensity
+    @test model_vd.species[1].density_source isa DensityProfile
     @test model_vd.species[1].density ≈ model.species[1].density rtol=1e-6
 
-    # A @law profile is accepted as density_profile, and density remains empty until initialize!
+    # A @law source is accepted, and density remains empty until initialize!
     flat_profile = @law h -> fill(1e15, length(h))
     sp_fn = AURORA.N2Species(flat_profile)
-    @test sp_fn.density_profile isa ExprLaw
-    @test sp_fn.density_profile === flat_profile
+    @test sp_fn.density_source isa ExprLaw
+    @test sp_fn.density_source === flat_profile
     @test isempty(sp_fn.density)
 
     # A bare anonymous law is rejected to ensure reproducibility
     @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
+end
+
+@testitem "NeutralAtmosphere as a model atmosphere" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    neutrals = read_msis_file(msis_file)
+    @test neutrals isa NeutralAtmosphere
+    @test all(haskey(neutrals, s) for s in (:N2, :O2, :O))
+    @test neutrals[:N2] isa DensityProfile
+    @test_throws ArgumentError neutrals[:XX]
+
+    # A NeutralAtmosphere is accepted wherever an MSIS path is, and gives the same densities
+    model_path = AuroraModel((100, 400), 180:-30:0, 100, msis_file, iri_file)
+    model_prof = AuroraModel((100, 400), 180:-30:0, 100, neutrals, iri_file)
+    initialize!(model_path)
+    initialize!(model_prof)
+    for name in (:N2, :O2, :O)
+        @test model_prof.species[name].density ≈ model_path.species[name].density rtol=1e-12
+    end
 end
 
 @testitem "AuroraModel species support Symbol indexing" begin
@@ -206,10 +228,29 @@ end
 @testitem "Species Symbol indexing rejects duplicate names" begin
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
-    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+    model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                         species = (N2Species(msis_file), N2Species(msis_file)))
 
     @test_throws ArgumentError model.species[:N2]
+end
+
+@testitem "AuroraModel requires exactly one of neutrals or species" begin
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+
+    # Neither given: the model has no way to build the default species.
+    @test_throws "either a neutral atmosphere" AuroraModel(
+        [100, 200], 180:-90:0, 100, nothing, iri_file, 0)
+
+    # Both given: neutrals would be silently ignored.
+    @test_throws "not used when `species`" AuroraModel(
+        [100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        species = (N2Species(msis_file),))
+
+    # neutrals = nothing with an explicit species tuple constructs fine.
+    model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
+                        species = (N2Species(msis_file),))
+    @test model isa AuroraModel
 end
 
 @testitem "AuroraModel is uninitialized before initialize!" begin
@@ -229,7 +270,7 @@ end
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
 
         flat_n2 = @law h -> fill(1e18, length(h))
-        model.species[:N2].density_profile = flat_n2
+        model.species[:N2].density_source = flat_n2
 
         flux = InputFlux(FlatSpectrum(1.0; E_min=50.0); beams=1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode=SteadyStateMode())
@@ -249,7 +290,7 @@ end
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
 
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                             species = (O2Species(msis_file), OSpecies(msis_file)))
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
@@ -272,7 +313,7 @@ end
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)
 
-        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0;
+        model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
                             species = (N2Species(msis_file), O2Species(msis_file),
                                        OSpecies(msis_file), custom_sp))
 
@@ -478,7 +519,7 @@ end
     # Bare anonymous functions are rejected
     @test_throws ArgumentError AURORA.CascadingSpec("X", [1.0], (a, b) -> a)
     @test_throws ArgumentError AURORA.N2Species(h -> fill(1e15, length(h)))
-    @test_throws ArgumentError AURORA.NeutralSpecies(:G, MSISDensity(msis_file, :N2);
+    @test_throws ArgumentError AURORA.NeutralSpecies(:G, read_msis_file(msis_file)[:N2];
                                    cascading_spec      = AURORA.DefaultCascadingSpecN2(),
                                    phase_fcn_generator = (θ, E) -> θ)
 
@@ -487,11 +528,36 @@ end
         @law h -> fill(n0, length(h))
     end)
 
+    # A non-callable object is rejected too — the realistic mistake of assigning a whole
+    # NeutralAtmosphere as density_source instead of indexing it (neutrals[:N2])
+    @test_throws "must be callable" AURORA.NeutralSpecies(:G, read_msis_file(msis_file);
+                                   cascading_spec      = AURORA.DefaultCascadingSpecN2(),
+                                   phase_fcn_generator = AURORA.phase_fcn_N2)
+
     # @law, functors and named functions are all accepted
     @test (@law h -> fill(1e15, length(h))) isa ExprLaw
-    sp = AURORA.N2Species(MSISDensity(msis_file, :N2))
-    @test sp.density_profile isa MSISDensity        # functor
-    @test sp.phase_fcn_generator === phase_fcn_N2   # named function
+    sp = AURORA.N2Species(read_msis_file(msis_file)[:N2])
+    @test sp.density_source isa DensityProfile        # eager file read → DensityProfile
+    @test sp.phase_fcn_generator === phase_fcn_N2    # named function
+end
+
+@testitem "The positional NeutralSpecies constructor enforces reproducibility" begin
+    empty_mat = Matrix{Float64}(undef, 0, 0)
+    spec      = AURORA.DefaultCascadingSpecN2()
+    cache     = AURORA.SpeciesCascadingCache(spec)
+
+    @test_throws "bare anonymous function" AURORA.NeutralSpecies(
+        :G, h -> fill(1e18, length(h)), Float64[], empty_mat, empty_mat,
+        AURORA.phase_fcn_N2, (empty_mat, copy(empty_mat)), spec, cache)
+
+    @test_throws "bare anonymous function" AURORA.NeutralSpecies(
+        :G, @law(h -> fill(1e18, length(h))), Float64[], empty_mat, empty_mat,
+        (θ, E) -> θ, (empty_mat, copy(empty_mat)), spec, cache)
+
+    sp = AURORA.NeutralSpecies(:G, @law(h -> fill(1e18, length(h))), Float64[], empty_mat,
+                               empty_mat, AURORA.phase_fcn_N2,
+                               (empty_mat, copy(empty_mat)), spec, cache)
+    @test sp.name === :G
 end
 
 @testitem "@law density round-trips through physics_state.jld2" begin
@@ -501,7 +567,7 @@ end
         iri_file  = find_iri_file(; verbose=false)
 
         model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
-        model.species[:N2].density_profile = @law h -> fill(1e18, length(h))
+        model.species[:N2].density_source = @law h -> fill(1e18, length(h))
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
         run!(sim; verbose=false)
@@ -509,15 +575,40 @@ end
         savefile = joinpath(savedir, "inputs", "physics_state.jld2")
         model2 = JLD2.load(savefile, "model")
 
-        prof = model2.species[:N2].density_profile
+        prof = model2.species[:N2].density_source
         @test prof isa ExprLaw
-        @test prof.src == model.species[:N2].density_profile.src
+        @test prof.src == model.species[:N2].density_source.src
         # Reconstructed law is callable in this same scope (relies on invokelatest)
         h = model2.altitude_grid.h
         @test prof(h) == fill(1e18, length(h))
         # Reloaded model re-initializes from the reconstructed law
         initialize!(model2; verbose=false)
         @test model2.species[:N2].density[1] ≈ 1e18
+    end
+end
+
+@testitem "ElectronProfile round-trips through physics_state.jld2" begin
+    using JLD2
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        # Build the electron background as an ElectronProfile (no file path stored on the model)
+        electron = read_iri_file(iri_file)
+        model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, electron, 0)
+        @test model.ionosphere.electron_source isa ElectronProfile
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+
+        model2 = JLD2.load(joinpath(savedir, "inputs", "physics_state.jld2"), "model")
+        es = model2.ionosphere.electron_source
+        @test es isa ElectronProfile
+        @test es.origin == electron.origin
+        # Reloaded model re-samples electrons from the stored profile (no external file)
+        initialize!(model2; verbose=false)
+        @test model2.ionosphere.ne ≈ model.ionosphere.ne rtol=1e-9
+        @test model2.ionosphere.Te ≈ model.ionosphere.Te rtol=1e-9
     end
 end
 

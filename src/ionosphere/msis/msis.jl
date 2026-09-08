@@ -1,6 +1,5 @@
 include("calculation.jl")
 include("io.jl")
-include("interpolation.jl")
 
 """
     find_msis_file(; year=2018, month=12, day=7, hour=11, minute=15,
@@ -8,10 +7,11 @@ include("interpolation.jl")
 
 Find or create a MSIS model data file for the specified conditions.
 
-It first searches for an existing MSIS file matching the given parameters.
-If no matching file is found, it calculates new MSIS data using the Python pymsis package
-and saves it to a file. The pymsis package will download, compile and run some fortran code
-under the hood.
+It first searches `internal_data/data_neutrals/` for an existing MSIS file matching the given
+parameters. If none is found, it calculates new MSIS data using the Python pymsis package
+(which downloads, compiles and runs Fortran code under the hood) and saves it there for later
+calls. [`read_msis_file`](@ref) turns the file into a [`NeutralAtmosphere`](@ref);
+[`run_msis`](@ref) returns one directly without the file cache.
 
 # Keyword Arguments
 - `year::Int=2018`: Year

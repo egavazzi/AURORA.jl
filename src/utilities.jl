@@ -325,3 +325,43 @@ function interpolate_profile(data_values, data_altitude_km, target_altitude_m;
 
     return interpolated
 end
+
+
+# Validate the vectors of a DensityProfile/ElectronProfile at construction: each (name, values)
+# pair matches `h` in length, `h` has ≥ 2 strictly increasing levels, and all values are finite
+# and strictly positive (they are log-interpolated). `type_name` is used in the messages.
+function check_profile_grid(type_name, h, values...)
+    for (name, v) in values
+        length(v) == length(h) || throw(ArgumentError(
+            "$type_name: h and $name must have the same length, got $(length(h)) and " *
+            "$(length(v))."))
+    end
+    length(h) >= 2 || throw(ArgumentError(
+        "$type_name: at least 2 altitude levels are needed to interpolate, got $(length(h))."))
+    all(>(0), diff(h)) || throw(ArgumentError(
+        "$type_name: h must be sorted, with strictly increasing altitudes."))
+    for (name, v) in values
+        bad = findall(x -> !(isfinite(x) && x > 0), v)
+        isempty(bad) || throw(ArgumentError(
+            "$type_name: $name must be finite and strictly positive, got $(v[bad[1]]) at " *
+            "$(h[bad[1]] / 1e3) km ($(length(bad)) level(s) affected). Drop or replace the " *
+            "invalid levels before building the profile."))
+    end
+    return nothing
+end
+
+
+# Find the column header of a CCMC ModelWeb export: the first line satisfying `ismarker`.
+# Returns (header_idx, header tokens, name => token index, "Columns found: ..." for messages).
+# `reader` and `kind` only word the error when no line matches.
+function locate_ccmc_header(lines, ismarker, file, reader, kind)
+    header_idx = findfirst(ismarker, lines)
+    header_idx === nothing && throw(ArgumentError(
+        "$reader: could not find the CCMC column header ($kind) in $file. " *
+        "Is this a CCMC ModelWeb export?"))
+    header = split(lines[header_idx])
+    column = Dict(name => i for (i, name) in enumerate(header))
+    return header_idx, header, column, "Columns found: " * join(header, ", ")
+end
+
+

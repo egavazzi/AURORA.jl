@@ -10,16 +10,16 @@ need to resolve the precise temporal dynamics.
 ```@example steady_state
 using AURORA
 
-# Atmospheric model — default VISIONS-2 conditions
-msis_file = find_msis_file()
-iri_file  = find_iri_file()
+# Neutral atmosphere (MSIS) and electron background (IRI) — default VISIONS-2 conditions
+neutrals  = run_msis()
+electrons = run_iri()
 
 model = AuroraModel(
     [100, 600],    # altitude limits [km]
     180:-15:0,     # pitch-angle bin edges [°]
     3000,          # maximum energy [eV]
-    msis_file,
-    iri_file,
+    neutrals,
+    electrons,
     13             # magnetic field angle to zenith [°]
 )
 ```
