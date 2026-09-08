@@ -103,6 +103,26 @@ end
     @test_throws ArgumentError read_ccmc_iri(iri_file)
 end
 
+
+@testitem "ElectronProfile call returns a named tuple" begin
+    z = make_altitude_grid(50, 800)
+    p = ElectronProfile([40e3, 100e3, 300e3, 850e3], [1e10, 1e11, 8e11, 5e10],
+                        [250.0, 400.0, 1000.0, 1400.0]; origin="byo")
+    res = p(z)
+
+    @test res isa NamedTuple{(:ne, :Te)}
+    @test res.ne == res[1]
+    @test res.Te == res[2]
+
+    ne, Te = p(z)
+    @test ne == res.ne
+    @test Te == res.Te
+
+    iono = Ionosphere(p, z)
+    @test iono.ne == res.ne
+    @test iono.Te == res.Te
+end
+
 @testitem "NeutralAtmosphere sources (CCMC, legacy file)" begin
     z = make_altitude_grid(100, 600)
 

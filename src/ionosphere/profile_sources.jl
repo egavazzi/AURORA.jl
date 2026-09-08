@@ -26,7 +26,7 @@ function warn_extrapolation(p, h_atm::AbstractVector)
 end
 
 # Normalize whatever was passed as the model's electrons argument into a callable
-# h_atm → (ne, Te). A legacy IRI file path is read eagerly into an ElectronProfile so the
+# h_atm → (; ne, Te). A legacy IRI file path is read eagerly into an ElectronProfile so the
 # result round-trips through physics_state.jld2. A custom callable is held to the same
 # reproducibility bar as a species' density_source, for the same reason.
 to_electron_source(p::ElectronProfile)   = p

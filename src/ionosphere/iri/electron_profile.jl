@@ -9,8 +9,8 @@ using Dates: DateTime
     ElectronProfile{T}(h, ne, Te; origin="")
 
 Electron background (electron density `ne` and temperature `Te`) defined on a native altitude
-grid. Callable on any altitude grid (m); returns the tuple `(ne, Te)` interpolated to that grid
-(`ne` in log-space, `Te` linearly — the same convention AURORA uses elsewhere).
+grid. Callable on any altitude grid (m); returns the named tuple `(; ne, Te)` interpolated to
+that grid (`ne` in log-space, `Te` linearly — the same convention AURORA uses elsewhere).
 
 This is the electron analogue of [`DensityProfile`](@ref): the universal interchange for the
 ionospheric electron background, whatever its origin. Build one from the IRI model with
@@ -33,6 +33,7 @@ floated, so integer input is stored as `Float64` and `Float32` input stays `Floa
 ```julia
 profile = ElectronProfile(h_m, ne_m3, Te_K; origin="my measurement")
 ne, Te  = profile(altitude_grid.h)
+Te      = profile(altitude_grid.h).Te
 ```
 """
 struct ElectronProfile{T<:Real}
@@ -64,7 +65,7 @@ function (p::ElectronProfile)(h_atm::AbstractVector)
     warn_extrapolation(p, h_atm)
     ne = interpolate_profile(p.ne, p.h ./ 1e3, h_atm; log_interpolation = true)
     Te = interpolate_profile(p.Te, p.h ./ 1e3, h_atm; log_interpolation = false)
-    return (ne, Te)
+    return (; ne, Te)
 end
 
 Base.show(io::IO, p::ElectronProfile) = print(io, profile_label(p))

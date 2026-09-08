@@ -2,7 +2,8 @@
     Ionosphere{FT, V<:AbstractVector{FT}, S}
 
 Electron background: electron density and temperature, sampled on the model altitude grid from
-an `electron_source` (an [`ElectronProfile`](@ref) or any callable `h_atm (m) → (ne, Te)`).
+an `electron_source` (an [`ElectronProfile`](@ref) or any callable `h_atm (m) → (; ne, Te)`,
+positional `(ne, Te)` also accepted).
 Neutral species densities are owned by the individual [`NeutralSpecies`](@ref) objects.
 """
 struct Ionosphere{FT, V<:AbstractVector{FT}, S}
