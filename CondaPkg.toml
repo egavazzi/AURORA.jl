@@ -2,7 +2,10 @@
 python = "3.11.*"
 cmake = ""
 ninja = ""
-gfortran = ""
+# conda-forge's Windows GCC 16.2 toolchain cannot link (ld does not find crt2.o),
+# which breaks iri2020's on-demand Fortran build; see
+# https://github.com/conda-forge/ctng-compilers-feedstock/issues/229
+gfortran = "<16"
 
 [pip.deps]
 iri2020 = "@https://github.com/space-physics/iri2020/archive/refs/heads/main.zip"

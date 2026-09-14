@@ -46,12 +46,23 @@ function calculate_iri_data(; year = 2018, month = 12, day = 7, hour = 11, minut
     datetime = pyimport("datetime")
     time = datetime.datetime(year, month, day, hour, minute, 0)
 
-    # Suppress verbose output and Fortran compiler warnings from iri2020 build
-    iri_data = redirect_stdio(stdout=devnull, stderr=devnull) do
-        # import iri2020 model from the Python package 'iri2020'
-        iri2020 = pyimport("iri2020")
-        # run the model and return result
-        iri2020.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
+    # iri2020 compiles its Fortran sources on first use and prints compiler warnings
+    # and progress to stdout/stderr. Capture that output at the file-descriptor level
+    # (the build runs in a Python subprocess) so it stays quiet on success but is
+    # included in the error when the build or the model call fails.
+    iri_data = mktemp() do log_path, log_io
+        close(log_io)
+        try
+            redirect_stdio(stdout = log_path, stderr = log_path) do
+                iri2020 = pyimport("iri2020")
+                iri2020.IRI(time, Py([height[1], height[end], step(height)]), Py(lat), Py(lon))
+            end
+        catch err
+            log = read(log_path, String)
+            error("iri2020 failed (see the exception below). Captured stdout/stderr:\n" *
+                  (isempty(log) ? "(no output)" : log) *
+                  "\n\n" * sprint(showerror, err))
+        end
     end
 
     # convert the Python Dataset to a DataArray
