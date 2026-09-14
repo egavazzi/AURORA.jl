@@ -167,3 +167,14 @@ few hundred bytes that outlive the multi-gigabyte `simulation_data.nc`:
 make_energy_budget_file("my_run")
 budget = load_energy_budget("my_run")
 ```
+
+With a Makie backend loaded, [`plot_energy_budget`](@ref) draws the same budget as a stacked
+bar against the dashed input line, each segment labelled with its energy flux and its share
+of the input:
+
+```julia
+using CairoMakie
+fig = plot_energy_budget(budget; label = "5 keV")
+```
+
+![Stacked energy budget of a 5 keV run](assets/energy_budget_5keV.png)
