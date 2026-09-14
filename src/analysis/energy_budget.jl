@@ -78,6 +78,14 @@ struct EnergyBudget
     inelastic_by_species::Vector{Pair{String,Float64}}
 end
 
+# The scalar fields of EnergyBudget, in constructor order: the TOML writer and reader both
+# iterate this tuple, so the file round-trips through the positional constructor.
+const ENERGY_BUDGET_SCALAR_FIELDS = (
+    :input, :escape, :net, :inelastic, :ionization, :excitation, :heating,
+    :residual, :residual_fraction, :albedo, :input_raw, :escape_raw,
+    :ionpairs, :excevents, :z_centroid,
+)
+
 function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
     pct(x) = round(100x / b.input, digits=2)
     println(io, "EnergyBudget (eV m⁻² s⁻¹, steady state, ∫ along field line):")
@@ -194,6 +202,82 @@ function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = n
     Ie  = @view res.Ie[:, :, 1, :]                              # [n_z, n_μ, n_E]
     return energy_budget_snapshot(model, Ie; verbose)
 end
+
+"""
+    make_energy_budget_file(sim; tidx=<last>, verbose=true) -> EnergyBudget
+    make_energy_budget_file(sim_dir; tidx=<last>, max_bytes=Inf, verbose=true) -> EnergyBudget
+
+Compute the steady-state energy budget and save it to
+`<savedir>/analysis/energy_budget.toml`. The compact TOML file holds every scalar field of
+[`EnergyBudget`](@ref), the species-resolved inelastic terms, the units, and a schema
+version, so the budget stays readable when the much larger `simulation_data.nc` is moved or
+deleted. Read it back with [`load_energy_budget`](@ref).
+"""
+function make_energy_budget_file(sim::AuroraSimulation;
+                                 tidx::Integer = size(sim.workspace.Ie, 2),
+                                 verbose::Bool = true)
+    budget = energy_budget(sim; tidx, verbose)
+    return write_energy_budget_file(sim.output.savedir, budget)
+end
+
+function make_energy_budget_file(sim_dir::AbstractString;
+                                 tidx::Union{Nothing,Integer} = nothing,
+                                 max_bytes::Real = Inf,
+                                 verbose::Bool = true)
+    budget = energy_budget(sim_dir; tidx, max_bytes, verbose)
+    return write_energy_budget_file(sim_dir, budget)
+end
+
+function write_energy_budget_file(sim_dir::AbstractString, budget::EnergyBudget)
+    analysis_dir = joinpath(sim_dir, "analysis")
+    mkpath(analysis_dir)
+    savefile = joinpath(analysis_dir, "energy_budget.toml")
+    values = Dict(String(name) => getfield(budget, name) for name in ENERGY_BUDGET_SCALAR_FIELDS)
+    data = Dict{String,Any}(
+        "schema_version" => 1,
+        "energy_flux_units" => "eV m-2 s-1",
+        "rate_units" => "m-2 s-1",
+        "z_centroid_units" => "km",
+        "values" => values,
+        "inelastic_by_species" => Dict(budget.inelastic_by_species),
+    )
+
+    # Write through a temporary file in the same directory, so an interrupted write leaves
+    # any previous energy_budget.toml intact rather than truncated.
+    tmp, io = mktemp(analysis_dir)
+    try
+        TOML.print(io, data; sorted = true)
+        close(io)
+        mv(tmp, savefile; force = true)
+    finally
+        isopen(io) && close(io)
+        isfile(tmp) && rm(tmp; force = true)
+    end
+    println("Energy budget saved in $savefile")
+    return budget
+end
+
+"""
+    load_energy_budget(sim_or_directory) -> EnergyBudget
+
+Load the compact result written by [`make_energy_budget_file`](@ref). Accepts either a saved
+run directory or an `AuroraSimulation` whose output directory contains the file.
+"""
+function load_energy_budget(sim_dir::AbstractString)
+    path = joinpath(sim_dir, "analysis", "energy_budget.toml")
+    isfile(path) || throw(ArgumentError("no energy_budget.toml found under $(dirname(path))"))
+    check_analysis_freshness(path, sim_dir)
+    data = TOML.parsefile(path)
+    get(data, "schema_version", nothing) == 1 ||
+        throw(ArgumentError("unsupported energy-budget schema in $path"))
+    values = data["values"]
+    scalars = (Float64(values[String(name)]) for name in ENERGY_BUDGET_SCALAR_FIELDS)
+    species = sort!(collect(data["inelastic_by_species"]); by = first)
+    return EnergyBudget(scalars..., [String(name) => Float64(value) for (name, value) in species])
+end
+
+load_energy_budget(sim::AuroraSimulation) = load_energy_budget(sim.output.savedir)
+
 """
     energy_budget_integrated(sim_dir; trange=:, max_bytes=512*1024^2, verbose=true)
         -> TimeIntegratedEnergyBudget
