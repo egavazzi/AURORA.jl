@@ -154,6 +154,58 @@ function plot_column_excitation! end
 export plot_column_excitation!
 
 """
+    plot_energy_budget(budget; label=nothing) -> Figure
+
+Plot an [`energy_budget`](@ref) as a single stacked bar against the input energy flux.
+
+The bar stacks, from the bottom, the energy that goes into ionization, into non-ionizing
+excitation, into thermal-electron heating, and back out of the top as backscatter; each
+segment is labelled with its value and its percentage of the input. The dashed line marks
+the input flux itself, so a stack that overshoots it shows the run creating energy and one
+that falls short shows energy leaving unaccounted; the header gives the ratio of the two.
+Accepts an [`EnergyBudget`](@ref) or a [`TimeIntegratedEnergyBudget`](@ref).
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Keyword Arguments
+- `label = nothing`: x tick label for the bar.
+
+# Examples
+```julia
+using CairoMakie
+fig = plot_energy_budget(energy_budget("my_run"); label = "5 keV")
+```
+"""
+function plot_energy_budget end
+"""
+    plot_energy_budget!(ax, budget; x=1, label=nothing, scale=nothing)
+
+Draw the stacked energy-budget bar of one run at abscissa `x` into an existing `Axis`. Call
+it once per run to put several bars side by side on one axis, which is how two runs that
+differ by a single change are compared:
+
+```julia
+ax = Axis(Figure()[1, 1])
+plot_energy_budget!(ax, energy_budget("run_before"); x = 1, label = "before", scale = 1e16)
+plot_energy_budget!(ax, energy_budget("run_after"); x = 2, label = "after", scale = 1e16)
+```
+
+Each call adds its own `label` to the axis ticks without disturbing the bars already drawn.
+See [`plot_energy_budget`](@ref) for what the segments are.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Keyword Arguments
+- `x = 1`: abscissa of this bar.
+- `label = nothing`: x tick label for this bar. No tick is set when it is `nothing`.
+- `scale = nothing`: power-of-ten divisor for the plotted values. Defaults to the one that
+  puts this bar's input flux between 1 and 10; pass the same value to every call so bars
+  drawn on one axis share a scale.
+"""
+function plot_energy_budget! end
+export plot_energy_budget, plot_energy_budget!
+
+"""
     plot_model(model::AuroraModel; panels=[:all])
 
 Plot the model setup: atmosphere, energy grid, cross-sections, phase functions, and

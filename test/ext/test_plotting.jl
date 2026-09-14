@@ -168,4 +168,25 @@
         @test isempty(figs4)
     end
 
+
+    @testset "plot_energy_budget smoke" begin
+        budget = energy_budget(SharedSimResults.ss_dir; verbose = false)
+
+        @test plot_energy_budget(budget) isa Figure
+        @test plot_energy_budget(budget; label = "fixture") isa Figure
+
+        # Several runs side by side on one axis, each call adding its own tick
+        fig = Figure()
+        ax = Axis(fig[1, 1])
+        @test plot_energy_budget!(ax, budget; x = 1, label = "first", scale = 1e16) isa
+              Makie.BarPlot
+        @test plot_energy_budget!(ax, budget; x = 2, label = "second", scale = 1e16) isa
+              Makie.BarPlot
+        @test ax.xticks[] == ([1.0, 2.0], ["first", "second"])
+
+        # A time-integrated budget carries the same fields and plots the same way
+        integrated = energy_budget_integrated(SharedSimResults.td_dir; verbose = false)
+        @test plot_energy_budget(integrated; label = "integrated") isa Figure
+    end
+
 end

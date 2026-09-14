@@ -7,6 +7,7 @@ include("src/animations/animate.jl")
 include("src/plot_input.jl")
 include("src/plot_excitation.jl")
 include("src/plot_model.jl")
+include("src/plot_energy_budget.jl")
 # export animate_Ie_in_time
 
 end
