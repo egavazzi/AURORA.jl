@@ -99,7 +99,7 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
     println(io, "├── thermal heating         : ", b.heating, "  (", pct(b.heating), "%)")
     println(io, "├── escape (↑ top)          : ", b.escape, "  (", pct(b.escape),
             "%)  albedo = ", round(b.albedo, digits=3))
-    println(io, "├── residual (subfloor+num) : ", b.residual, "  (", b.residual_fraction * 100, "%)")
+    println(io, "├── residual (subfloor+num) : ", b.residual, "  (", pct(b.residual), "%)")
     println(io, "└── ion-pairs = ", b.ionpairs, "   exc-events = ", b.excevents,
             "   z_centroid = ", round(b.z_centroid, digits=1), " km")
 end
@@ -145,7 +145,7 @@ function Base.show(io::IO, ::MIME"text/plain", b::TimeIntegratedEnergyBudget)
     println(io, "├── thermal heating         : ", b.heating, "  (", pct(b.heating), "%)")
     println(io, "├── escape (↑ top)          : ", b.escape, "  (", pct(b.escape),
             "%)  albedo = ", round(b.albedo, digits=3))
-    println(io, "└── residual (Δstored+num)  : ", b.residual, "  (", b.residual_fraction * 100, "%)")
+    println(io, "└── residual (Δstored+num)  : ", b.residual, "  (", pct(b.residual), "%)")
 end
 
 """
