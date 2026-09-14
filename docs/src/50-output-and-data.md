@@ -29,7 +29,8 @@ savedir/
     ├── Ie_top.nc
     ├── currents.nc
     ├── heating_rate.nc
-    └── psd.nc
+    ├── psd.nc
+    └── energy_budget.toml
 ```
 
 `config.toml`, `inputs/`, and `simulation_data.nc` are written by `run!`. The `analysis/`
@@ -72,8 +73,8 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
 - `atmosphere.nc` — altitude grid, electron density `ne` and temperature `Te`, and one number
   density variable per neutral species (`nN2`, `nO2`, `nO`, …).
 - `physics_state.jld2` — the complete [`AuroraModel`](@ref), including the materialized
-  scattering and cascading matrices. Reload it in Julia with
-  `model = JLD2.load("savedir/inputs/physics_state.jld2", "model")`.
+  scattering and cascading matrices. Reload it in Julia with [`load_model`](@ref), i.e.
+  `model = load_model("my_run")`.
 
 ## Controlling output — [`AuroraOutputManager`](@ref)
 
@@ -146,3 +147,23 @@ The `analysis/` files are produced on demand by the post-processing functions, e
 `simulation_data.nc` (and, where needed, `inputs/atmosphere.nc`). See
 [Post-Processing & Analysis](@ref Post-Processing) for usage and the [Analysis](@ref) API page
 for the per-function compatibility table.
+
+### Energy budget
+
+[`energy_budget`](@ref) reports where the precipitating energy flux ends up — neutral
+excitation and ionization, thermal-electron heating, backscatter out of the top — and how
+much of it the run fails to account for:
+
+```julia
+budget = energy_budget("my_run")   # prints a summary and returns an EnergyBudget
+budget.albedo                      # escaping / incoming energy flux
+budget.residual_fraction           # unaccounted fraction; small and positive on a good grid
+```
+
+[`make_energy_budget_file`](@ref) saves the same result as `analysis/energy_budget.toml`, a
+few hundred bytes that outlive the multi-gigabyte `simulation_data.nc`:
+
+```julia
+make_energy_budget_file("my_run")
+budget = load_energy_budget("my_run")
+```
