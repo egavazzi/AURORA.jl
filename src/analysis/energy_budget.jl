@@ -142,13 +142,13 @@ end
 
 """
     energy_budget(sim::AuroraSimulation; tidx=<last>, verbose=true) -> EnergyBudget
-    energy_budget(sim_dir::AbstractString; tidx=<last>, verbose=true) -> EnergyBudget
+    energy_budget(sim_dir::AbstractString; tidx=<last>, max_bytes=Inf, verbose=true) -> EnergyBudget
 
 Compute the steady-state energy balance of a finished simulation. Returns an
 [`EnergyBudget`](@ref); also prints a summary unless `verbose=false`.
 
 Two sources are accepted:
-- an in-memory `sim`, read from `sim.cache.Ie`;
+- an in-memory `sim`, read from `sim.workspace.Ie`;
 - a saved run directory `sim_dir`, reconstructing the model from
   `<sim_dir>/inputs/physics_state.jld2` (see [`load_model`](@ref)) and the electron flux from
   `<sim_dir>/simulation_data.nc`.
@@ -165,10 +165,10 @@ sub-floor thermalisation that AURORA does not track on-grid). A large or negativ
 flags energy non-conservation — e.g. a grid whose maximum bin width exceeds the lowest
 ionization threshold, which destabilises the high→low energy-degradation sweep.
 """
-function energy_budget(sim::AuroraSimulation; tidx::Integer = size(sim.cache.Ie, 2),
+function energy_budget(sim::AuroraSimulation; tidx::Integer = size(sim.workspace.Ie, 2),
                        verbose::Bool = true)
     model  = sim.model
-    Ie_raw = sim.cache.Ie
+    Ie_raw = sim.workspace.Ie
     n_t    = size(Ie_raw, 2)
     1 <= tidx <= n_t || throw(ArgumentError("tidx = $tidx out of range 1:$n_t"))
     warn_if_time_dependent(n_t, tidx, verbose)
@@ -181,20 +181,19 @@ function energy_budget(sim::AuroraSimulation; tidx::Integer = size(sim.cache.Ie,
 end
 
 function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = nothing,
-                       verbose::Bool = true)
+                       max_bytes::Real = Inf, verbose::Bool = true)
     model = load_model(sim_dir)
-    # Recompute the field-line path length from the saved geometry, so the diagnostic is robust
-    # to older physics_state.jld2 files written before `s_field` existed.
-    model.s_field = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
     n_t = load_coordinates(sim_dir).n_t
     it  = something(tidx, n_t)              # default: final slice
     1 <= it <= n_t || throw(ArgumentError("tidx = $it out of range 1:$n_t"))
     warn_if_time_dependent(n_t, it, verbose)
-    res = load_results(sim_dir; tidx = it:it)
+    # One 300 keV steady-state slice is about 2.5 GiB, above `load_results`' generic 2 GiB
+    # safety default; the budget needs the whole slice, so the cap is off by default. Set
+    # `max_bytes` to impose a bound on a memory-constrained machine.
+    res = load_results(sim_dir; tidx = it:it, max_bytes)
     Ie  = @view res.Ie[:, :, 1, :]                              # [n_z, n_μ, n_E]
     return energy_budget_snapshot(model, Ie; verbose)
 end
-
 """
     energy_budget_integrated(sim_dir; trange=:, max_bytes=512*1024^2, verbose=true)
         -> TimeIntegratedEnergyBudget
@@ -218,7 +217,6 @@ deposition-energy-weighted average of the per-slice centroids.
 function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(),
                                   max_bytes::Real = 512 * 1024^2, verbose::Bool = true)
     model = load_model(sim_dir)
-    model.s_field = model.altitude_grid.h ./ cosd(model.B_angle_to_zenith)
     co = load_coordinates(sim_dir)
     ts = trange === Colon() ? (1:co.n_t) : trange
     (ts isa AbstractUnitRange{<:Integer} && first(ts) >= 1 && last(ts) <= co.n_t) ||
@@ -298,17 +296,19 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     n_z = length(z)
     n_μ = length(μ)
     n_E = length(E)
-    size(Ie) == (n_z, n_μ, n_E) ||
+    # The loops below index z, μ, E and Ie with the same indices, so the axes must agree.
+    axes(Ie) == (eachindex(z), eachindex(μ), eachindex(E)) ||
         throw(ArgumentError("Ie snapshot $(size(Ie)) does not match the model grid " *
                             "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
 
-    # ---- Boundary energy fluxes at the top altitude (i_z = n_z) --------------------------
+    # ---- Boundary energy fluxes at the top altitude --------------------------------------
     # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm). The raw
     # (along-field, un-|μ|-weighted) Σ Ie·E is kept alongside for diagnostics.
     input  = 0.0; escape  = 0.0    # |μ|-weighted vertical flux (↓ / ↑)
     input_raw = 0.0; escape_raw = 0.0   # along-field, un-weighted
-    @inbounds for iμ in 1:n_μ, iE in 1:n_E
-        fe = Ie[n_z, iμ, iE] * E[iE]
+    i_top = lastindex(Ie, 1)
+    for iμ in axes(Ie, 2), iE in axes(Ie, 3)
+        fe = Ie[i_top, iμ, iE] * E[iE]
         if μ[iμ] < 0
             input     += fe * abs(μ[iμ])
             input_raw += fe
@@ -340,9 +340,9 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
             E_loss > 0 || continue          # skip elastic (no energy loss)
             secondaries = levels[lvl, 2]
             ionizing    = secondaries >= 1
-            for iz in 1:n_z
+            for iz in eachindex(dep_sp, dens)
                 acc = 0.0
-                @inbounds for iE in 1:n_E
+                for iE in eachindex(E)
                     acc += Ie_omni[iz, iE] * σ[lvl, iE]
                 end
                 rate = dens[iz] * acc       # reaction rate of this level [m⁻³ s⁻¹]
@@ -391,8 +391,9 @@ end
 # Trapezoidal integral over a (possibly descending) 1-D grid x. Used both for the field-line
 # path integral (x = model.s_field) and for the altitude integral of the deposition centroid.
 function trapz_path(x, f)
+    eachindex(x, f)                    # x and f must share indices
     s = 0.0
-    @inbounds for i in 1:(length(x) - 1)
+    for i in firstindex(x):(lastindex(x) - 1)
         s += 0.5 * (f[i] + f[i + 1]) * abs(x[i + 1] - x[i])
     end
     return s
@@ -401,13 +402,13 @@ end
 # Trapezoidal quadrature weights w for samples at points x, so that ∫ f dx ≈ Σ w[k] f[k].
 # Lets the time-integrated budget integrate each per-slice quantity with one weight vector.
 function trapz_weights(x)
-    n = length(x)
-    w = zeros(n)
-    n == 1 && return w
-    @inbounds for k in 1:n
-        lo = k == 1 ? x[1] : x[k - 1]
-        hi = k == n ? x[n] : x[k + 1]
-        w[k] = (hi - lo) / 2
+    w = zeros(length(x))
+    length(x) == 1 && return w
+    lo_idx, hi_idx = firstindex(x), lastindex(x)
+    for (j, k) in enumerate(eachindex(x))
+        lo = k == lo_idx ? x[lo_idx] : x[k - 1]
+        hi = k == hi_idx ? x[hi_idx] : x[k + 1]
+        w[j] = (hi - lo) / 2
     end
     return w
 end
