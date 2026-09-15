@@ -27,6 +27,9 @@
 # the column path length is s. Integrating over z instead injects a spurious 1/cos(B_angle)
 # factor (it vanishes at B_angle = 0, where s == z).
 #
+# The quadrature is the solver's own (see `column_weights`), not a generic trapezoid rule, so
+# the budget measures the energy the discrete operator actually deposits.
+#
 # The vertical-energy-flux projection (Σ Ie·E·|μ|) matches `field_aligned_beam_norm`, so
 # E_in computed here equals the InputFlux's `IeE_tot` normalisation.
 #
@@ -371,18 +374,27 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
         end
     end
 
-    # ---- Omnidirectional flux for the volumetric (deposition / heating) terms -----------
-    Ie_omni = dropdims(sum(Ie, dims=2), dims=2)            # [n_z, n_E]
+    # ---- Weighted omnidirectional flux for the volumetric (deposition / heating) terms ---
+    # Every volumetric term is linear in the local flux, so folding each beam's quadrature
+    # weight into the flux integrates all of them in one pass: the profiles below are already
+    # weighted, and their plain sums over altitude are the column integrals.
+    w = column_weights(s)
+    Ie_omni = zeros(n_z, n_E)                              # [n_z, n_E], weight-folded
+    for iμ in axes(Ie, 2)
+        w_μ = μ[iμ] < 0 ? w.down : w.up
+        for iE in axes(Ie, 3), iz in axes(Ie, 1)
+            Ie_omni[iz, iE] += w_μ[iz] * Ie[iz, iμ, iE]
+        end
+    end
 
     # ---- Inelastic energy deposition (∫ along the field line) ----------------------------
     # Σ_s w_s Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ, split into ionizing (≥1 secondary) and
     # non-ionizing channels, with the ion-pair production rate alongside.
-    dep_profile_total = zeros(n_z)      # energy-deposition profile [eV m⁻³ s⁻¹]
+    dep_profile_total = zeros(n_z)      # weighted energy deposition [eV m⁻² s⁻¹]
     ion_profile       = zeros(n_z)      # → ionization
     exc_profile       = zeros(n_z)      # → excitation
-    ionpair_profile   = zeros(n_z)      # ion-pair production rate  [m⁻³ s⁻¹]
+    ionpair_profile   = zeros(n_z)      # weighted ion-pair production [m⁻² s⁻¹]
     inelastic_by_species = Pair{String,Float64}[]
-    w = column_weights(s)
     for sp in model.species
         σ      = sp.cross_sections          # [n_levels, n_E]
         levels = sp.excitation_levels       # [n_levels, 2]: (energy loss, #secondaries)
@@ -409,18 +421,18 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
                 end
             end
         end
-        push!(inelastic_by_species, String(sp.name) => column_integral(w, dep_sp))
+        push!(inelastic_by_species, String(sp.name) => sum(dep_sp))
         dep_profile_total .+= dep_sp
     end
-    inelastic  = column_integral(w, dep_profile_total)
-    ionization = column_integral(w, ion_profile)
-    excitation = column_integral(w, exc_profile)
-    ionpairs   = column_integral(w, ionpair_profile)
+    inelastic  = sum(dep_profile_total)
+    ionization = sum(ion_profile)
+    excitation = sum(exc_profile)
+    ionpairs   = sum(ionpair_profile)
 
     # ---- Thermal-electron heating (reuse the existing Coulomb-loss routine) --------------
     heating_profile = calculate_heating_rate(z, [0.0], reshape(Ie_omni, n_z, 1, n_E),
                                              E, ne, Te)[:, 1]
-    heating = column_integral(w, heating_profile)
+    heating = sum(heating_profile)
 
     budget = close_budget(input, escape, inelastic, ionization, excitation, heating,
                           ionpairs, inelastic_by_species, nothing)
@@ -428,16 +440,26 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     return budget
 end
 
-# Quadrature weights for the column integral along the field line: ∫ f ds ≈ Σ w[i] f[i].
-column_weights(s) = abs.(trapz_weights(s))
-
-function column_integral(w, f)
-    eachindex(w, f)                    # the weights and the profile must share indices
-    total = 0.0
-    for i in eachindex(f)
-        total += w[i] * f[i]
+# Quadrature weights for the column integral along the field line, taken from the solvers so
+# that summing the discrete equations with them telescopes the transport term into the
+# boundary fluxes and leaves exactly the sinks this budget measures.
+#
+# Both solvers difference μ ∂Ie/∂s upwind, with the interval the beam comes from in the
+# denominator (`build_spatial_operators` in src/solvers/sparse_indexing.jl): downward beams
+# use s[i+1] - s[i], upward beams s[i] - s[i-1]. The collision sinks sit in the same rows
+# with no cell length of their own, so they carry the same weight. The first and last rows
+# hold boundary conditions rather than a balance, so they get no weight: the flux at the top
+# is already counted as `input`/`escape`, and the flux the bottom row zeroes leaves the
+# domain without a budget term.
+function column_weights(s)
+    down = zeros(length(s))
+    up   = zeros(length(s))
+    lo, hi = firstindex(s), lastindex(s)
+    for k in (lo + 1):(hi - 1)
+        down[k - lo + 1] = abs(s[k + 1] - s[k])
+        up[k - lo + 1]   = abs(s[k] - s[k - 1])
     end
-    return total
+    return (; down, up)
 end
 
 # Trapezoidal quadrature weights w for samples at points x, so that ∫ f dx ≈ Σ w[k] f[k].
