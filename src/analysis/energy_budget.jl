@@ -104,7 +104,9 @@ rate_units(b::EnergyBudget) = b.interval === nothing ? "m⁻² s⁻¹" : "m⁻²
 # channel (thermal heating at a few keV) does not read as "0.0".
 function percent_string(value, total)
     pct = 100 * value / total
-    pct != 0 && abs(pct) < 0.1 && return string(round(pct; sigdigits = 2))
+    # @sprintf rather than round: rounding 5.8e-27 to two significant digits leaves a float
+    # whose shortest representation is 5.799999999999999e-27.
+    pct != 0 && abs(pct) < 0.1 && return replace(@sprintf("%.2g", pct), "e-0" => "e-")
     return string(round(pct; digits = 1))
 end
 

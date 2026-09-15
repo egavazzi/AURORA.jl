@@ -5,7 +5,7 @@
   - Works on an in-memory `sim` or on a saved run directory. `tidx` picks one time slice (the default is the last), and `trange` integrates the balance over a range of slices, which is what closes for a transient run.
   - `make_energy_budget_file` writes the result to `analysis/energy_budget.toml`, and `load_energy_budget` reads it back.
   - `load_model` reloads the `AuroraModel` saved in `inputs/physics_state.jld2`.
-  - With a Makie backend loaded, `plot_energy_budget` draws the balance as a stacked bar against the input flux; `plot_energy_budget!` puts several runs side by side on one axis.
+  - With a Makie backend loaded, `plot_energy_budget` draws the balance as a stacked bar against the input flux, taking either one budget or a vector of them to compare runs side by side; `plot_energy_budget!` draws a single bar into an axis of your own.
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.
   - New functions `run_msis`, `read_msis_file`, `read_ccmc_msis` (returning a `NeutralAtmosphere`) and `run_iri`, `read_iri_file`, `read_ccmc_iri` (returning an `ElectronProfile`).

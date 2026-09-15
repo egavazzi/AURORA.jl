@@ -187,6 +187,10 @@ of the input:
 ```julia
 using CairoMakie
 fig = plot_energy_budget(budget; label = "5 keV")
+
+# Several runs side by side, one bar each
+fig = plot_energy_budget([load_energy_budget(dir) for dir in run_dirs];
+                         labels = ["2 keV", "5 keV", "10 keV"])
 ```
 
 ![Stacked energy budget of a 5 keV run](assets/energy_budget_5keV.png)
