@@ -151,12 +151,13 @@ for the per-function compatibility table.
 ### Energy budget
 
 [`energy_budget`](@ref) reports where the precipitating energy flux ends up — neutral
-excitation and ionization, thermal-electron heating, backscatter out of the top — and how
-much of it the run fails to account for:
+excitation and ionization, thermal-electron heating, backscatter out of the top, absorption
+at the bottom of the grid — and how much of it the run fails to account for:
 
 ```julia
 budget = energy_budget("my_run")   # prints a summary and returns an EnergyBudget
 budget.albedo                      # escaping / incoming energy flux
+budget.bottom_escape               # energy absorbed at the floor of the grid
 budget.residual_fraction           # unaccounted fraction; small and positive on a good grid
 ```
 

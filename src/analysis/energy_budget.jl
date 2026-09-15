@@ -5,13 +5,15 @@
 # Global energy balance of the suprathermal electron population. At steady state the downward
 # energy flux entering the top is accounted for by
 #
-#     E_in  =  E_inelastic  +  E_heating  +  E_escape  +  residual
+#     E_in  =  E_inelastic  +  E_heating  +  E_escape  +  E_bottom  +  residual
 #
 # where
 #   E_in        vertical energy flux carried by the *downward* beams at the top boundary
 #               (= the imposed precipitation), Σ_beam Σ_E Ie·E·|μ|   [eV m⁻² s⁻¹]
 #   E_escape    vertical energy flux carried by the *upward* beams at the top boundary
 #               (backscattered electrons leaving the domain)
+#   E_bottom    vertical energy flux carried by the *downward* beams into the absorbing
+#               bottom boundary, which the solver discards
 #   E_inelastic energy deposited in neutral excitation + ionization thresholds,
 #               Σ_s w_s Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
 #   E_heating   energy transferred to the thermal electrons (Coulomb), via
@@ -52,12 +54,18 @@ energies in eV m⁻² and `ionpairs` is a total count in m⁻².
 Energy terms
 - `input`, `escape`   |μ|-weighted *vertical* energy flux of the downward / upward beams at
   the top boundary (`input` matches `IeE_tot`).
-- `net`               `input - escape`: the energy actually deposited in the column.
+- `bottom_escape`     the downward energy flux absorbed at the bottom of the grid. The
+  lowest grid row imposes `Ie = 0` rather than a balance, so the transport operator's column
+  sum telescopes into the top fluxes and the downward flux at the point that feeds that row:
+  this term is that flux, the energy that leaves the modelled column through the floor.
+- `net`               `input - escape - bottom_escape`: the energy deposited in the modelled
+  column, and the numerator of the energy per ion pair.
 - `inelastic`         energy into neutral excitation + ionization thresholds.
 - `ionization`, `excitation`  the inelastic term split into ionizing (≥1 secondary) and
   non-ionizing channels (`inelastic == ionization + excitation`).
 - `heating`           energy transferred to the thermal electrons (Coulomb).
-- `residual`          `input - inelastic - heating - escape` (sub-floor thermalisation +
+- `residual`          `input - inelastic - heating - escape - bottom_escape` (sub-floor
+  thermalisation +
   numerical non-conservation); `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
 - `inelastic_by_species`  the inelastic term per species, in model order.
@@ -68,6 +76,7 @@ Rates
 struct EnergyBudget
     input::Float64
     escape::Float64
+    bottom_escape::Float64
     net::Float64
     inelastic::Float64
     ionization::Float64
@@ -84,7 +93,7 @@ end
 # The scalar fields of EnergyBudget, in constructor order: the TOML writer and reader both
 # iterate this tuple, so the file round-trips through the positional constructor.
 const ENERGY_BUDGET_SCALAR_FIELDS = (
-    :input, :escape, :net, :inelastic, :ionization, :excitation, :heating,
+    :input, :escape, :bottom_escape, :net, :inelastic, :ionization, :excitation, :heating,
     :residual, :residual_fraction, :albedo, :ionpairs,
 )
 
@@ -114,16 +123,17 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
     row("excitation", b.excitation)
     row("thermal heating", b.heating)
     row("escape (↑ top)", b.escape)
+    row("escape (↓ bottom)", b.bottom_escape)
     row("residual", b.residual)
     if !isempty(b.inelastic_by_species)
         shares = join(("$name $(percent_string(val, b.inelastic))"
                        for (name, val) in b.inelastic_by_species), ", ")
         println(io, "inelastic by species (% of inelastic): ", shares)
     end
-    accounted = b.inelastic + b.heating + b.escape
+    accounted = b.inelastic + b.heating + b.escape + b.bottom_escape
     println(io, "albedo ", round(b.albedo; digits = 3),
             " · net energy per ion pair ", value(b.net / b.ionpairs), " eV",
-            " · (deposited + backscattered)/input ", @sprintf("%.3f", accounted / b.input))
+            " · (deposited + escaped)/input ", @sprintf("%.3f", accounted / b.input))
 end
 
 """
@@ -221,7 +231,7 @@ function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
 
     names = [String(sp.name) for sp in model.species]
     sums  = Dict(n => 0.0 for n in names)
-    input = 0.0; escape = 0.0; inelastic = 0.0; ionization = 0.0
+    input = 0.0; escape = 0.0; bottom_escape = 0.0; inelastic = 0.0; ionization = 0.0
     excitation = 0.0; heating = 0.0; ionpairs = 0.0
     # `foreach_Ie_time_chunk` reuses its buffer between calls, so each slice is reduced to a
     # budget before the next chunk is read.
@@ -230,6 +240,7 @@ function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
             b = energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]); verbose = false)
             wk = w[it - first(ts) + 1]
             input += wk * b.input;           escape += wk * b.escape
+            bottom_escape += wk * b.bottom_escape
             inelastic += wk * b.inelastic;   ionization += wk * b.ionization
             excitation += wk * b.excitation; heating += wk * b.heating
             ionpairs += wk * b.ionpairs
@@ -239,8 +250,8 @@ function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
         end
     end
 
-    budget = close_budget(input, escape, inelastic, ionization, excitation, heating,
-                          ionpairs, [n => sums[n] for n in names],
+    budget = close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
+                          heating, ionpairs, [n => sums[n] for n in names],
                           (first(t), last(t)))
     verbose && (show(stdout, MIME"text/plain"(), budget); println())
     return budget
@@ -338,12 +349,12 @@ function warn_if_snapshot(n_t, tidx, verbose)
 end
 
 # Assemble the derived terms shared by the snapshot and the time integral.
-function close_budget(input, escape, inelastic, ionization, excitation, heating, ionpairs,
-                      inelastic_by_species, interval)
-    net      = input - escape
-    residual = input - inelastic - heating - escape
-    return EnergyBudget(input, escape, net, inelastic, ionization, excitation, heating,
-                        residual, input > 0 ? residual / input : NaN,
+function close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
+                      heating, ionpairs, inelastic_by_species, interval)
+    net      = input - escape - bottom_escape
+    residual = input - inelastic - heating - escape - bottom_escape
+    return EnergyBudget(input, escape, bottom_escape, net, inelastic, ionization, excitation,
+                        heating, residual, input > 0 ? residual / input : NaN,
                         input > 0 ? escape / input : NaN, ionpairs,
                         inelastic_by_species, interval)
 end
@@ -365,10 +376,17 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
         throw(ArgumentError("Ie snapshot $(size(Ie)) does not match the model grid " *
                             "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
 
-    # ---- Boundary energy fluxes at the top altitude --------------------------------------
-    # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm).
-    input = 0.0; escape = 0.0
+    # ---- Boundary energy fluxes ----------------------------------------------------------
+    # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm), taken at
+    # the two points the transport operator's column sum telescopes to: the top row, and the
+    # point above the absorbing bottom row, whose downward flux leaves the column.
+    input = 0.0; escape = 0.0; bottom_escape = 0.0
     i_top = lastindex(Ie, 1)
+    i_bottom = firstindex(Ie, 1) + 1
+    for iμ in axes(Ie, 2), iE in axes(Ie, 3)
+        μ[iμ] < 0 || continue
+        bottom_escape += Ie[i_bottom, iμ, iE] * E[iE] * abs(μ[iμ])
+    end
     for iμ in axes(Ie, 2), iE in axes(Ie, 3)
         fe = Ie[i_top, iμ, iE] * E[iE] * abs(μ[iμ])
         if μ[iμ] < 0
@@ -438,8 +456,8 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
                                              E, ne, Te)[:, 1]
     heating = sum(heating_profile)
 
-    budget = close_budget(input, escape, inelastic, ionization, excitation, heating,
-                          ionpairs, inelastic_by_species, nothing)
+    budget = close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
+                          heating, ionpairs, inelastic_by_species, nothing)
     verbose && (show(stdout, MIME"text/plain"(), budget); println())
     return budget
 end

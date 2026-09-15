@@ -9,13 +9,15 @@
     @test budget.interval === nothing          # a snapshot, so fluxes rather than energies
     @test budget.input > 0
     @test budget.escape >= 0
+    @test budget.bottom_escape >= 0
     @test budget.inelastic >= 0
     @test budget.heating >= 0
     @test budget.ionpairs > 0
-    @test budget.net == budget.input - budget.escape
+    @test budget.net == budget.input - budget.escape - budget.bottom_escape
     @test budget.inelastic ≈ budget.ionization + budget.excitation
     @test budget.inelastic ≈ sum(last, budget.inelastic_by_species)
-    @test budget.residual ≈ budget.input - budget.inelastic - budget.heating - budget.escape
+    @test budget.residual ≈ budget.input - budget.inelastic - budget.heating -
+                            budget.escape - budget.bottom_escape
     @test budget.residual_fraction ≈ budget.residual / budget.input
     @test budget.albedo ≈ budget.escape / budget.input
     @test [name for (name, _) in budget.inelastic_by_species] == ["N2", "O2", "O"]
@@ -42,16 +44,17 @@ end
     @test occursin("EnergyBudget — steady state, ∫ along the field line", lines[1])
     @test occursin("eV m⁻² s⁻¹", lines[2])
     @test occursin("% of input", lines[3])
-    for name in ("ionization", "excitation", "thermal heating", "escape (↑ top)", "residual")
+    for name in ("ionization", "excitation", "thermal heating", "escape (↑ top)",
+                 "escape (↓ bottom)", "residual")
         @test any(line -> occursin(name, line), lines)
     end
     @test occursin("inelastic by species (% of inelastic): N2 ", text)
     @test occursin("net energy per ion pair", text)
-    @test occursin("(deposited + backscattered)/input", text)
+    @test occursin("(deposited + escaped)/input", text)
 
-    # The five percentage rows are shares of the input, so they sum to 100%.
+    # The six percentage rows are shares of the input, so they sum to 100%.
     shares = (budget.ionization, budget.excitation, budget.heating, budget.escape,
-              budget.residual)
+              budget.bottom_escape, budget.residual)
     @test sum(shares) ≈ budget.input
 
     # A small but nonzero term keeps two significant digits instead of reading as "0.0".
@@ -115,11 +118,12 @@ end
     @test integrated.interval !== nothing
     @test integrated.interval[2] > integrated.interval[1]
     @test integrated.input > 0
-    @test integrated.net == integrated.input - integrated.escape
+    @test integrated.net == integrated.input - integrated.escape - integrated.bottom_escape
     @test integrated.inelastic ≈ integrated.ionization + integrated.excitation
     @test integrated.inelastic ≈ sum(last, integrated.inelastic_by_species)
-    @test integrated.residual ≈
-          integrated.input - integrated.inelastic - integrated.heating - integrated.escape
+    @test integrated.residual ≈ integrated.input - integrated.inelastic -
+                                integrated.heating - integrated.escape -
+                                integrated.bottom_escape
     @test integrated.residual_fraction ≈ integrated.residual / integrated.input
     @test sprint(show, MIME"text/plain"(), integrated) |> text -> occursin("∫ over t =", text)
 

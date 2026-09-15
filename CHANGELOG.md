@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- New energy-budget diagnostic: `energy_budget` reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating and backscatter out of the top, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
+- New energy-budget diagnostic: `energy_budget` reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
   - Works on an in-memory `sim` or on a saved run directory. `tidx` picks one time slice (the default is the last), and `trange` integrates the balance over a range of slices, which is what closes for a transient run.
   - `make_energy_budget_file` writes the result to `analysis/energy_budget.toml`, and `load_energy_budget` reads it back.
   - `load_model` reloads the `AuroraModel` saved in `inputs/physics_state.jld2`.
