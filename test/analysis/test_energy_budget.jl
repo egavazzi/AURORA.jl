@@ -86,8 +86,8 @@ end
 
     @test_throws "tidx = 2 out of range 1:1" energy_budget(sim; tidx = 2, verbose = false)
     @test_throws "tidx = 0 out of range 1:1" energy_budget(savedir; tidx = 0, verbose = false)
-    @test_throws "pass either tidx" energy_budget(savedir; tidx = 1, trange = 1:1,
-                                                  verbose = false)
+    @test_throws "pass at most one of" energy_budget(savedir; tidx = 1, trange = 1:1,
+                                                     verbose = false)
 
     # TOML round trip, from the simulation and from its directory.
     saved = make_energy_budget_file(sim; verbose = false)
@@ -139,6 +139,39 @@ end
           integrated.interval[2] - integrated.interval[1]
     @test partial.input < integrated.input
 
+    # A (t0, t1) tuple selects the slices inside that closed time interval.
+    t = load_coordinates(dir).t
+    by_time = energy_budget(dir; trange = (t[2], t[5]), verbose = false)
+    by_index = energy_budget(dir; trange = 2:5, verbose = false)
+    for name in fieldnames(EnergyBudget)
+        @test getfield(by_time, name) == getfield(by_index, name)
+    end
+    @test by_time.interval == (t[2], t[5])
+
+    @test_throws "at least 2 are needed" energy_budget(dir; trange = (t[2], t[2]),
+                                                       verbose = false)
+    @test_throws "at least 2 are needed" energy_budget(dir; trange = (-2.0, -1.0),
+                                                       verbose = false)
+    @test_throws "runs backwards" energy_budget(dir; trange = (t[5], t[2]), verbose = false)
+
+    # `t` picks the saved slice nearest that time.
+    by_t = energy_budget(dir; t = t[4], verbose = false)
+    at_index = energy_budget(dir; tidx = 4, verbose = false)
+    for name in fieldnames(EnergyBudget)
+        @test getfield(by_t, name) == getfield(at_index, name)
+    end
+    nearer_to_4 = energy_budget(dir; t = t[4] + 0.3 * (t[5] - t[4]), verbose = false)
+    @test nearer_to_4.input == at_index.input
+    nearer_to_5 = energy_budget(dir; t = t[4] + 0.7 * (t[5] - t[4]), verbose = false)
+    @test nearer_to_5.input == energy_budget(dir; tidx = 5, verbose = false).input
+
+    @test_throws "outside the saved time span" energy_budget(dir; t = last(t) + 1,
+                                                             verbose = false)
+    @test_throws "outside the saved time span" energy_budget(dir; t = first(t) - 1,
+                                                             verbose = false)
+    @test_throws "pass at most one of" energy_budget(dir; t = t[2], tidx = 2,
+                                                     verbose = false)
+
     # The integrated budget round-trips through TOML, interval included.
     make_energy_budget_file(dir; trange = :, verbose = false)
     loaded = load_energy_budget(dir)
@@ -156,6 +189,6 @@ end
 
     dir = SharedSimResults.td_dir
     @test_throws "trange must be a Colon" energy_budget(dir; trange = [1, 3], verbose = false)
-    @test_throws "trange must be a Colon" energy_budget(dir; trange = 0:3, verbose = false)
+    @test_throws "out of bounds for the" energy_budget(dir; trange = 0:3, verbose = false)
     @test_throws "need ≥ 2 time slices" energy_budget(dir; trange = 2:2, verbose = false)
 end

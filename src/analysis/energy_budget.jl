@@ -139,9 +139,9 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
 end
 
 """
-    energy_budget(sim::AuroraSimulation; tidx=<last>, trange=nothing, verbose=true)
-    energy_budget(sim_dir::AbstractString; tidx=nothing, trange=nothing, max_bytes=nothing,
-                  verbose=true) -> EnergyBudget
+    energy_budget(sim::AuroraSimulation; tidx=<last>, t=nothing, trange=nothing, verbose=true)
+    energy_budget(sim_dir::AbstractString; tidx=nothing, t=nothing, trange=nothing,
+                  max_bytes=nothing, verbose=true) -> EnergyBudget
 
 Compute the energy balance of a finished simulation. Returns an [`EnergyBudget`](@ref); also
 prints a summary unless `verbose=false`.
@@ -154,12 +154,16 @@ Two sources are accepted:
   for a time-dependent run the workspace holds only the last solver loop, so the call is
   forwarded to `sim.output.savedir`, which `run!` has written in full.
 
-Pass at most one of `tidx` and `trange`:
-- neither: the **last** time slice, which is the steady-state solution of an `n_t == 1` run;
+Pass at most one of `tidx`, `t` and `trange`:
+- none of them: the **last** time slice, which is the steady-state solution of an `n_t == 1`
+  run;
 - `tidx`: that single time slice;
-- `trange`: a contiguous range of slices, or `:` for all of them, time-integrated with
-  trapezoid weights over the time axis. The result then carries `interval = (t0, t1)` and
-  holds energies (eV m⁻²) rather than fluxes.
+- `t`: the single saved slice nearest that time in seconds (the earlier one on a tie);
+- `trange`: several slices, time-integrated with trapezoid weights over the time axis. It
+  takes `:` for every slice, a contiguous range of slice indices, or a `(t0, t1)` tuple of
+  times in seconds, which selects every slice with `t0 <= t <= t1`. The result then carries
+  `interval = (t0, t1)` — the times of the first and last slice actually used — and holds
+  energies (eV m⁻²) rather than fluxes.
 
 A single slice balances only at steady state: on a time-dependent run energy is in transit,
 and a *transient* input reads `input == 0` at any slice after the pulse has passed. A warning
@@ -175,10 +179,10 @@ ionization threshold, which destabilises the high→low energy-degradation sweep
 default, since the budget needs the whole slice) or one streaming chunk when integrating
 (512 MiB by default; cf. [`foreach_Ie_time_chunk`](@ref)).
 """
-function energy_budget(sim::AuroraSimulation; tidx = nothing, trange = nothing,
+function energy_budget(sim::AuroraSimulation; tidx = nothing, t = nothing, trange = nothing,
                        max_bytes::Union{Nothing,Real} = nothing, verbose::Bool = true)
-    if sim.mode isa TimeDependentMode || trange !== nothing
-        return energy_budget(sim.output.savedir; tidx, trange, max_bytes, verbose)
+    if sim.mode isa TimeDependentMode || trange !== nothing || t !== nothing
+        return energy_budget(sim.output.savedir; tidx, t, trange, max_bytes, verbose)
     end
     model  = sim.model
     Ie_raw = sim.workspace.Ie
@@ -194,13 +198,15 @@ function energy_budget(sim::AuroraSimulation; tidx = nothing, trange = nothing,
     return energy_budget_snapshot(model, Ie; verbose)
 end
 
-function energy_budget(sim_dir::AbstractString; tidx = nothing, trange = nothing,
-                       max_bytes::Union{Nothing,Real} = nothing, verbose::Bool = true)
-    tidx === nothing || trange === nothing ||
-        throw(ArgumentError("pass either tidx (one time slice) or trange (a time " *
-                            "integral), not both"))
+function energy_budget(sim_dir::AbstractString; tidx = nothing, t = nothing,
+                       trange = nothing, max_bytes::Union{Nothing,Real} = nothing,
+                       verbose::Bool = true)
+    count(!isnothing, (tidx, t, trange)) <= 1 ||
+        throw(ArgumentError("pass at most one of tidx (one slice by index), t (one slice " *
+                            "by time) and trange (a time integral)"))
     model = load_model(sim_dir)
     co = load_coordinates(sim_dir)
+    t === nothing || (tidx = time_index_nearest(co, t))
     trange === nothing &&
         return energy_budget_at(model, sim_dir, co, something(tidx, co.n_t),
                                 something(max_bytes, Inf), verbose)
@@ -221,10 +227,7 @@ end
 # Trapezoidal time integral of the per-slice budgets over `trange`. The flux is streamed in
 # time-chunks, so peak memory is bounded by `max_bytes` whatever the run length.
 function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
-    ts = trange === Colon() ? (1:co.n_t) : trange
-    (ts isa AbstractUnitRange{<:Integer} && first(ts) >= 1 && last(ts) <= co.n_t) ||
-        throw(ArgumentError("trange must be a Colon (:) or a contiguous range within " *
-                            "1:$(co.n_t)"))
+    ts = time_index_range(co, trange)
     length(ts) >= 2 ||
         throw(ArgumentError("need ≥ 2 time slices to integrate; pass tidx for a single " *
                             "snapshot"))
@@ -337,6 +340,48 @@ function load_energy_budget(sim_dir::AbstractString)
 end
 
 load_energy_budget(sim::AuroraSimulation) = load_energy_budget(sim.output.savedir)
+
+# The saved slice closest in time to `t`, the earlier one when two are equally close.
+function time_index_nearest(co, t)
+    issorted(co.t) ||
+        throw(ArgumentError("the saved time axis is not sorted, so there is no nearest " *
+                            "slice to a given time"))
+    first(co.t) <= t <= last(co.t) ||
+        throw(ArgumentError("t = $t lies outside the saved time span " *
+                            "$(first(co.t)) – $(last(co.t)) s"))
+    return argmin(abs.(co.t .- t))
+end
+
+# Resolve the `trange` selector into the contiguous range of saved time indices it names:
+# `:` is every slice, an integer range is itself, and a `(t0, t1)` tuple is every slice whose
+# time lies in the closed interval, which is contiguous because the time axis is sorted.
+function time_index_range(co, trange)
+    trange === Colon() && return 1:co.n_t
+    if trange isa AbstractUnitRange{<:Integer}
+        first(trange) >= 1 && last(trange) <= co.n_t ||
+            throw(ArgumentError("trange = $trange is out of bounds for the $(co.n_t) saved " *
+                                "time slices"))
+        return trange
+    end
+    if trange isa Tuple{Real,Real}
+        t0, t1 = trange
+        t0 <= t1 ||
+            throw(ArgumentError("trange = $trange runs backwards; pass (t0, t1) with " *
+                                "t0 <= t1"))
+        issorted(co.t) ||
+            throw(ArgumentError("the saved time axis is not sorted, so a time interval does " *
+                                "not select a contiguous range of slices"))
+        inside = findall(t -> t0 <= t <= t1, co.t)
+        length(inside) >= 2 ||
+            throw(ArgumentError("trange = $trange selects $(length(inside)) of the " *
+                                "$(co.n_t) saved time slices, which span " *
+                                "$(first(co.t)) – $(last(co.t)) s; at least 2 are needed " *
+                                "to integrate"))
+        return first(inside):last(inside)
+    end
+    throw(ArgumentError("trange must be a Colon (:), a contiguous range of time indices, " *
+                        "or a (t0, t1) tuple of times in seconds; got $(typeof(trange))"))
+end
 
 # A single slice balances only at steady state. Warn (when printing) that a snapshot of a
 # time-dependent run does not conserve, since a transient input can read input == 0 at a slice

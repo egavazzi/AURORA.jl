@@ -76,6 +76,10 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
   scattering and cascading matrices. Reload it in Julia with [`load_model`](@ref), i.e.
   `model = load_model("my_run")`.
 
+```@docs; canonical=false
+load_model
+```
+
 ## Controlling output — [`AuroraOutputManager`](@ref)
 
 `AuroraSimulation` takes an [`AuroraOutputManager`](@ref) as its third argument, which holds
@@ -168,8 +172,10 @@ covers in `budget.interval`:
 
 ```julia
 budget = energy_budget("my_run"; trange = :)        # all slices
-budget = energy_budget("my_run"; trange = 10:40)    # part of the run
-budget = energy_budget("my_run"; tidx = 25)         # one slice, for comparison
+budget = energy_budget("my_run"; trange = 10:40)    # part of the run, by slice index
+budget = energy_budget("my_run"; trange = (0.0, 0.05))  # part of the run, by time (s)
+budget = energy_budget("my_run"; tidx = 25)         # one slice, by index
+budget = energy_budget("my_run"; t = 0.03)          # one slice, the one nearest 0.03 s
 ```
 
 [`make_energy_budget_file`](@ref) saves the same result as `analysis/energy_budget.toml`, a
