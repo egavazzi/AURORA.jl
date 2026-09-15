@@ -1,8 +1,9 @@
 # [Analysis](@id Analysis)
 
 Post-processing functions that compute derived quantities from raw simulation output. Each
-reads `simulation_data.nc` and writes a NetCDF file into the `analysis/` subdirectory of the
-simulation's save directory (see [Output & data](@ref Output) for the layout and schema).
+reads `simulation_data.nc` and writes a file into the `analysis/` subdirectory of the
+simulation's save directory — NetCDF, except for the energy budget, which is a handful of
+scalars and is written as TOML (see [Output & data](@ref Output) for the layout and schema).
 
 !!! note "Compatibility"
 
@@ -14,6 +15,7 @@ simulation's save directory (see [Output & data](@ref Output) for the layout and
     | `make_current_file` | ✓ | ✓ |
     | `make_heating_rate_file` | ✓ | ✓ |
     | `make_psd_file` | | ✓ |
+    | `make_energy_budget_file` | ✓ | ✓ (snapshot, or time-integrated with `trange`) |
 
 ## Excitation rates
 
@@ -39,4 +41,23 @@ make_heating_rate_file
 
 ```@docs; canonical=false
 make_psd_file
+```
+
+## Energy budget
+
+Global energy balance of the electron population: how much of the precipitating energy flux
+ends up in neutral excitation and ionization, in thermal-electron heating, and back out of
+the top of the ionosphere.
+
+```@docs; canonical=false
+energy_budget
+EnergyBudget
+make_energy_budget_file
+load_energy_budget
+```
+
+## Saved model
+
+```@docs; canonical=false
+load_model
 ```

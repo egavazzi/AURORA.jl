@@ -154,6 +154,49 @@ function plot_column_excitation! end
 export plot_column_excitation!
 
 """
+    plot_energy_budget(budget::EnergyBudget; label=nothing) -> Figure
+    plot_energy_budget(budgets::AbstractVector{<:EnergyBudget}; labels=nothing) -> Figure
+
+Plot an [`energy_budget`](@ref) as a stacked bar against the input energy flux.
+
+The bar stacks, from the bottom, the energy that goes into ionization, into non-ionizing
+excitation, into thermal-electron heating, out through the floor of the grid, and back out
+of the top as backscatter; each segment is labelled with its value and its percentage of the
+input. The dashed line across the bar marks the input itself, so a stack that overshoots it
+shows the run creating energy and one that falls short shows energy the budget cannot place.
+
+Given a vector of budgets, one bar per budget is drawn side by side on a shared axis, which
+is how runs that differ by a single change are compared. The header ratio is shown only for
+a single budget.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+
+# Keyword Arguments
+- `label = nothing`: x tick label for the bar.
+- `labels = nothing`: one x tick label per budget, for the vector form.
+
+# Examples
+```julia
+using CairoMakie
+fig = plot_energy_budget(energy_budget("my_run"); label = "5 keV")
+fig = plot_energy_budget([energy_budget(dir) for dir in run_dirs];
+                         labels = ["2 keV", "5 keV", "10 keV"])
+```
+"""
+function plot_energy_budget end
+"""
+    plot_energy_budget!(ax, budget::EnergyBudget; x=1)
+
+Draw the stacked energy-budget bar of one run, and the dashed line marking its input, at
+abscissa `x` in an existing `Axis`. Returns the `BarPlot`. Axis labels, ticks and legend are
+the caller's to set; [`plot_energy_budget`](@ref) is the form that builds a complete figure.
+
+Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
+"""
+function plot_energy_budget! end
+export plot_energy_budget, plot_energy_budget!
+
+"""
     plot_model(model::AuroraModel; panels=[:all])
 
 Plot the model setup: atmosphere, energy grid, cross-sections, phase functions, and

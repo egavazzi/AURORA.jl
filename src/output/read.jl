@@ -1,4 +1,5 @@
 using NCDatasets: NCDataset, load!
+import JLD2
 
 # ======================================================================================== #
 #                              RESULT FILE READERS                                       #
@@ -69,11 +70,13 @@ end
 
 
 """
-    foreach_Ie_time_chunk(f, sim_dir; max_bytes = 512 * 1024^2)
+    foreach_Ie_time_chunk(f, sim_dir; trange = :, max_bytes = 512 * 1024^2)
 
 Stream the electron flux `Ie` from `simulation_data.nc` in `sim_dir` over contiguous
 time-chunks, calling `f(Ie_chunk, t_range)` for each. `Ie_chunk::Array{Float64,4}` has shape
 `[n_z, n_μ, length(t_range), n_E]` and `t_range` is the corresponding range of time indices.
+`trange` restricts the pass to a contiguous range of time indices, which are the only ones
+read from disk; `:` (the default) streams the whole file.
 
 The chunk length is the largest that keeps one `Ie_chunk` under `max_bytes`, so peak memory is
 bounded regardless of the total run length. On disk `Ie` is chunked one time-slice per chunk,
@@ -84,17 +87,19 @@ so each slab read is contiguous.
     are overwritten by the next chunk. Copy it if you need to keep data past the return of
     `f`.
 """
-function foreach_Ie_time_chunk(f, sim_dir::AbstractString; max_bytes::Real = 512 * 1024^2)
+function foreach_Ie_time_chunk(f, sim_dir::AbstractString; trange = Colon(),
+                               max_bytes::Real = 512 * 1024^2)
     nc_path = joinpath(sim_dir, "simulation_data.nc")
     NCDataset(nc_path, "r") do ds
         # Read through the raw variable into a preallocated buffer
         v = ds["Ie"].var
         n_z, n_μ, n_t, n_E = size(v)
+        ts = resolve_selector(trange, n_t, "trange")
         slice_bytes = n_z * n_μ * n_E * sizeof(Float64)
-        nt_chunk = time_chunk_length(slice_bytes, max_bytes, n_t)
+        nt_chunk = time_chunk_length(slice_bytes, max_bytes, length(ts))
         buffer = Array{Float64, 4}(undef, n_z, n_μ, nt_chunk, n_E)
-        for t0 in 1:nt_chunk:n_t
-            t_range = t0:min(t0 + nt_chunk - 1, n_t)
+        for t0 in first(ts):nt_chunk:last(ts)
+            t_range = t0:min(t0 + nt_chunk - 1, last(ts))
             if length(t_range) == nt_chunk
                 load!(v, buffer, :, :, t_range, :)
                 f(buffer, t_range)
@@ -170,6 +175,22 @@ function load_results(sim_dir::AbstractString;
 end
 
 load_results(sim::AuroraSimulation; kwargs...) = load_results(sim.output.savedir; kwargs...)
+
+
+"""
+    load_model(sim_dir) → AuroraModel
+
+Load the fully-initialized [`AuroraModel`](@ref) saved in `<sim_dir>/inputs/physics_state.jld2`
+(written by `run!`). The returned model holds the grids, ionosphere, and species with their
+cross sections, excitation levels, and densities used to produce the run — suitable for
+post-hoc analysis such as [`energy_budget`](@ref).
+"""
+function load_model(sim_dir::AbstractString)
+    jld_path = joinpath(sim_dir, "inputs", "physics_state.jld2")
+    isfile(jld_path) ||
+        throw(ArgumentError("no physics_state.jld2 found under $(joinpath(sim_dir, "inputs"))"))
+    return JLD2.load(jld_path, "model")
+end
 
 
 """
