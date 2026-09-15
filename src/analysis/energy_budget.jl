@@ -103,7 +103,7 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
     interval = b.interval
     span = interval === nothing ? "steady state" :
            "∫ over t = $(interval[1]) – $(interval[2]) s"
-    value(x) = @sprintf("%.3g", x)
+    value(x) = replace(@sprintf("%.3g", x), "e+" => "e")   # 2.95e16, not 2.95e+16
     row(name, x) = println(io, "  ", rpad(name, 21), lpad(value(x), 9), "  ",
                            lpad(percent_string(x, b.input), 9))
 
