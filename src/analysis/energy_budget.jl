@@ -2,9 +2,8 @@
 #                              ENERGY-BUDGET DIAGNOSTIC                                     #
 # ======================================================================================== #
 #
-# Global steady-state energy balance for the suprathermal electron population, in the spirit
-# of the conservation check that the TRANS family (transcar / aeroplanets) prints. At steady
-# state, the downward energy flux entering the top must be accounted for by:
+# Global energy balance of the suprathermal electron population. At steady state the downward
+# energy flux entering the top is accounted for by
 #
 #     E_in  =  E_inelastic  +  E_heating  +  E_escape  +  residual
 #
@@ -14,36 +13,42 @@
 #   E_escape    vertical energy flux carried by the *upward* beams at the top boundary
 #               (backscattered electrons leaving the domain)
 #   E_inelastic energy deposited in neutral excitation + ionization thresholds,
-#               Σ_s Δs Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
+#               Σ_s w_s Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
 #   E_heating   energy transferred to the thermal electrons (Coulomb), via
 #               `calculate_heating_rate`, integrated along the field line
-#   residual    everything unaccounted: physically the energy of electrons degraded below the
-#               grid floor (sub-floor thermalisation, a small *positive* term on a good grid),
-#               PLUS any numerical non-conservation. A healthy run shows a small positive
-#               residual; a grid that violates the ΔE < threshold stability bound shows the
-#               inelastic term ballooning and the residual going large/negative (energy
-#               "created") — exactly the failure this diagnostic is meant to catch.
+#   residual    everything unaccounted: the energy of electrons degraded below the grid floor
+#               (sub-floor thermalisation, a small *positive* term on a good grid) plus any
+#               numerical non-conservation. A grid that violates the ΔE < threshold stability
+#               bound shows the inelastic term ballooning and the residual going
+#               large/negative (energy "created") — the failure this diagnostic catches.
 #
 # Volume integrals run ALONG THE MAGNETIC FIELD LINE (over `model.s_field = h / cos B_angle`),
-# NOT over vertical altitude: AURORA's transport conserves the field-aligned flux (μ ∂Ie/∂s),
-# so the column path length is s. Integrating over z instead injects a spurious 1/cos(B_angle)
+# NOT over vertical altitude: the transport conserves the field-aligned flux (μ ∂Ie/∂s), so
+# the column path length is s. Integrating over z instead injects a spurious 1/cos(B_angle)
 # factor (it vanishes at B_angle = 0, where s == z).
 #
 # The vertical-energy-flux projection (Σ Ie·E·|μ|) matches `field_aligned_beam_norm`, so
 # E_in computed here equals the InputFlux's `IeE_tot` normalisation.
 #
-# Works either on an in-memory `sim` or on a saved run directory (reconstructing the model and
-# flux from disk) — see the two `energy_budget` methods below.
+# A single time slice balances only at steady state. Over a time interval that starts and ends
+# at rest the same identity holds for the time-integrated terms, which is what `trange` gives.
+
+using Printf
 
 """
     EnergyBudget
 
-Result of [`energy_budget`](@ref). Energy fluxes are column-integrated along the field line
-and in eV m⁻² s⁻¹; reaction rates are in m⁻² s⁻¹; `z_centroid` is in km.
+Result of [`energy_budget`](@ref): where the precipitating energy flux ends up, with every
+term column-integrated along the field line.
 
-Energy fluxes
-- `input`, `escape`   |μ|-weighted *vertical* energy flux of the downward / upward beams at the
-  top boundary (`input` matches `IeE_tot`).
+`interval` says which of the two forms this is. For a single time slice it is `nothing`, the
+energy terms are fluxes in eV m⁻² s⁻¹ and `ionpairs` is a production rate in m⁻² s⁻¹. For a
+time-integrated budget it is the `(t0, t1)` interval in seconds, the energy terms are
+energies in eV m⁻² and `ionpairs` is a total count in m⁻².
+
+Energy terms
+- `input`, `escape`   |μ|-weighted *vertical* energy flux of the downward / upward beams at
+  the top boundary (`input` matches `IeE_tot`).
 - `net`               `input - escape`: the energy actually deposited in the column.
 - `inelastic`         energy into neutral excitation + ionization thresholds.
 - `ionization`, `excitation`  the inelastic term split into ionizing (≥1 secondary) and
@@ -52,12 +57,10 @@ Energy fluxes
 - `residual`          `input - inelastic - heating - escape` (sub-floor thermalisation +
   numerical non-conservation); `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
-- `input_raw`, `escape_raw`  the *along-field*, un-|μ|-weighted top fluxes, Σ Ie·E.
+- `inelastic_by_species`  the inelastic term per species, in model order.
 
-Rates / geometry
-- `ionpairs`, `excevents`   column ion-pair and excitation-event production rates.
-- `z_centroid`              energy-deposition-weighted mean altitude (km).
-- `inelastic_by_species`    the inelastic term broken down per species.
+Rates
+- `ionpairs`          column ion-pair production.
 """
 struct EnergyBudget
     input::Float64
@@ -70,161 +73,193 @@ struct EnergyBudget
     residual::Float64
     residual_fraction::Float64
     albedo::Float64
-    input_raw::Float64
-    escape_raw::Float64
     ionpairs::Float64
-    excevents::Float64
-    z_centroid::Float64
     inelastic_by_species::Vector{Pair{String,Float64}}
+    interval::Union{Nothing,Tuple{Float64,Float64}}
 end
 
 # The scalar fields of EnergyBudget, in constructor order: the TOML writer and reader both
 # iterate this tuple, so the file round-trips through the positional constructor.
 const ENERGY_BUDGET_SCALAR_FIELDS = (
     :input, :escape, :net, :inelastic, :ionization, :excitation, :heating,
-    :residual, :residual_fraction, :albedo, :input_raw, :escape_raw,
-    :ionpairs, :excevents, :z_centroid,
+    :residual, :residual_fraction, :albedo, :ionpairs,
 )
 
+energy_units(b::EnergyBudget) = b.interval === nothing ? "eV m⁻² s⁻¹" : "eV m⁻²"
+rate_units(b::EnergyBudget) = b.interval === nothing ? "m⁻² s⁻¹" : "m⁻²"
+
+# Percentages, with two significant digits for a term below 0.1% so that a small but nonzero
+# channel (thermal heating at a few keV) does not read as "0.0".
+function percent_string(value, total)
+    pct = 100 * value / total
+    pct != 0 && abs(pct) < 0.1 && return string(round(pct; sigdigits = 2))
+    return string(round(pct; digits = 1))
+end
+
 function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
-    pct(x) = round(100x / b.input, digits=2)
-    println(io, "EnergyBudget (eV m⁻² s⁻¹, steady state, ∫ along field line):")
-    println(io, "├── input (precip., ↓ top) : ", b.input)
-    println(io, "├── inelastic deposited     : ", b.inelastic, "  (", pct(b.inelastic), "%)")
-    println(io, "│     ├── ionization        : ", b.ionization, "  (", pct(b.ionization), "%)")
-    println(io, "│     ├── excitation        : ", b.excitation, "  (", pct(b.excitation), "%)")
-    for (name, val) in b.inelastic_by_species
-        println(io, "│     ├── ", rpad(name, 4), "             : ", val, "  (", pct(val), "%)")
+    interval = b.interval
+    span = interval === nothing ? "steady state" :
+           "∫ over t = $(interval[1]) – $(interval[2]) s"
+    value(x) = @sprintf("%.3g", x)
+    row(name, x) = println(io, "  ", rpad(name, 21), lpad(value(x), 9), "  ",
+                           lpad(percent_string(x, b.input), 9))
+
+    println(io, "EnergyBudget — ", span, ", ∫ along the field line")
+    println(io, rpad("input (↓ top)", 23), value(b.input), " ", energy_units(b))
+    println(io, rpad("", 23), "value        % of input")
+    row("ionization", b.ionization)
+    row("excitation", b.excitation)
+    row("thermal heating", b.heating)
+    row("escape (↑ top)", b.escape)
+    row("residual", b.residual)
+    if !isempty(b.inelastic_by_species)
+        shares = join(("$name $(percent_string(val, b.inelastic))"
+                       for (name, val) in b.inelastic_by_species), ", ")
+        println(io, "inelastic by species (% of inelastic): ", shares)
     end
-    println(io, "├── thermal heating         : ", b.heating, "  (", pct(b.heating), "%)")
-    println(io, "├── escape (↑ top)          : ", b.escape, "  (", pct(b.escape),
-            "%)  albedo = ", round(b.albedo, digits=3))
-    println(io, "├── residual (subfloor+num) : ", b.residual, "  (", pct(b.residual), "%)")
-    println(io, "└── ion-pairs = ", b.ionpairs, "   exc-events = ", b.excevents,
-            "   z_centroid = ", round(b.z_centroid, digits=1), " km")
+    accounted = b.inelastic + b.heating + b.escape
+    println(io, "albedo ", round(b.albedo; digits = 3),
+            " · net energy per ion pair ", value(b.net / b.ionpairs), " eV",
+            " · (deposited + backscattered)/input ", @sprintf("%.3f", accounted / b.input))
 end
 
 """
-    TimeIntegratedEnergyBudget
+    energy_budget(sim::AuroraSimulation; tidx=<last>, trange=nothing, verbose=true)
+    energy_budget(sim_dir::AbstractString; tidx=nothing, trange=nothing, max_bytes=nothing,
+                  verbose=true) -> EnergyBudget
 
-Result of [`energy_budget_integrated`](@ref): an [`EnergyBudget`](@ref) whose terms have been
-integrated over a time interval `[t0, t1]` (seconds). Energy fluxes are therefore in **eV m⁻²**
-(energy per area over the interval) and `ionpairs`/`excevents` are **total counts m⁻²**. All
-`EnergyBudget` fields are forwarded (e.g. `b.input`, `b.residual`); additionally `t0`, `t1`, and
-`span` (= `t1 - t0`) are available.
-
-For a transient that starts and ends at rest the balance closes, and `residual` then collects
-the energy left stored in the population over the interval plus numerical non-conservation.
-"""
-struct TimeIntegratedEnergyBudget
-    budget::EnergyBudget
-    t0::Float64
-    t1::Float64
-end
-
-function Base.getproperty(b::TimeIntegratedEnergyBudget, s::Symbol)
-    s === :span && return getfield(b, :t1) - getfield(b, :t0)
-    (s === :budget || s === :t0 || s === :t1) && return getfield(b, s)
-    return getproperty(getfield(b, :budget), s)   # forward EnergyBudget fields
-end
-
-Base.propertynames(b::TimeIntegratedEnergyBudget) =
-    (:t0, :t1, :span, propertynames(getfield(b, :budget))...)
-
-function Base.show(io::IO, ::MIME"text/plain", b::TimeIntegratedEnergyBudget)
-    pct(x) = round(100x / b.input, digits=2)
-    println(io, "TimeIntegratedEnergyBudget (eV m⁻², ∫ over Δt = ", round(b.span, digits=4),
-            " s, ∫ along field line):")
-    println(io, "├── input (precip., ↓ top) : ", b.input)
-    println(io, "├── inelastic deposited     : ", b.inelastic, "  (", pct(b.inelastic), "%)")
-    println(io, "│     ├── ionization        : ", b.ionization, "  (", pct(b.ionization), "%)")
-    println(io, "│     ├── excitation        : ", b.excitation, "  (", pct(b.excitation), "%)")
-    for (name, val) in b.inelastic_by_species
-        println(io, "│     ├── ", rpad(name, 4), "             : ", val, "  (", pct(val), "%)")
-    end
-    println(io, "├── thermal heating         : ", b.heating, "  (", pct(b.heating), "%)")
-    println(io, "├── escape (↑ top)          : ", b.escape, "  (", pct(b.escape),
-            "%)  albedo = ", round(b.albedo, digits=3))
-    println(io, "└── residual (Δstored+num)  : ", b.residual, "  (", pct(b.residual), "%)")
-end
-
-"""
-    energy_budget(sim::AuroraSimulation; tidx=<last>, verbose=true) -> EnergyBudget
-    energy_budget(sim_dir::AbstractString; tidx=<last>, max_bytes=Inf, verbose=true) -> EnergyBudget
-
-Compute the steady-state energy balance of a finished simulation. Returns an
-[`EnergyBudget`](@ref); also prints a summary unless `verbose=false`.
+Compute the energy balance of a finished simulation. Returns an [`EnergyBudget`](@ref); also
+prints a summary unless `verbose=false`.
 
 Two sources are accepted:
-- an in-memory `sim`, read from `sim.workspace.Ie`;
 - a saved run directory `sim_dir`, reconstructing the model from
   `<sim_dir>/inputs/physics_state.jld2` (see [`load_model`](@ref)) and the electron flux from
-  `<sim_dir>/simulation_data.nc`.
+  `<sim_dir>/simulation_data.nc`;
+- an in-memory `sim`. For a steady-state run the flux comes straight from `sim.workspace.Ie`;
+  for a time-dependent run the workspace holds only the last solver loop, so the call is
+  forwarded to `sim.output.savedir`, which `run!` has written in full.
 
-The budget is evaluated at a single time slice, `tidx` (default: the **last** slice, which is
-the steady-state solution for an `n_t == 1` run). This balance closes only at steady state: on
-a **time-dependent** run a single snapshot does not conserve (energy is in transit / stored),
-and in particular a *transient* input (e.g. a pulse) will read `input == 0` at any time after
-the pulse has passed — pass `tidx` to evaluate at the time of interest (e.g. the input peak). A
-warning is emitted when the run has more than one time step.
+Pass at most one of `tidx` and `trange`:
+- neither: the **last** time slice, which is the steady-state solution of an `n_t == 1` run;
+- `tidx`: that single time slice;
+- `trange`: a contiguous range of slices, or `:` for all of them, time-integrated with
+  trapezoid weights over the time axis. The result then carries `interval = (t0, t1)` and
+  holds energies (eV m⁻²) rather than fluxes.
+
+A single slice balances only at steady state: on a time-dependent run energy is in transit,
+and a *transient* input reads `input == 0` at any slice after the pulse has passed. A warning
+points this out; `trange` is the form that closes for a transient that starts and ends at
+rest, where `residual` also collects the energy left stored in the population.
 
 Use as a guardrail: on a converged, stable run the residual is a small positive fraction (the
 sub-floor thermalisation that AURORA does not track on-grid). A large or negative residual
 flags energy non-conservation — e.g. a grid whose maximum bin width exceeds the lowest
 ionization threshold, which destabilises the high→low energy-degradation sweep.
+
+`max_bytes` caps the flux read from disk: one full time slice for a snapshot (no cap by
+default, since the budget needs the whole slice) or one streaming chunk when integrating
+(512 MiB by default; cf. [`foreach_Ie_time_chunk`](@ref)).
 """
-function energy_budget(sim::AuroraSimulation; tidx::Integer = size(sim.workspace.Ie, 2),
-                       verbose::Bool = true)
+function energy_budget(sim::AuroraSimulation; tidx = nothing, trange = nothing,
+                       max_bytes::Union{Nothing,Real} = nothing, verbose::Bool = true)
+    if sim.mode isa TimeDependentMode || trange !== nothing
+        return energy_budget(sim.output.savedir; tidx, trange, max_bytes, verbose)
+    end
     model  = sim.model
     Ie_raw = sim.workspace.Ie
     n_t    = size(Ie_raw, 2)
-    1 <= tidx <= n_t || throw(ArgumentError("tidx = $tidx out of range 1:$n_t"))
-    warn_if_time_dependent(n_t, tidx, verbose)
+    it     = something(tidx, n_t)
+    1 <= it <= n_t || throw(ArgumentError("tidx = $it out of range 1:$n_t"))
+    warn_if_snapshot(n_t, it, verbose)
     n_z = length(model.altitude_grid.h)
     n_μ = length(model.pitch_angle_grid.μ_center)
     n_E = length(model.energy_grid.E_centers)
     # Reshape [n_z·n_μ, n_t, n_E] → [n_z, n_μ, n_E]; row = (i_μ-1)·n_z + i_z.
-    Ie = reshape(@view(Ie_raw[:, tidx, :]), n_z, n_μ, n_E)
+    Ie = reshape(@view(Ie_raw[:, it, :]), n_z, n_μ, n_E)
     return energy_budget_snapshot(model, Ie; verbose)
 end
 
-function energy_budget(sim_dir::AbstractString; tidx::Union{Nothing,Integer} = nothing,
-                       max_bytes::Real = Inf, verbose::Bool = true)
+function energy_budget(sim_dir::AbstractString; tidx = nothing, trange = nothing,
+                       max_bytes::Union{Nothing,Real} = nothing, verbose::Bool = true)
+    tidx === nothing || trange === nothing ||
+        throw(ArgumentError("pass either tidx (one time slice) or trange (a time " *
+                            "integral), not both"))
     model = load_model(sim_dir)
-    n_t = load_coordinates(sim_dir).n_t
-    it  = something(tidx, n_t)              # default: final slice
-    1 <= it <= n_t || throw(ArgumentError("tidx = $it out of range 1:$n_t"))
-    warn_if_time_dependent(n_t, it, verbose)
-    # One 300 keV steady-state slice is about 2.5 GiB, above `load_results`' generic 2 GiB
-    # safety default; the budget needs the whole slice, so the cap is off by default. Set
-    # `max_bytes` to impose a bound on a memory-constrained machine.
+    co = load_coordinates(sim_dir)
+    trange === nothing &&
+        return energy_budget_at(model, sim_dir, co, something(tidx, co.n_t),
+                                something(max_bytes, Inf), verbose)
+    return energy_budget_over(model, sim_dir, co, trange,
+                              something(max_bytes, 512 * 1024^2), verbose)
+end
+
+# One time slice. A 300 keV slice is about 2.5 GiB, above `load_results`' generic 2 GiB safety
+# default, and the budget needs the whole slice, so the cap is off unless the caller sets it.
+function energy_budget_at(model, sim_dir, co, it::Integer, max_bytes, verbose)
+    1 <= it <= co.n_t || throw(ArgumentError("tidx = $it out of range 1:$(co.n_t)"))
+    warn_if_snapshot(co.n_t, it, verbose)
     res = load_results(sim_dir; tidx = it:it, max_bytes)
     Ie  = @view res.Ie[:, :, 1, :]                              # [n_z, n_μ, n_E]
     return energy_budget_snapshot(model, Ie; verbose)
 end
 
-"""
-    make_energy_budget_file(sim; tidx=<last>, verbose=true) -> EnergyBudget
-    make_energy_budget_file(sim_dir; tidx=<last>, max_bytes=Inf, verbose=true) -> EnergyBudget
+# Trapezoidal time integral of the per-slice budgets over `trange`. The flux is streamed in
+# time-chunks, so peak memory is bounded by `max_bytes` whatever the run length.
+function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
+    ts = trange === Colon() ? (1:co.n_t) : trange
+    (ts isa AbstractUnitRange{<:Integer} && first(ts) >= 1 && last(ts) <= co.n_t) ||
+        throw(ArgumentError("trange must be a Colon (:) or a contiguous range within " *
+                            "1:$(co.n_t)"))
+    length(ts) >= 2 ||
+        throw(ArgumentError("need ≥ 2 time slices to integrate; pass tidx for a single " *
+                            "snapshot"))
+    t = co.t[ts]
+    w = trapz_weights(t)               # ∫ f dt ≈ Σ w[k] f[k]
 
-Compute the steady-state energy budget and save it to
-`<savedir>/analysis/energy_budget.toml`. The compact TOML file holds every scalar field of
-[`EnergyBudget`](@ref), the species-resolved inelastic terms, the units, and a schema
-version, so the budget stays readable when the much larger `simulation_data.nc` is moved or
-deleted. Read it back with [`load_energy_budget`](@ref).
+    names = [String(sp.name) for sp in model.species]
+    sums  = Dict(n => 0.0 for n in names)
+    input = 0.0; escape = 0.0; inelastic = 0.0; ionization = 0.0
+    excitation = 0.0; heating = 0.0; ionpairs = 0.0
+    # `foreach_Ie_time_chunk` reuses its buffer between calls, so each slice is reduced to a
+    # budget before the next chunk is read.
+    foreach_Ie_time_chunk(sim_dir; trange = ts, max_bytes) do Ie_chunk, t_range
+        for (j, it) in enumerate(t_range)
+            b = energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]); verbose = false)
+            wk = w[it - first(ts) + 1]
+            input += wk * b.input;           escape += wk * b.escape
+            inelastic += wk * b.inelastic;   ionization += wk * b.ionization
+            excitation += wk * b.excitation; heating += wk * b.heating
+            ionpairs += wk * b.ionpairs
+            for (name, val) in b.inelastic_by_species
+                sums[name] += wk * val
+            end
+        end
+    end
+
+    budget = close_budget(input, escape, inelastic, ionization, excitation, heating,
+                          ionpairs, [n => sums[n] for n in names],
+                          (first(t), last(t)))
+    verbose && (show(stdout, MIME"text/plain"(), budget); println())
+    return budget
+end
+
 """
-function make_energy_budget_file(sim::AuroraSimulation;
-                                 tidx::Integer = size(sim.workspace.Ie, 2),
-                                 verbose::Bool = true)
-    budget = energy_budget(sim; tidx, verbose)
+    make_energy_budget_file(sim_or_dir; tidx=nothing, trange=nothing, verbose=true)
+        -> EnergyBudget
+
+Compute the energy budget with [`energy_budget`](@ref) (same keywords) and save it to
+`<savedir>/analysis/energy_budget.toml`. The compact TOML file holds every scalar field of
+[`EnergyBudget`](@ref), the species-resolved inelastic terms in model order, the time
+interval, and the units, so the budget stays readable when the much larger
+`simulation_data.nc` is moved or deleted. Read it back with [`load_energy_budget`](@ref).
+"""
+function make_energy_budget_file(sim::AuroraSimulation; kwargs...)
+    budget = energy_budget(sim; kwargs...)
     return write_energy_budget_file(sim.output.savedir, budget)
 end
 
-function make_energy_budget_file(sim_dir::AbstractString;
-                                 tidx::Union{Nothing,Integer} = nothing,
-                                 max_bytes::Real = Inf,
-                                 verbose::Bool = true)
-    budget = energy_budget(sim_dir; tidx, max_bytes, verbose)
+function make_energy_budget_file(sim_dir::AbstractString; kwargs...)
+    budget = energy_budget(sim_dir; kwargs...)
     return write_energy_budget_file(sim_dir, budget)
 end
 
@@ -235,12 +270,14 @@ function write_energy_budget_file(sim_dir::AbstractString, budget::EnergyBudget)
     values = Dict(String(name) => getfield(budget, name) for name in ENERGY_BUDGET_SCALAR_FIELDS)
     data = Dict{String,Any}(
         "schema_version" => 1,
-        "energy_flux_units" => "eV m-2 s-1",
-        "rate_units" => "m-2 s-1",
-        "z_centroid_units" => "km",
+        "energy_units" => energy_units(budget),
+        "rate_units" => rate_units(budget),
         "values" => values,
-        "inelastic_by_species" => Dict(budget.inelastic_by_species),
+        # An array of tables, so the species keep their model order on the way back in.
+        "inelastic_by_species" => [Dict("species" => name, "value" => val)
+                                   for (name, val) in budget.inelastic_by_species],
     )
+    budget.interval === nothing || (data["interval"] = collect(budget.interval))
 
     # Write through a temporary file in the same directory, so an interrupted write leaves
     # any previous energy_budget.toml intact rather than truncated.
@@ -272,103 +309,39 @@ function load_energy_budget(sim_dir::AbstractString)
         throw(ArgumentError("unsupported energy-budget schema in $path"))
     values = data["values"]
     scalars = (Float64(values[String(name)]) for name in ENERGY_BUDGET_SCALAR_FIELDS)
-    species = sort!(collect(data["inelastic_by_species"]); by = first)
-    return EnergyBudget(scalars..., [String(name) => Float64(value) for (name, value) in species])
+    species = [String(entry["species"]) => Float64(entry["value"])
+               for entry in data["inelastic_by_species"]]
+    interval = haskey(data, "interval") ?
+               (Float64(data["interval"][1]), Float64(data["interval"][2])) : nothing
+    return EnergyBudget(scalars..., species, interval)
 end
 
 load_energy_budget(sim::AuroraSimulation) = load_energy_budget(sim.output.savedir)
 
-"""
-    energy_budget_integrated(sim_dir; trange=:, max_bytes=512*1024^2, verbose=true)
-        -> TimeIntegratedEnergyBudget
-
-Time-integrated energy balance for a *time-dependent* run, computed from a saved directory by
-trapezoidally integrating the per-time-slice [`energy_budget`](@ref) over the time axis (or the
-contiguous integer sub-range `trange`). Returns a [`TimeIntegratedEnergyBudget`](@ref) (energy
-fluxes in eV m⁻²; rates as total counts m⁻²); also prints a summary unless `verbose=false`.
-
-Unlike the single-slice `energy_budget`, this closes for a transient that starts and ends at
-rest: `input = inelastic + heating + escape + residual`, with `residual` then collecting the
-energy left stored in the population over `[t0, t1]` plus numerical non-conservation. This is the
-appropriate tool for a pulsed / Alfvénic precipitation run, where a single snapshot does not
-conserve.
-
-The flux is streamed from `simulation_data.nc` in time-chunks (a single pass, peak memory
-bounded by `max_bytes`; cf. [`foreach_Ie_time_chunk`](@ref)) rather than loaded all at once. A
-sub-range `trange` still streams the whole file and filters in memory. `z_centroid` is the
-deposition-energy-weighted average of the per-slice centroids.
-"""
-function energy_budget_integrated(sim_dir::AbstractString; trange = Colon(),
-                                  max_bytes::Real = 512 * 1024^2, verbose::Bool = true)
-    model = load_model(sim_dir)
-    co = load_coordinates(sim_dir)
-    ts = trange === Colon() ? (1:co.n_t) : trange
-    (ts isa AbstractUnitRange{<:Integer} && first(ts) >= 1 && last(ts) <= co.n_t) ||
-        throw(ArgumentError("trange must be a Colon (:) or a contiguous range within 1:$(co.n_t)"))
-    length(ts) >= 2 ||
-        throw(ArgumentError("need ≥ 2 time slices to integrate; use `energy_budget` for a single snapshot"))
-    tt = co.t[ts]
-    w  = trapz_weights(tt)             # ∫ f dt ≈ Σ w[k] f[k]
-    lo, hi = first(ts), last(ts)
-
-    # Stream the flux in time-chunks (a single pass over simulation_data.nc, peak memory bounded
-    # by `max_bytes`) and keep the cheap per-slice snapshot budgets; integrate them afterwards.
-    # `push!` mutates the vectors in place, so the streaming closure boxes none of the totals.
-    budgets = EnergyBudget[]
-    idxs    = Int[]
-    foreach_Ie_time_chunk(sim_dir; max_bytes) do Ie_chunk, t_range
-        for (j, it) in enumerate(t_range)
-            lo <= it <= hi || continue
-            push!(budgets, energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]);
-                                                  verbose = false))
-            push!(idxs, it)
-        end
-    end
-
-    names = [String(sp.name) for sp in model.species]
-    sums  = Dict(n => 0.0 for n in names)
-    input = 0.0; escape = 0.0; inelastic = 0.0; ionization = 0.0; excitation = 0.0
-    heating = 0.0; input_raw = 0.0; escape_raw = 0.0; ionpairs = 0.0; excevents = 0.0
-    cz_num = 0.0; cz_den = 0.0
-    for (m, b) in enumerate(budgets)
-        wk = w[idxs[m] - lo + 1]
-        input += wk*b.input;          escape += wk*b.escape
-        inelastic += wk*b.inelastic;  ionization += wk*b.ionization
-        excitation += wk*b.excitation; heating += wk*b.heating
-        input_raw += wk*b.input_raw;  escape_raw += wk*b.escape_raw
-        ionpairs += wk*b.ionpairs;    excevents += wk*b.excevents
-        for (name, val) in b.inelastic_by_species
-            sums[name] += wk*val
-        end
-        if b.inelastic > 0 && isfinite(b.z_centroid)
-            cz_num += wk*b.inelastic*b.z_centroid; cz_den += wk*b.inelastic
-        end
-    end
-    net        = input - escape
-    residual   = input - inelastic - heating - escape
-    z_centroid = cz_den > 0 ? cz_num / cz_den : NaN
-    budget = EnergyBudget(input, escape, net, inelastic, ionization, excitation, heating,
-                          residual, input > 0 ? residual / input : NaN,
-                          input > 0 ? escape / input : NaN, input_raw, escape_raw,
-                          ionpairs, excevents, z_centroid, [n => sums[n] for n in names])
-    result = TimeIntegratedEnergyBudget(budget, first(tt), last(tt))
-    verbose && (show(stdout, MIME"text/plain"(), result); println())
-    return result
-end
-
-# The budget closes only at steady state. Warn (once per call, when printing) that a snapshot of
-# a time-dependent run does not conserve, since a transient input can read input == 0 at a slice
+# A single slice balances only at steady state. Warn (when printing) that a snapshot of a
+# time-dependent run does not conserve, since a transient input can read input == 0 at a slice
 # taken after the pulse — the usual source of a "surprising" zero/blown-up budget.
-function warn_if_time_dependent(n_t, tidx, verbose)
+function warn_if_snapshot(n_t, tidx, verbose)
     if n_t > 1 && verbose
         @warn "energy_budget is a single-time snapshot (tidx = $tidx of $n_t); for a " *
               "time-dependent run the balance does not close (energy in transit), and a " *
-              "transient input reads 0 after the pulse. Pass `tidx` to pick a time."
+              "transient input reads 0 after the pulse. Pass `tidx` to pick a time, or " *
+              "`trange` to integrate over time."
     end
 end
 
-# Core computation shared by both `energy_budget` methods. `Ie` is the steady-state flux
-# snapshot, shape [n_z, n_μ, n_E].
+# Assemble the derived terms shared by the snapshot and the time integral.
+function close_budget(input, escape, inelastic, ionization, excitation, heating, ionpairs,
+                      inelastic_by_species, interval)
+    net      = input - escape
+    residual = input - inelastic - heating - escape
+    return EnergyBudget(input, escape, net, inelastic, ionization, excitation, heating,
+                        residual, input > 0 ? residual / input : NaN,
+                        input > 0 ? escape / input : NaN, ionpairs,
+                        inelastic_by_species, interval)
+end
+
+# Budget of one flux snapshot `Ie`, shape [n_z, n_μ, n_E].
 function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     eg  = model.energy_grid
     z   = model.altitude_grid.h          # m (vertical altitude)
@@ -386,19 +359,15 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
                             "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
 
     # ---- Boundary energy fluxes at the top altitude --------------------------------------
-    # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm). The raw
-    # (along-field, un-|μ|-weighted) Σ Ie·E is kept alongside for diagnostics.
-    input  = 0.0; escape  = 0.0    # |μ|-weighted vertical flux (↓ / ↑)
-    input_raw = 0.0; escape_raw = 0.0   # along-field, un-weighted
+    # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm).
+    input = 0.0; escape = 0.0
     i_top = lastindex(Ie, 1)
     for iμ in axes(Ie, 2), iE in axes(Ie, 3)
-        fe = Ie[i_top, iμ, iE] * E[iE]
+        fe = Ie[i_top, iμ, iE] * E[iE] * abs(μ[iμ])
         if μ[iμ] < 0
-            input     += fe * abs(μ[iμ])
-            input_raw += fe
+            input += fe
         else
-            escape     += fe * abs(μ[iμ])
-            escape_raw += fe
+            escape += fe
         end
     end
 
@@ -406,14 +375,14 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     Ie_omni = dropdims(sum(Ie, dims=2), dims=2)            # [n_z, n_E]
 
     # ---- Inelastic energy deposition (∫ along the field line) ----------------------------
-    # Σ_s Δs Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ, split into ionizing (≥1 secondary) and
-    # non-ionizing channels, with the corresponding column reaction rates.
+    # Σ_s w_s Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ, split into ionizing (≥1 secondary) and
+    # non-ionizing channels, with the ion-pair production rate alongside.
     dep_profile_total = zeros(n_z)      # energy-deposition profile [eV m⁻³ s⁻¹]
     ion_profile       = zeros(n_z)      # → ionization
     exc_profile       = zeros(n_z)      # → excitation
     ionpair_profile   = zeros(n_z)      # ion-pair production rate  [m⁻³ s⁻¹]
-    excevent_profile  = zeros(n_z)      # excitation-event rate     [m⁻³ s⁻¹]
     inelastic_by_species = Pair{String,Float64}[]
+    w = column_weights(s)
     for sp in model.species
         σ      = sp.cross_sections          # [n_levels, n_E]
         levels = sp.excitation_levels       # [n_levels, 2]: (energy loss, #secondaries)
@@ -436,55 +405,42 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
                     ion_profile[iz]     += dep
                     ionpair_profile[iz] += rate * secondaries
                 else
-                    exc_profile[iz]      += dep
-                    excevent_profile[iz] += rate
+                    exc_profile[iz] += dep
                 end
             end
         end
-        col = trapz_path(s, dep_sp)
-        push!(inelastic_by_species, String(sp.name) => col)
+        push!(inelastic_by_species, String(sp.name) => column_integral(w, dep_sp))
         dep_profile_total .+= dep_sp
     end
-    inelastic  = trapz_path(s, dep_profile_total)
-    ionization = trapz_path(s, ion_profile)
-    excitation = trapz_path(s, exc_profile)
-    ionpairs   = trapz_path(s, ionpair_profile)
-    excevents  = trapz_path(s, excevent_profile)
-
-    # Energy-deposition centroid (vertical altitude, km): ∫ z·dep dz / ∫ dep dz.
-    dep_col_z  = trapz_path(z, dep_profile_total)
-    z_centroid = dep_col_z > 0 ? trapz_path(z, z .* dep_profile_total) / dep_col_z / 1e3 : NaN
+    inelastic  = column_integral(w, dep_profile_total)
+    ionization = column_integral(w, ion_profile)
+    excitation = column_integral(w, exc_profile)
+    ionpairs   = column_integral(w, ionpair_profile)
 
     # ---- Thermal-electron heating (reuse the existing Coulomb-loss routine) --------------
     heating_profile = calculate_heating_rate(z, [0.0], reshape(Ie_omni, n_z, 1, n_E),
                                              E, ne, Te)[:, 1]
-    heating = trapz_path(s, heating_profile)
+    heating = column_integral(w, heating_profile)
 
-    # ---- Closure ------------------------------------------------------------------------
-    net      = input - escape
-    residual = input - inelastic - heating - escape
-    budget = EnergyBudget(input, escape, net, inelastic, ionization, excitation, heating,
-                          residual, input > 0 ? residual / input : NaN,
-                          input > 0 ? escape / input : NaN, input_raw, escape_raw,
-                          ionpairs, excevents, z_centroid, inelastic_by_species)
-    verbose && show(stdout, MIME"text/plain"(), budget)
-    verbose && println()
+    budget = close_budget(input, escape, inelastic, ionization, excitation, heating,
+                          ionpairs, inelastic_by_species, nothing)
+    verbose && (show(stdout, MIME"text/plain"(), budget); println())
     return budget
 end
 
-# Trapezoidal integral over a (possibly descending) 1-D grid x. Used both for the field-line
-# path integral (x = model.s_field) and for the altitude integral of the deposition centroid.
-function trapz_path(x, f)
-    eachindex(x, f)                    # x and f must share indices
-    s = 0.0
-    for i in firstindex(x):(lastindex(x) - 1)
-        s += 0.5 * (f[i] + f[i + 1]) * abs(x[i + 1] - x[i])
+# Quadrature weights for the column integral along the field line: ∫ f ds ≈ Σ w[i] f[i].
+column_weights(s) = abs.(trapz_weights(s))
+
+function column_integral(w, f)
+    eachindex(w, f)                    # the weights and the profile must share indices
+    total = 0.0
+    for i in eachindex(f)
+        total += w[i] * f[i]
     end
-    return s
+    return total
 end
 
 # Trapezoidal quadrature weights w for samples at points x, so that ∫ f dx ≈ Σ w[k] f[k].
-# Lets the time-integrated budget integrate each per-slice quantity with one weight vector.
 function trapz_weights(x)
     w = zeros(length(x))
     length(x) == 1 && return w

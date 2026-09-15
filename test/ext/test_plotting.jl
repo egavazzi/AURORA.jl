@@ -185,7 +185,7 @@
         @test ax.xticks[] == ([1.0, 2.0], ["first", "second"])
 
         # A time-integrated budget carries the same fields and plots the same way
-        integrated = energy_budget_integrated(SharedSimResults.td_dir; verbose = false)
+        integrated = energy_budget(SharedSimResults.td_dir; trange = :, verbose = false)
         @test plot_energy_budget(integrated; label = "integrated") isa Figure
     end
 

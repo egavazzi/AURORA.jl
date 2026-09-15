@@ -25,23 +25,11 @@ const _SUPERSCRIPTS = Dict('0' => '⁰', '1' => '¹', '2' => '²', '3' => '³', 
                            '-' => '⁻')
 _superscript(n::Integer) = String([_SUPERSCRIPTS[c] for c in string(n)])
 
-# Percentages of the input flux, never rounded down to a bare "0.0" for a nonzero term.
-function _pct_string(value, total)
-    pct = 100 * value / total
-    pct != 0 && abs(pct) < 0.1 && return string(round(pct; sigdigits = 2))
-    return string(round(pct; digits = 1))
-end
-
 # Scaled values, with the same guarantee: a nonzero term never reads as "0.0".
 function _value_string(v)
     v != 0 && abs(v) < 0.005 && return string(round(v; sigdigits = 2))
     return string(round(v; digits = 2))
 end
-
-_budget_units(::AURORA.EnergyBudget) = "eV m⁻² s⁻¹"
-_budget_units(::AURORA.TimeIntegratedEnergyBudget) = "eV m⁻²"
-
-const _AnyEnergyBudget = Union{AURORA.EnergyBudget, AURORA.TimeIntegratedEnergyBudget}
 
 # Keep the axis ticks of every bar already drawn, so repeated `plot_energy_budget!` calls on
 # one axis accumulate labelled positions instead of overwriting each other.
@@ -64,7 +52,7 @@ function _add_xtick!(ax, x, label)
     return nothing
 end
 
-function AURORA.plot_energy_budget!(ax, budget::_AnyEnergyBudget;
+function AURORA.plot_energy_budget!(ax, budget::AURORA.EnergyBudget;
                                     x = 1, label = nothing, scale = nothing)
     input = budget.input
     sc = something(scale, _budget_scale(input))
@@ -88,7 +76,7 @@ function AURORA.plot_energy_budget!(ax, budget::_AnyEnergyBudget;
 
     for (i, (field, _, _, textcolor)) in enumerate(_ENERGY_BUDGET_SEGMENTS)
         text = "$(_value_string(values[i])) " *
-               "($(_pct_string(getproperty(budget, field), input))%)"
+               "($(AURORA.percent_string(getproperty(budget, field), input))%)"
         text!(ax, Float64(x), heights[i]; text, align = (:center, :center), fontsize = 14,
               color = textcolor)
     end
@@ -97,7 +85,7 @@ function AURORA.plot_energy_budget!(ax, budget::_AnyEnergyBudget;
     return plot
 end
 
-function AURORA.plot_energy_budget(budget::_AnyEnergyBudget; label = nothing)
+function AURORA.plot_energy_budget(budget::AURORA.EnergyBudget; label = nothing)
     input = budget.input
     sc = _budget_scale(input)
     exponent = round(Int, log10(sc))
@@ -107,7 +95,7 @@ function AURORA.plot_energy_budget(budget::_AnyEnergyBudget; label = nothing)
     fig = Figure(size = (560, 760), fontsize = 17)
     ax = Axis(fig[1, 1];
               ylabel = "Vertical energy flux (×10$(_superscript(exponent)) " *
-                       "$(_budget_units(budget)))",
+                       "$(AURORA.energy_units(budget)))",
               title = @sprintf("(deposited + backscattered) / input = %.3f", ratio),
               titlefont = :regular, titlesize = 14,
               yminorticksvisible = true,

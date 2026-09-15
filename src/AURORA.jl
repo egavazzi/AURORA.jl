@@ -95,7 +95,6 @@ export make_volume_excitation_file, make_column_excitation_file,
        make_Ie_top_file, make_current_file,
        make_heating_rate_file, make_psd_file,
        energy_budget, EnergyBudget,
-       energy_budget_integrated, TimeIntegratedEnergyBudget,
        make_energy_budget_file, load_energy_budget
 
 include("viz_interface.jl")
