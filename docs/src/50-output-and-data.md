@@ -160,6 +160,17 @@ budget.albedo                      # escaping / incoming energy flux
 budget.residual_fraction           # unaccounted fraction; small and positive on a good grid
 ```
 
+On a time-dependent run a single slice does not balance, because energy is still in transit.
+Pass `trange` to integrate the balance over time instead, which closes for a transient that
+starts and ends at rest; the result then holds energies (eV m⁻²) and carries the interval it
+covers in `budget.interval`:
+
+```julia
+budget = energy_budget("my_run"; trange = :)        # all slices
+budget = energy_budget("my_run"; trange = 10:40)    # part of the run
+budget = energy_budget("my_run"; tidx = 25)         # one slice, for comparison
+```
+
 [`make_energy_budget_file`](@ref) saves the same result as `analysis/energy_budget.toml`, a
 few hundred bytes that outlive the multi-gigabyte `simulation_data.nc`:
 

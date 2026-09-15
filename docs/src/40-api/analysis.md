@@ -15,8 +15,7 @@ scalars and is written as TOML (see [Output & data](@ref Output) for the layout 
     | `make_current_file` | ✓ | ✓ |
     | `make_heating_rate_file` | ✓ | ✓ |
     | `make_psd_file` | | ✓ |
-    | `make_energy_budget_file` | ✓ | one time slice |
-    | `energy_budget_integrated` | | ✓ |
+    | `make_energy_budget_file` | ✓ | ✓ (snapshot, or time-integrated with `trange`) |
 
 ## Excitation rates
 
@@ -53,8 +52,6 @@ the top of the ionosphere.
 ```@docs; canonical=false
 energy_budget
 EnergyBudget
-energy_budget_integrated
-TimeIntegratedEnergyBudget
 make_energy_budget_file
 load_energy_budget
 ```
