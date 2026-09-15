@@ -312,8 +312,12 @@ function load_energy_budget(sim_dir::AbstractString)
         throw(ArgumentError("unsupported energy-budget schema in $path"))
     values = data["values"]
     scalars = (Float64(values[String(name)]) for name in ENERGY_BUDGET_SCALAR_FIELDS)
-    species = [String(entry["species"]) => Float64(entry["value"])
-               for entry in data["inelastic_by_species"]]
+    entries = data["inelastic_by_species"]
+    entries isa AbstractVector ||
+        throw(ArgumentError("$path stores inelastic_by_species as $(typeof(entries)); it " *
+                            "must be an array of {species, value} tables. Rewrite the file " *
+                            "with make_energy_budget_file."))
+    species = [String(entry["species"]) => Float64(entry["value"]) for entry in entries]
     interval = haskey(data, "interval") ?
                (Float64(data["interval"][1]), Float64(data["interval"][2])) : nothing
     return EnergyBudget(scalars..., species, interval)
