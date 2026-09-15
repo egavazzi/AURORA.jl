@@ -95,6 +95,42 @@ end
     @test once == full.Ie
 end
 
+
+@testitem "foreach_Ie_time_chunk trange reads only those slices" setup=[SharedSimResults] begin
+    using AURORA
+
+    dir = SharedSimResults.td_dir
+    full = load_results(dir)
+    n_t = size(full.Ie, 3)
+
+    seen = Int[]
+    AURORA.foreach_Ie_time_chunk(dir; trange = 2:4) do Ie_chunk, t_range
+        append!(seen, collect(t_range))
+        @test size(Ie_chunk, 3) == length(t_range)
+        for (j, it) in enumerate(t_range)
+            @test Ie_chunk[:, :, j, :] == full.Ie[:, :, it, :]
+        end
+    end
+    @test seen == [2, 3, 4]
+
+    # One slice per chunk still visits exactly the requested range
+    seen_small = Int[]
+    AURORA.foreach_Ie_time_chunk(dir; trange = 2:4, max_bytes = 1) do _, t_range
+        append!(seen_small, collect(t_range))
+    end
+    @test seen_small == [2, 3, 4]
+
+    # The default still streams everything
+    seen_all = Int[]
+    AURORA.foreach_Ie_time_chunk(dir) do _, t_range
+        append!(seen_all, collect(t_range))
+    end
+    @test seen_all == collect(1:n_t)
+
+    @test_throws "trange must be a Colon" AURORA.foreach_Ie_time_chunk((_, _) -> nothing, dir;
+                                                                       trange = [1, 3])
+end
+
 @testitem "load_Ie_top" setup=[SharedSimResults] begin
     # Time-dependent
     inp_td = load_Ie_top(SharedSimResults.td_dir)
