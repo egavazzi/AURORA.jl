@@ -187,7 +187,7 @@ budget = load_energy_budget("my_run")
 ```
 
 With a Makie backend loaded, [`plot_energy_budget`](@ref) draws the same budget as a stacked
-bar against the dashed input line, each segment labelled with its energy flux and its share
+bar against a dashed input line, each segment labelled with its energy flux and its share
 of the input:
 
 ```julia

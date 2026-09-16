@@ -159,15 +159,7 @@ export plot_column_excitation!
 
 Plot an [`energy_budget`](@ref) as a stacked bar against the input energy flux.
 
-The bar stacks, from the bottom, the energy that goes into ionization, into non-ionizing
-excitation, into thermal-electron heating, out through the floor of the grid, and back out
-of the top as backscatter; each segment is labelled with its value and its percentage of the
-input. The dashed line across the bar marks the input itself, so a stack that overshoots it
-shows the run creating energy and one that falls short shows energy the budget cannot place.
-
-Given a vector of budgets, one bar per budget is drawn side by side on a shared axis, which
-is how runs that differ by a single change are compared. The header ratio is shown only for
-a single budget.
+Given a vector of budgets, one bar per budget is drawn side by side on a shared axis.
 
 Requires a Makie backend (e.g. `using CairoMakie` or `using GLMakie`).
 

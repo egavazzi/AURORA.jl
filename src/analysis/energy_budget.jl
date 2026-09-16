@@ -16,24 +16,11 @@
 #               bottom boundary, which the solver discards
 #   E_inelastic energy deposited in neutral excitation + ionization thresholds,
 #               Σ_s w_s Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
-#   E_heating   energy transferred to the thermal electrons (Coulomb), via
-#               `calculate_heating_rate`, integrated along the field line
+#   E_heating   energy transferred to the thermal electrons (Coulomb)
 #   residual    everything unaccounted: the energy of electrons degraded below the grid floor
 #               (sub-floor thermalisation, a small *positive* term on a good grid) plus any
-#               numerical non-conservation. A grid that violates the ΔE < threshold stability
-#               bound shows the inelastic term ballooning and the residual going
-#               large/negative (energy "created") — the failure this diagnostic catches.
+#               numerical non-conservation.
 #
-# Volume integrals run ALONG THE MAGNETIC FIELD LINE (over `model.s_field = h / cos B_angle`),
-# NOT over vertical altitude: the transport conserves the field-aligned flux (μ ∂Ie/∂s), so
-# the column path length is s. Integrating over z instead injects a spurious 1/cos(B_angle)
-# factor (it vanishes at B_angle = 0, where s == z).
-#
-# The quadrature is the solver's own (see `column_weights`), not a generic trapezoid rule, so
-# the budget measures the energy the discrete operator actually deposits.
-#
-# The vertical-energy-flux projection (Σ Ie·E·|μ|) matches `field_aligned_beam_norm`, so
-# E_in computed here equals the InputFlux's `IeE_tot` normalisation.
 #
 # A single time slice balances only at steady state. Over a time interval that starts and ends
 # at rest the same identity holds for the time-integrated terms, which is what `trange` gives.
@@ -54,10 +41,7 @@ energies in eV m⁻² and `ionpairs` is a total count in m⁻².
 Energy terms
 - `input`, `escape`   |μ|-weighted *vertical* energy flux of the downward / upward beams at
   the top boundary (`input` matches `IeE_tot`).
-- `bottom_escape`     the downward energy flux absorbed at the bottom of the grid. The
-  lowest grid row imposes `Ie = 0` rather than a balance, so the transport operator's column
-  sum telescopes into the top fluxes and the downward flux at the point that feeds that row:
-  this term is that flux, the energy that leaves the modelled column through the floor.
+- `bottom_escape`     the downward energy flux escaping at the bottom of the grid.
 - `net`               `input - escape - bottom_escape`: the energy deposited in the modelled
   column, and the numerator of the energy per ion pair.
 - `inelastic`         energy into neutral excitation + ionization thresholds.
@@ -65,8 +49,7 @@ Energy terms
   non-ionizing channels (`inelastic == ionization + excitation`).
 - `heating`           energy transferred to the thermal electrons (Coulomb).
 - `residual`          `input - inelastic - heating - escape - bottom_escape` (sub-floor
-  thermalisation +
-  numerical non-conservation); `residual_fraction == residual / input`.
+  thermalisation + numerical non-conservation); `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
 - `inelastic_by_species`  the inelastic term per species, in model order.
 
@@ -104,8 +87,8 @@ rate_units(b::EnergyBudget) = b.interval === nothing ? "m⁻² s⁻¹" : "m⁻²
 # channel (thermal heating at a few keV) does not read as "0.0".
 function percent_string(value, total)
     pct = 100 * value / total
-    # @sprintf rather than round: rounding 5.8e-27 to two significant digits leaves a float
-    # whose shortest representation is 5.799999999999999e-27.
+    # @sprintf rather than round: round(x; sigdigits = 2) can sometimes return a float whose
+    # shortest representation is not two digits, e.g. 8.51e-24 rounds to 8.499999999999999e-24.
     pct != 0 && abs(pct) < 0.1 && return replace(@sprintf("%.2g", pct), "e-0" => "e-")
     return string(round(pct; digits = 1))
 end
@@ -147,37 +130,17 @@ Compute the energy balance of a finished simulation. Returns an [`EnergyBudget`]
 prints a summary unless `verbose=false`.
 
 Two sources are accepted:
-- a saved run directory `sim_dir`, reconstructing the model from
-  `<sim_dir>/inputs/physics_state.jld2` (see [`load_model`](@ref)) and the electron flux from
-  `<sim_dir>/simulation_data.nc`;
-- an in-memory `sim`. For a steady-state run the flux comes straight from `sim.workspace.Ie`;
-  for a time-dependent run the workspace holds only the last solver loop, so the call is
-  forwarded to `sim.output.savedir`, which `run!` has written in full.
+- a saved run directory `sim_dir`.
+- an in-memory `sim`.
 
 Pass at most one of `tidx`, `t` and `trange`:
-- none of them: the **last** time slice, which is the steady-state solution of an `n_t == 1`
-  run;
-- `tidx`: that single time slice;
+- none of them: the **last** time slice, to be used for steady-state (`n_t == 1`) runs;
+- `tidx`: a single time slice;
 - `t`: the single saved slice nearest that time in seconds (the earlier one on a tie);
-- `trange`: several slices, time-integrated with trapezoid weights over the time axis. It
-  takes `:` for every slice, a contiguous range of slice indices, or a `(t0, t1)` tuple of
-  times in seconds, which selects every slice with `t0 <= t <= t1`. The result then carries
-  `interval = (t0, t1)` — the times of the first and last slice actually used — and holds
-  energies (eV m⁻²) rather than fluxes.
-
-A single slice balances only at steady state: on a time-dependent run energy is in transit,
-and a *transient* input reads `input == 0` at any slice after the pulse has passed. A warning
-points this out; `trange` is the form that closes for a transient that starts and ends at
-rest, where `residual` also collects the energy left stored in the population.
-
-Use as a guardrail: on a converged, stable run the residual is a small positive fraction (the
-sub-floor thermalisation that AURORA does not track on-grid). A large or negative residual
-flags energy non-conservation — e.g. a grid whose maximum bin width exceeds the lowest
-ionization threshold, which destabilises the high→low energy-degradation sweep.
-
-`max_bytes` caps the flux read from disk: one full time slice for a snapshot (no cap by
-default, since the budget needs the whole slice) or one streaming chunk when integrating
-(512 MiB by default; cf. [`foreach_Ie_time_chunk`](@ref)).
+- `trange`: several slices, time-integrated. It can take `:` for every saved slice, a
+    contiguous range of slice indices, or a `(t0, t1)` tuple of times in seconds which
+    selects every slice with `t0 <= t <= t1`. The result then holds energies (eV m⁻²)
+    rather than fluxes.
 """
 function energy_budget(sim::AuroraSimulation; tidx = nothing, t = nothing, trange = nothing,
                        max_bytes::Union{Nothing,Real} = nothing, verbose::Bool = true)
@@ -207,15 +170,19 @@ function energy_budget(sim_dir::AbstractString; tidx = nothing, t = nothing,
     model = load_model(sim_dir)
     co = load_coordinates(sim_dir)
     t === nothing || (tidx = time_index_nearest(co, t))
-    trange === nothing &&
+    if trange === nothing
+        # One time slice. A 300 keV slice is about 2.5 GiB, above `load_results`' generic
+        # 2 GiB safety default, and the budget needs the whole slice, so the cap is off (set
+        # to Inf) unless the caller already set it.
         return energy_budget_at(model, sim_dir, co, something(tidx, co.n_t),
                                 something(max_bytes, Inf), verbose)
-    return energy_budget_over(model, sim_dir, co, trange,
+    else
+        return energy_budget_over(model, sim_dir, co, trange,
                               something(max_bytes, 512 * 1024^2), verbose)
+    end
 end
 
-# One time slice. A 300 keV slice is about 2.5 GiB, above `load_results`' generic 2 GiB safety
-# default, and the budget needs the whole slice, so the cap is off unless the caller sets it.
+
 function energy_budget_at(model, sim_dir, co, it::Integer, max_bytes, verbose)
     1 <= it <= co.n_t || throw(ArgumentError("tidx = $it out of range 1:$(co.n_t)"))
     warn_if_snapshot(co.n_t, it, verbose)
@@ -269,8 +236,7 @@ end
 Compute the energy budget with [`energy_budget`](@ref) (same keywords) and save it to
 `<savedir>/analysis/energy_budget.toml`. The compact TOML file holds every scalar field of
 [`EnergyBudget`](@ref), the species-resolved inelastic terms in model order, the time
-interval, and the units, so the budget stays readable when the much larger
-`simulation_data.nc` is moved or deleted. Read it back with [`load_energy_budget`](@ref).
+interval, and the units. Read it back with [`load_energy_budget`](@ref).
 """
 function make_energy_budget_file(sim::AuroraSimulation; kwargs...)
     budget = energy_budget(sim; kwargs...)
@@ -384,8 +350,7 @@ function time_index_range(co, trange)
 end
 
 # A single slice balances only at steady state. Warn (when printing) that a snapshot of a
-# time-dependent run does not conserve, since a transient input can read input == 0 at a slice
-# taken after the pulse — the usual source of a "surprising" zero/blown-up budget.
+# time-dependent run does not conserve.
 function warn_if_snapshot(n_t, tidx, verbose)
     if n_t > 1 && verbose
         @warn "energy_budget is a single-time snapshot (tidx = $tidx of $n_t); for a " *
@@ -509,25 +474,15 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     return budget
 end
 
-# Quadrature weights for the column integral along the field line, taken from the solvers so
-# that summing the discrete equations with them telescopes the transport term into the
-# boundary fluxes and leaves exactly the sinks this budget measures.
-#
-# Both solvers difference μ ∂Ie/∂s upwind, with the interval the beam comes from in the
-# denominator (`build_spatial_operators` in src/solvers/sparse_indexing.jl): downward beams
-# use s[i+1] - s[i], upward beams s[i] - s[i-1]. The collision sinks sit in the same rows
-# with no cell length of their own, so they carry the same weight. The first and last rows
-# hold boundary conditions rather than a balance, so they get no weight: the flux at the top
-# is already counted as `input`/`escape`, and the flux the bottom row zeroes leaves the
-# domain without a budget term.
+# Cell lengths for the column integral. The solvers use an upwind scheme, so at a given
+# altitude a downward beam is differenced over the cell above it and an upward beam over the
+# cell below it; each beam is integrated with the cell lengths its own equation uses. The
+# first and last rows hold boundary conditions, not a balance, and get zero weight.
 function column_weights(s)
-    down = zeros(length(s))
-    up   = zeros(length(s))
-    lo, hi = firstindex(s), lastindex(s)
-    for k in (lo + 1):(hi - 1)
-        down[k - lo + 1] = abs(s[k + 1] - s[k])
-        up[k - lo + 1]   = abs(s[k] - s[k - 1])
-    end
+    Base.require_one_based_indexing(s)
+    Δs = abs.(diff(s))
+    down = [0.0; Δs[2:end];     0.0]   # cell above, for μ < 0
+    up   = [0.0; Δs[1:end - 1]; 0.0]   # cell below, for μ > 0
     return (; down, up)
 end
 

@@ -182,8 +182,7 @@ load_results(sim::AuroraSimulation; kwargs...) = load_results(sim.output.savedir
 
 Load the fully-initialized [`AuroraModel`](@ref) saved in `<sim_dir>/inputs/physics_state.jld2`
 (written by `run!`). The returned model holds the grids, ionosphere, and species with their
-cross sections, excitation levels, and densities used to produce the run — suitable for
-post-hoc analysis such as [`energy_budget`](@ref).
+cross sections, excitation levels, densities, etc. used to produce the run.
 """
 function load_model(sim_dir::AbstractString)
     jld_path = joinpath(sim_dir, "inputs", "physics_state.jld2")

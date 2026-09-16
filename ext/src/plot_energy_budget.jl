@@ -29,16 +29,11 @@ const _BAR_HALF_WIDTH = 0.4
 # and would fall on the figure background if it overflowed.
 const _BAR_GUTTER = 0.15
 
-const _SUPERSCRIPTS = Dict('0' => '⁰', '1' => '¹', '2' => '²', '3' => '³', '4' => '⁴',
-                           '5' => '⁵', '6' => '⁶', '7' => '⁷', '8' => '⁸', '9' => '⁹',
-                           '-' => '⁻')
-_superscript(s::AbstractString) = String([_SUPERSCRIPTS[c] for c in s])
-
-# Three significant digits in scientific notation, e.g. 2.95×10¹⁶.
-function _sci_string(x)
-    x == 0 && return "0"
-    mantissa, exponent = split(replace(@sprintf("%.2e", x), "e+" => "e"), 'e')
-    return string(mantissa, "×10", _superscript(string(parse(Int, exponent))))
+# Three significant digits in scientific notation, e.g. 2.95×10¹⁶, as rich text.
+function _sci_text(x)
+    x == 0 && return Makie.rich("0")
+    mantissa, exponent = split(@sprintf("%.2e", x), 'e')
+    return Makie.rich(string(mantissa, "×10"), Makie.superscript(string(parse(Int, exponent))))
 end
 
 _budget_ylabel(budget) = budget.interval === nothing ?
@@ -72,7 +67,7 @@ function AURORA.plot_energy_budget!(ax, budget::AURORA.EnergyBudget; x = 1)
     for (i, (field, _, _, textcolor)) in enumerate(_ENERGY_BUDGET_SEGMENTS)
         v = values[i]
         v < _SEGMENT_LABEL_MIN_SHARE * budget.input && continue
-        text = "$(_sci_string(v)) ($(AURORA.percent_string(v, budget.input))%)"
+        text = Makie.rich(_sci_text(v), " ($(AURORA.percent_string(v, budget.input))%)")
         text!(ax, Float64(x), heights[i]; text, align = (:center, :center), fontsize = 14,
               color = textcolor)
     end
@@ -91,7 +86,7 @@ function AURORA.plot_energy_budget(budget::AURORA.EnergyBudget; label = nothing)
     AURORA.plot_energy_budget!(ax, budget; x = 1)
 
     xmin, xmax = 1 - _BAR_HALF_WIDTH - _BAR_GUTTER, 1 + _BAR_HALF_WIDTH + _BAR_GUTTER
-    text!(ax, xmin + 0.01 * (xmax - xmin), budget.input; text = "input",
+    text!(ax, 1 - _BAR_HALF_WIDTH, budget.input; text = "input",
           align = (:left, :bottom), fontsize = 13, color = :black)
     _budget_legend!(fig)
     _budget_limits!(ax, (budget,), xmin, xmax)
