@@ -317,3 +317,34 @@ end
     @test all(secondary .>= 0)
     @test all(primary   .>= 0)
 end
+
+@testitem "Two quick cascading-cache saves for one species do not collide" begin
+    cache_files(dir) = isdir(dir) ? filter(name -> endswith(name, ".jld2"), readdir(dir)) : String[]
+
+    cache_root = mktempdir()
+    n2_dir = joinpath(cache_root, "e_cascading", "N2")
+    save_policy = AURORA.CachePolicy(; force_recompute = true, save_cache = true, cache_root)
+
+    # Two different grids for the same species, saved back to back: fast enough that the
+    # "yyyymmdd-HHMMSS" timestamp in the filename can be identical for both.
+    grid_a = AURORA.EnergyGrid(60)
+    grid_b = AURORA.EnergyGrid(90)
+
+    cache_a = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
+    cache_b = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
+    AURORA.load_or_compute_cascading!(cache_a, grid_a; policy = save_policy, verbose = false)
+    AURORA.load_or_compute_cascading!(cache_b, grid_b; policy = save_policy, verbose = false)
+
+    files = cache_files(n2_dir)
+    @test length(files) == 2
+    @test allunique(files)
+
+    # Both files are intact and independently loadable.
+    reloaded_a = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
+    reloaded_b = AURORA.SpeciesCascadingCache(AURORA.DefaultCascadingSpecN2())
+    load_policy_a = AURORA.CachePolicy(; cache_root)
+    AURORA.load_or_compute_cascading!(reloaded_a, grid_a; policy = load_policy_a, verbose = false)
+    AURORA.load_or_compute_cascading!(reloaded_b, grid_b; policy = load_policy_a, verbose = false)
+    @test reloaded_a.E_edges == cache_a.E_edges
+    @test reloaded_b.E_edges == cache_b.E_edges
+end

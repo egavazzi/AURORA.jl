@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Cascading cache filenames now include a hash of the physics they were built from (thresholds, secondary counts, secondary law, grid edges) instead of only a per-second timestamp, so two saves for the same species within one second no longer overwrite each other
 - **Breaking** `initialize!(model)` now throws an `ArgumentError` (renamed `check_bins_narrower_than_ionization_threshold`, was `warn_if_bins_wider_than_ionization_threshold`) instead of warning when an energy bin is wider than a species' lowest ionization threshold: an electron can then ionize twice within one bin, which the cascading matrices do not account for
 - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions to return the cross-section at the correct energy for any order of the input energies, and to accept integer energies: several returned mis-ordered values, or threw an `InexactError`, unless called with an already-sorted `Vector{Float64}`
 - **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition of the degraded electrons over the lower energy bins. Each bin gets the share of the degraded range it covers; when part of that range falls below the lowest grid edge, the corresponding electrons thermalise there instead of being pushed back into the first bin

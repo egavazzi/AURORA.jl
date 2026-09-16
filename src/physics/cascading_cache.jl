@@ -169,10 +169,22 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
                               policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(cache.spec, policy)
     mkpath(species_dir)
-    filename = joinpath(species_dir,
-                       string("cascading_", cache.spec.name, "_",
-                             Dates.format(now(), "yyyymmdd-HHMMSS"),
-                             ".jld2"))
+    # The timestamp alone is not unique: matrices for a species can build in under a second,
+    # so two saves can carry the same "yyyymmdd-HHMMSS" stem. Append a hash of the physics the
+    # file was built from, and fall back to a counter on top of that in the unlikely case the
+    # hash also collides, so no save ever overwrites another file.
+    content_fingerprint = hash((cache.E_edges, cache.ionization_thresholds,
+                                cache.spec.n_secondaries,
+                                law_fingerprint(cache.spec.secondary_law)))
+    stem = string("cascading_", cache.spec.name, "_",
+                 Dates.format(now(), "yyyymmdd-HHMMSS"), "_",
+                 string(content_fingerprint; base = 16))
+    filename = joinpath(species_dir, stem * ".jld2")
+    counter = 1
+    while ispath(filename)
+        filename = joinpath(species_dir, string(stem, "-", counter, ".jld2"))
+        counter += 1
+    end
     jldopen(filename, "w") do file
         file["version_AURORA"]  = cache_version_string()
         file["Q_primary"]       = cache.primary_transfer_matrix
