@@ -308,7 +308,10 @@ end
         iri_file  = find_iri_file(; verbose=false)
 
         custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-        custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75], custom_law)
+        # The excitation levels below are N₂'s, so the cascading spec carries N₂'s ionizing
+        # channels: every ionizing level must have a matching threshold and secondary count.
+        custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75, 24.0, 42.0],
+                                           custom_law; n_secondaries = [1, 1, 1, 1, 2])
         custom_sp   = AURORA.NeutralSpecies(:CustomGas, @law(h -> fill(1e18, length(h)));
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)

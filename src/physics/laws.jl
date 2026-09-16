@@ -92,6 +92,69 @@ Base.convert(::Type{ExprLaw}, s::ExprLawSerialization) = ExprLaw(s.src)
 Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
 profile_label(l::ExprLaw) = "@law $(l.src)"
 
+"""
+    is_fingerprintable(law) -> Bool
+
+Whether [`law_fingerprint`](@ref) can identify `law`.
+
+An [`ExprLaw`](@ref) carries its own source, and a functor carries its parameters in its
+fields. A callable with neither — a plain named function — is only its name here, and two
+different definitions of the same name are indistinguishable, so it has no fingerprint.
+"""
+is_fingerprintable(law) = fieldcount(typeof(law)) > 0
+is_fingerprintable(::ExprLaw) = true
+
+"""
+    law_fingerprint(law) -> String
+
+String identifying a law, built from everything the law carries: the source of an
+[`ExprLaw`](@ref), or the type of a functor together with the values of all its fields,
+recursively. Two laws whose fingerprints differ may behave differently, so a cache file
+built under one fingerprint is only reused for a law with the same one.
+
+Throws for a law that [`is_fingerprintable`](@ref) rejects.
+"""
+law_fingerprint(law::ExprLaw) = law.src
+function law_fingerprint(law)
+    is_fingerprintable(law) || throw(ArgumentError(
+        "a $(typeof(law)) carries no source and no fields, so there is nothing to identify \
+         it by. Wrap the law with @law, or hold its parameters in a functor struct."))
+    io = IOBuffer()
+    dump_law_value(io, law)
+    return String(take!(io))
+end
+
+# Type name and field values, read with `getfield` and written with `repr` at the leaves.
+# Going through `show` instead would let a type with a custom display hide the very
+# parameters that make it behave the way it does.
+function dump_law_value(io::IO, value)
+    T = typeof(value)
+    print(io, T)
+    fieldcount(T) == 0 && return io
+    print(io, "(")
+    for i in 1:fieldcount(T)
+        i > 1 && print(io, ", ")
+        print(io, fieldname(T, i), "=")
+        dump_law_value(io, getfield(value, i))
+    end
+    print(io, ")")
+    return io
+end
+
+# `repr` round-trips these, so it reproduces e.g. every digit of a Float64 parameter.
+dump_law_value(io::IO, value::Union{Number, AbstractString, Symbol, Nothing}) =
+    (print(io, repr(value)); io)
+
+function dump_law_value(io::IO, value::Union{AbstractArray, Tuple})
+    print(io, typeof(value), "[")
+    for (i, element) in enumerate(value)
+        i > 1 && print(io, ", ")
+        dump_law_value(io, element)
+    end
+    print(io, "]")
+    return io
+end
+
 # A law is reproducible unless it is a bare anonymous function/closure. Functors (callable
 # structs, including ExprLaw, DensityProfile and ElectronProfile) and named functions all pass.
 is_anonymous(f) = f isa Function && startswith(string(nameof(f)), "#")

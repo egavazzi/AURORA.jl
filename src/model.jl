@@ -145,6 +145,7 @@ function initialize!(model::AuroraModel;
         if isempty(sp.excitation_levels)
             sp.excitation_levels = load_excitation_threshold_for(name_str)
         end
+        validate_ionization_channels(sp)
         sp.phase_fcn         = sp.phase_fcn_generator(θ, eg.E_centers)
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)
     end

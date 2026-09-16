@@ -108,6 +108,43 @@ function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
     return species[found_index]
 end
 
+"""
+    validate_ionization_channels(sp::NeutralSpecies)
+
+Check that the ionizing channels of `sp.excitation_levels` and of `sp.cascading_spec`
+describe the same physics.
+
+The two hold independent copies of every ionizing channel: column 1 of `excitation_levels`
+is the energy loss that `update_B!` charges the primary electron and the key under which
+`compute_ionization_spectra!` looks up a cascading matrix, column 2 is the number of
+secondaries it multiplies that matrix by, and `cascading_spec` carries the thresholds and
+secondary counts the matrices were actually built with. Any disagreement splits one
+collision's energy between two different accountings, so they must match exactly.
+"""
+function validate_ionization_channels(sp::NeutralSpecies)
+    spec = sp.cascading_spec
+    E_levels = sp.excitation_levels
+    for i_level in axes(E_levels, 1)
+        n_secondary = E_levels[i_level, 2]
+        (isinteger(n_secondary) && 0 <= n_secondary <= 2) || throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) produces $(n_secondary) secondary \
+             electrons; the second column of the levels data must be 0, 1 or 2"))
+        n_secondary > 0 || continue
+
+        threshold = E_levels[i_level, 1]
+        i_threshold = findfirst(==(threshold), spec.ionization_thresholds)
+        isnothing(i_threshold) && throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) ionizes at $(threshold) eV, which is not \
+             one of the cascading thresholds $(spec.ionization_thresholds)"))
+        spec.n_secondaries[i_threshold] == n_secondary || throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) produces $(Int(n_secondary)) secondary \
+             electrons at $(threshold) eV, while its cascading spec produces \
+             $(spec.n_secondaries[i_threshold])"))
+    end
+    return nothing
+end
+
+
 # Per-species variant of load_excitation_threshold (which loads all three species).
 function load_excitation_threshold_for(species_name::AbstractString)
     file = pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.dat")
