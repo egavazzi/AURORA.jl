@@ -53,3 +53,28 @@ An electron ionizes a neutral, producing:
 
 Both the secondary and degraded primary electrons contribute to the source term for
 lower energy bins.
+
+## The lowest energy bin
+
+The energy grid starts at a lowest edge of a few eV, and a degraded electron can arrive
+below it. Such an electron leaves the suprathermal population: it is not placed in the
+first bin, and it is not counted anywhere else on the grid.
+
+For a non-ionizing channel, the electrons that leave a bin arrive spread over the range
+
+```math
+\left[E_\text{edges}[iE] - E_\text{loss},\ \min\left(E_\text{edges}[iE+1] - E_\text{loss},\ E_\text{edges}[iE]\right)\right]
+```
+
+and each lower bin receives the share of that range it covers. Where the range extends
+below the lowest edge, the shares sum to less than one and the remainder is the part that
+thermalises.
+
+For an ionizing channel, the degraded primary and the secondaries are placed from the
+cascading transfer matrices, normalized by the number of ionization events of that primary
+bin. Close to a threshold the excess energy is small, so part of both distributions falls
+below the lowest edge; again only what is on-grid is placed.
+
+In both cases the energy carried below the grid is real energy deposited in the
+atmosphere, but it is not resolved by the transport equation. The `residual` term of the
+energy budget written by [`make_energy_budget_file`](@ref) therefore contains it.
