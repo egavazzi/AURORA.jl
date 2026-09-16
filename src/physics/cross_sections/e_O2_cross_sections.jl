@@ -1,7 +1,7 @@
 using DataInterpolations: LinearInterpolation, PCHIPInterpolation, ExtrapolationType
 
 
-function e_O2elastic(Ep)
+function _e_O2elastic_sorted(Ep)
     s = [4.0725, 4.2883, 5.272, 5.8454, 7.1862, 8.8346, 9.7956, 10.861, 8.8346, 6.4813, 4.5155, 2.2608, 0.91126, 0.10422] .* 1e-20
     E = [0.05, 0.1, 0.6, 1, 2, 7, 10, 13.58, 30, 60, 100, 300, 1000, 1e4]
 
@@ -17,7 +17,9 @@ function e_O2elastic(Ep)
     return cross_section
 end
 
-function e_O2_OO3S(Ep)
+e_O2elastic(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2elastic_sorted, Ep)
+
+function _e_O2_OO3S_sorted(Ep)
     s = [0.15583, 1.2885, 2.185, 2.9369, 3.3692, 3.3338, 2.6989, 1.7689] .* 1e-22
     E = [15.647, 18.361, 30, 50, 80, 100, 200, 400]
 
@@ -33,7 +35,9 @@ function e_O2_OO3S(Ep)
     return cross_section
 end
 
-function e_O2_9p97(Ep)
+e_O2_OO3S(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2_OO3S_sorted, Ep)
+
+function _e_O2_9p97_sorted(Ep)
     s = [0.12616, 1.4321, 3.7052, 5.9598, 6.9829, 6.283, 3.5146, 2.185, 1.316] .* 1e-22
     E = [10.66, 20, 40, 60, 90, 100, 200, 400, 600]
 
@@ -49,7 +53,9 @@ function e_O2_9p97(Ep)
     return cross_section
 end
 
-function e_O2_8p4(Ep)
+e_O2_9p97(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2_9p97_sorted, Ep)
+
+function _e_O2_8p4_sorted(Ep)
     s = [0.68369, 9.5863, 97.91, 120.94, 120.94, 97.91, 44.339, 13.16] .* 1e-22
     E = [8.7992, 9, 10, 20, 50, 90, 120, 600]
 
@@ -65,7 +71,9 @@ function e_O2_8p4(Ep)
     return cross_section
 end
 
-function e_O2_6(Ep)
+e_O2_8p4(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2_8p4_sorted, Ep)
+
+function _e_O2_6_sorted(Ep)
     s = [59.598, 146.26, 235.27, 223.16, 200.79, 56.532, 45.767, 28.453, 19.66, 9.3859, 6.8369] .* 1e-23
     E = [6, 7, 8, 9, 10, 17.783, 20, 30, 40, 90, 100]
 
@@ -81,7 +89,9 @@ function e_O2_6(Ep)
     return cross_section
 end
 
-function e_O2_4p5(Ep)
+e_O2_6(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2_6_sorted, Ep)
+
+function _e_O2_4p5_sorted(Ep)
     s = [4.9802, 6.8369, 56.532, 95.863, 95.863, 69.829, 7.5986, 1.7319] .* 1e-23
     E = [4.9, 5, 6, 7, 8, 10, 20, 30]
 
@@ -97,7 +107,9 @@ function e_O2_4p5(Ep)
     return cross_section
 end
 
-function e_O2b1Sgp(Ep)
+e_O2_4p5(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2_4p5_sorted, Ep)
+
+function _e_O2b1Sgp_sorted(Ep)
     s = [1.9249, 2.6425, 9.3859, 15.916, 19.66, 19.66, 15.916, 9.0932, 5.535, 1.0213, 0.28755] .* 1e-23
     E = [1.9, 2, 3, 4, 5, 7, 10, 20, 30, 90, 120]
 
@@ -113,7 +125,9 @@ function e_O2b1Sgp(Ep)
     return cross_section
 end
 
-function e_O2a1Dg(Ep)
+e_O2b1Sgp(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2b1Sgp_sorted, Ep)
+
+function _e_O2a1Dg_sorted(Ep)
     s = [6.1516, 15.916, 37.052, 56.532, 73.616, 86.254, 89.031, 75.986, 33.338, 19.66, 5.535, 2.9369] .* 1e-23
     E = [1.4678, 2, 3, 4, 5, 6, 7, 9, 20, 30, 80, 100]
 
@@ -129,7 +143,9 @@ function e_O2a1Dg(Ep)
     return cross_section
 end
 
-function e_O2vib(Ep)
+e_O2a1Dg(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2a1Dg_sorted, Ep)
+
+function _e_O2vib_sorted(Ep)
     s = [1.9973, 17.464, 26.395, 23.806, 1.255, 2.5856, 11.555, 1.6247] .* 1e-22
     E = [0.24755, 0.44367, 0.6389, 0.73923, 1.4251, 6.1282, 9.086, 14.7]
 
@@ -145,7 +161,9 @@ function e_O2vib(Ep)
     return cross_section
 end
 
-function e_O2ionx2pg(Ep)
+e_O2vib(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2vib_sorted, Ep)
+
+function _e_O2ionx2pg_sorted(Ep)
     # e_O2ionX2Pg - electron ionisation cross section (m^2) to the
     # ground-state of O2+
     cross_section = similar(Ep)
@@ -161,7 +179,9 @@ function e_O2ionx2pg(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O2iona4pu(Ep)
+e_O2ionx2pg(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2ionx2pg_sorted, Ep)
+
+function _e_O2iona4pu_sorted(Ep)
     # e_O2iona4Pu - electron ionisation cross section (m^2) to the
     # first excited state of O2+
     # Ep electron energy (eV)
@@ -178,7 +198,9 @@ function e_O2iona4pu(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O2ion16p9(Ep)
+e_O2iona4pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2iona4pu_sorted, Ep)
+
+function _e_O2ion16p9_sorted(Ep)
     # e_O2ion16p9 - electron ionisation cross section (m^2) to the
     # excited states A2Pu, B2Sg-, 2Pu, c4Sg- of O2+
     # Ep electron energy (eV)
@@ -195,7 +217,9 @@ function e_O2ion16p9(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O2ionb4sgm(Ep)
+e_O2ion16p9(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2ion16p9_sorted, Ep)
+
+function _e_O2ionb4sgm_sorted(Ep)
     # e_O2ionb4sgm - electron ionisation cross section (m^2) to the
     # excited states O_2^+(b^4\Sigma_g^-)
     # Ep electron energy (eV)
@@ -212,7 +236,9 @@ function e_O2ionb4sgm(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O2dion(Ep)
+e_O2ionb4sgm(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2ionb4sgm_sorted, Ep)
+
+function _e_O2dion_sorted(Ep)
     # e_O2dion - dissociative ionization cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -228,7 +254,9 @@ function e_O2dion(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O2ddion(Ep)
+e_O2dion(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2dion_sorted, Ep)
+
+function _e_O2ddion_sorted(Ep)
     # e_O2ddion - dissociative-double ionization cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -243,3 +271,5 @@ function e_O2ddion(Ep)
     end
     return cross_section ./ 1e4
 end
+
+e_O2ddion(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2ddion_sorted, Ep)
