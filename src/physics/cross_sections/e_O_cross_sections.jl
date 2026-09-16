@@ -1,6 +1,6 @@
 using DataInterpolations: LinearInterpolation, PCHIPInterpolation, ExtrapolationType
 
-function e_Oelastic(Ep)
+function _e_Oelastic_sorted(Ep)
     # e_Oelastic - elastic electron collision cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -16,7 +16,9 @@ function e_Oelastic(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O1D(Ep)
+e_Oelastic(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oelastic_sorted, Ep)
+
+function _e_O1D_sorted(Ep)
     # e_O1D - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -34,7 +36,9 @@ function e_O1D(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O1S(Ep)
+e_O1D(Ep::AbstractVector) = evaluate_in_energy_order(_e_O1D_sorted, Ep)
+
+function _e_O1S_sorted(Ep)
     # e_O1S - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -50,7 +54,9 @@ function e_O1S(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O3s5S0(Ep)
+e_O1S(Ep::AbstractVector) = evaluate_in_energy_order(_e_O1S_sorted, Ep)
+
+function _e_O3s5S0_sorted(Ep)
     # e_O3s5S0 - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -66,7 +72,9 @@ function e_O3s5S0(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O3s3S0(Ep)
+e_O3s5S0(Ep::AbstractVector) = evaluate_in_energy_order(_e_O3s5S0_sorted, Ep)
+
+function _e_O3s3S0_sorted(Ep)
     # e_O3s3S0 - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     s = [4, 9.83, 10.67, 11.17, 8.67, 7.9, 6.33, 5.67, 4.27] .* 1e-22
@@ -84,7 +92,9 @@ function e_O3s3S0(Ep)
     return cross_section
 end
 
-function e_O3p5P(Ep)
+e_O3s3S0(Ep::AbstractVector) = evaluate_in_energy_order(_e_O3s3S0_sorted, Ep)
+
+function _e_O3p5P_sorted(Ep)
     # e_O3p5P - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
@@ -102,7 +112,9 @@ function e_O3p5P(Ep)
     return cross_section ./ 1e4
 end
 
-function e_O3sp3D0(Ep)
+e_O3p5P(Ep::AbstractVector) = evaluate_in_energy_order(_e_O3p5P_sorted, Ep)
+
+function _e_O3sp3D0_sorted(Ep)
     # e_O3sp3D0 - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     s = [3, 5.5, 5, 5.8, 4.5, 4, 2.5] .* 1e-22
@@ -120,7 +132,9 @@ function e_O3sp3D0(Ep)
     return cross_section
 end
 
-function e_O3p3P(Ep)
+e_O3sp3D0(Ep::AbstractVector) = evaluate_in_energy_order(_e_O3sp3D0_sorted, Ep)
+
+function _e_O3p3P_sorted(Ep)
     # e_O3p3P - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     s = [5.1, 7.8, 4, 2.9, 1.1] .* 1e-22
@@ -130,7 +144,7 @@ function e_O3p3P(Ep)
     cross_section = exp.(cross_section)
 
     if any(Ep .> 60)
-        cross_section = [cross_section; e_O3p3P([59.9]) .* 60 ./ log(60) .* log.(Ep[Ep .> 60]) ./ Ep[Ep .> 60]]
+        cross_section = [cross_section; _e_O3p3P_sorted([59.9]) .* 60 ./ log(60) .* log.(Ep[Ep .> 60]) ./ Ep[Ep .> 60]]
     end
 
     cross_section[.!isfinite.(cross_section)] .= 0
@@ -139,7 +153,9 @@ function e_O3p3P(Ep)
     return cross_section
 end
 
-function e_Oion4S0(Ep)
+e_O3p3P(Ep::AbstractVector) = evaluate_in_energy_order(_e_O3p3P_sorted, Ep)
+
+function _e_Oion4S0_sorted(Ep)
     # e_Oion4S0 - O electron ionization cross section to O^+(4S_0) (m^2)
     # Ep - electron energy (eV)
     # Data source: Tima Sergienko, private communication
@@ -158,7 +174,9 @@ function e_Oion4S0(Ep)
     return cross_section ./ 1e4
 end
 
-function e_Oion2D0(Ep)
+e_Oion4S0(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oion4S0_sorted, Ep)
+
+function _e_Oion2D0_sorted(Ep)
     # e_Oion2D0 - O electron ionization cross section to O^+(2P_0) (m^2)
     # Ep - electron energy (eV)
     # Data source: Tima Sergienko, private communication
@@ -177,7 +195,9 @@ function e_Oion2D0(Ep)
     return cross_section ./ 1e4
 end
 
-function e_Oion2P0(Ep)
+e_Oion2D0(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oion2D0_sorted, Ep)
+
+function _e_Oion2P0_sorted(Ep)
     # e_Oion2P0 - O electron ionization cross section to O^+(2P_0) (m^2)
     # Ep - electron energy (eV)
     # Data source: Tima Sergienko, private communication
@@ -196,7 +216,9 @@ function e_Oion2P0(Ep)
     return cross_section ./ 1e4
 end
 
-function e_Oionion(Ep)
+e_Oion2P0(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oion2P0_sorted, Ep)
+
+function _e_Oionion_sorted(Ep)
     # e_Oionion - O electron double ionization cross section (m^2)
     # Ep - electron energy (eV)
     # Source of data: Tima Sergienko, private communication
@@ -214,3 +236,5 @@ function e_Oionion(Ep)
 
     return cross_section ./ 1e4
 end
+
+e_Oionion(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oionion_sorted, Ep)
