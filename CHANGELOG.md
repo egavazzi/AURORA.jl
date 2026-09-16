@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition over lower bins; electrons degraded below the lowest grid edge thermalise instead of being pushed into the first bin
 - **Numerical Breaking (small)** Ionizing collisions near a threshold no longer delete the electron, and both cascading spectra are normalized by the row's ionization event count, so outgoing electrons below the lowest energy bin thermalise (energy-budget residual) instead of being redistributed on-grid
 - **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
