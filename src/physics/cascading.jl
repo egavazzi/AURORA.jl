@@ -18,6 +18,8 @@ struct CascadingSpec{F}
              (length $(length(thresholds)))"))
         all(n -> 1 <= n <= 2, n_secondaries) || throw(ArgumentError(
             "n_secondaries entries must be 1 (single) or 2 (double ionization); got $(collect(n_secondaries))"))
+        allunique(thresholds) || throw(ArgumentError(
+            "ionization thresholds must be distinct; got $(collect(thresholds))"))
         return new{typeof(law)}(String(name), collect(Float64, thresholds),
                                 collect(Int, n_secondaries), law)
     end
@@ -823,21 +825,36 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
 end
 
 
+# Index of the transfer matrix for exactly `E_ionization_threshold`.
+function threshold_index(cache::SpeciesCascadingCache, E_ionization_threshold)
+    i_threshold = findfirst(==(E_ionization_threshold), cache.ionization_thresholds)
+    isnothing(i_threshold) && throw(ArgumentError(
+        "no cascading matrix for ionization threshold $(E_ionization_threshold) eV in \
+         $(cache.spec.name); available thresholds are $(cache.ionization_thresholds)"))
+    return i_threshold
+end
+
+# Bin index holding `E_primary_energy`, clamped to the grid.
+function primary_bin_index(cache::SpeciesCascadingCache, E_primary_energy)
+    i_primary = searchsortedlast(cache.E_edges, E_primary_energy)
+    return clamp(i_primary, 1, size(cache.primary_transfer_matrix, 1))
+end
+
+
 # Load the secondary electron distribution, for a given initial primary energy index
 # and ionization threshold.
 function secondary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                             E_ionization_threshold)
 
-    i_threshold = findmin(x -> abs(x - E_ionization_threshold), cache.ionization_thresholds)[2]
+    i_threshold = threshold_index(cache, E_ionization_threshold)
     return @view(cache.secondary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 function secondary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
                             E_ionization_threshold)
 
-    i_primary = searchsortedlast(cache.E_edges, E_primary_energy) - 1
-    i_primary = clamp(i_primary, 1, size(cache.secondary_transfer_matrix, 1))
-    return secondary_spectrum(cache, i_primary, E_ionization_threshold)
+    return secondary_spectrum(cache, primary_bin_index(cache, E_primary_energy),
+                              E_ionization_threshold)
 end
 
 
@@ -846,14 +863,13 @@ end
 function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
                           E_ionization_threshold)
 
-    i_threshold = findmin(x -> abs(x - E_ionization_threshold), cache.ionization_thresholds)[2]
+    i_threshold = threshold_index(cache, E_ionization_threshold)
     return @view(cache.primary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
                           E_ionization_threshold)
 
-    i_primary = searchsortedlast(cache.E_edges, E_primary_energy) - 1
-    i_primary = clamp(i_primary, 1, size(cache.primary_transfer_matrix, 1))
-    return primary_spectrum(cache, i_primary, E_ionization_threshold)
+    return primary_spectrum(cache, primary_bin_index(cache, E_primary_energy),
+                            E_ionization_threshold)
 end

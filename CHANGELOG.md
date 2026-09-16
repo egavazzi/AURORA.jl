@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- A cascading cache file is reused only when its thresholds, secondary counts and secondary law match, and matrices are selected by exact threshold; older cache files are recomputed
+- The energy-argument `primary_spectrum` and `secondary_spectrum` accessors of a cascading cache select the bin that contains the given energy (they selected the bin below it)
 - Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.

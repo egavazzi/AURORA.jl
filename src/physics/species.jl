@@ -108,6 +108,36 @@ function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
     return species[found_index]
 end
 
+"""
+    validate_ionization_channels(sp::NeutralSpecies)
+
+Throw an `ArgumentError` unless every ionizing row of `sp.excitation_levels` (energy loss,
+secondary count) matches a threshold and secondary count of `sp.cascading_spec` exactly.
+"""
+function validate_ionization_channels(sp::NeutralSpecies)
+    spec = sp.cascading_spec
+    E_levels = sp.excitation_levels
+    for i_level in axes(E_levels, 1)
+        n_secondary = E_levels[i_level, 2]
+        (isinteger(n_secondary) && 0 <= n_secondary <= 2) || throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) produces $(n_secondary) secondary \
+             electrons; the second column of the levels data must be 0, 1 or 2"))
+        n_secondary > 0 || continue
+
+        threshold = E_levels[i_level, 1]
+        i_threshold = findfirst(==(threshold), spec.ionization_thresholds)
+        isnothing(i_threshold) && throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) ionizes at $(threshold) eV, which is not \
+             one of the cascading thresholds $(spec.ionization_thresholds)"))
+        spec.n_secondaries[i_threshold] == n_secondary || throw(ArgumentError(
+            "$(sp.name) excitation level $(i_level) produces $(Int(n_secondary)) secondary \
+             electrons at $(threshold) eV, while its cascading spec produces \
+             $(spec.n_secondaries[i_threshold])"))
+    end
+    return nothing
+end
+
+
 # Per-species variant of load_excitation_threshold (which loads all three species).
 function load_excitation_threshold_for(species_name::AbstractString)
     file = pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.dat")
