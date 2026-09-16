@@ -89,30 +89,25 @@ end
     @test_throws ArgumentError PitchAngleGrid(0:10:180)
 end
 
-@testitem "Warn when energy bins are wider than ionization thresholds" begin
-    Warn = Base.CoreLogging.Warn
-
+@testitem "Error when energy bins are wider than ionization thresholds" begin
     # N2-like species: row 1 is elastic, one excitation channel (no secondaries),
     # ionization channels have a secondary count > 0 in column 2
     E_levels_N2 = [0.0 0.0; 6.17 0.0; 15.581 1.0; 42.0 2.0]
     species = [(; name = :N2, excitation_levels = E_levels_N2)]
 
-    # The default grid saturates below all default ionization thresholds → no warning
+    # The default grid saturates below all default ionization thresholds → no error
     fine_grid = EnergyGrid(7000)
     @test maximum(fine_grid.ΔE) < 15.581
-    @test_logs min_level = Warn AURORA.warn_if_bins_wider_than_ionization_threshold(
-        fine_grid, species)
+    AURORA.check_bins_narrower_than_ionization_threshold(fine_grid, species)
 
-    # A coarse grid with bins wider than the threshold → one warning listing all
-    # offending species with their thresholds
+    # A coarse grid with bins wider than the threshold → throws, listing all offending
+    # species with their thresholds
     coarse_grid = (; ΔE = [10.0, 50.0, 243.0])
     species_two = [species[1], (; name = :O2, excitation_levels = [0.0 0.0; 12.072 1.0])]
-    @test_logs (:warn, r"ionization threshold of N2 \(15.58 eV\), O2 \(12.07 eV\)") begin
-        AURORA.warn_if_bins_wider_than_ionization_threshold(coarse_grid, species_two)
-    end
+    @test_throws "ionization threshold of N2 (15.58 eV), O2 (12.07 eV)" AURORA.check_bins_narrower_than_ionization_threshold(
+        coarse_grid, species_two)
 
-    # A wide excitation channel alone (no ionization) must not warn
+    # A wide excitation channel alone (no ionization) must not throw
     species_no_ion = [(; name = :X, excitation_levels = [0.0 0.0; 6.17 0.0])]
-    @test_logs min_level = Warn AURORA.warn_if_bins_wider_than_ionization_threshold(
-        coarse_grid, species_no_ion)
+    AURORA.check_bins_narrower_than_ionization_threshold(coarse_grid, species_no_ion)
 end
