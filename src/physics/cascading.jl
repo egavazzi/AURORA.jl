@@ -794,7 +794,8 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
         # entry would be counted in the normalization of `compute_ionization_spectra!` but
         # never deposited by `add_ionization_collisions!`.
         # The clamp W reaches the diagonal only when a bin is wider than the ionization
-        # threshold, and `warn_if_bins_wider_than_ionization_threshold` warns on such grids.
+        # threshold, and `check_bins_narrower_than_ionization_threshold` rejects such grids
+        # at `initialize!`.
         i_min_degraded = max(1, searchsortedlast(E_left, W / 3))
         i_max_degraded = min(i_primary - 1, searchsortedlast(E_left, W))
         for i_degraded in i_min_degraded:i_max_degraded

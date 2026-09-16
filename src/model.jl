@@ -147,17 +147,22 @@ function initialize!(model::AuroraModel;
         end
         validate_ionization_channels(sp)
         sp.phase_fcn         = sp.phase_fcn_generator(θ, eg.E_centers)
+    end
+    # Before the cascading matrices: they are expensive, and would be cached for a grid that
+    # is then refused.
+    check_bins_narrower_than_ionization_threshold(eg, model.species)
+    for sp in model.species
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)
     end
-    warn_if_bins_wider_than_ionization_threshold(eg, model.species)
     model.initialized = true
     return nothing
 end
 
 """
-    warn_if_bins_wider_than_ionization_threshold(energy_grid, species)
+    check_bins_narrower_than_ionization_threshold(energy_grid, species)
 
-Warn if any energy bin is wider than the smallest ionization threshold of any species.
+Throw an `ArgumentError` if any energy bin is wider than the smallest ionization
+threshold of any species.
 
 The ionization bookkeeping is split between two code paths that are only consistent as
 long as every ionizing collision moves the primary electron out of its energy bin:
@@ -172,8 +177,9 @@ The default grid from `make_energy_grid` saturates at ΔE ≈ 11.65 eV, below th
 ionization thresholds of N2, O2 and O, so this only triggers for custom coarse grids or
 custom species with low ionization thresholds.
 """
-function warn_if_bins_wider_than_ionization_threshold(energy_grid, species)
-    ΔE_max = maximum(energy_grid.ΔE)
+function check_bins_narrower_than_ionization_threshold(energy_grid, species)
+    i_widest = argmax(energy_grid.ΔE)
+    ΔE_max = energy_grid.ΔE[i_widest]
     offenders = String[]
     for sp in species
         E_levels = sp.excitation_levels
@@ -186,11 +192,13 @@ function warn_if_bins_wider_than_ionization_threshold(energy_grid, species)
         end
     end
     if !isempty(offenders)
-        @warn "The widest energy bin (ΔE = $(round(ΔE_max; digits = 2)) eV) is wider " *
-              "than the lowest ionization threshold of " * join(offenders, ", ") * ". " *
-              "Ionizing collisions in bins wider than the threshold over-count primary " *
-              "and secondary electrons (see " *
-              "`warn_if_bins_wider_than_ionization_threshold`). Use a finer energy grid."
+        throw(ArgumentError(
+            "The widest energy bin (bin $(i_widest), ΔE = $(round(ΔE_max; digits = 2)) eV) " *
+            "is wider than the lowest ionization threshold of " * join(offenders, ", ") *
+            ". Ionizing collisions in bins wider than the threshold over-count primary " *
+            "and secondary electrons. Use an energy grid whose bins all stay narrower " *
+            "than every ionization threshold."
+        ))
     end
     return nothing
 end
