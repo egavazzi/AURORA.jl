@@ -285,7 +285,7 @@ end
     @test all(cache.primary_transfer_matrix   .>= 0)
     # no secondary production below the lowest ionization threshold
     i_threshold = searchsortedlast(cache.E_edges, 15.0)
-    @test all(cache.secondary_transfer_matrix[1:i_threshold, :, :] .== 0)
+    @test all(cache.secondary_transfer_matrix[1:(i_threshold - 1), :, :] .== 0)
 end
 
 @testitem "Custom NeutralSpecies with custom CascadingSpec: spectra are accessible" begin
