@@ -333,24 +333,24 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            sum_secondary = sum(secondary_e_spectra)    # for normalization
-            sum_primary = sum(primary_e_spectra)        # for normalization
-            if sum_secondary > 0
-                # Here we normalize the secondary spectrum by `sum_primary` for the following
-                # reason: The secondary law peaks at E_s→0, so the part below the ~2 eV grid
-                # floor is missing from the binned matrix. Dividing by sum_secondary would
-                # smear that missing low-energy mass onto the surviving higher-energy bins,
-                # inflating ⟨E_s⟩ and breaking energy conservation (degraded+secondary > E_p-I).
-                # Using sum_primary is like using the "true" total sum_secondary as if they
-                # were all on-grid, preserving energy conservation.
-                secondary_scale = σ_level * n_secondary / sum_primary
-                secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
+            # Both spectra are normalized by the number of ionization events of the row,
+            # not by an on-grid sum of one of them. The secondary law peaks at E_s → 0, and
+            # the degraded primary reaches down to (E_p − E_loss)/2 for single ionization
+            # and (E_p − E_loss)/3 for double ionization, so close to threshold part of both
+            # lands below the lowest grid edge and is absent from the binned matrices.
+            # Dividing by an on-grid sum would move that mass back onto the surviving bins
+            # and create energy; dividing by the event count places only what is on-grid and
+            # leaves the rest out of the suprathermal population, where it shows up in the
+            # energy-budget residual as sub-floor thermalisation.
+            events = event_count(species_cascading, iE, E_loss)
+            if events <= 0
+                σ_level > 0 && throw(ArgumentError(
+                    "ionizing channel at $(E_loss) eV has cross section $(σ_level) m² in \
+                     energy bin $(iE) but no ionization events in its cascading matrices"))
+                continue
             end
-            if sum_primary > 0
-                # scale by cross-section and spectra normalization
-                primary_scale = σ_level / sum_primary
-                primary_e_spectrum .+= primary_e_spectra .* primary_scale
-            end
+            secondary_e_spectrum .+= secondary_e_spectra .* (σ_level * n_secondary / events)
+            primary_e_spectrum .+= primary_e_spectra .* (σ_level / events)
         end
     end
 end
