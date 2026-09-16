@@ -60,7 +60,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
                 min_ionization_E = min(min_ionization_E, E_levels[i_level, 1])
             end
         end
-        if min_ionization_E < E_edges[iE]
+        if min_ionization_E <= E_edges[iE]
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
                                      n, Ie, z, μ_center, Ω_beam, iE, workspace)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
@@ -326,6 +326,9 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
             E_loss = E_levels[i_level, 1]
+            # The bin holding the threshold has no cascading row (see the TODO in
+            # `calculate_cascading_matrices`).
+            species_cascading.E_edges[iE] >= E_loss || continue
             # Number of secondary electrons ejected (1 = single, 2 = double ionization)
             n_secondary = E_levels[i_level, 2]
             σ_level = σ[i_level, iE]
@@ -333,24 +336,18 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            sum_secondary = sum(secondary_e_spectra)    # for normalization
-            sum_primary = sum(primary_e_spectra)        # for normalization
-            if sum_secondary > 0
-                # Here we normalize the secondary spectrum by `sum_primary` for the following
-                # reason: The secondary law peaks at E_s→0, so the part below the ~2 eV grid
-                # floor is missing from the binned matrix. Dividing by sum_secondary would
-                # smear that missing low-energy mass onto the surviving higher-energy bins,
-                # inflating ⟨E_s⟩ and breaking energy conservation (degraded+secondary > E_p-I).
-                # Using sum_primary is like using the "true" total sum_secondary as if they
-                # were all on-grid, preserving energy conservation.
-                secondary_scale = σ_level * n_secondary / sum_primary
-                secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
+            # Normalize by the row's ionization event count, not an on-grid sum: the part
+            # of either spectrum below the lowest grid edge is left out (thermalised)
+            # instead of being moved back onto the grid.
+            events = event_count(species_cascading, iE, E_loss)
+            if events <= 0
+                σ_level > 0 && throw(ArgumentError(
+                    "ionizing channel at $(E_loss) eV has cross section $(σ_level) m² in \
+                     energy bin $(iE) but no ionization events in its cascading matrices"))
+                continue
             end
-            if sum_primary > 0
-                # scale by cross-section and spectra normalization
-                primary_scale = σ_level / sum_primary
-                primary_e_spectrum .+= primary_e_spectra .* primary_scale
-            end
+            secondary_e_spectrum .+= secondary_e_spectra .* (σ_level * n_secondary / events)
+            primary_e_spectrum .+= primary_e_spectra .* (σ_level / events)
         end
     end
 end
