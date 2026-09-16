@@ -8,7 +8,23 @@ in the upper atmosphere: **N₂**, **O₂**, and **atomic O**. For each species,
 inelastic (excitation of rotational, vibrational, electronic states and ionization) 
 cross-sections are included. 
 
-These data are loaded internally when an [`AuroraModel`](@ref) is constructed.
+Each species carries its inelastic collisions as a vector of [`CollisionChannel`](@ref)s —
+a name, a cross-section function σ(E) in m², the energy loss in eV, the number of secondary
+electrons ejected (0, 1 or 2), and a free-form `source` string recording where the data come
+from. Its elastic cross section and its secondary-electron energy distribution sit alongside,
+in the `elastic_cross_section` and `secondary_law` fields of [`NeutralSpecies`](@ref).
+
+At `initialize!(model)` the channel table is evaluated on the model energy grid into the
+`cross_sections` matrix `[n_levels × n_E]` and the `excitation_levels` matrix
+`[n_levels × 2]`, and the ionizing channels define the cascading thresholds. Row 1 of both
+matrices is the elastic channel and row `i + 1` is `channels[i]`, so the rows cannot fall out
+of step and the cascading thresholds cannot disagree with the energy losses charged to the
+primary electron.
+
+The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and
+`channels_O.jl`, and are returned by [`default_channels`](@ref),
+[`default_elastic_cross_section`](@ref) and [`default_secondary_law`](@ref). A run writes its
+tables to `inputs/collision_channels.toml` for inspection.
 
 ## Data sources
 

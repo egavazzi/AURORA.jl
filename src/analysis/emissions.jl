@@ -6,11 +6,37 @@ using NCDatasets: NCDataset, defDim, defVar
 # ======================================================================================== #
 
 """
+    ion_production_cross_section(model, species_name::Symbol, E_centers) → Vector
+
+Cross section for producing one ion pair by electron impact on `species_name` of `model`:
+each collision channel's cross section weighted by the number of secondary electrons it
+ejects, summed over the channels. Unit m².
+"""
+function ion_production_cross_section(model, species_name::Symbol, E_centers::AbstractVector)
+    i_species = findfirst(sp -> sp.name === species_name, model.species)
+    isnothing(i_species) && throw(ArgumentError(
+        "The simulation has no species named $(species_name), so its ionization rate cannot \
+         be computed. Its species are \
+         $(join((String(sp.name) for sp in model.species), ", ")). Volume excitation rates \
+         are only defined for a model containing N2, O2 and O."))
+    sp = model.species[i_species]
+    size(sp.cross_sections, 2) == length(E_centers) || throw(ArgumentError(
+        "The $(species_name) cross sections of the saved model cover \
+         $(size(sp.cross_sections, 2)) energy bins, but the results have \
+         $(length(E_centers)); the saved model does not belong to these results."))
+    return sp.cross_sections' * sp.excitation_levels[:, 2]
+end
+
+
+"""
     make_volume_excitation_file(directory_to_process)
 
-Read `simulation_data.nc` and `inputs/atmosphere.nc` from `directory_to_process`,
-compute volume-excitation-rates for all tracked optical emissions and ionizations,
-and write results to `analysis/volume_excitation.nc`.
+Read `simulation_data.nc`, `inputs/atmosphere.nc` and `inputs/physics_state.jld2` from
+`directory_to_process`, compute volume-excitation-rates for all tracked optical emissions and
+ionizations, and write results to `analysis/volume_excitation.nc`.
+
+The ionization rates use the collision channels of the saved model, so they follow an edited
+channel table.
 
 Returns a [`VolumeExcitationResult`](@ref).
 
@@ -40,12 +66,11 @@ function make_volume_excitation_file(directory_to_process; max_bytes::Real = 512
     σ_O1D     = excitation_O1D(E_centers)
     σ_O1S     = excitation_O1S(E_centers)
 
-    ## Load ionization cross-sections
-    σ_N2, σ_O2, σ_O = load_cross_sections(E_centers)
-    N2_levels, O2_levels, O_levels = load_excitation_threshold()
-    σ_Oi  = σ_O'  * O_levels[:, 2]  # equivalent to sum(σ_for_each_reaction * N_ionizations_per_reaction)
-    σ_O2i = σ_O2' * O2_levels[:, 2]
-    σ_N2i = σ_N2' * N2_levels[:, 2]
+    ## Ion-production cross-sections, from the collision channels this run actually used
+    model = load_model(directory_to_process)
+    σ_N2i = ion_production_cross_section(model, :N2, E_centers)
+    σ_O2i = ion_production_cross_section(model, :O2, E_centers)
+    σ_Oi  = ion_production_cross_section(model, :O,  E_centers)
 
     ## Allocate volume-excitation-rate arrays [n_z, n_t]
     n_z = length(z)

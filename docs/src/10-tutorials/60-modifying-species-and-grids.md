@@ -196,21 +196,42 @@ is the cached route that reuses the package's own file storage.
 
 ## Overriding cross-sections, phase functions, or cascading
 
-The same interception window lets you replace other per-species physics before `initialize!`.
-Set the *generator* (re-evaluated on every `initialize!`, so it tracks grid changes) rather than
-the materialized array where possible:
+A species describes its collision physics with three fields: an `elastic_cross_section`, a
+vector of [`CollisionChannel`](@ref)s, and a `secondary_law`. Everything the solvers read —
+the `cross_sections` and `excitation_levels` matrices and the cascading spec — is derived
+from those at `initialize!`, so editing the channel table is enough.
 
 ```julia
 # Phase-function generator: (θ, E) -> (elastic, inelastic) matrices.
 # Can be a named function, functor, or @law, but not an anonymous function.
 model.species[:N2].phase_fcn_generator = my_custom_phase_function
 
-# Cascading: ionization thresholds + a secondary-electron distribution law f(E_s, E_p)
-law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
-model.species[:O2].cascading_spec = AURORA.CascadingSpec("O2", [12.07, 16.1], law)
+# Add a channel: name, cross section σ(E) in m², energy loss in eV, secondaries ejected.
+# `source` is free text; write down where the numbers actually came from.
+push!(model.species[:N2].channels,
+      CollisionChannel("mystate", my_sigma, 9.0, 0;
+                       source = "own digitization of fig. 3; see lab notebook"))
 
-# Cross-sections can be pre-populated directly for a non-standard species (see below)
+# Change one field of an existing channel
+i = findfirst(c -> c.name == "a3sup", model.species[:N2].channels)
+model.species[:N2].channels[i] =
+    CollisionChannel(model.species[:N2].channels[i]; energy_loss = 6.2)
+
+# Drop channels
+filter!(c -> c.name != "ddion", model.species[:N2].channels)
+
+# Secondary-electron distribution f(E_s, E_p) of the ionizing channels. The ionization
+# thresholds are read off the channel table, so only the law itself is set here.
+model.species[:O2].secondary_law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
 ```
+
+The channel order is the row order of `cross_sections` and `excitation_levels` (row 1 is
+elastic, row `i + 1` is `channels[i]`), so the two matrices can never fall out of step. Look
+up a channel by name with [`AURORA.channel`](@ref), list them with
+[`channel_names`](@ref), and keep the ionizing ones with [`ionizing_channels`](@ref).
+
+A species edited after `initialize!(model)` needs an explicit `initialize!(model)` to rebuild
+the derived data; editing before the first `run!` needs nothing.
 
 ## Adding, removing, or replacing species
 
@@ -226,28 +247,48 @@ model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
                     species = (O2Species(neutrals), OSpecies(neutrals)))
 ```
 
-A completely custom species needs its cascading law and a phase-function generator. Because the
-built-in cross-section library only knows N₂/O₂/O, pre-populate the cross-sections and
-excitation levels for a new gas in the interception window:
+A completely custom species is built from its own channel table, elastic cross section,
+secondary-electron law and phase-function generator. Each cross section is a callable mapping
+a vector of energies (eV) to m²:
 
 ```julia
-law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
-spec = AURORA.CascadingSpec("Ar", [15.76, 27.63], law)
+# Everything below is invented for the sake of the example
+σ_ar_elastic = @law E -> 1e-20 .* exp.(-E ./ 500)
+σ_ar_4s      = @law E -> 1e-21 .* (E .> 11.55)
+σ_ar_ion     = @law E -> 2e-21 .* (E .> 15.76)
+
 argon = NeutralSpecies(:Ar, neutrals[:Ar];
-                       cascading_spec = spec, phase_fcn_generator = phase_fcn_N2)
+                       elastic_cross_section = σ_ar_elastic,
+                       channels = [CollisionChannel("4s", σ_ar_4s, 11.55, 0),
+                                   CollisionChannel("ion", σ_ar_ion, 15.76, 1;
+                                                    source = "invented")],
+                       secondary_law = @law((E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)),
+                       phase_fcn_generator = phase_fcn_N2)
 
 model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
                     species = (N2Species(neutrals), O2Species(neutrals),
                                OSpecies(neutrals), argon))
 
-model.species[:Ar].cross_sections    = my_sigma_matrix   # [n_levels × n_E]
-model.species[:Ar].excitation_levels = my_levels_matrix  # [n_levels × 2]
-
 run!(AuroraSimulation(model, flux, savedir; mode))
 ```
 
+The built-in tables for N₂, O₂ and O are available as
+[`default_channels`](@ref), [`default_elastic_cross_section`](@ref) and
+[`default_secondary_law`](@ref), which is the easiest way to build a variant of one of them:
+
+```julia
+# N₂ without dissociative double ionization
+channels = filter(c -> c.name != "ddion", default_channels(:N2))
+n2_variant = NeutralSpecies(:N2variant, neutrals[:N2];
+                            elastic_cross_section = default_elastic_cross_section(:N2),
+                            channels,
+                            secondary_law = default_secondary_law(:N2),
+                            phase_fcn_generator = phase_fcn_N2)
+```
+
 !!! tip
-    Laws (density profiles, phase-function generators, cascading laws) must be reproducible so
+    Laws (density profiles, cross sections, phase-function generators, secondary-electron
+    laws) must be reproducible so
     the model can be saved and reloaded. Use [`@law`](@ref) for closed-form laws, a functor
     `struct` when the law carries parameters, or a named function. **Bare anonymous functions
     are rejected**. The chosen law will be stored in `inputs/physics_state.jld2` and possible

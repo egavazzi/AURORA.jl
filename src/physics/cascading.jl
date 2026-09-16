@@ -23,6 +23,35 @@ struct CascadingSpec{F}
     end
 end
 
+"""
+    CascadingSpec(name, secondary_law; channels)
+
+Derive the cascading spec of a species from its collision channels: the ionization
+thresholds are the distinct energy losses of the ionizing channels, in order of first
+appearance, each with the number of secondary electrons that channel ejects.
+
+Throws an `ArgumentError` when two channels ionize at the same energy loss but eject
+different numbers of secondary electrons, since one threshold cannot describe both.
+"""
+function CascadingSpec(name::AbstractString, secondary_law; channels)
+    thresholds = Float64[]
+    n_secondaries = Int[]
+    for c in channels
+        c.n_secondaries > 0 || continue
+        i = findfirst(==(c.energy_loss), thresholds)
+        if isnothing(i)
+            push!(thresholds, c.energy_loss)
+            push!(n_secondaries, c.n_secondaries)
+        elseif n_secondaries[i] != c.n_secondaries
+            throw(ArgumentError(
+                "$(name) has two ionizing channels at $(c.energy_loss) eV ejecting \
+                 $(n_secondaries[i]) and $(c.n_secondaries) secondary electrons; channels \
+                 sharing an energy loss must eject the same number of secondaries"))
+        end
+    end
+    return CascadingSpec(name, thresholds, secondary_law; n_secondaries)
+end
+
 # Secondary-electron distribution for atomic O. It needs external parameters (A and B) so we
 # cannot just wrap it in @law. Instead we build a custom callable struct that contains the
 # parameters in its fields.
@@ -46,31 +75,6 @@ function interp_flat(x::AbstractVector, y::AbstractVector, xq)
     t = (xq - x[i]) / (x[i + 1] - x[i])
     return y[i] + t * (y[i + 1] - y[i])
 end
-
-function DefaultCascadingSpecN2()
-    ionization_thresholds = [15.581, 16.73, 18.75, 24.0, 42.0]
-    n_secondaries         = [1, 1, 1, 1, 2]
-    law = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-    return CascadingSpec("N2", ionization_thresholds, law; n_secondaries)
-end
-
-function DefaultCascadingSpecO2()
-    ionization_thresholds = [12.072, 16.1, 16.9, 18.2, 18.9, 32.51]
-    n_secondaries         = [1, 1, 1, 1, 1, 2]
-    law = @law (E_s, E_p) -> 1.0 / (15.2^2 + E_s^2)
-    return CascadingSpec("O2", ionization_thresholds, law; n_secondaries)
-end
-
-function DefaultCascadingSpecO()
-    ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
-    n_secondaries         = [1, 1, 1, 2]
-    energy_params = [100.0, 200, 500, 1000, 2000]  # eV
-    A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
-    B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
-    law = OSecondaryLaw(energy_params, A_params, B_params)
-    return CascadingSpec("O", ionization_thresholds, law; n_secondaries)
-end
-
 
 # ======================================================================================== #
 #                      CASCADING CACHE — Per-species in-memory cache                       #

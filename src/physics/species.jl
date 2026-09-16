@@ -3,94 +3,124 @@
 # ======================================================================================== #
 
 """
-    NeutralSpecies{S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+    NeutralSpecies
 
 All per-species data needed to advance the transport equation through one neutral species.
 
+The collision physics is described by `elastic_cross_section`, `channels` and
+`secondary_law`. Everything the solvers read — `cross_sections`, `excitation_levels`,
+`cascading_spec` and `cascading_data` — is derived from those three at `initialize!(model)`,
+so a channel added, removed or edited before that call is reflected everywhere at once.
+
 # Fields
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
-- `density_source`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
+- `density_source`: callable `h_atm (m) → density (m⁻³)` that (re)samples `density`.
     Can be a [`DensityProfile`](@ref) or any callable.
     Untyped so it can be replaced freely before calling `initialize!(model)`.
 - `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³).
     Empty until `initialize!(model)` is called.
-- `cross_sections::Matrix{Float64}`: collision cross sections, shape `[n_levels × n_E]` (m²).
-    Auto-loaded from the built-in library when empty; pre-populate before `initialize!(model)`
-    to supply custom data for a non-standard species.
-    Empty until `initialize!(model)` is called.
-- `excitation_levels::Matrix{Float64}`: excitation thresholds and secondary counts,
-    shape `[n_levels × 2]`. First column = threshold energy (eV), second column = number
-    of secondaries produced (non-zero only for ionizing channels).
-    Auto-loaded from the built-in library when empty; pre-populate before `initialize!(model)`
-    to supply custom data for a non-standard species.
-    Empty until `initialize!(model)` is called.
-- `phase_fcn_generator`: callable `(θ, E) -> (phaseE, phaseI)` used to (re)build
+- `elastic_cross_section`: callable mapping energies (eV) to the elastic cross section (m²).
+- `channels::Vector{CollisionChannel}`: the inelastic collision channels, in the row order
+    of `cross_sections` and `excitation_levels`.
+- `secondary_law`: callable `(E_secondary, E_primary) -> Float64` giving the
+    secondary-electron energy distribution of the ionizing channels.
+- `phase_fcn_generator`: callable `(θ, E) -> (phaseE, phaseI)` that (re)builds
     `phase_fcn` whenever the pitch-angle or energy grid changes.
     Untyped so it can be replaced freely before calling `initialize!(model)`.
-- `phase_fcn::P`: tuple `(phaseE, phaseI)` of `[n_θ × n_E]` matrices materialized from the
+- `phase_fcn`: tuple `(phaseE, phaseI)` of `[n_θ × n_E]` matrices materialized from the
     generator on the model's scattering θ grid and energy centers.
     Holds 0×0 placeholder matrices until `initialize!(model)` is called.
-- `cascading_spec::S`: ionization thresholds and secondary-distribution law used to
-    build the cascading transfer matrices
-- `cascading_data::C`: cascading transfer matrices (populated lazily by
-    `load_or_compute_cascading!`)
+- `cross_sections::Matrix{Float64}`: cross sections evaluated on the model energy grid,
+    shape `[n_levels × n_E]` (m²). Row 1 is elastic, row `i + 1` is `channels[i]`.
+    Empty until `initialize!(model)` is called.
+- `excitation_levels::Matrix{Float64}`: energy losses and secondary counts, shape
+    `[n_levels × 2]`, in the same row order as `cross_sections`.
+    Empty until `initialize!(model)` is called.
+- `cascading_spec::CascadingSpec`: ionization thresholds and secondary-distribution law the
+    cascading transfer matrices are built from.
+- `cascading_data::SpeciesCascadingCache`: cascading transfer matrices, filled in by
+    `load_or_compute_cascading!`
+
+!!! note "Mutation happens before `initialize!`"
+    Assigning `channels`, `elastic_cross_section`, `secondary_law` or `density_source` does
+    not mark the model uninitialized, because a species does not know which model holds it.
+    Edit a species of an already-initialized model, then call `initialize!(model)` explicitly
+    to rebuild the derived data.
 """
-mutable struct NeutralSpecies{S<:CascadingSpec, C<:SpeciesCascadingCache, P}
+mutable struct NeutralSpecies
     name::Symbol
     density_source         # untyped: freely replaceable before initialize!(model)
     density::Vector{Float64}
+    elastic_cross_section  # untyped: freely replaceable before initialize!(model)
+    channels::Vector{CollisionChannel}
+    secondary_law          # untyped: freely replaceable before initialize!(model)
+    phase_fcn_generator    # untyped: freely replaceable before initialize!(model)
+    phase_fcn::Tuple{Matrix{Float64}, Matrix{Float64}}
     cross_sections::Matrix{Float64}
     excitation_levels::Matrix{Float64}
-    phase_fcn_generator    # untyped: freely replaceable before initialize!(model)
-    phase_fcn::P
-    cascading_spec::S
-    cascading_data::C
+    cascading_spec::CascadingSpec
+    cascading_data::SpeciesCascadingCache
 
-    function NeutralSpecies{S,C,P}(name, density_source, density, cross_sections,
-                                   excitation_levels, phase_fcn_generator, phase_fcn,
-                                   cascading_spec, cascading_data) where {S,C,P}
+    function NeutralSpecies(name, density_source, density, elastic_cross_section, channels,
+                            secondary_law, phase_fcn_generator, phase_fcn, cross_sections,
+                            excitation_levels, cascading_spec, cascading_data)
         require_reproducible(density_source, "density_source")
+        require_reproducible(elastic_cross_section, "elastic_cross_section")
+        require_reproducible(secondary_law, "secondary_law")
         require_reproducible(phase_fcn_generator, "phase_fcn_generator")
-        return new{S,C,P}(name, density_source, density, cross_sections, excitation_levels,
-                          phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
+        return new(Symbol(name), density_source, density, elastic_cross_section,
+                   collect(CollisionChannel, channels), secondary_law,
+                   phase_fcn_generator, phase_fcn, cross_sections, excitation_levels,
+                   cascading_spec, cascading_data)
     end
 end
 
-function NeutralSpecies(name, density_source, density, cross_sections, excitation_levels,
-                        phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
-    return NeutralSpecies{typeof(cascading_spec), typeof(cascading_data), typeof(phase_fcn)}(
-        name, density_source, density, cross_sections, excitation_levels,
-        phase_fcn_generator, phase_fcn, cascading_spec, cascading_data)
-end
-
 """
-    NeutralSpecies(name, density_source; cascading_spec, phase_fcn_generator)
+    NeutralSpecies(name::Symbol, density_source; elastic_cross_section, channels,
+                   secondary_law, phase_fcn_generator)
 
-Build a lightweight `NeutralSpecies`. All grid-dependent fields (`density`, `cross_sections`,
-`excitation_levels`, `phase_fcn`) start empty and are populated by `initialize!(model)`.
+Build a lightweight `NeutralSpecies`. The grid-dependent fields (`density`,
+`cross_sections`, `excitation_levels`, `phase_fcn`) start empty and are populated by
+`initialize!(model)`.
+
+# Example
+```julia
+gas = NeutralSpecies(:MyGas, @law(z -> 1e18 .* exp.(-z ./ 30e3));
+                     elastic_cross_section = AURORA.e_N2elastic,
+                     channels = [CollisionChannel("exc", AURORA.e_N2a3sup, 6.17, 0),
+                                 CollisionChannel("ion", AURORA.e_N2ionx2sgp, 15.6, 1)],
+                     secondary_law = @law((E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)),
+                     phase_fcn_generator = phase_fcn_N2)
+```
 """
-function NeutralSpecies(name::Symbol, density_source;
-                        cascading_spec::CascadingSpec, phase_fcn_generator)
+function NeutralSpecies(name::Symbol, density_source; elastic_cross_section, channels,
+                        secondary_law, phase_fcn_generator)
     empty_mat = Matrix{Float64}(undef, 0, 0)
+    spec = CascadingSpec(String(name), secondary_law; channels)
     return NeutralSpecies(
         name,
         density_source,
         Float64[],
-        empty_mat,
-        empty_mat,
+        elastic_cross_section,
+        channels,
+        secondary_law,
         phase_fcn_generator,
         (empty_mat, copy(empty_mat)),
-        cascading_spec,
-        SpeciesCascadingCache(cascading_spec),
+        copy(empty_mat),
+        copy(empty_mat),
+        spec,
+        SpeciesCascadingCache(spec),
     )
 end
 
-# Density profiles and phase-function generators are commonly swapped in via direct field
-# assignment (the interception window before initialize!), which bypasses the constructor.
-# Intercept those assignments to enforce the reproducibility rule there too.
+# Density profiles, cross sections and phase-function generators are commonly swapped in via
+# direct field assignment, which bypasses the constructor. Intercept those assignments to
+# enforce the reproducibility rule there too.
 function Base.setproperty!(sp::NeutralSpecies, name::Symbol, value)
-    if name === :density_source || name === :phase_fcn_generator
+    if name in (:density_source, :elastic_cross_section, :phase_fcn_generator)
         require_reproducible(value, String(name))
+    elseif name === :secondary_law
+        require_reproducible(value, "secondary_law")
     end
     ty = fieldtype(typeof(sp), name)
     return setfield!(sp, name, value isa ty ? value : convert(ty, value))
@@ -108,47 +138,39 @@ function Base.getindex(species::Tuple{Vararg{NeutralSpecies}}, name::Symbol)
     return species[found_index]
 end
 
+channel_names(sp::NeutralSpecies) = channel_names(sp.channels)
+ionizing_channels(sp::NeutralSpecies) = ionizing_channels(sp.channels)
+channel(sp::NeutralSpecies, name::AbstractString) = channel(sp.channels, name)
+
 """
-    validate_ionization_channels(sp::NeutralSpecies)
+    rebuild_collision_data!(sp::NeutralSpecies, E_centers)
 
-Check that the ionizing channels of `sp.excitation_levels` and of `sp.cascading_spec`
-describe the same physics.
+Derive `cross_sections`, `excitation_levels` and the cascading spec of `sp` from its channel
+table, evaluating the cross sections on `E_centers`.
 
-The two hold independent copies of every ionizing channel: column 1 of `excitation_levels`
-is the energy loss that `update_B!` charges the primary electron and the key under which
-`compute_ionization_spectra!` looks up a cascading matrix, column 2 is the number of
-secondaries it multiplies that matrix by, and `cascading_spec` carries the thresholds and
-secondary counts the matrices were actually built with. Any disagreement splits one
-collision's energy between two different accountings, so they must match exactly.
+A spec equal to the one the cascading cache already holds leaves that cache object in place,
+for `load_or_compute_cascading!` to refresh against the current energy grid; a spec that
+differs replaces the cache with an empty one built from it.
 """
-function validate_ionization_channels(sp::NeutralSpecies)
-    spec = sp.cascading_spec
-    E_levels = sp.excitation_levels
-    for i_level in axes(E_levels, 1)
-        n_secondary = E_levels[i_level, 2]
-        (isinteger(n_secondary) && 0 <= n_secondary <= 2) || throw(ArgumentError(
-            "$(sp.name) excitation level $(i_level) produces $(n_secondary) secondary \
-             electrons; the second column of the levels data must be 0, 1 or 2"))
-        n_secondary > 0 || continue
-
-        threshold = E_levels[i_level, 1]
-        i_threshold = findfirst(==(threshold), spec.ionization_thresholds)
-        isnothing(i_threshold) && throw(ArgumentError(
-            "$(sp.name) excitation level $(i_level) ionizes at $(threshold) eV, which is not \
-             one of the cascading thresholds $(spec.ionization_thresholds)"))
-        spec.n_secondaries[i_threshold] == n_secondary || throw(ArgumentError(
-            "$(sp.name) excitation level $(i_level) produces $(Int(n_secondary)) secondary \
-             electrons at $(threshold) eV, while its cascading spec produces \
-             $(spec.n_secondaries[i_threshold])"))
+function rebuild_collision_data!(sp::NeutralSpecies, E_centers::AbstractVector)
+    sp.cross_sections    = channel_cross_sections(sp.elastic_cross_section, sp.channels,
+                                                  E_centers)
+    sp.excitation_levels = channel_excitation_levels(sp.channels)
+    spec = CascadingSpec(String(sp.name), sp.secondary_law; sp.channels)
+    if !describes_same_cascading(sp.cascading_spec, spec)
+        sp.cascading_spec = spec
+        sp.cascading_data = SpeciesCascadingCache(spec)
     end
     return nothing
 end
 
-
-# Per-species variant of load_excitation_threshold (which loads all three species).
-function load_excitation_threshold_for(species_name::AbstractString)
-    file = pkgdir(AURORA, "internal_data", "data_neutrals", species_name * "_levels.dat")
-    return readdlm(file, comments=true, comment_char='%')
+# Two specs build the same transfer matrices when they agree on the thresholds, the secondary
+# counts and the law object itself.
+function describes_same_cascading(a::CascadingSpec, b::CascadingSpec)
+    return a.name == b.name &&
+           a.ionization_thresholds == b.ionization_thresholds &&
+           a.n_secondaries == b.n_secondaries &&
+           a.secondary_law === b.secondary_law
 end
 
 
@@ -161,9 +183,9 @@ end
     N2Species(neutrals::NeutralAtmosphere)
     N2Species(msis_file::AbstractString)
 
-Construct the default N₂ species with cross sections from the built-in `e_N2_*` library,
-phase function from [`phase_fcn_N2`](@ref), and cascading described by
-[`DefaultCascadingSpecN2`](@ref).
+Construct the default N₂ species: elastic cross section, collision channels and
+secondary-electron law from [`default_channels`](@ref) and friends, phase function from
+[`phase_fcn_N2`](@ref).
 
 `density_source` can be a [`DensityProfile`](@ref) or any callable `h_atm (m) → density
 (m⁻³)`. Passing a [`NeutralAtmosphere`](@ref) is shorthand for `neutrals[:N2]`. Passing an MSIS
@@ -177,9 +199,7 @@ function N2Species(msis_file::AbstractString)
     return N2Species(read_msis_file(msis_file)[:N2])
 end
 function N2Species(density_source)
-    return NeutralSpecies(:N2, density_source;
-                          cascading_spec      = DefaultCascadingSpecN2(),
-                          phase_fcn_generator = phase_fcn_N2)
+    return default_species(:N2, density_source, phase_fcn_N2)
 end
 
 """
@@ -196,9 +216,7 @@ function O2Species(msis_file::AbstractString)
     return O2Species(read_msis_file(msis_file)[:O2])
 end
 function O2Species(density_source)
-    return NeutralSpecies(:O2, density_source;
-                          cascading_spec      = DefaultCascadingSpecO2(),
-                          phase_fcn_generator = phase_fcn_O2)
+    return default_species(:O2, density_source, phase_fcn_O2)
 end
 
 """
@@ -215,9 +233,15 @@ function OSpecies(msis_file::AbstractString)
     return OSpecies(read_msis_file(msis_file)[:O])
 end
 function OSpecies(density_source)
-    return NeutralSpecies(:O, density_source;
-                          cascading_spec      = DefaultCascadingSpecO(),
-                          phase_fcn_generator = phase_fcn_O)
+    return default_species(:O, density_source, phase_fcn_O)
+end
+
+function default_species(name::Symbol, density_source, phase_fcn_generator)
+    return NeutralSpecies(name, density_source;
+                          elastic_cross_section = default_elastic_cross_section(name),
+                          channels              = default_channels(name),
+                          secondary_law         = default_secondary_law(name),
+                          phase_fcn_generator)
 end
 
 
@@ -232,6 +256,8 @@ end
 function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
     println(io, "NeutralSpecies(", sp.name, "):")
     println(io, "├── Density source:  ", profile_label(sp.density_source))
+    println(io, "├── Channels:        ", length(sp.channels), " (",
+                                         length(ionizing_channels(sp)), " ionizing)")
     if isempty(sp.density)
         println(io, "├── (not initialized — call initialize!(model))")
     else
@@ -239,7 +265,6 @@ function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
         println(io, "├── Max density:      ", round(maximum(sp.density), sigdigits=3), " m⁻³")
         println(io, "├── Cross sections:   ", size(sp.cross_sections, 1), " levels × ",
                                               size(sp.cross_sections, 2), " energies")
-        println(io, "├── Excitation lvls:  ", size(sp.excitation_levels, 1))
     end
     print(io,   "└── Cascading:        ", sp.cascading_spec.name,
                 " (", length(sp.cascading_spec.ionization_thresholds), " thresholds)")
