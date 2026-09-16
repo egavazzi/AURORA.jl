@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Two cascading cache saves for one species within the same second no longer overwrite each other
 - **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold
 - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies; they take a vector of energies only
 - A cascading cache file is reused only when its thresholds, secondary counts and secondary law match, and matrices are selected by exact threshold; older cache files are recomputed

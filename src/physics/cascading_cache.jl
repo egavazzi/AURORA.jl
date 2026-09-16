@@ -149,10 +149,15 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
                               policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(cache.spec, policy)
     mkpath(species_dir)
-    filename = joinpath(species_dir,
-                       string("cascading_", cache.spec.name, "_",
-                             Dates.format(now(), "yyyymmdd-HHMMSS"),
-                             ".jld2"))
+    # Matrices can build in under a second, so the timestamp can repeat; a counter suffix
+    # keeps the names distinct.
+    stem = string("cascading_", cache.spec.name, "_", Dates.format(now(), "yyyymmdd-HHMMSS"))
+    filename = joinpath(species_dir, stem * ".jld2")
+    counter = 1
+    while ispath(filename)
+        filename = joinpath(species_dir, string(stem, "-", counter, ".jld2"))
+        counter += 1
+    end
     jldopen(filename, "w") do file
         file["version_AURORA"]  = cache_version_string()
         file["Q_primary"]       = cache.primary_transfer_matrix
