@@ -1,6 +1,6 @@
 using DataInterpolations: LinearInterpolation, PCHIPInterpolation, ExtrapolationType
 
-function e_N2elastic(Ep)
+function _e_N2elastic_sorted(Ep)
     cross_section = Vector{Float64}(undef, length(Ep))
     for ie in eachindex(Ep)
         if (Ep[ie] >= 1) & (Ep[ie] .< 1.733)
@@ -33,7 +33,9 @@ function e_N2elastic(Ep)
     return cross_section
 end
 
-function e_N2rot0_2(Ep)
+e_N2elastic(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2elastic_sorted, Ep)
+
+function _e_N2rot0_2_sorted(Ep)
     log10E = [-1.529205842868462, -1.401759744308854, -1.298455005566862,
               -1.229836683674959, -1.107192298263224, -0.930884014999626,
               -0.739165582563789, -0.534726081040409, -0.361197419278502,
@@ -76,7 +78,9 @@ function e_N2rot0_2(Ep)
     return cross_section
 end
 
-function e_N2rot0_4(Ep)
+e_N2rot0_2(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2rot0_2_sorted, Ep)
+
+function _e_N2rot0_4_sorted(Ep)
     log10E = [-1.532680902603447, -1.404874076776330, -1.275825566920618,
               -1.224367870665778, -1.149260425122097, -0.985947211351686,
               -0.834892017817066, -0.642148004931654, -0.267182529393861,
@@ -128,7 +132,9 @@ function e_N2rot0_4(Ep)
     return cross_section
 end
 
-function e_N2rot0_6(Ep)
+e_N2rot0_4(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2rot0_4_sorted, Ep)
+
+function _e_N2rot0_6_sorted(Ep)
     log10E = [-1.540835374081948, -1.393951276348084, -1.299408565019692,
               -1.198041825677987, -1.085443481487013, -1.027862686921294,
               -0.853878202151661, -0.718632215072602, -0.500218151334885,
@@ -153,7 +159,9 @@ function e_N2rot0_6(Ep)
     return cross_section
 end
 
-function e_N2rot0_8(Ep)
+e_N2rot0_6(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2rot0_6_sorted, Ep)
+
+function _e_N2rot0_8_sorted(Ep)
     log10E = [-1.528601289020590, -1.426292957506456, -1.329246907900923,
               -1.276205819361377, -1.202716630014793, -1.121888884265058,
               -1.049473630001863, -0.957742617010783, -0.856184155958383,
@@ -178,7 +186,9 @@ function e_N2rot0_8(Ep)
     return cross_section
 end
 
-function e_N2vib0_1(Ep)
+e_N2rot0_8(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2rot0_8_sorted, Ep)
+
+function _e_N2vib0_1_sorted(Ep)
     E = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     s = [1e-23, 3e-23, 3.8e-23, 4.2e-23, 4.6e-23, 5.5e-23, 6.7e-23, 8.1e-23]
 
@@ -203,7 +213,9 @@ function e_N2vib0_1(Ep)
     return cross_section
 end
 
-function e_N2vib0_2(Ep)
+e_N2vib0_1(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_1_sorted, Ep)
+
+function _e_N2vib0_2_sorted(Ep)
     E = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     s = [1, 3, 3.8, 4.2, 4.6, 5.5, 6.7, 8.1] .* 1e-23
     E = vcat(E, [1.67, 1.75, 1.8, 1.85, 1.9, 1.9375, 1.978, 2.0, 2.05, 2.1, 2.125, 2.2, 2.24, 2.28, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.85, 2.9, 2.95, 3, 3.05, 3.1, 3.15, 3.2, 3.25, 3.3, 3.35, 3.4])
@@ -226,7 +238,9 @@ function e_N2vib0_2(Ep)
     return cross_section
 end
 
-function e_N2vib0_3(Ep)
+e_N2vib0_2(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_2_sorted, Ep)
+
+function _e_N2vib0_3_sorted(Ep)
     E = [1.0271, 1.8119, 1.9281, 2.3916, 2.4163, 2.5739, 2.7995, 3.0116, 3.1689, 3.3487, 3.5064, 3.7333, 3.8524, 4.0669, 4.067, 4.2041, 4.3523, 4.5029, 4.6469]
     s = [7.0427e-25, 5.5034e-24, 2.5652e-22, 1.673e-20, 1.6872e-20, 3.4988e-21, 1.5817e-20, 2.1678e-21, 1.1187e-20, 1.5309e-21, 4.3424e-21, 1.2751e-21, 1.7867e-21, 7.6565e-22, 7.6526e-22, 1.0711e-21, 5.0849e-22, 1.0811e-21, 5.5485e-22]
 
@@ -242,7 +256,9 @@ function e_N2vib0_3(Ep)
     return cross_section
 end
 
-function e_N2vib0_4(Ep)
+e_N2vib0_3(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_3_sorted, Ep)
+
+function _e_N2vib0_4_sorted(Ep)
     # Initial combination of e_N2vib0_1 and e_N2vib0_2
     # initial_cross_section = (0.3 * e_N2vib0_1(Ep) + 0.35 * e_N2vib0_2(Ep)) * 2 / 5 # not used? /EG20240515
 
@@ -266,7 +282,9 @@ function e_N2vib0_4(Ep)
     return cross_section
 end
 
-function e_N2vib0_5(Ep)
+e_N2vib0_4(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_4_sorted, Ep)
+
+function _e_N2vib0_5_sorted(Ep)
     E = [1.7459, 2.0816, 2.3099, 2.4942, 2.6043, 2.8488, 3.1042, 3.2912, 3.4976, 3.7519, 3.8671]
     s = [6.8315e-24, 2.1617e-23, 2.9028e-21, 3.9878e-21, 6.2584e-21, 2.6986e-22, 3.9496e-21, 2.6388e-22, 1.613e-21, 1.7546e-22, 5.1621e-22]
     s = vcat([s[1]/3], s)
@@ -284,7 +302,9 @@ function e_N2vib0_5(Ep)
     return cross_section
 end
 
-function e_N2vib0_6(Ep)
+e_N2vib0_5(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_5_sorted, Ep)
+
+function _e_N2vib0_6_sorted(Ep)
     E = [1.5176, 2.143, 2.2964, 2.5275, 2.8863, 3.0358, 3.1708, 3.4811]
     s = [1.0846e-25, 9.2113e-24, 4.9432e-23, 4.459e-21, 3.4105e-22, 1.1193e-21, 2.9207e-22, 2.1537e-22]
 
@@ -300,7 +320,9 @@ function e_N2vib0_6(Ep)
     return cross_section
 end
 
-function e_N2vib0_7(Ep)
+e_N2vib0_6(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_6_sorted, Ep)
+
+function _e_N2vib0_7_sorted(Ep)
     E = [2.0073, 2.2342, 2.3663, 2.5946, 2.8222, 3.0483, 3.2516, 3.3851, 3.5291, 4.1979]
     s = [6.317e-23, 1.3348e-22, 6.3896e-22, 2.4423e-21, 4.2059e-22, 1.6918e-21, 3.8452e-22, 7.5752e-22, 3.9773e-22, 2.5062e-22]
 
@@ -316,7 +338,9 @@ function e_N2vib0_7(Ep)
     return cross_section
 end
 
-function e_N2a3sup(Ep)
+e_N2vib0_7(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2vib0_7_sorted, Ep)
+
+function _e_N2a3sup_sorted(Ep)
     E = [7, 8, 9, 10, 13, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 15, 17.6, 20.5, 22, 15, 6, 3.8] .* 1e-22
 
@@ -350,7 +374,9 @@ function e_N2a3sup(Ep)
     return Xs
 end
 
-function e_N2b3pg(Ep)
+e_N2a3sup(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2a3sup_sorted, Ep)
+
+function _e_N2b3pg_sorted(Ep)
     E = [7, 8, 9, 10, 12.5, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 25, 32, 22.5, 18.5, 13, 8, 3] .* 1e-22
 
@@ -382,7 +408,9 @@ function e_N2b3pg(Ep)
     return cross_section
 end
 
-function e_N2w3du(Ep)
+e_N2b3pg(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2b3pg_sorted, Ep)
+
+function _e_N2w3du_sorted(Ep)
     cross_section_temp = similar(Ep)
 
     for ie in eachindex(Ep)
@@ -411,7 +439,9 @@ function e_N2w3du(Ep)
     return cross_section
 end
 
-function e_N2bp3sum(Ep)
+e_N2w3du(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2w3du_sorted, Ep)
+
+function _e_N2bp3sum_sorted(Ep)
     cross_section_temp = similar(Ep)
 
     for ie in eachindex(Ep)
@@ -442,7 +472,9 @@ function e_N2bp3sum(Ep)
     return cross_section
 end
 
-function e_N2ap1sum(Ep)
+e_N2bp3sum(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2bp3sum_sorted, Ep)
+
+function _e_N2ap1sum_sorted(Ep)
     cross_section_temp = similar(Ep)
 
     for ie in eachindex(Ep)
@@ -473,7 +505,9 @@ function e_N2ap1sum(Ep)
     return cross_section
 end
 
-function e_N2w1du(Ep)
+e_N2ap1sum(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2ap1sum_sorted, Ep)
+
+function _e_N2w1du_sorted(Ep)
     cross_section_temp = similar(Ep)
 
     for ie in eachindex(Ep)
@@ -506,7 +540,9 @@ function e_N2w1du(Ep)
     return cross_section
 end
 
-function e_N2e3sgp(Ep)
+e_N2w1du(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2w1du_sorted, Ep)
+
+function _e_N2e3sgp_sorted(Ep)
     cross_section = zeros(length(Ep))
 
     for ie in eachindex(Ep)
@@ -526,7 +562,9 @@ function e_N2e3sgp(Ep)
     return cross_section
 end
 
-function e_N2ab1sgp(Ep)
+e_N2e3sgp(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2e3sgp_sorted, Ep)
+
+function _e_N2ab1sgp_sorted(Ep)
     cross_section = zeros(length(Ep))
 
     for ie in eachindex(Ep)
@@ -547,7 +585,9 @@ function e_N2ab1sgp(Ep)
     return cross_section
 end
 
-function e_N2a1pg(Ep)
+e_N2ab1sgp(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2ab1sgp_sorted, Ep)
+
+function _e_N2a1pg_sorted(Ep)
     cross_section_temp = zeros(length(Ep))
 
     for ie in eachindex(Ep)
@@ -576,7 +616,9 @@ function e_N2a1pg(Ep)
     return cross_section
 end
 
-function e_N2c3pu(Ep)
+e_N2a1pg(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2a1pg_sorted, Ep)
+
+function _e_N2c3pu_sorted(Ep)
     cross_section_temp = similar(Ep)
 
     for ie in eachindex(Ep)
@@ -607,7 +649,9 @@ function e_N2c3pu(Ep)
     return cross_section
 end
 
-function e_N2bp1sup(Ep)
+e_N2c3pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2c3pu_sorted, Ep)
+
+function _e_N2bp1sup_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -625,7 +669,9 @@ function e_N2bp1sup(Ep)
     return cross_section
 end
 
-function e_N2cp1sup(Ep)
+e_N2bp1sup(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2bp1sup_sorted, Ep)
+
+function _e_N2cp1sup_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -643,7 +689,9 @@ function e_N2cp1sup(Ep)
     return cross_section
 end
 
-function e_N2cp3pu(Ep)
+e_N2cp1sup(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2cp1sup_sorted, Ep)
+
+function _e_N2cp3pu_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -663,7 +711,9 @@ function e_N2cp3pu(Ep)
     return cross_section
 end
 
-function e_N2d3sup(Ep)
+e_N2cp3pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2cp3pu_sorted, Ep)
+
+function _e_N2d3sup_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -681,7 +731,9 @@ function e_N2d3sup(Ep)
     return cross_section
 end
 
-function e_N2f3pu(Ep)
+e_N2d3sup(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2d3sup_sorted, Ep)
+
+function _e_N2f3pu_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -701,7 +753,9 @@ function e_N2f3pu(Ep)
     return cross_section
 end
 
-function e_N2g3pu(Ep)
+e_N2f3pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2f3pu_sorted, Ep)
+
+function _e_N2g3pu_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -721,7 +775,9 @@ function e_N2g3pu(Ep)
     return cross_section
 end
 
-function e_N2M1M2(Ep)
+e_N2g3pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2g3pu_sorted, Ep)
+
+function _e_N2M1M2_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -741,7 +797,9 @@ function e_N2M1M2(Ep)
     return cross_section
 end
 
-function e_N2o1pu(Ep)
+e_N2M1M2(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2M1M2_sorted, Ep)
+
+function _e_N2o1pu_sorted(Ep)
     cross_section = similar(Ep)
 
     for iE in length(Ep):-1:1
@@ -759,7 +817,9 @@ function e_N2o1pu(Ep)
     return cross_section
 end
 
-function e_N2dissociation(Ep)
+e_N2o1pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2o1pu_sorted, Ep)
+
+function _e_N2dissociation_sorted(Ep)
     E = [20, 23.6, 27.8, 35, 45, 55, 65, 80, 96, 110, 125, 148, 170, 195, 245, 295, 2985.1, 49183, 55306]
     s = [0.87, 1.13, 1.39, 1.54, 1.7, 1.87, 1.87, 2.04, 2.07, 1.96, 1.9, 1.87, 1.78, 1.74, 1.57, 1.48, 5.0198e-1/3, 4.5953e-2/3, 4.47e-2/3] * 1e-20
 
@@ -779,7 +839,9 @@ function e_N2dissociation(Ep)
     return cross_section
 end
 
-function e_N2ionx2sgp(Ep)
+e_N2dissociation(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2dissociation_sorted, Ep)
+
+function _e_N2ionx2sgp_sorted(Ep)
     # e_N2ionX2Sg+ - electron ionisation cross section (m^2) to the
     # ground-state  of N2+
     cross_section = similar(Ep)
@@ -801,7 +863,9 @@ function e_N2ionx2sgp(Ep)
     return cross_section
 end
 
-function e_N2iona2pu(Ep)
+e_N2ionx2sgp(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2ionx2sgp_sorted, Ep)
+
+function _e_N2iona2pu_sorted(Ep)
     # e_N2ionA2Pu - electron ionisation cross section (m^2) to the
     # first electronically excited state of N2+
     cross_section = similar(Ep)
@@ -823,7 +887,9 @@ function e_N2iona2pu(Ep)
     return cross_section
 end
 
-function e_N2ionb2sup(Ep)
+e_N2iona2pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2iona2pu_sorted, Ep)
+
+function _e_N2ionb2sup_sorted(Ep)
     # e_N2ionB2Su+ - electron ionisation cross section (m^2) to the
     # second electronically excited state of N2+
     cross_section = similar(Ep)
@@ -845,7 +911,9 @@ function e_N2ionb2sup(Ep)
     return cross_section
 end
 
-function e_N2dion(Ep)
+e_N2ionb2sup(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2ionb2sup_sorted, Ep)
+
+function _e_N2dion_sorted(Ep)
     # e_N2dion - dissociative ionization cross section (m^2)
 
     cross_section = similar(Ep)
@@ -867,7 +935,9 @@ function e_N2dion(Ep)
     return cross_section
 end
 
-function e_N2ddion(Ep)
+e_N2dion(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2dion_sorted, Ep)
+
+function _e_N2ddion_sorted(Ep)
     # e_N2ddion - double dissociative ionization cross section (m^2)
     # i.e. N2 + e** -> e** + 2e* + N^+ + N^+
 
@@ -889,3 +959,5 @@ function e_N2ddion(Ep)
 
     return cross_section
 end
+
+e_N2ddion(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2ddion_sorted, Ep)
