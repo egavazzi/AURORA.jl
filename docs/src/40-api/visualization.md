@@ -44,5 +44,7 @@ plot_input
 plot_excitation!
 plot_column_excitation!
 plot_input!
+plot_energy_budget
+plot_energy_budget!
 animate_Ie_in_time
 ```

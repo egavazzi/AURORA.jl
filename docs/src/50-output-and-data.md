@@ -29,7 +29,8 @@ savedir/
     ├── Ie_top.nc
     ├── currents.nc
     ├── heating_rate.nc
-    └── psd.nc
+    ├── psd.nc
+    └── energy_budget.toml
 ```
 
 `config.toml`, `inputs/`, and `simulation_data.nc` are written by `run!`. The `analysis/`
@@ -72,8 +73,12 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
 - `atmosphere.nc` — altitude grid, electron density `ne` and temperature `Te`, and one number
   density variable per neutral species (`nN2`, `nO2`, `nO`, …).
 - `physics_state.jld2` — the complete [`AuroraModel`](@ref), including the materialized
-  scattering and cascading matrices. Reload it in Julia with
-  `model = JLD2.load("savedir/inputs/physics_state.jld2", "model")`.
+  scattering and cascading matrices. Reload it in Julia with [`load_model`](@ref), i.e.
+  `model = load_model("my_run")`.
+
+```@docs; canonical=false
+load_model
+```
 
 ## Controlling output — [`AuroraOutputManager`](@ref)
 
@@ -146,3 +151,52 @@ The `analysis/` files are produced on demand by the post-processing functions, e
 `simulation_data.nc` (and, where needed, `inputs/atmosphere.nc`). See
 [Post-Processing & Analysis](@ref Post-Processing) for usage and the [Analysis](@ref) API page
 for the per-function compatibility table.
+
+### Energy budget
+
+[`energy_budget`](@ref) reports where the precipitating energy flux ends up — neutral
+excitation and ionization, thermal-electron heating, backscatter out of the top, absorption
+at the bottom of the grid — and how much of it the run fails to account for:
+
+```julia
+budget = energy_budget("my_run")   # prints a summary and returns an EnergyBudget
+budget.albedo                      # escaping / incoming energy flux
+budget.bottom_escape               # energy absorbed at the floor of the grid
+budget.residual_fraction           # unaccounted fraction; small and positive on a good grid
+```
+
+On a time-dependent run a single slice does not balance, because energy is still in transit.
+Pass `trange` to integrate the balance over time instead, which closes for a transient that
+starts and ends at rest; the result then holds energies (eV m⁻²) and carries the interval it
+covers in `budget.interval`:
+
+```julia
+budget = energy_budget("my_run"; trange = :)        # all slices
+budget = energy_budget("my_run"; trange = 10:40)    # part of the run, by slice index
+budget = energy_budget("my_run"; trange = (0.0, 0.05))  # part of the run, by time (s)
+budget = energy_budget("my_run"; tidx = 25)         # one slice, by index
+budget = energy_budget("my_run"; t = 0.03)          # one slice, the one nearest 0.03 s
+```
+
+[`make_energy_budget_file`](@ref) saves the same result as `analysis/energy_budget.toml`, a
+few hundred bytes that outlive the multi-gigabyte `simulation_data.nc`:
+
+```julia
+make_energy_budget_file("my_run")
+budget = load_energy_budget("my_run")
+```
+
+With a Makie backend loaded, [`plot_energy_budget`](@ref) draws the same budget as a stacked
+bar against a dashed input line, each segment labelled with its energy flux and its share
+of the input:
+
+```julia
+using CairoMakie
+fig = plot_energy_budget(budget; label = "5 keV")
+
+# Several runs side by side, one bar each
+fig = plot_energy_budget([load_energy_budget(dir) for dir in run_dirs];
+                         labels = ["2 keV", "5 keV", "10 keV"])
+```
+
+![Stacked energy budget of a 5 keV run](assets/energy_budget_5keV.png)

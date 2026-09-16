@@ -168,4 +168,42 @@
         @test isempty(figs4)
     end
 
+
+    @testset "plot_energy_budget smoke" begin
+        budget = energy_budget(SharedSimResults.ss_dir; verbose = false)
+
+        @test plot_energy_budget(budget) isa Figure
+        @test plot_energy_budget(budget; label = "fixture") isa Figure
+
+        # Several runs side by side, with and without tick labels
+        @test plot_energy_budget([budget, budget, budget]) isa Figure
+        @test plot_energy_budget([budget, budget, budget];
+                                 labels = ["a", "b", "c"]) isa Figure
+        @test_throws DimensionMismatch plot_energy_budget([budget, budget]; labels = ["a"])
+        @test_throws "no budgets to plot" plot_energy_budget(AURORA.EnergyBudget[])
+
+        # The mutating form draws one bar into an axis of the caller's making
+        fig = Figure()
+        ax = Axis(fig[1, 1])
+        @test plot_energy_budget!(ax, budget; x = 1) isa Makie.BarPlot
+        @test plot_energy_budget!(ax, budget; x = 2) isa Makie.BarPlot
+
+        # A vanishing term gets no segment label, whether it is zero or merely negligible
+        with_bottom(v) = AURORA.EnergyBudget([f === :bottom_escape ? v : getfield(budget, f)
+                                              for f in fieldnames(AURORA.EnergyBudget)]...)
+        labels_drawn(b) = begin
+            ax = Axis(Figure()[1, 1])
+            plot_energy_budget!(ax, b; x = 1)
+            count(p -> p isa Makie.Text, ax.scene.plots)
+        end
+        none = labels_drawn(with_bottom(0.0))
+        @test labels_drawn(with_bottom(1e-9 * budget.input)) == none  # negligible, not zero
+        @test labels_drawn(with_bottom(1e-3 * budget.input)) == none + 1
+        @test plot_energy_budget(with_bottom(0.0)) isa Figure
+
+        # A time-integrated budget carries the same fields and plots the same way
+        integrated = energy_budget(SharedSimResults.td_dir; trange = :, verbose = false)
+        @test plot_energy_budget(integrated; label = "integrated") isa Figure
+    end
+
 end

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.
   - New functions `run_msis`, `read_msis_file`, `read_ccmc_msis` (returning a `NeutralAtmosphere`) and `run_iri`, `read_iri_file`, `read_ccmc_iri` (returning an `ElectronProfile`).
