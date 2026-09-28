@@ -35,6 +35,10 @@ end
 
 e_N2elastic(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2elastic_sorted, Ep)
 
+# e_N2elastic reproduces the rotationally summed (vibrationally elastic) cross section
+# recommended by Itikawa (2006, Table 3) within 10 % over 1–10 eV, so the resolved
+# rotational channels rot0_2…rot0_8 count rotational scattering a second time. They are
+# zeroed above 10 eV to bound that overlap.
 function _e_N2rot0_2_sorted(Ep)
     log10E = [-1.529205842868462, -1.401759744308854, -1.298455005566862,
               -1.229836683674959, -1.107192298263224, -0.930884014999626,
@@ -72,7 +76,7 @@ function _e_N2rot0_2_sorted(Ep)
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924 # still wonder why /EG20250504
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2rot0_2_sorted
     cross_section[Ep .< 0.001480105560000] .= 0
 
     return cross_section
@@ -126,7 +130,7 @@ function _e_N2rot0_4_sorted(Ep)
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2rot0_2_sorted
     cross_section[Ep .< 0.004933884000000] .= 0
 
     return cross_section
@@ -153,7 +157,7 @@ function _e_N2rot0_6_sorted(Ep)
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2rot0_2_sorted
     cross_section[Ep .< 0.010361812440000] .= 0
 
     return cross_section
@@ -180,7 +184,7 @@ function _e_N2rot0_8_sorted(Ep)
 
     cross_section = cross_section / 1e4
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2rot0_2_sorted
     cross_section[Ep .< 0.017764640640000] .= 0
 
     return cross_section
@@ -188,6 +192,9 @@ end
 
 e_N2rot0_8(Ep::AbstractVector) = evaluate_in_energy_order(_e_N2rot0_8_sorted, Ep)
 
+# The vibrational tables match Itikawa (2006, Table 6) up to 30 eV, but their log–log
+# extrapolation above the last tabulated point is up to 50× the recommended values. The
+# channels are zeroed above 10 eV because their high-energy tails are not validated.
 function _e_N2vib0_1_sorted(Ep)
     E = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     s = [1e-23, 3e-23, 3.8e-23, 4.2e-23, 4.6e-23, 5.5e-23, 6.7e-23, 8.1e-23]
@@ -207,7 +214,7 @@ function _e_N2vib0_1_sorted(Ep)
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20230924
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 0.2888] .= 0
 
     return cross_section
@@ -232,7 +239,7 @@ function _e_N2vib0_2_sorted(Ep)
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20240515
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 0.5742] .= 0
 
     return cross_section
@@ -250,7 +257,7 @@ function _e_N2vib0_3_sorted(Ep)
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01
 
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 0.8559] .= 0
 
     return cross_section
@@ -276,7 +283,7 @@ function _e_N2vib0_4_sorted(Ep)
     cross_section = cross_section .+ 0.35378 .* cross_section_01
 
     # Set cross-section to zero outside specified energy ranges
-    cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 1.1342] .= 0
 
     return cross_section
@@ -296,7 +303,7 @@ function _e_N2vib0_5_sorted(Ep)
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01 / 10.663 * 2.5
 
-    cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 1.4088] .= 0
 
     return cross_section
@@ -314,7 +321,7 @@ function _e_N2vib0_6_sorted(Ep)
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01 / 20
 
-    cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 1.6801] .= 0
 
     return cross_section
@@ -332,7 +339,7 @@ function _e_N2vib0_7_sorted(Ep)
     cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end]) / 5
     cross_section = cross_section .+ cross_section_01
 
-    cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
+    cross_section[Ep .> 10] .= 0 # see the note above _e_N2vib0_1_sorted
     cross_section[Ep .< 1.9475] .= 0
 
     return cross_section
