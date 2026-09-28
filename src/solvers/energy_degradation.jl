@@ -21,6 +21,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
     n_μ = length(μ_center)
 
     Q = matrices.Q  # Extract Q for convenient access
+    upwind_ratio = matrices.upwind_ratio
 
     # e-e collisions
     if iE > 1
@@ -43,8 +44,8 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         B2B_inelastic = B2B_inelastic_neutrals[i]
         species_cascading = sp.cascading_data
 
-        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, energy_grid,
-                                  iE, workspace)
+        add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, upwind_ratio,
+                                  energy_grid, iE, workspace)
 
         # Zero out the ionization arrays for this species
         fill!(secondary_e_flux[i], 0)
@@ -62,7 +63,7 @@ function update_Q!(matrices::TransportMatrices, Ie, model::AuroraModel, t,
         end
         if min_ionization_E < E_edges[iE]
             compute_ionization_flux!(secondary_e_flux[i], primary_e_flux[i],
-                                     n, Ie, z, μ_center, Ω_beam, iE, workspace)
+                                     n, Ie, z, μ_center, Ω_beam, upwind_ratio, iE)
             compute_ionization_spectra!(secondary_e_spectrum[i], primary_e_spectrum[i],
                                         σ, E_levels, species_cascading, iE)
         end
@@ -100,17 +101,18 @@ end
 #################################################################################
 
 """
-    calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
+    calculate_scattered_flux!(result, B2B_inelastic, upwind_ratio, n, Ie_slice)
 
 Calculate the flux of electrons after pitch-angle scattering by inelastic collisions.
 
 # Physics
 The scattered flux at each altitude and angle is computed as:
-    result[z, μ₁, t] = Σ_μ₂ n(z) x P(μ₁←μ₂) x Ie[z, μ₂, t]
+    result[z, μ₁, t] = Σ_μ₂ n(z) x P(μ₁←μ₂) x F(z, μ₁, μ₂) x Ie[z, μ₂, t]
 
 where:
 - `n(z)` is the neutral density at altitude z
 - `P(μ₁←μ₂)` is the probability of scattering from pitch angle μ₂ to μ₁ (from B2B_inelastic)
+- `F(z, μ₁, μ₂)` is the ratio of upwind cell lengths from `upwind_cell_ratio`
 - `Ie[z, μ₂, t]` is the incident electron flux before scattering
 
 # Implementation
@@ -121,10 +123,11 @@ the small scattering probability matrix and density profile.
 # Arguments
 - `result`: Output array (n_z x n_μ, n_t) - scattered electron flux
 - `B2B_inelastic`: Scattering probability matrix (n_μ, n_μ) - pitch angle redistribution
+- `upwind_ratio`: Transfer scaling (n_z, n_μ, n_μ) from `upwind_cell_ratio`
 - `n`: Neutral density profile (n_z,) - altitude-dependent density [m⁻³]
 - `Ie_slice`: Incident electron flux at the current energy (n_z x n_μ, n_t) - flux before scattering
 """
-function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
+function calculate_scattered_flux!(result, B2B_inelastic, upwind_ratio, n, Ie_slice)
     # Zero out result first
     # fill!(result, 0.0) # actually we don't need this because all values will get updated
 
@@ -139,7 +142,8 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
                 tmp = 0.0
                 for i2 in 1:n_μ
                     col = (i2 - 1) * n_z + iz
-                    tmp += n[iz] * B2B_inelastic[i1, i2] * Ie_slice[col, it]
+                    tmp += n[iz] * B2B_inelastic[i1, i2] * upwind_ratio[iz, i1, i2] *
+                           Ie_slice[col, it]
                 end
                 result[row, it] = tmp
             end
@@ -149,7 +153,7 @@ function calculate_scattered_flux!(result, B2B_inelastic, n, Ie_slice)
     return nothing
 end
 
-function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic,
+function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic, upwind_ratio,
                                    energy_grid::EnergyGrid, iE, workspace)
     E_edges = energy_grid.E_edges
     ΔE = energy_grid.ΔE
@@ -158,7 +162,7 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic,
 
     # Calculate the flux of electrons after pitch-angle scattering by inelastic collisions
     # This is computed ONCE for all energy levels of this species at this energy
-    calculate_scattered_flux!(Ie_scatter, B2B_inelastic, n, @view(Ie[:, :, iE]))
+    calculate_scattered_flux!(Ie_scatter, B2B_inelastic, upwind_ratio, n, @view(Ie[:, :, iE]))
 
     # Loop over the energy levels of the collisions with the i-th neutral species
     for i_level in axes(E_levels, 1)[2:end]
@@ -257,10 +261,7 @@ end
 ```
 =#
 function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
-                                  n, Ie, z, μ_center, Ω_beam, iE,
-                                  workspace)
-    source_sum = workspace.ionization_source_sum
-
+                                  n, Ie, z, μ_center, Ω_beam, upwind_ratio, iE)
     n_z = length(z)
     n_μ = length(μ_center)
     n_t = size(Ie, 2)
@@ -278,27 +279,22 @@ function compute_ionization_flux!(secondary_e_flux, primary_e_flux,
         end
     end
 
-    # SECONDARY ELECTRONS: we first compute the total incident flux (summed over pitch-angle beams)
-    @tturbo for it in 1:n_t
-        for iz in 1:n_z
-            source_total = 0.0
-            for i_μ in 1:n_μ
-                row = (i_μ - 1) * n_z + iz
-                source_total += Ie[row, it, iE]
-            end
-            source_sum[iz, it] = source_total
-        end
-    end
-
-    # SECONDARY ELECTRONS: which we then redistribute isotropically over all pitch angles,
-    # using the solid-angle weight fractions Ω_beam[μᵢ] / sum(Ω_beam). We also weight by the
-    # neutral density.
+    # SECONDARY ELECTRONS: the incident flux summed over pitch-angle beams, redistributed
+    # isotropically over all pitch angles with the solid-angle fractions
+    # Ω_beam[μᵢ] / sum(Ω_beam) and weighted by the neutral density. Each source beam's
+    # contribution to a receiving beam is scaled by `upwind_ratio`, as for any other
+    # beam-to-beam transfer.
     @tturbo for it in 1:n_t
         for i_μ in 1:n_μ
             beam_weight = Ω_beam[i_μ] * inv_sum_Ω_beam
             for iz in 1:n_z
                 row = (i_μ - 1) * n_z + iz
-                secondary_e_flux[row, it] = n[iz] * source_sum[iz, it] * beam_weight
+                source_total = 0.0
+                for i2 in 1:n_μ
+                    col = (i2 - 1) * n_z + iz
+                    source_total += upwind_ratio[iz, i_μ, i2] * Ie[col, it, iE]
+                end
+                secondary_e_flux[row, it] = n[iz] * source_total * beam_weight
             end
         end
     end

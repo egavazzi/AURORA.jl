@@ -477,7 +477,8 @@ end
 # Cell lengths for the column integral. The solvers use an upwind scheme, so at a given
 # altitude a downward beam is differenced over the cell above it and an upward beam over the
 # cell below it; each beam is integrated with the cell lengths its own equation uses. The
-# first and last rows hold boundary conditions, not a balance, and get zero weight.
+# solvers scale beam-to-beam transfers by ratios of these lengths (`upwind_cell_ratio`), so
+# the weighted column sum conserves what the transfers move. The first and last rows hold boundary conditions, not a balance, and get zero weight.
 function column_weights(s)
     Base.require_one_based_indexing(s)
     Δs = abs.(diff(s))

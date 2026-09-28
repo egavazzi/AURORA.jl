@@ -13,6 +13,7 @@ mutable struct TransportMatrices
     B2B_inelastic_neutrals::Vector{Matrix{Float64}}  # inelastic beam-to-beam per species
     phase_fcn_e::Vector{Float64}                     # 3D elastic phase function scratch
     phase_fcn_i::Vector{Float64}                     # 3D inelastic phase function scratch
+    upwind_ratio::Array{Float64, 3}                  # beam-to-beam transfer scaling (n_z × n_angle × n_angle), see `upwind_cell_ratio`
 end
 
 """
@@ -22,7 +23,8 @@ Construct an empty TransportMatrices container with zeros.
 
 The scratch buffers that depend on the number of species and on the scattering grid
 (`B2B_inelastic_neutrals`, `phase_fcn_e`, `phase_fcn_i`) are created empty here and
-sized later in [`initialize_transport_matrices`](@ref).
+sized later in [`initialize_transport_matrices`](@ref). `upwind_ratio` is filled with ones
+here and set from the model's field-line grid in `initialize_transport_matrices`.
 """
 function TransportMatrices(n_altitude::Int, n_angle::Int, n_time::Int, n_energy::Int)
     A = zeros(Float64, n_altitude)
@@ -34,8 +36,9 @@ function TransportMatrices(n_altitude::Int, n_angle::Int, n_time::Int, n_energy:
     B2B_inelastic_neutrals = Matrix{Float64}[]
     phase_fcn_e = Float64[]
     phase_fcn_i = Float64[]
+    upwind_ratio = ones(Float64, n_altitude, n_angle, n_angle)
 
     return TransportMatrices(A, B, Q,
                              Le, B2B_elastic, B2B_inelastic_neutrals,
-                             phase_fcn_e, phase_fcn_i)
+                             phase_fcn_e, phase_fcn_i, upwind_ratio)
 end

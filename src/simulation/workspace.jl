@@ -27,7 +27,6 @@ function SolverWorkspace()
 end
 
 mutable struct DegradationWorkspace{N}
-    ionization_source_sum::Matrix{Float64}           # total incident flux summed over beams (shape: n_z x n_t)
     thermal_e_loss::Vector{Float64}
     Ie_scatter::Matrix{Float64}
     secondary_e_flux::NTuple{N, Matrix{Float64}}     # isotropic secondary e- flux per species (shape: n_z·n_μ x n_t)
@@ -38,7 +37,6 @@ end
 
 
 function DegradationWorkspace{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where {N}
-    ionization_source_sum = Matrix{Float64}(undef, n_z, n_t)
     thermal_e_loss = Vector{Float64}(undef, n_z)
     Ie_scatter = Matrix{Float64}(undef, n_z * n_μ, n_t)
 
@@ -47,7 +45,7 @@ function DegradationWorkspace{N}(n_μ::Int, n_t::Int, n_z::Int, n_E::Int) where 
     secondary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
     primary_e_spectrum = ntuple(_ -> zeros(n_E), Val(N))
 
-    return DegradationWorkspace(ionization_source_sum, thermal_e_loss, Ie_scatter,
+    return DegradationWorkspace(thermal_e_loss, Ie_scatter,
                                 secondary_e_flux, primary_e_flux,
                                 secondary_e_spectrum, primary_e_spectrum)
 end
