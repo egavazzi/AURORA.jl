@@ -76,5 +76,6 @@ bin. Close to a threshold the excess energy is small, so part of both distributi
 below the lowest edge; again only what is on-grid is placed.
 
 In both cases the energy carried below the grid is real energy deposited in the
-atmosphere, but it is not resolved by the transport equation. The `residual` term of the
-energy budget written by [`make_energy_budget_file`](@ref) therefore contains it.
+atmosphere, but it is not resolved by the transport equation. The `subfloor` term of the
+energy budget written by [`make_energy_budget_file`](@ref) accounts for it, together with the
+electrons that the Coulomb loss takes out of the lowest bin.
