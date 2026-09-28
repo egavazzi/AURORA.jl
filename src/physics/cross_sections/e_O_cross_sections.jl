@@ -25,7 +25,7 @@ function _e_O1D_sorted(Ep)
     for iE in eachindex(Ep)
         if Ep[iE] > 1.967 && Ep[iE] < 6.867
             cross_section[iE] = (1-1.9/Ep[iE])*exp(-38.0685-0.2992*Ep[iE]+0.20375*Ep[iE]^2-0.0211739*Ep[iE]^3)
-        elseif Ep[iE] > 6.867 && Ep[iE] < 30
+        elseif Ep[iE] >= 6.867 && Ep[iE] < 30
             cross_section[iE] = exp(-34.081-0.912397*Ep[iE]+7.185417e-2*Ep[iE]^2-2.48398e-3*Ep[iE]^3+3.00574e-5*Ep[iE]^4)
         elseif Ep[iE] >= 30
             cross_section[iE] = 1.881e-13/Ep[iE]^3
@@ -101,7 +101,7 @@ function _e_O3p5P_sorted(Ep)
     for iE in eachindex(Ep)
         if Ep[iE] > 10.73 && Ep[iE] < 31.614
             cross_section[iE] = (1 - 10.73 / Ep[iE]) * exp(678.5487 - 931.9045 * log(Ep[iE]) + 452.4033 * log(Ep[iE])^2 - 97.15600 * log(Ep[iE])^3 + 7.763117 * log(Ep[iE])^4)
-        elseif Ep[iE] > 31.614 && Ep[iE] < 200
+        elseif Ep[iE] >= 31.614 && Ep[iE] < 200
             cross_section[iE] = exp(-54.32016 + 19.35011 * log(Ep[iE]) - 8.191310 * log(Ep[iE])^2 + 1.323729 * log(Ep[iE])^3 - 0.07969778 * log(Ep[iE])^4)
         elseif Ep[iE] >= 200
             cross_section[iE] = 1.593536e-14 / Ep[iE]^3

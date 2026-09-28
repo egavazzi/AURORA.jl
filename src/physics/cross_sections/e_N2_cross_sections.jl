@@ -64,7 +64,7 @@ function _e_N2rot0_2_sorted(Ep)
 
     cross_section = 10 .^ [
         PCHIPInterpolation(log10Xs, log10E)(log10.(Ep[Ep .<= 10^log10E[end - 1]]));
-        LinearInterpolation(log10Xs[(end - 1):end], log10E[(end - 1):end]; extrapolation = ExtrapolationType.Linear)(log10.(Ep[Ep .>= 10^log10E[end - 1]]))
+        LinearInterpolation(log10Xs[(end - 1):end], log10E[(end - 1):end]; extrapolation = ExtrapolationType.Linear)(log10.(Ep[Ep .> 10^log10E[end - 1]]))
         ]
 
     I = findall(.!isfinite.(cross_section))
@@ -247,7 +247,7 @@ function _e_N2vib0_3_sorted(Ep)
     cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
     # Handling energies beyond the last data point using e_N2vib0_1
-    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
+    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01
 
     cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312
@@ -272,7 +272,7 @@ function _e_N2vib0_4_sorted(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
     # Handling energies beyond the last data point using e_N2vib0_1
-    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
+    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ 0.35378 .* cross_section_01
 
     # Set cross-section to zero outside specified energy ranges
@@ -293,7 +293,7 @@ function _e_N2vib0_5_sorted(Ep)
     cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
-    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
+    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01 / 10.663 * 2.5
 
     cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
@@ -311,7 +311,7 @@ function _e_N2vib0_6_sorted(Ep)
     cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
-    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end])
+    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end])
     cross_section = cross_section .+ cross_section_01 / 20
 
     cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
@@ -329,7 +329,7 @@ function _e_N2vib0_7_sorted(Ep)
     cross_section = PCHIPInterpolation(s, E; extrapolation = ExtrapolationType.Extension)(Ep)
     cross_section = cross_section .* (Ep .< E[end])
 
-    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .> E[end]) / 5
+    cross_section_01 = e_N2vib0_1(Ep) .* (Ep .>= E[end]) / 5
     cross_section = cross_section .+ cross_section_01
 
     cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
