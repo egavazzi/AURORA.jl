@@ -225,7 +225,12 @@ end
 e_Oion2P0(Ep::AbstractVector) = evaluate_in_energy_order(_e_Oion2P0_sorted, Ep)
 
 function _e_Oionion_sorted(Ep)
-    # e_Oionion - O electron double ionization cross section (m^2)
+    # e_Oionion - O electron ionization cross section (m^2) into the O⁺(2s2p⁴ ⁴P)
+    # inner-shell state: single ionization with one secondary electron, threshold
+    # 28.48 eV (NIST: 13.618 + 14.858 eV; Laher & Gilmore 1990, Table 1 lists this state at
+    # 28.49 eV). It is not double ionization O → O²⁺, which opens at 48.74 eV. The
+    # magnitude is about 1.4× the Laher & Gilmore (1990) Table 23 values at 100 eV and
+    # matches them above 500 eV.
     # Ep - electron energy (eV)
     # Source of data: Tima Sergienko, private communication
     cross_section = similar(Ep)

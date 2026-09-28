@@ -63,7 +63,7 @@ end
 
 function DefaultCascadingSpecO()
     ionization_thresholds = [13.618, 16.9, 18.6, 28.5]
-    n_secondaries         = [1, 1, 1, 2]
+    n_secondaries         = [1, 1, 1, 1]
     energy_params = [100.0, 200, 500, 1000, 2000]  # eV
     A_params = [12.6, 13.7, 14.1, 14.0, 13.7]
     B_params = [7.18, 4.97, 2.75, 1.69, 1.02] .* 1e-22
