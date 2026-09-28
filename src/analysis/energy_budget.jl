@@ -5,7 +5,7 @@
 # Global energy balance of the suprathermal electron population. At steady state the downward
 # energy flux entering the top is accounted for by
 #
-#     E_in  =  E_inelastic  +  E_heating  +  E_escape  +  E_bottom  +  residual
+#     E_in  =  E_inelastic  +  E_heating  +  E_subfloor  +  E_escape  +  E_bottom  +  residual
 #
 # where
 #   E_in        vertical energy flux carried by the *downward* beams at the top boundary
@@ -17,10 +17,12 @@
 #   E_inelastic energy deposited in neutral excitation + ionization thresholds,
 #               Σ_s w_s Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
 #   E_heating   energy transferred to the thermal electrons (Coulomb)
-#   residual    everything unaccounted: the energy of electrons degraded below the grid floor
-#               (sub-floor thermalisation, a small *positive* term on a good grid) plus any
-#               numerical non-conservation.
-#
+#   E_subfloor  energy of the electrons that inelastic collisions and the Coulomb loss take
+#               below the lowest energy-grid edge, where they thermalise
+#               (see subfloor_energy.jl)
+#   residual    the numerical non-conservation of the scheme: the upwind cell weights on a
+#               non-uniform altitude grid, and the placement of degraded electrons at bin
+#               centres.
 #
 # A single time slice balances only at steady state. Over a time interval that starts and ends
 # at rest the same identity holds for the time-integrated terms, which is what `trange` gives.
@@ -48,8 +50,12 @@ Energy terms
 - `ionization`, `excitation`  the inelastic term split into ionizing (≥1 secondary) and
   non-ionizing channels (`inelastic == ionization + excitation`).
 - `heating`           energy transferred to the thermal electrons (Coulomb).
-- `residual`          `input - inelastic - heating - escape - bottom_escape` (sub-floor
-  thermalisation + numerical non-conservation); `residual_fraction == residual / input`.
+- `subfloor`          energy of the electrons that inelastic collisions and the Coulomb loss
+  take below the lowest edge of the energy grid, where they thermalise.
+- `residual`          `input - inelastic - heating - subfloor - escape - bottom_escape`,
+  the numerical non-conservation of the scheme (upwind cell weights on a non-uniform
+  altitude grid, and placement of degraded electrons at bin centres);
+  `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
 - `inelastic_by_species`  the inelastic term per species, in model order.
 
@@ -65,6 +71,7 @@ struct EnergyBudget
     ionization::Float64
     excitation::Float64
     heating::Float64
+    subfloor::Float64
     residual::Float64
     residual_fraction::Float64
     albedo::Float64
@@ -77,7 +84,7 @@ end
 # iterate this tuple, so the file round-trips through the positional constructor.
 const ENERGY_BUDGET_SCALAR_FIELDS = (
     :input, :escape, :bottom_escape, :net, :inelastic, :ionization, :excitation, :heating,
-    :residual, :residual_fraction, :albedo, :ionpairs,
+    :subfloor, :residual, :residual_fraction, :albedo, :ionpairs,
 )
 
 energy_units(b::EnergyBudget) = b.interval === nothing ? "eV m⁻² s⁻¹" : "eV m⁻²"
@@ -98,15 +105,16 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
     span = interval === nothing ? "steady state" :
            "∫ over t = $(interval[1]) – $(interval[2]) s"
     value(x) = replace(@sprintf("%.3g", x), "e+" => "e")   # 2.95e16, not 2.95e+16
-    row(name, x) = println(io, "  ", rpad(name, 21), lpad(value(x), 9), "  ",
+    row(name, x) = println(io, "  ", rpad(name, 24), lpad(value(x), 9), "  ",
                            lpad(percent_string(x, b.input), 9))
 
     println(io, "EnergyBudget — ", span, ", ∫ along the field line")
-    println(io, rpad("input (↓ top)", 23), value(b.input), " ", energy_units(b))
-    println(io, rpad("", 23), "value        % of input")
+    println(io, rpad("input (↓ top)", 26), value(b.input), " ", energy_units(b))
+    println(io, rpad("", 26), "value        % of input")
     row("ionization", b.ionization)
     row("excitation", b.excitation)
     row("thermal heating", b.heating)
+    row("sub-floor thermalisation", b.subfloor)
     row("escape (↑ top)", b.escape)
     row("escape (↓ bottom)", b.bottom_escape)
     row("residual", b.residual)
@@ -115,7 +123,7 @@ function Base.show(io::IO, ::MIME"text/plain", b::EnergyBudget)
                        for (name, val) in b.inelastic_by_species), ", ")
         println(io, "inelastic by species (% of inelastic): ", shares)
     end
-    accounted = b.inelastic + b.heating + b.escape + b.bottom_escape
+    accounted = b.inelastic + b.heating + b.subfloor + b.escape + b.bottom_escape
     println(io, "albedo ", round(b.albedo; digits = 3),
             " · net energy per ion pair ", value(b.net / b.ionpairs), " eV",
             " · (deposited + escaped)/input ", @sprintf("%.3f", accounted / b.input))
@@ -204,18 +212,20 @@ function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
     names = [String(sp.name) for sp in model.species]
     sums  = Dict(n => 0.0 for n in names)
     input = 0.0; escape = 0.0; bottom_escape = 0.0; inelastic = 0.0; ionization = 0.0
-    excitation = 0.0; heating = 0.0; ionpairs = 0.0
+    excitation = 0.0; heating = 0.0; subfloor = 0.0; ionpairs = 0.0
+    subfloor_factors = budget_subfloor_factors(model)
     # `foreach_Ie_time_chunk` reuses its buffer between calls, so each slice is reduced to a
     # budget before the next chunk is read.
     foreach_Ie_time_chunk(sim_dir; trange = ts, max_bytes) do Ie_chunk, t_range
         for (j, it) in enumerate(t_range)
-            b = energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]); verbose = false)
+            b = energy_budget_snapshot(model, @view(Ie_chunk[:, :, j, :]); verbose = false,
+                                       subfloor_factors)
             wk = w[it - first(ts) + 1]
             input += wk * b.input;           escape += wk * b.escape
             bottom_escape += wk * b.bottom_escape
             inelastic += wk * b.inelastic;   ionization += wk * b.ionization
             excitation += wk * b.excitation; heating += wk * b.heating
-            ionpairs += wk * b.ionpairs
+            subfloor += wk * b.subfloor;     ionpairs += wk * b.ionpairs
             for (name, val) in b.inelastic_by_species
                 sums[name] += wk * val
             end
@@ -223,7 +233,7 @@ function energy_budget_over(model, sim_dir, co, trange, max_bytes, verbose)
     end
 
     budget = close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
-                          heating, ionpairs, [n => sums[n] for n in names],
+                          heating, subfloor, ionpairs, [n => sums[n] for n in names],
                           (first(t), last(t)))
     verbose && (show(stdout, MIME"text/plain"(), budget); println())
     return budget
@@ -293,6 +303,12 @@ function load_energy_budget(sim_dir::AbstractString)
     get(data, "schema_version", nothing) == 1 ||
         throw(ArgumentError("unsupported energy-budget schema in $path"))
     values = data["values"]
+    missing_fields = [String(name) for name in ENERGY_BUDGET_SCALAR_FIELDS
+                      if !haskey(values, String(name))]
+    isempty(missing_fields) ||
+        throw(ArgumentError("$path has no value for $(join(missing_fields, ", ")), so it " *
+                            "does not describe the current EnergyBudget. Rewrite the file " *
+                            "with make_energy_budget_file."))
     scalars = (Float64(values[String(name)]) for name in ENERGY_BUDGET_SCALAR_FIELDS)
     entries = data["inelastic_by_species"]
     entries isa AbstractVector ||
@@ -362,17 +378,19 @@ end
 
 # Assemble the derived terms shared by the snapshot and the time integral.
 function close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
-                      heating, ionpairs, inelastic_by_species, interval)
+                      heating, subfloor, ionpairs, inelastic_by_species, interval)
     net      = input - escape - bottom_escape
-    residual = input - inelastic - heating - escape - bottom_escape
+    residual = input - inelastic - heating - subfloor - escape - bottom_escape
     return EnergyBudget(input, escape, bottom_escape, net, inelastic, ionization, excitation,
-                        heating, residual, input > 0 ? residual / input : NaN,
+                        heating, subfloor, residual, input > 0 ? residual / input : NaN,
                         input > 0 ? escape / input : NaN, ionpairs,
                         inelastic_by_species, interval)
 end
 
-# Budget of one flux snapshot `Ie`, shape [n_z, n_μ, n_E].
-function energy_budget_snapshot(model, Ie; verbose::Bool = true)
+# Budget of one flux snapshot `Ie`, shape [n_z, n_μ, n_E]. `subfloor_factors` is
+# `budget_subfloor_factors(model)`, which a caller budgeting many slices computes once.
+function energy_budget_snapshot(model, Ie; verbose::Bool = true,
+                                subfloor_factors = budget_subfloor_factors(model))
     eg  = model.energy_grid
     z   = model.altitude_grid.h          # m (vertical altitude)
     s   = model.s_field                  # m (path length along the magnetic field line)
@@ -387,6 +405,12 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
     axes(Ie) == (eachindex(z), eachindex(μ), eachindex(E)) ||
         throw(ArgumentError("Ie snapshot $(size(Ie)) does not match the model grid " *
                             "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
+    length(subfloor_factors.collisions) == length(model.species) &&
+        all(size(f) == size(sp.cross_sections)
+            for (f, sp) in zip(subfloor_factors.collisions, model.species)) &&
+        size(subfloor_factors.coulomb) == (n_z, n_E) ||
+        throw(DimensionMismatch("subfloor_factors do not match the model; compute them " *
+                                "with budget_subfloor_factors(model)"))
 
     # ---- Boundary energy fluxes ----------------------------------------------------------
     # Vertical energy flux = Σ_beam Σ_E Ie·E·|μ| (matches field_aligned_beam_norm), taken at
@@ -423,13 +447,16 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
 
     # ---- Inelastic energy deposition (∫ along the field line) ----------------------------
     # Σ_s w_s Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ, split into ionizing (≥1 secondary) and
-    # non-ionizing channels, with the ion-pair production rate alongside.
+    # non-ionizing channels, with the ion-pair production rate alongside. The collisional
+    # part of the sub-floor term is the same sum with the threshold replaced by the energy
+    # one collision takes below the grid, from `subfloor_energy_factors`.
     dep_profile_total = zeros(n_z)      # weighted energy deposition [eV m⁻² s⁻¹]
     ion_profile       = zeros(n_z)      # → ionization
     exc_profile       = zeros(n_z)      # → excitation
     ionpair_profile   = zeros(n_z)      # weighted ion-pair production [m⁻² s⁻¹]
     inelastic_by_species = Pair{String,Float64}[]
-    for sp in model.species
+    subfloor = 0.0
+    for (sp, F) in zip(model.species, subfloor_factors.collisions)
         σ      = sp.cross_sections          # [n_levels, n_E]
         levels = sp.excitation_levels       # [n_levels, 2]: (energy loss, #secondaries)
         dens   = sp.density                 # [n_z]
@@ -441,9 +468,12 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
             ionizing    = secondaries >= 1
             for iz in eachindex(dep_sp, dens)
                 acc = 0.0
+                acc_subfloor = 0.0
                 for iE in eachindex(E)
                     acc += Ie_omni[iz, iE] * σ[lvl, iE]
+                    acc_subfloor += Ie_omni[iz, iE] * σ[lvl, iE] * F[lvl, iE]
                 end
+                subfloor += dens[iz] * acc_subfloor
                 rate = dens[iz] * acc       # reaction rate of this level [m⁻³ s⁻¹]
                 dep  = rate * E_loss        # energy into this channel    [eV m⁻³ s⁻¹]
                 dep_sp[iz] += dep
@@ -468,8 +498,13 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true)
                                              E, ne, Te)[:, 1]
     heating = sum(heating_profile)
 
+    # ---- Sub-floor energy of the Coulomb loss --------------------------------------------
+    for iE in axes(Ie_omni, 2), iz in axes(Ie_omni, 1)
+        subfloor += subfloor_factors.coulomb[iz, iE] * Ie_omni[iz, iE]
+    end
+
     budget = close_budget(input, escape, bottom_escape, inelastic, ionization, excitation,
-                          heating, ionpairs, inelastic_by_species, nothing)
+                          heating, subfloor, ionpairs, inelastic_by_species, nothing)
     verbose && (show(stdout, MIME"text/plain"(), budget); println())
     return budget
 end

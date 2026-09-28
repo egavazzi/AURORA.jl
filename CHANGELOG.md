@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Breaking** `EnergyBudget` gains a `subfloor` term, the energy of the electrons that inelastic collisions and the Coulomb loss take below the lowest energy-grid edge, where they thermalise; `residual` is now `input - inelastic - heating - subfloor - escape - bottom_escape` and holds only the numerical non-conservation of the scheme. `load_energy_budget` throws on an `energy_budget.toml` without a `subfloor` value; rewrite such a file with `make_energy_budget_file`. The printed summary and `plot_energy_budget` show the new term [#182](https://github.com/egavazzi/AURORA.jl/pull/182)
 - **Breaking** A neutral species describes its collisions with an in-code channel table instead of the `internal_data/data_neutrals/<species>_levels.dat` / `.name` files [#186](https://github.com/egavazzi/AURORA.jl/pull/186)
   - New exported type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)`. A `NeutralSpecies` holds a vector of them in `channels`, next to its `elastic_cross_section` and `secondary_law` (`nothing` when no channel ionizes); the constructor takes these three keywords in place of `cascading_spec`.
   - `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are derived from the table at `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`) and can no longer be assigned. Edit `channels` instead (`push!`, `filter!`, `AURORA.replace_channel!`), or `elastic_cross_section` and `secondary_law`.

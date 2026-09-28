@@ -45,8 +45,8 @@ make_psd_file
 ## Energy budget
 
 Global energy balance of the electron population: how much of the precipitating energy flux
-ends up in neutral excitation and ionization, in thermal-electron heating, and back out of
-the top of the ionosphere.
+ends up in neutral excitation and ionization, in thermal-electron heating, in electrons
+degraded below the lowest energy bin, and back out of the top of the ionosphere.
 
 ```@docs; canonical=false
 energy_budget

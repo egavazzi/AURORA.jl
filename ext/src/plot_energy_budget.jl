@@ -7,6 +7,7 @@ const _ENERGY_BUDGET_SEGMENTS = (
     (:ionization, "ionization", Makie.RGBf(0.16, 0.44, 0.30), :white),
     (:excitation, "excitation (non-ionizing)", Makie.RGBf(0.42, 0.72, 0.50), :white),
     (:heating, "thermal e-e loss", Makie.RGBf(0.45, 0.42, 0.72), :white),
+    (:subfloor, "sub-floor thermalisation", Makie.RGBf(0.72, 0.70, 0.88), :black),
     (:bottom_escape, "escape ↓ bottom", Makie.RGBf(0.40, 0.31, 0.22), :white),
     (:escape, "backscattered ↑ top", Makie.RGBf(0.90, 0.60, 0.0), :black),
 )
@@ -39,8 +40,9 @@ end
 _budget_ylabel(budget) = budget.interval === nothing ?
     "Vertical energy flux (eV m⁻² s⁻¹)" : "Vertical energy (eV m⁻²)"
 
-_budget_ratio(budget) =
-    (budget.inelastic + budget.heating + budget.escape + budget.bottom_escape) / budget.input
+# The input share of the terms drawn as segments, i.e. all but the residual.
+_budget_accounted(b) = b.inelastic + b.heating + b.subfloor + b.escape + b.bottom_escape
+_budget_ratio(budget) = _budget_accounted(budget) / budget.input
 
 function AURORA.plot_energy_budget!(ax, budget::AURORA.EnergyBudget; x = 1)
     values = [getproperty(budget, field) for (field, _, _, _) in _ENERGY_BUDGET_SEGMENTS]
@@ -122,8 +124,7 @@ _budget_legend!(fig) =
            orientation = :horizontal, framevisible = true, nbanks = 2)
 
 function _budget_limits!(ax, budgets, xmin, xmax)
-    top = maximum(max(b.input, b.inelastic + b.heating + b.escape + b.bottom_escape)
-                  for b in budgets)
+    top = maximum(max(b.input, _budget_accounted(b)) for b in budgets)
     ylims!(ax, 0, 1.15 * top)
     xlims!(ax, xmin, xmax)
     return nothing
