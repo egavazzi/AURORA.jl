@@ -102,3 +102,13 @@ end
         end
     end
 end
+
+@testitem "N2 dissociation matches the Itikawa (2006) recommendation" begin
+    # Cosby (1993) total dissociation cross section, Itikawa (2006, Table 14), in cm².
+    E = [30.0, 50.0, 100.0, 200.0]
+    σ_recommended = [1.04e-16, 1.23e-16, 1.16e-16, 0.95e-16] .* 1e-4 # m²
+    σ = AURORA.e_N2dissociation(E)
+    for i in eachindex(E, σ_recommended)
+        @test isapprox(σ[i], σ_recommended[i]; rtol = 0.3)
+    end
+end

@@ -830,9 +830,10 @@ function _e_N2dissociation_sorted(Ep)
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
-    # Arbitrary correction of diss-cross-section
-    correction_factor = 0.3 .+ 0.7 ./ (1 .+ exp.((Ep .- 120) ./ 20))
-    cross_section = cross_section .* correction_factor
+    # The tabulated values are 1.4–1.8× the Cosby (1993) total dissociation cross section
+    # recommended by Itikawa (2006, Table 14) over 20–1000 eV; the factor 0.62 brings them
+    # within ±25 % of it from 20 eV to 100 keV.
+    cross_section = 0.62 .* cross_section
 
     cross_section[Ep .< 20.6] .= 0
 
