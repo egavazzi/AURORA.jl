@@ -50,6 +50,7 @@ end
         4.6469, 4.0781, 3.8671, 3.4811, 4.1979, # e_N2vib0_3…0_7 table/vib0_1-tail splices
         10.0, 25.0, 30.0, 200.0, 250.0, 300.0, 1000.0, 1e5,
         0.2888, 0.5742, 1.9, 1.9475, 1.68, 1.6801, 12.25, 12.255, # N2 gates
+        15.58, 15.581,                                            # N2 ionization gate
         16.1, 16.9,                                               # O2 gates
         4.17, 4.19, 10.73, 10.74, 13.6, 13.618,                   # O gates
     ]
@@ -72,6 +73,31 @@ end
             @test σ[1] == σ3[2]
             if σ3[1] > 0 && σ3[3] > 0
                 @test σ[1] > 0
+            end
+        end
+    end
+end
+
+@testitem "Cross sections vanish below the channel energy loss" begin
+    # Row i of <species>_levels.dat is the energy loss of the channel named on row i of
+    # <species>_levels.name.
+    E_grid = exp10.(range(log10(0.03), 5; length = 30001))
+    levels = AURORA.load_excitation_threshold()
+
+    for species in ("N2", "O2", "O")
+        names = AURORA.get_level_names(species)
+        E_levels = getfield(levels, Symbol(species, "_levels"))
+        @test size(E_levels, 1) == length(names)
+        for i in 2:length(names)
+            E_loss = E_levels[i, 1]
+            E_loss > 0 || continue
+            fname = "e_" * species * names[i]
+            f = getfield(AURORA, Symbol(fname))
+            # e_N2rot0_2 is not defined below the start of its table (≈0.03 eV).
+            E = filter(>=(first(E_grid)), vcat(E_grid, prevfloat(E_loss)))
+            σ = f(E)
+            @testset "$fname" begin
+                @test all(iszero, σ[E .< E_loss])
             end
         end
     end

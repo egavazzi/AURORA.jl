@@ -201,13 +201,15 @@ end
 e_O2iona4pu(Ep::AbstractVector) = evaluate_in_energy_order(_e_O2iona4pu_sorted, Ep)
 
 function _e_O2ion16p9_sorted(Ep)
-    # e_O2ion16p9 - electron ionisation cross section (m^2) to the
-    # excited states A2Pu, B2Sg-, 2Pu, c4Sg- of O2+
+    # e_O2ion16p9 - electron ionisation cross section (m^2) lumping the O₂⁺ excited
+    # states A²Πu, B²Σg⁻, ²Πu and c⁴Σu⁻, with a 16.9 eV energy loss. No separate fit
+    # exists for the lumped states: the fit is the same polynomial as e_O2iona4pu,
+    # gated and switched on at 16.9 eV.
     # Ep electron energy (eV)
     cross_section = similar(Ep)
     for iE in eachindex(Ep)
-        if Ep[iE] > 16.1 && Ep[iE] < 300
-            cross_section[iE] = (1-16.1/Ep[iE])*exp(-49.02795+6.907601*log(Ep[iE])-1.325630*log(Ep[iE])^2+0.08157475*log(Ep[iE])^3-0.0002650063*log(Ep[iE])^4)
+        if Ep[iE] > 16.9 && Ep[iE] < 300
+            cross_section[iE] = (1-16.9/Ep[iE])*exp(-49.02795+6.907601*log(Ep[iE])-1.325630*log(Ep[iE])^2+0.08157475*log(Ep[iE])^3-0.0002650063*log(Ep[iE])^4)
         elseif Ep[iE] >= 300
             cross_section[iE] = 4.911588e-15*log(0.024825*Ep[iE])/Ep[iE]
         else

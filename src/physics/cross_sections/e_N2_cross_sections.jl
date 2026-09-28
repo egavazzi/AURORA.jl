@@ -233,7 +233,7 @@ function _e_N2vib0_2_sorted(Ep)
     cross_section[I] .= 0
 
     cross_section[Ep .> 10] .= 0 #TODO: FIX THIS/BG20190312  # wonder why? /EG20240515
-    cross_section[Ep .< 0.2888] .= 0
+    cross_section[Ep .< 0.5742] .= 0
 
     return cross_section
 end
@@ -315,7 +315,7 @@ function _e_N2vib0_6_sorted(Ep)
     cross_section = cross_section .+ cross_section_01 / 20
 
     cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
-    cross_section[Ep .< 1.68] .= 0
+    cross_section[Ep .< 1.6801] .= 0
 
     return cross_section
 end
@@ -333,7 +333,7 @@ function _e_N2vib0_7_sorted(Ep)
     cross_section = cross_section .+ cross_section_01
 
     cross_section[Ep .> 10] .= 0  # TODO: FIX THIS/BG20190312
-    cross_section[Ep .< 1.9] .= 0
+    cross_section[Ep .< 1.9475] .= 0
 
     return cross_section
 end
@@ -568,8 +568,8 @@ function _e_N2ab1sgp_sorted(Ep)
     cross_section = zeros(length(Ep))
 
     for ie in eachindex(Ep)
-        if Ep[ie] > 12.25 && Ep[ie] < 24.98
-            cross_section[ie] = (1 - 12.25 / Ep[ie]) * exp(91.77961 - 148.1616 * log(Ep[ie]) + 55.75255 * log(Ep[ie])^2 - 6.95604 * log(Ep[ie])^3)
+        if Ep[ie] > 12.255 && Ep[ie] < 24.98
+            cross_section[ie] = (1 - 12.255 / Ep[ie]) * exp(91.77961 - 148.1616 * log(Ep[ie]) + 55.75255 * log(Ep[ie])^2 - 6.95604 * log(Ep[ie])^3)
         elseif Ep[ie] >= 24.98 && Ep[ie] < 50
             cross_section[ie] = exp(80.2784 - 92.0627 * log(Ep[ie]) + 23.36969 * log(Ep[ie])^2 - 1.985404 * log(Ep[ie])^3)
         elseif Ep[ie] >= 50
@@ -846,8 +846,10 @@ function _e_N2ionx2sgp_sorted(Ep)
     # ground-state  of N2+
     cross_section = similar(Ep)
 
+    # The gate equals the energy loss in N2_levels.dat; the onset factor keeps the value
+    # the polynomial was fitted with.
     for iE in length(Ep):-1:1
-        if Ep[iE] > 15.58 && Ep[iE] < 42.71
+        if Ep[iE] > 15.581 && Ep[iE] < 42.71
             cross_section[iE] = (1 - 15.58 / Ep[iE]) * exp(-834.7627 + 879.6264 * log(Ep[iE]) - 363.6978 * log(Ep[iE])^2 + 66.81782 * log(Ep[iE])^3 - 4.600032 * log(Ep[iE])^4)
         elseif Ep[iE] >= 42.71 && Ep[iE] < 300
             cross_section[iE] = exp(-100.7150 + 51.41718 * log(Ep[iE]) - 15.61180 * log(Ep[iE])^2 + 2.119856 * log(Ep[iE])^3 - 0.1089437 * log(Ep[iE])^4)

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Every inelastic cross section is zero below the energy loss assigned to its channel in `<species>_levels.dat`. The gates of `e_N2vib0_2` (0.5742 eV), `e_N2vib0_6` (1.6801 eV), `e_N2vib0_7` (1.9475 eV), `e_N2ab1sgp` (12.255 eV), `e_N2ionx2sgp` (15.581 eV), `e_O2ion16p9` (16.9 eV), `e_O1S` (4.19 eV), `e_O3p5P` (10.74 eV) and `e_Oion4S0` (13.618 eV) are raised to that loss, so no collision below it removes more energy than the electron has; `e_N2ab1sgp` and `e_O2ion16p9` also switch on from their new threshold
 - Fix cross-section functions at the energies where two fits or tables are joined: `e_N2rot0_2` threw a `BoundsError` at 10^1.477 eV (≈30 eV), and `e_O1D` (6.867 eV), `e_O3p5P` (31.614 eV) and `e_N2vib0_3`…`e_N2vib0_7` (at the last point of their tables) returned 0 there
 - Cascading cache filenames now include a hash of the physics they were built from (thresholds, secondary counts, secondary law, grid edges) instead of only a per-second timestamp, so two saves for the same species within one second no longer overwrite each other
 - **Breaking** `initialize!(model)` now throws an `ArgumentError` (renamed `check_bins_narrower_than_ionization_threshold`, was `warn_if_bins_wider_than_ionization_threshold`) instead of warning when an energy bin is wider than a species' lowest ionization threshold: an electron can then ionize twice within one bin, which the cascading matrices do not account for

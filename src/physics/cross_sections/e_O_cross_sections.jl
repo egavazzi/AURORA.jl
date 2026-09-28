@@ -42,8 +42,10 @@ function _e_O1S_sorted(Ep)
     # e_O1S - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
+    # The gate equals the energy loss in O_levels.dat; the onset factor keeps the value
+    # the polynomial was fitted with.
     for iE in eachindex(Ep)
-        if Ep[iE] > 4.17 && Ep[iE] < 30
+        if Ep[iE] > 4.19 && Ep[iE] < 30
             cross_section[iE] = (1-4.17/Ep[iE])*exp(-77.00326+61.07961*log(Ep[iE])-37.16693*log(Ep[iE])^2+10.03347*log(Ep[iE])^3-1.021318*log(Ep[iE])^4)
         elseif Ep[iE] >= 30
             cross_section[iE] = 3.24e-14/Ep[iE]^3
@@ -98,8 +100,10 @@ function _e_O3p5P_sorted(Ep)
     # e_O3p5P - electron excitation cross section (m^2)
     # Ep electron energy (eV)
     cross_section = similar(Ep)
+    # The gate equals the energy loss in O_levels.dat; the onset factor keeps the value
+    # the polynomial was fitted with.
     for iE in eachindex(Ep)
-        if Ep[iE] > 10.73 && Ep[iE] < 31.614
+        if Ep[iE] > 10.74 && Ep[iE] < 31.614
             cross_section[iE] = (1 - 10.73 / Ep[iE]) * exp(678.5487 - 931.9045 * log(Ep[iE]) + 452.4033 * log(Ep[iE])^2 - 97.15600 * log(Ep[iE])^3 + 7.763117 * log(Ep[iE])^4)
         elseif Ep[iE] >= 31.614 && Ep[iE] < 200
             cross_section[iE] = exp(-54.32016 + 19.35011 * log(Ep[iE]) - 8.191310 * log(Ep[iE])^2 + 1.323729 * log(Ep[iE])^3 - 0.07969778 * log(Ep[iE])^4)
@@ -161,8 +165,10 @@ function _e_Oion4S0_sorted(Ep)
     # Data source: Tima Sergienko, private communication
     cross_section = similar(Ep)
 
+    # The gate equals the energy loss in O_levels.dat; the onset factor keeps the value
+    # the polynomial was fitted with.
     for iE in eachindex(Ep)
-        if Ep[iE] > 13.6 && Ep[iE] <= 250
+        if Ep[iE] > 13.618 && Ep[iE] <= 250
             cross_section[iE] = 0.35*(1-13.6/Ep[iE])*exp(-38.13225-1.957729*log(Ep[iE])+1.526543*(log(Ep[iE]))^2-0.3056663*(log(Ep[iE]))^3+0.01849928*(log(Ep[iE]))^4)
         elseif Ep[iE] > 250
             cross_section[iE] = 4.760656e-15*log(0.032*Ep[iE])/Ep[iE]
