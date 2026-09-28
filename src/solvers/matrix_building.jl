@@ -160,9 +160,14 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kern
             end
         end
 
-        # add scattering from inelastic and ionization collisions
+        # add in-bin scattering from non-ionizing inelastic collisions
         n_collisions = size(σ, 1)
         for i_coll in 2:n_collisions
+            # The cascading matrices place the whole degraded primary of an ionizing
+            # collision in lower bins, so nothing stays in the bin. (Energy grids with a bin
+            # wider than an ionization threshold are rejected at construction, so the
+            # factor below is zero for these rows anyway.)
+            E_levels[i_coll, 2] > 0 && continue
             σ_coll = σ[i_coll, iE]
             E_loss = E_levels[i_coll, 1]
             # The last factor corrects for the case where the energy loss
