@@ -272,3 +272,37 @@ function build_spatial_operators(z; half_weight::Bool = false)
                          1 =>  1 ./ (scale .* diff(z_extended_top[1:(end - 1)])))
     return Ddz_Up, Ddz_Down
 end
+
+"""
+    upwind_cell_ratio(s, μ)
+
+Scaling `F[iz, i1, i2] = Δs_{i2}(iz) / Δs_{i1}(iz)` for the transfer of electrons from beam
+`i2` into beam `i1` at node `iz` of the field-line grid `s`, where `Δs_i(iz)` is the length of
+the cell over which beam `i`'s row at node `iz` is differenced.
+
+The operators from `build_spatial_operators` difference a downward beam (`μ < 0`) over
+the cell above node `iz` and an upward beam over the cell below it (see `column_weights`), so
+the sum of the rows weighted by these cell lengths telescopes to the boundary fluxes. A
+collision at node `iz` removes an electron from beam `i2`'s row, which carries weight
+`Δs_{i2}`, and adds it to beam `i1`'s row, which carries weight `Δs_{i1}`. Scaling the transfer
+by `F` gives `Σ_i1 Δs_{i1} F[iz, i1, i2] P[i1, i2] = Δs_{i2} Σ_i1 P[i1, i2]`, so the weighted row
+sum conserves the particles and energy moved by every beam-to-beam transfer. `F = 1` for
+transfers within one direction and on the boundary rows, which hold boundary conditions.
+"""
+function upwind_cell_ratio(s, μ)
+    Base.require_one_based_indexing(s, μ)
+    n_z = length(s)
+    w = column_weights(s)
+    all(>(0), @view(w.down[2:(n_z - 1)])) && all(>(0), @view(w.up[2:(n_z - 1)])) ||
+        throw(ArgumentError("the field-line grid has a zero-length cell"))
+    F = ones(Float64, n_z, length(μ), length(μ))
+    for i2 in eachindex(μ), i1 in eachindex(μ)
+        (μ[i1] < 0) == (μ[i2] < 0) && continue
+        w1 = μ[i1] < 0 ? w.down : w.up
+        w2 = μ[i2] < 0 ? w.down : w.up
+        for iz in 2:(n_z - 1)
+            F[iz, i1, i2] = w2[iz] / w1[iz]
+        end
+    end
+    return F
+end

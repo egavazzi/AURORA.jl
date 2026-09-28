@@ -125,6 +125,16 @@ B(\mu_i \to \mu_j) = \sum_s n_s(z) \cdot v(E) \sum_k \sigma_k^s(E) \cdot P_k(\mu
 
 where ``P_k`` is the scattering probability for collision process ``k``.
 
+The upwind transport operator differences a downward beam over the grid cell above an
+altitude node and an upward beam over the cell below it, so each beam's equation at that
+node stands for a balance over a cell of its own length ``\Delta s``. Every beam-to-beam
+transfer at a node (the entries of ``B``, the pitch-angle redistribution of inelastically
+scattered electrons, and the isotropic emission of secondary electrons in ``Q``) is
+multiplied by ``\Delta s_i / \Delta s_j``, the ratio of the source and receiving beams' cell
+lengths (`upwind_cell_ratio`). With this factor the cell-length-weighted sum of the
+discrete equations telescopes to the boundary fluxes, so transfers between downward and
+upward beams conserve particles and energy on a non-uniform grid.
+
 ### Source term Q
 
 `update_Q!(Q, iE, ...)` accumulates contributions from higher energies into the source
