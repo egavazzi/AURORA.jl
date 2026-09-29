@@ -1,4 +1,3 @@
-
 """
     evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
 
@@ -25,19 +24,26 @@ end
     load_cross_sections(energy_grid)
     load_cross_sections(E_centers::AbstractVector)
 
-Cross sections of the built-in N₂, O₂ and O channel tables, evaluated on the energy grid.
+Load the cross-sections of the neutrals species for their different energy states.
+
+# Calling
+`σ_neutrals = load_cross_sections(energy_grid)`
+`σ_neutrals = load_cross_sections(E_centers)`
 
 # Inputs
 - `energy_grid`: an `EnergyGrid` object, or
 - `E_centers`: energy bin centers (eV). Vector [n\\_E]
 
 # Returns
-- `σ_neutrals`: named tuple `(σ_N2, σ_O2, σ_O)` of `[n_levels × n_E]` matrices (m²).
+- `σ_neutrals`: A named tuple containing the cross-sections (m²) for N2, O2, and O.
 """
 function load_cross_sections(E_centers::AbstractVector)
-    return (σ_N2 = get_cross_section(:N2, E_centers),
-            σ_O2 = get_cross_section(:O2, E_centers),
-            σ_O  = get_cross_section(:O,  E_centers))
+    σ_N2 = get_cross_section("N2", E_centers)
+    σ_O2 = get_cross_section("O2", E_centers)
+    σ_O = get_cross_section("O", E_centers)
+
+    σ_neutrals = (σ_N2 = σ_N2, σ_O2 = σ_O2, σ_O = σ_O)
+    return σ_neutrals
 end
 
 load_cross_sections(energy_grid::EnergyGrid) = load_cross_sections(energy_grid.E_centers)
@@ -46,8 +52,11 @@ load_cross_sections(energy_grid::EnergyGrid) = load_cross_sections(energy_grid.E
     get_cross_section(species, energy_grid)
     get_cross_section(species, E_centers::AbstractVector)
 
-Cross sections of one of the built-in species (`:N2`, `:O2` or `:O`), evaluated on the energy
-grid.
+Calculate the cross-section for a given species and their different energy states.
+
+# Calling
+`σ_N2 = get_cross_section("N2", energy_grid)`
+`σ_N2 = get_cross_section("N2", E_centers)`
 
 # Inputs
 - `species`: species name, a `Symbol` or a `String`

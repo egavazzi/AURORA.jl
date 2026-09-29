@@ -69,8 +69,11 @@ end
 # Energy levels
 # ======================================================================================== #
 function plot_energy_levels(model)
+    titles = Dict(:N2 => "N₂", :O2 => "O₂", :O => "O")
+
     fig = Figure(size = (800, 600))
-    axs = [Axis(fig[1, i]; title=_species_title(sp)) for (i, sp) in enumerate(model.species)]
+    axs = [Axis(fig[1, i]; title=get(titles, sp.name, String(sp.name)))
+           for (i, sp) in enumerate(model.species)]
     axs[1].ylabel = "Excitation energy (eV)"
 
     for (ax, sp) in zip(axs, model.species)
@@ -106,13 +109,14 @@ end
 # ======================================================================================== #
 function plot_cross_sections(model)
     E = model.energy_grid.E_centers
+    titles = Dict(:N2 => "σ N₂", :O2 => "σ O₂", :O => "σ O")
 
     fig = Figure(size=(1800, 800))
 
     for (idx, sp) in enumerate(model.species)
         species  = String(sp.name)
         σ_sp     = sp.cross_sections
-        title_str = "σ " * _species_title(sp)
+        title_str = get(titles, sp.name, "σ " * String(sp.name))
 
         names = ["elastic"; AURORA.channel_names(sp)]
         n_levels = length(names)
@@ -171,14 +175,7 @@ function plot_cross_sections(model)
     return fig
 end
 
-"""Readable label for a species: the Unicode formula for N₂ and O₂, the name itself otherwise."""
-function _species_title(sp)
-    sp.name === :N2 && return "N₂"
-    sp.name === :O2 && return "O₂"
-    return String(sp.name)
-end
-
-"""Format a raw level name (e.g. `"_elastic"`, `"rot0_2"`) into a readable label."""
+"""Format a level name (e.g. `"elastic"`, `"rot0_2"`) into a readable label."""
 function _format_level_name(species, name)
     # Strip leading underscore
     n = lstrip(name, '_')

@@ -116,14 +116,10 @@ The channel called `name`. Throws a `KeyError` when there is none, and an `Argum
 when several channels share the name.
 """
 function channel(channels, name::AbstractString)
-    found = 0
-    for (i, c) in pairs(channels)
-        c.name == name || continue
-        found == 0 || throw(ArgumentError("Multiple channels are named $(name)"))
-        found = i
-    end
-    found == 0 && throw(KeyError(name))
-    return channels[found]
+    i = findall(c -> c.name == name, channels)
+    isempty(i) && throw(KeyError(name))
+    length(i) == 1 || throw(ArgumentError("Multiple channels are named $(name)"))
+    return channels[only(i)]
 end
 
 """

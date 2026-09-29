@@ -13,7 +13,7 @@ The collision physics is described by `elastic_cross_section`, `channels` and
 
 # Fields
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
-- `density_source`: callable `h_atm (m) → density (m⁻³)` that (re)samples `density`.
+- `density_source`: callable `h_atm (m) → density (m⁻³)` used to (re)sample `density`.
     Can be a [`DensityProfile`](@ref) or any callable.
     Untyped so it can be replaced freely before calling `initialize!(model)`.
 - `density::Vector{Float64}`: density profile sampled on the model altitude grid (m⁻³).
@@ -23,7 +23,7 @@ The collision physics is described by `elastic_cross_section`, `channels` and
     of `cross_sections` and `excitation_levels`.
 - `secondary_law`: callable `(E_secondary, E_primary) -> Float64` giving the
     secondary-electron energy distribution of the ionizing channels.
-- `phase_fcn_generator`: callable `(θ, E) -> (phaseE, phaseI)` that (re)builds
+- `phase_fcn_generator`: callable `(θ, E) -> (phaseE, phaseI)` used to (re)build
     `phase_fcn` whenever the pitch-angle or energy grid changes.
     Untyped so it can be replaced freely before calling `initialize!(model)`.
 - `phase_fcn`: tuple `(phaseE, phaseI)` of `[n_θ × n_E]` matrices materialized from the
@@ -112,9 +112,10 @@ function NeutralSpecies(name::Symbol, density_source; elastic_cross_section, cha
     )
 end
 
-# Density profiles, cross sections and phase-function generators are commonly swapped in via
-# direct field assignment, which bypasses the constructor. Intercept those assignments to
-# enforce the reproducibility rule there too.
+# Density profiles, cross sections, secondary laws and phase-function generators are commonly
+# swapped in via direct field assignment (the interception window before initialize!), which
+# bypasses the constructor. Intercept those assignments to enforce the reproducibility rule
+# there too.
 function Base.setproperty!(sp::NeutralSpecies, name::Symbol, value)
     if name in (:density_source, :elastic_cross_section, :secondary_law, :phase_fcn_generator)
         require_reproducible(value, String(name))
@@ -288,6 +289,7 @@ function Base.show(io::IO, ::MIME"text/plain", sp::NeutralSpecies)
         println(io, "├── Max density:      ", round(maximum(sp.density), sigdigits=3), " m⁻³")
         println(io, "├── Cross sections:   ", size(sp.cross_sections, 1), " levels × ",
                                               size(sp.cross_sections, 2), " energies")
+        println(io, "├── Excitation lvls:  ", size(sp.excitation_levels, 1))
     end
     print(io,   "└── Cascading:        ", sp.cascading_spec.name,
                 " (", length(sp.cascading_spec.ionization_thresholds), " thresholds)")

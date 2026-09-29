@@ -55,14 +55,11 @@ secondary count, source) in row order.
 """
 function write_collision_channels_toml(sim::AuroraSimulation)
     channel_keys = ["name", "energy_loss_eV", "n_secondaries", "source"]
-    species_keys = String[]
+    species_keys = [String(sp.name) for sp in sim.model.species]
+    allunique(species_keys) ||
+        throw(ArgumentError("species names must be unique: $(species_keys)"))
     config = Dict{String, Any}()
-    for sp in sim.model.species
-        species_name = String(sp.name)
-        species_name in species_keys && throw(ArgumentError(
-            "Multiple species are named $(species_name); species names must be unique for \
-             the channel tables to be written separately"))
-        push!(species_keys, species_name)
+    for (species_name, sp) in zip(species_keys, sim.model.species)
         config[species_name] = Dict{String, Any}(
             "channels" => [Dict{String, Any}("name"           => c.name,
                                              "energy_loss_eV" => c.energy_loss,
