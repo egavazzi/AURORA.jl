@@ -36,9 +36,16 @@ export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 include("physics/laws.jl")
 export ExprLaw, @law
 
+include("physics/collision_channel.jl")
+export CollisionChannel, channel_names, ionizing_channels
+
 include("physics/cascading.jl")
 include("physics/cascading_cache.jl")
 export clear_cascading_cache!
+
+include("physics/cross_sections/channels.jl")
+export default_channels, default_elastic_cross_section, default_secondary_law,
+       default_cascading_spec
 
 include("physics/species.jl")
 export NeutralSpecies

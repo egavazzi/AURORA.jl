@@ -47,6 +47,39 @@ function write_config_toml(sim::AuroraSimulation)
 end
 
 
+"""
+    write_collision_channels_toml(sim)
+
+Write `inputs/collision_channels.toml`: each species' collision channels (name, energy loss,
+secondary count, source) in row order.
+"""
+function write_collision_channels_toml(sim::AuroraSimulation)
+    channel_keys = ["name", "energy_loss_eV", "n_secondaries", "source"]
+    species_keys = [String(sp.name) for sp in sim.model.species]
+    allunique(species_keys) ||
+        throw(ArgumentError("species names must be unique: $(species_keys)"))
+    config = Dict{String, Any}()
+    for (species_name, sp) in zip(species_keys, sim.model.species)
+        config[species_name] = Dict{String, Any}(
+            "channels" => [Dict{String, Any}("name"           => c.name,
+                                             "energy_loss_eV" => c.energy_loss,
+                                             "n_secondaries"  => c.n_secondaries,
+                                             "source"         => c.source)
+                           for c in sp.channels],
+        )
+    end
+
+    # Explicit key order: species in model order, channel fields in the order above.
+    key_order = vcat(species_keys, channel_keys)
+    rank(k) = something(findfirst(==(k), key_order), length(key_order) + 1)
+
+    savefile = joinpath(sim.output.savedir, "inputs", "collision_channels.toml")
+    open(savefile, "w") do f
+        TOML.print(f, config; sorted=true, by=rank)
+    end
+end
+
+
 function write_atmosphere_nc(sim::AuroraSimulation)
     model = sim.model
     ionosphere = model.ionosphere

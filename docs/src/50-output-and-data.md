@@ -21,6 +21,7 @@ savedir/
 ├── config.toml               # scalar parameters (grid limits, dt, E_max, version, commit)
 ├── inputs/
 │   ├── atmosphere.nc         # neutral & electron density / temperature profiles
+│   ├── collision_channels.toml  # per-species collision channels (name, energy loss, secondaries, source)
 │   └── physics_state.jld2    # full AuroraModel (species + physics matrices) — Julia reload
 ├── simulation_data.nc        # electron flux output (appended per solver loop, crash-safe)
 └── analysis/                 # derived quantities, written by the make_* functions
@@ -72,6 +73,10 @@ Global attributes: `aurora_version`, `commit_hash`, `creation_time`.
 
 - `atmosphere.nc` — altitude grid, electron density `ne` and temperature `Te`, and one number
   density variable per neutral species (`nN2`, `nO2`, `nO`, …).
+- `collision_channels.toml` — one table per species listing its inelastic collision channels
+  in row order (row `i + 1` of the species matrices), each with `name`, `energy_loss_eV`,
+  `n_secondaries` and `source`. This file is for reading; the channels themselves are
+  reloaded from `physics_state.jld2`.
 - `physics_state.jld2` — the complete [`AuroraModel`](@ref), including the materialized
   scattering and cascading matrices. Reload it in Julia with [`load_model`](@ref), i.e.
   `model = load_model("my_run")`.

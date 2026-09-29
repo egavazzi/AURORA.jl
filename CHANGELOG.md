@@ -1,6 +1,23 @@
 # Changelog
 
 ## Unreleased
+- **Breaking** A neutral species describes its collisions with an in-code channel table instead of the `internal_data/data_neutrals/<species>_levels.dat` / `.name` files [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+  - New type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)` for one inelastic channel; `CollisionChannel(c; energy_loss = ...)` copies it with fields replaced.
+  - `NeutralSpecies` gains `elastic_cross_section`, `channels` and `secondary_law`; `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are rebuilt from them at every `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`).
+  - **Breaking** `NeutralSpecies(name, density_source; ...)` takes `elastic_cross_section`, `channels` and `secondary_law` in place of `cascading_spec`. `NeutralSpecies` is no longer parametric.
+  - New functions `default_channels(:N2)`, `default_elastic_cross_section`, `default_secondary_law`, `default_cascading_spec`, and the lookup helpers `AURORA.channel` (not exported), `channel_names`, `ionizing_channels`. The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and `channels_O.jl`.
+  - `AURORA.cascading_spec_from_channels(name, secondary_law, channels)` derives the ionization thresholds and secondary counts from a channel table, and throws when two channels ionize at the same energy loss with different secondary counts.
+  - **Breaking** `DefaultCascadingSpecN2` / `O2` / `O`, `load_excitation_threshold`, `load_excitation_threshold_for` and `get_level_names` are removed. `get_cross_section` also accepts a `Symbol` species name.
+  - A run writes its channel tables to `inputs/collision_channels.toml`.
+  - `make_volume_excitation_file` takes the ionization cross sections from the run's `inputs/physics_state.jld2`, which it now requires.
+  - The cross sections and excitation levels of the built-in N₂, O₂ and O species are unchanged, bit for bit.
+- Cascading cache filenames include a hash of the physics they were built from, so two saves within one second no longer overwrite each other [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies; they take a vector of energies only [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition over lower bins; electrons degraded below the lowest grid edge thermalise instead of being pushed into the first bin [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- **Numerical Breaking (small)** Ionizing collisions near a threshold no longer delete the electron, and both cascading spectra are normalized by the row's ionization event count, so outgoing electrons below the lowest energy bin thermalise (energy-budget residual) instead of being redistributed on-grid [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- A cascading cache file is reused only when its thresholds, secondary counts and secondary law match, and matrices are selected by exact threshold; older cache files are recomputed [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
+- The energy-argument `primary_spectrum` and `secondary_spectrum` accessors of a cascading cache select the bin that contains the given energy (they selected the bin below it) [#181](https://github.com/egavazzi/AURORA.jl/pull/181)
 - Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.

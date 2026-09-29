@@ -34,12 +34,16 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
     if needs_initialization(sim)
         initialize!(sim; verbose)
     end
+    for sp in sim.model.species
+        check_collision_data_current(sp, sim.model.energy_grid.E_centers)
+    end
 
     mkpath(savedir)
     mkpath(joinpath(savedir, "inputs"))
 
     write_config_toml(sim)
     write_atmosphere_nc(sim)
+    write_collision_channels_toml(sim)
     write_physics_jld2(sim)
 
     ds = create_simulation_nc(sim)

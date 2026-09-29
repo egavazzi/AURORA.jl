@@ -62,3 +62,47 @@ end
     # should be the same as steady state (integral of 1.0 over z = 100e3)
     @test I[end] ≈ 100e3 rtol = 0.01
 end
+
+@testitem "Ionization rates follow the run's own channel table" begin
+    using NCDatasets
+    msis_file = find_msis_file(; verbose=false)
+    iri_file  = find_iri_file(; verbose=false)
+    flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+
+    QN2i_of(savedir) = NCDataset(joinpath(savedir, "analysis", "volume_excitation.nc"),
+                                 "r") do ds
+        Array(ds["QN2i"])
+    end
+
+    # Reference run with the default N₂ channels
+    reference = mktempdir()
+    model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+    run!(AuroraSimulation(model, flux, reference; mode = SteadyStateMode()); verbose=false)
+    make_volume_excitation_file(reference)
+
+    # Same run without the doubly-ionizing N₂ channel
+    trimmed = mktempdir()
+    model2 = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
+    ddion = AURORA.channel(model2.species[:N2], "ddion")
+    filter!(c -> c.name != "ddion", model2.species[:N2].channels)
+    run!(AuroraSimulation(model2, flux, trimmed; mode = SteadyStateMode()); verbose=false)
+    make_volume_excitation_file(trimmed)
+
+    QN2i_ref = QN2i_of(reference)
+    QN2i_trimmed = QN2i_of(trimmed)
+    @test size(QN2i_ref) == size(QN2i_trimmed)
+    # Dropping an ionizing channel changes the ion-pair production rate
+    @test QN2i_trimmed != QN2i_ref
+
+    # The weight the dropped channel carried is exactly 2 σ_ddion
+    E_centers = load_coordinates(trimmed).E_centers
+    σ_full = AURORA.ion_production_cross_section(
+        AURORA.load_model(reference), :N2, E_centers)
+    σ_trimmed = AURORA.ion_production_cross_section(
+        AURORA.load_model(trimmed), :N2, E_centers)
+    @test σ_full .- σ_trimmed ≈ 2 .* ddion.cross_section(E_centers)
+
+    # A model without N2/O2/O cannot produce these rates, and says so
+    @test_throws "need a species named" AURORA.ion_production_cross_section(
+        (; species = (model.species[:O2], model.species[:O])), :N2, E_centers)
+end

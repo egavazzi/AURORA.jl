@@ -163,52 +163,35 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic,
     # Loop over the energy levels of the collisions with the i-th neutral species
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] <= 0  # these collisions should not produce secondary e-
+            E_loss = E_levels[i_level, 1]
             # Calculate the degradation factor combining:
             # 1) Cross-section σ[i_level, iE] - collision probability
             # 2) Energy loss correction min(1, E_loss/ΔE[iE]) - accounts for when the energy
             #    loss is smaller than the bin width (prevents over-depleting the current bin)
-            factor = σ[i_level, iE] * min(1, E_levels[i_level, 1] / ΔE[iE])
+            factor = σ[i_level, iE] * min(1, E_loss / ΔE[iE])
 
-            # Find the energy bins where electrons will end up after losing E_levels[i_level, 1] eV
-            E_loss = E_levels[i_level, 1]
-            E_min = E_edges[iE] - E_loss           # Minimum energy after collision
-            E_max = E_edges[iE+1] - E_loss         # Maximum energy after collision
-            # Find indices where degraded electrons end up
-            i_min = searchsortedfirst(@view(E_edges[2:end]), E_min)  # First bin with upper edge > E_min
-            i_max = searchsortedlast(@view(E_edges[1:end-1]), E_max) # Last bin with lower edge < E_max
-            i_degrade = i_min:i_max
-            partition_fraction = zeros(length(i_degrade)) # initialise
+            # Arrival range of the electrons leaving the bin: the bin shifted down by
+            # E_loss, cut at E_edges[iE] (the rest stays in the bin, see update_B!).
+            leaving_lower = E_edges[iE] - E_loss
+            leaving_upper = min(E_edges[iE+1] - E_loss, E_edges[iE])
+            leaving_width = leaving_upper - leaving_lower
 
-            if !isempty(i_degrade) && i_degrade[1] < iE
-                # Distribute the degrading e- between those bins
-                partition_fraction[1] = min(1, (E_edges[i_degrade[1]+1] -
-                                                E_edges[iE] + E_levels[i_level, 1]) / ΔE[iE])
-                if length(i_degrade) > 2
-                    partition_fraction[2:end-1] = min.(1, ΔE[i_degrade[2:end-1]] / ΔE[iE])
-                end
-                partition_fraction[end] = min(1, (E_edges[iE+1] - E_edges[i_degrade[end]] -
-                                                    E_levels[i_level, 1]) / ΔE[iE])
-                if i_degrade[end] == iE
-                    partition_fraction[end] = 0
-                end
+            if leaving_width > 0
+                # Lower bins overlapping the arrival range
+                i_min = searchsortedfirst(@view(E_edges[2:end]), leaving_lower)
+                i_max = min(searchsortedlast(@view(E_edges[1:end-1]), leaving_upper), iE - 1)
 
-                # Normalize partition fractions to sum to 1. If they sum to zero, the degraded
-                # electrons all land on/below the grid floor (no overlap with any on-grid bin),
-                # so they are lost (they thermalise below the grid). Skip placing them to avoid
-                # a 0/0 division producing NaNs in some very specific cases.
-                partition_sum = sum(partition_fraction)
-                if partition_sum > 0
-                    partition_fraction = partition_fraction / partition_sum
-
-                    # Add the degraded electron flux to Q
-                    # Q[z,t,E'] += Ie_scatter[z,t] x partition_fraction[E'] x σ x min(1, E_loss/dE)
-                    for i_u in eachindex(partition_fraction)
-                        iE_degrade = i_degrade[i_u]
-                        weight = partition_fraction[i_u] * factor
-                        @tturbo for j in axes(Q, 2)
-                            for k in axes(Q, 1)
-                                Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
-                            end
+                # Each bin takes the share of the range it covers; the share below
+                # E_edges[1] is not placed (thermalised).
+                # Q[z,t,E'] += Ie_scatter[z,t] x share[E'] x σ x min(1, E_loss/ΔE)
+                for iE_degrade in i_min:i_max
+                    overlap = min(E_edges[iE_degrade + 1], leaving_upper) -
+                              max(E_edges[iE_degrade], leaving_lower)
+                    overlap > 0 || continue
+                    weight = factor * overlap / leaving_width
+                    @tturbo for j in axes(Q, 2)
+                        for k in axes(Q, 1)
+                            Q[k, j, iE_degrade] += Ie_scatter[k, j] * weight
                         end
                     end
                 end
@@ -333,24 +316,18 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            sum_secondary = sum(secondary_e_spectra)    # for normalization
-            sum_primary = sum(primary_e_spectra)        # for normalization
-            if sum_secondary > 0
-                # Here we normalize the secondary spectrum by `sum_primary` for the following
-                # reason: The secondary law peaks at E_s→0, so the part below the ~2 eV grid
-                # floor is missing from the binned matrix. Dividing by sum_secondary would
-                # smear that missing low-energy mass onto the surviving higher-energy bins,
-                # inflating ⟨E_s⟩ and breaking energy conservation (degraded+secondary > E_p-I).
-                # Using sum_primary is like using the "true" total sum_secondary as if they
-                # were all on-grid, preserving energy conservation.
-                secondary_scale = σ_level * n_secondary / sum_primary
-                secondary_e_spectrum .+= secondary_e_spectra .* secondary_scale
+            # Normalize by the row's ionization event count, not an on-grid sum: the part
+            # of either spectrum below the lowest grid edge is left out (thermalised)
+            # instead of being moved back onto the grid.
+            events = event_count(species_cascading, iE, E_loss)
+            if events <= 0
+                σ_level > 0 && throw(ArgumentError(
+                    "ionizing channel at $(E_loss) eV has cross section $(σ_level) m² in \
+                     energy bin $(iE) but no ionization events in its cascading matrices"))
+                continue
             end
-            if sum_primary > 0
-                # scale by cross-section and spectra normalization
-                primary_scale = σ_level / sum_primary
-                primary_e_spectrum .+= primary_e_spectra .* primary_scale
-            end
+            secondary_e_spectrum .+= secondary_e_spectra .* (σ_level * n_secondary / events)
+            primary_e_spectrum .+= primary_e_spectra .* (σ_level / events)
         end
     end
 end

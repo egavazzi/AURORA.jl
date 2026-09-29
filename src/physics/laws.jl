@@ -92,6 +92,72 @@ Base.convert(::Type{ExprLaw}, s::ExprLawSerialization) = ExprLaw(s.src)
 Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
 profile_label(l::ExprLaw) = "@law $(l.src)"
 
+"""
+    is_fingerprintable(law) -> Bool
+
+True for an [`ExprLaw`](@ref) or a functor with fields; false for a plain named function.
+The fingerprint covers only what the law object holds: a functor's call method and any
+global a law reads are not part of it.
+"""
+is_fingerprintable(law) = fieldcount(typeof(law)) > 0
+is_fingerprintable(::ExprLaw) = true
+
+"""
+    law_fingerprint(law) -> String
+
+String identifying a law, built from everything the law carries: the source of an
+[`ExprLaw`](@ref), or the type of a functor together with the values of all its fields,
+recursively.
+
+Throws for a law that [`is_fingerprintable`](@ref) rejects.
+"""
+law_fingerprint(law::ExprLaw) = law.src
+function law_fingerprint(law)
+    is_fingerprintable(law) || throw(ArgumentError(
+        "a $(typeof(law)) carries no source and no fields, so there is nothing to identify \
+         it by. Wrap the law with @law, or hold its parameters in a functor struct."))
+    io = IOBuffer()
+    dump_law_value(io, law)
+    return String(take!(io))
+end
+
+# Type name and field values, recursively, via `getfield` (not `show`, which a custom
+# display could make lossy).
+function dump_law_value(io::IO, value)
+    T = typeof(value)
+    if fieldcount(T) == 0
+        # A fieldless value is its type; a named function is its qualified name, which does
+        # not depend on the printing context.
+        value isa Function ? print(io, parentmodule(value), ".", nameof(value)) : print(io, T)
+        return io
+    end
+    print(io, T, "(")
+    for i in 1:fieldcount(T)
+        i > 1 && print(io, ", ")
+        print(io, fieldname(T, i), "=")
+        dump_law_value(io, getfield(value, i))
+    end
+    print(io, ")")
+    return io
+end
+
+# Leaves: `repr` keeps every digit.
+dump_law_value(io::IO, value::Union{Number, AbstractString, Symbol, Char, Enum, Nothing}) =
+    (print(io, repr(value)); io)
+
+# An `ExprLaw` is its source; its compiled closure has a per-session name.
+dump_law_value(io::IO, value::ExprLaw) = (print(io, "ExprLaw(", repr(value.src), ")"); io)
+
+function dump_law_value(io::IO, value::Union{AbstractArray, Tuple})
+    print(io, typeof(value), axes(value), "[")
+    for (i, element) in enumerate(value)
+        i > 1 && print(io, ", ")
+        dump_law_value(io, element)
+    end
+    print(io, "]")
+    return io
+end
+
 # A law is reproducible unless it is a bare anonymous function/closure. Functors (callable
 # structs, including ExprLaw, DensityProfile and ElectronProfile) and named functions all pass.
 is_anonymous(f) = f isa Function && startswith(string(nameof(f)), "#")

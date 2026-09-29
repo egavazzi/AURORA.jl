@@ -54,7 +54,12 @@ src/
 │   └── input_flux.jl            # InputFlux, compute_flux
 │
 ├── physics/
-│   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section data
+│   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section functions
+│   │   ├── channels.jl          # default_channels / _elastic_cross_section / _secondary_law
+│   │   ├── channels_N2.jl       # N₂ collision-channel table
+│   │   ├── channels_O2.jl       # O₂ collision-channel table
+│   │   └── channels_O.jl        # O collision-channel table
+│   ├── collision_channel.jl     # CollisionChannel and the matrices derived from a table
 │   ├── cascading.jl             # Ionization cascading transfer matrices
 │   ├── phase_functions.jl       # Differential cross sections → 3D scattering
 │   └── scattering.jl            # Pitch-angle scattering matrices
@@ -77,7 +82,7 @@ src/
 │
 ├── output/
 │   ├── output_manager.jl        # AuroraOutputManager (output options)
-│   ├── write.jl                 # config.toml, atmosphere.nc, physics_state.jld2, simulation_data.nc
+│   ├── write.jl                 # config.toml, atmosphere.nc, collision_channels.toml, physics_state.jld2, simulation_data.nc
 │   └── read.jl                  # SimulationResult, load_results, read_atmosphere_nc
 │
 ├── analysis/
