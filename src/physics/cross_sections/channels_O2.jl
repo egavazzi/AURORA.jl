@@ -26,7 +26,7 @@ end
 """
     default_elastic_cross_section_O2()
 
-The built-in O₂ elastic cross section, [`e_O2elastic`](@ref).
+The built-in O₂ elastic cross section, `e_O2elastic`.
 """
 default_elastic_cross_section_O2() = e_O2elastic
 

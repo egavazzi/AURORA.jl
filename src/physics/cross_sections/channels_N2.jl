@@ -47,7 +47,7 @@ end
 """
     default_elastic_cross_section_N2()
 
-The built-in N₂ elastic cross section, [`e_N2elastic`](@ref).
+The built-in N₂ elastic cross section, `e_N2elastic`.
 """
 default_elastic_cross_section_N2() = e_N2elastic
 

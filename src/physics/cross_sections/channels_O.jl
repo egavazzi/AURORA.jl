@@ -26,14 +26,14 @@ end
 """
     default_elastic_cross_section_O()
 
-The built-in atomic-oxygen elastic cross section, [`e_Oelastic`](@ref).
+The built-in atomic-oxygen elastic cross section, `e_Oelastic`.
 """
 default_elastic_cross_section_O() = e_Oelastic
 
 """
     default_secondary_law_O()
 
-The built-in atomic-oxygen secondary-electron energy distribution, an [`OSecondaryLaw`](@ref)
+The built-in atomic-oxygen secondary-electron energy distribution, an `OSecondaryLaw`
 interpolating its parameters in the primary energy.
 """
 function default_secondary_law_O()
