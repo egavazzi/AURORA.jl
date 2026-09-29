@@ -100,6 +100,9 @@ Whether [`law_fingerprint`](@ref) can identify `law`.
 An [`ExprLaw`](@ref) carries its own source, and a functor carries its parameters in its
 fields. A callable with neither — a plain named function — is only its name here, and two
 different definitions of the same name are indistinguishable, so it has no fingerprint.
+
+The fingerprint covers only what the law object holds. A functor's call method, and any
+global a law reads, are not part of it.
 """
 is_fingerprintable(law) = fieldcount(typeof(law)) > 0
 is_fingerprintable(::ExprLaw) = true
@@ -129,9 +132,13 @@ end
 # parameters that make it behave the way it does.
 function dump_law_value(io::IO, value)
     T = typeof(value)
-    print(io, T)
-    fieldcount(T) == 0 && return io
-    print(io, "(")
+    if fieldcount(T) == 0
+        # A fieldless value is its type; a named function is its qualified name, which does
+        # not depend on the printing context.
+        value isa Function ? print(io, parentmodule(value), ".", nameof(value)) : print(io, T)
+        return io
+    end
+    print(io, T, "(")
     for i in 1:fieldcount(T)
         i > 1 && print(io, ", ")
         print(io, fieldname(T, i), "=")
@@ -142,11 +149,14 @@ function dump_law_value(io::IO, value)
 end
 
 # `repr` round-trips these, so it reproduces e.g. every digit of a Float64 parameter.
-dump_law_value(io::IO, value::Union{Number, AbstractString, Symbol, Nothing}) =
+dump_law_value(io::IO, value::Union{Number, AbstractString, Symbol, Char, Enum, Nothing}) =
     (print(io, repr(value)); io)
 
+# An `ExprLaw` is its source; its compiled closure has a per-session name.
+dump_law_value(io::IO, value::ExprLaw) = (print(io, "ExprLaw(", repr(value.src), ")"); io)
+
 function dump_law_value(io::IO, value::Union{AbstractArray, Tuple})
-    print(io, typeof(value), "[")
+    print(io, typeof(value), axes(value), "[")
     for (i, element) in enumerate(value)
         i > 1 && print(io, ", ")
         dump_law_value(io, element)

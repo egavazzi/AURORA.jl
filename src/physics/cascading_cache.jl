@@ -32,19 +32,13 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
                            find_cascading_cache(cache.spec, E_edges; verbose, policy)
 
     if file_found
-        try
-            cascading_data = load_cascading_cache(filepath, n_E, cache.spec; verbose)
-            cache.primary_transfer_matrix = cascading_data[1]
-            cache.secondary_transfer_matrix = cascading_data[2]
-            cache.E_edges = cascading_data[3]
-            # The file's thresholds were checked for equality with the spec's before it was
-            # accepted, so the spec is the single source of truth for them.
-            cache.ionization_thresholds = copy(cache.spec.ionization_thresholds)
-            cache.event_count = cascading_data[5]
-            return nothing
-        catch err
-            @warn "Could not load cascading cache $(basename(filepath)). Recomputing." exception = err
-        end
+        cascading_data = load_cascading_cache(filepath, n_E, cache.spec; verbose)
+        cache.primary_transfer_matrix = cascading_data[1]
+        cache.secondary_transfer_matrix = cascading_data[2]
+        cache.E_edges = cascading_data[3]
+        cache.ionization_thresholds = copy(cache.spec.ionization_thresholds)
+        cache.event_count = cascading_data[5]
+        return nothing
     end
 
     if !cacheable
@@ -139,7 +133,7 @@ function find_cascading_cache(spec::CascadingSpec, E_edges;
     return (false, "")
 end
 
-function load_cascading_cache(filepath, n_E::Int, spec::CascadingSpec; verbose::Bool = true)
+function load_cascading_cache(filepath, n_E::Integer, spec::CascadingSpec; verbose::Bool = true)
     verbose && println("Loading cascading matrices from file: $(basename(filepath))")
     n_bins = n_E - 1
     n_thresholds = length(spec.ionization_thresholds)
@@ -169,13 +163,12 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
                               policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(cache.spec, policy)
     mkpath(species_dir)
-    # The timestamp alone is not unique: matrices for a species can build in under a second,
-    # so two saves can carry the same "yyyymmdd-HHMMSS" stem. Append a hash of the physics the
-    # file was built from, and fall back to a counter on top of that in the unlikely case the
-    # hash also collides, so no save ever overwrites another file.
+    # Matrices can build in under a second, so the timestamp alone does not make the name
+    # unique. The content hash separates saves of different physics or grids; the counter
+    # separates repeated saves of the same content.
+    fingerprint = law_fingerprint(cache.spec.secondary_law)
     content_fingerprint = hash((cache.E_edges, cache.ionization_thresholds,
-                                cache.spec.n_secondaries,
-                                law_fingerprint(cache.spec.secondary_law)))
+                                cache.spec.n_secondaries, fingerprint))
     stem = string("cascading_", cache.spec.name, "_",
                  Dates.format(now(), "yyyymmdd-HHMMSS"), "_",
                  string(content_fingerprint; base = 16))
@@ -193,7 +186,7 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
         file["E_edges"]         = cache.E_edges
         file["E_ionizations"]   = cache.ionization_thresholds
         file["n_secondaries"]   = cache.spec.n_secondaries
-        file["law_fingerprint"] = law_fingerprint(cache.spec.secondary_law)
+        file["law_fingerprint"] = fingerprint
     end
     verbose && println("Saved cascading matrices to $(basename(filename)).")
     return filename

@@ -59,20 +59,14 @@ end
 
     n2_file = joinpath(n2_dir, only(cache_files(n2_dir)))
     payload = jldopen(n2_file, "r") do file
-        (
-            Q_primary   = file["Q_primary"],
-            Q_secondary = file["Q_secondary"],
-            E_edges     = file["E_edges"],
-            E_ionizations = file["E_ionizations"],
-        )
+        Dict(key => file[key] for key in AURORA.CASCADING_CACHE_KEYS)
     end
     rm(n2_file; force=true)
+    payload["version_AURORA"] = "0.0.0"
     jldopen(n2_file, "w") do file
-        file["version_AURORA"] = "0.0.0"
-        file["Q_primary"]      = payload.Q_primary
-        file["Q_secondary"]    = payload.Q_secondary
-        file["E_edges"]        = payload.E_edges
-        file["E_ionizations"]  = payload.E_ionizations
+        for (key, value) in payload
+            file[key] = value
+        end
     end
 
     stale_cache = AURORA.SpeciesCascadingCache(AURORA.default_cascading_spec(:N2))
@@ -316,6 +310,11 @@ end
     files = cache_files(n2_dir)
     @test length(files) == 2
     @test allunique(files)
+
+    # Saving the same content again within the same second: the content hash is identical,
+    # so the counter suffix has to keep the names apart.
+    AURORA.save_cascading_cache(cache_a; policy = save_policy, verbose = false)
+    @test length(cache_files(n2_dir)) == 3
 
     # Both files are intact and independently loadable.
     reloaded_a = AURORA.SpeciesCascadingCache(AURORA.default_cascading_spec(:N2))
