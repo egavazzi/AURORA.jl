@@ -8,16 +8,14 @@
 One inelastic collision channel of a neutral species: a cross section, the energy it removes
 from the colliding electron, and the number of secondary electrons it ejects.
 
-A species holds its channels in a vector whose order is the row order of the `cross_sections`
-and `excitation_levels` matrices derived from it, so row `i + 1` of both matrices always
-describes `channels[i]` (row 1 is the elastic channel).
+In a species, `channels[i]` is row `i + 1` of `cross_sections` and `excitation_levels` (row
+1 is elastic).
 
 # Fields
 - `name::String`: channel identifier, e.g. `"a3sup"`, `"ionx2sgp"`. Used for labels and for
     [`channel`](@ref) lookup.
 - `cross_section::F`: callable mapping a vector of energies (eV) to cross sections (m²).
-    Must be a named function, a functor, or an [`ExprLaw`](@ref) so that it survives being
-    saved to `inputs/physics_state.jld2`.
+    Must be a named function, a functor, or an [`ExprLaw`](@ref).
 - `energy_loss::Float64`: energy removed from the electron per collision (eV).
 - `n_secondaries::Int`: secondary electrons ejected — `0` for excitation, `1` for single
     ionization, `2` for double ionization.

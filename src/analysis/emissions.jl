@@ -8,17 +8,14 @@ using NCDatasets: NCDataset, defDim, defVar
 """
     ion_production_cross_section(model, species_name::Symbol, E_centers) → Vector
 
-Cross section for producing one ion pair by electron impact on `species_name` of `model`:
-each collision channel's cross section weighted by the number of secondary electrons it
-ejects, summed over the channels. Unit m².
+Ionization cross section (m²) of `species_name` in `model`: the channel cross sections
+weighted by their number of secondary electrons.
 """
 function ion_production_cross_section(model, species_name::Symbol, E_centers::AbstractVector)
     i_species = findfirst(sp -> sp.name === species_name, model.species)
     isnothing(i_species) && throw(ArgumentError(
-        "The simulation has no species named $(species_name), so its ionization rate cannot \
-         be computed. Its species are \
-         $(join((String(sp.name) for sp in model.species), ", ")). Volume excitation rates \
-         are only defined for a model containing N2, O2 and O."))
+        "Volume excitation rates need a species named $(species_name); the model has \
+         $(join((String(sp.name) for sp in model.species), ", "))."))
     sp = model.species[i_species]
     size(sp.cross_sections, 2) == length(E_centers) || throw(ArgumentError(
         "The $(species_name) cross sections of the saved model cover \
@@ -34,9 +31,6 @@ end
 Read `simulation_data.nc`, `inputs/atmosphere.nc` and `inputs/physics_state.jld2` from
 `directory_to_process`, compute volume-excitation-rates for all tracked optical emissions and
 ionizations, and write results to `analysis/volume_excitation.nc`.
-
-The ionization rates use the collision channels of the saved model, so they follow an edited
-channel table.
 
 Returns a [`VolumeExcitationResult`](@ref).
 
@@ -66,7 +60,7 @@ function make_volume_excitation_file(directory_to_process; max_bytes::Real = 512
     σ_O1D     = excitation_O1D(E_centers)
     σ_O1S     = excitation_O1S(E_centers)
 
-    ## Ion-production cross-sections, from the collision channels this run actually used
+    ## Load ionization cross-sections
     model = load_model(directory_to_process)
     σ_N2i = ion_production_cross_section(model, :N2, E_centers)
     σ_O2i = ion_production_cross_section(model, :O2, E_centers)

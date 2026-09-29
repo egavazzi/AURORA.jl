@@ -7,9 +7,6 @@ include("channels_O.jl")
 
 The built-in inelastic collision channels of `:N2`, `:O2` or `:O`, in the row order of the
 `cross_sections` and `excitation_levels` matrices.
-
-The tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and
-`channels_O.jl`.
 """
 function default_channels(species::Symbol)
     species === :N2 && return default_channels_N2()

@@ -15,11 +15,9 @@ from. Its elastic cross section and its secondary-electron energy distribution s
 in the `elastic_cross_section` and `secondary_law` fields of [`NeutralSpecies`](@ref).
 
 At `initialize!(model)` the channel table is evaluated on the model energy grid into the
-`cross_sections` matrix `[n_levels × n_E]` and the `excitation_levels` matrix
-`[n_levels × 2]`, and the ionizing channels define the cascading thresholds. Row 1 of both
-matrices is the elastic channel and row `i + 1` is `channels[i]`, so the rows cannot fall out
-of step and the cascading thresholds cannot disagree with the energy losses charged to the
-primary electron.
+`cross_sections` `[n_levels × n_E]` and `excitation_levels` `[n_levels × 2]` matrices (row 1
+elastic, row `i + 1` = `channels[i]`), and the ionizing channels define the cascading
+thresholds.
 
 The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and
 `channels_O.jl`, and are returned by [`default_channels`](@ref),

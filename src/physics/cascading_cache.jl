@@ -1,10 +1,7 @@
 using Dates: Dates, now
 using JLD2: jldopen
 
-# Keys a cascading cache file must carry. Besides the matrices themselves, the file records
-# every ingredient of the physics it was built from, so that a file built for a different
-# spec (other thresholds, other secondary counts, other secondary law) is rejected instead
-# of being reused under the same species name.
+# Entries a cascading cache file must hold; they identify the spec it was built for.
 const CASCADING_CACHE_KEYS = ("version_AURORA", "Q_primary", "Q_secondary", "event_count",
                               "E_edges", "E_ionizations", "n_secondaries", "law_fingerprint")
 
@@ -18,8 +15,7 @@ Matrices are loaded from a JLD2 cache file when one on disk was built with the s
 ionization thresholds, secondary counts and secondary law as `cache.spec`. Otherwise they
 are computed from scratch (and optionally saved to disk depending on `CachePolicy` options).
 
-A spec whose secondary law is not [`is_fingerprintable`](@ref) is never cached: there is
-nothing to tell one such law from another, so its matrices are recomputed every time.
+Matrices for a secondary law that is not [`is_fingerprintable`](@ref) are never cached.
 """
 function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::EnergyGrid;
                                     verbose::Bool = true,
@@ -36,17 +32,15 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
         cache.primary_transfer_matrix = cascading_data[1]
         cache.secondary_transfer_matrix = cascading_data[2]
         cache.E_edges = cascading_data[3]
-        cache.ionization_thresholds = copy(cache.spec.ionization_thresholds)
+        cache.ionization_thresholds = cascading_data[4]
         cache.event_count = cascading_data[5]
         return nothing
     end
 
     if !cacheable
         verbose && println("Cascading matrices for $(cache.spec.name) are not cached: its \
-                            secondary law is a $(typeof(cache.spec.secondary_law)), which \
-                            carries nothing to identify it by. Wrap the law with @law, or \
-                            hold its parameters in a functor struct, to cache them. \
-                            Computing...")
+                            secondary law, a $(typeof(cache.spec.secondary_law)), cannot be \
+                            fingerprinted (use @law or a functor). Computing...")
     elseif !file_found && !policy.force_recompute
         verbose && println("No compatible cascading cache for $(cache.spec.name). Computing...")
     end

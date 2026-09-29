@@ -442,7 +442,7 @@ end
 @testitem "Cascading real-law energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.default_cascading_spec(:N2)             # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
     I = spec.ionization_thresholds[1]                  # 15.581 eV
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
     Ec = eg.E_centers
@@ -470,9 +470,7 @@ end
         # Energy carried away by the outgoing electrons (degraded primary + secondaries) per event.
         placed = sum(Ec .* (sec .+ prim)) / σ[2, iE]
         push!(ratios, placed / (Ec[iE] - I))
-        # The secondary law reaches down to E_s = 0, so every row loses the secondaries
-        # below the grid floor. Well above threshold that mass carries a negligible share
-        # of the excess energy and the row places essentially all of it.
+        # Well above threshold the below-floor secondaries carry a negligible share.
         if eg.E_edges[iE] >= 10 * I
             push!(on_grid_ratios, placed / (Ec[iE] - I))
         end
@@ -490,7 +488,7 @@ end
 @testitem "Cascading double-ionization energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.default_cascading_spec(:N2)             # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
     @test spec.n_secondaries[end] == 2                 # sanity: last channel is double ionization
     I = spec.ionization_thresholds[end]                # 42.0 eV double-ionization threshold
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
@@ -517,9 +515,7 @@ end
         # Energy carried away by the three outgoing electrons (degraded primary + 2 secondaries).
         placed = sum(Ec .* (sec .+ prim)) / σ[2, iE]
         push!(ratios, placed / (Ec[iE] - I))
-        # The secondary law reaches down to E_s = 0, so every row loses the secondaries below
-        # the grid floor. Well above threshold that mass carries a negligible share of the
-        # excess energy and the row places essentially all of it.
+        # Well above threshold the below-floor secondaries carry a negligible share.
         if eg.E_edges[iE] >= 10 * I
             push!(on_grid_ratios, placed / (Ec[iE] - I))
         end
@@ -602,8 +598,7 @@ end
                                                law, pbuf, sbuf)
         end
 
-        # The event count normalizes both spectra, so the two methods must agree on it
-        # wherever the row carries weight.
+        # CDF and adaptive event counts agree.
         for i in i_first:n_E
             Z_ref[i, 1] > 0 || continue
             @test isapprox(Z_cdf[i, 1], Z_ref[i, 1]; rtol = 2e-2)
@@ -660,9 +655,8 @@ end
     end
 end
 
-# Near-threshold coverage: a primary bin that can ionize must redistribute the electrons that
-# `update_A!` removes from it. The only rows that place nothing are those whose whole
-# kinematic range lies below the lowest grid edge; their electrons thermalise there.
+# Every ionizing row places its electrons unless its whole kinematic range lies below the grid
+# floor.
 @testitem "Cascading near-threshold rows are filled" begin
     using AURORA
 
@@ -710,9 +704,7 @@ end
         for I in spec.ionization_thresholds
             checked = 0
             for iE in eachindex(eg.E_centers)
-                # The lowest degraded energy of the row is (E_edges[iE] − I)/2 for single and
-                # (E_edges[iE] − I)/3 for double ionization; above the floor in both cases
-                # the whole degraded range is binned.
+                # Whole degraded range on-grid (lowest is (E − I)/3 for double ionization).
                 (eg.E_edges[iE] - I) / 3 >= eg.E_edges[1] || continue
                 checked += 1
                 @test isapprox(sum(AURORA.primary_spectrum(cache, iE, I)),

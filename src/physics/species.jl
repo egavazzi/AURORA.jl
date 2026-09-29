@@ -9,8 +9,7 @@ All per-species data needed to advance the transport equation through one neutra
 
 The collision physics is described by `elastic_cross_section`, `channels` and
 `secondary_law`. Everything the solvers read — `cross_sections`, `excitation_levels`,
-`cascading_spec` and `cascading_data` — is derived from those three at `initialize!(model)`,
-so a channel added, removed or edited before that call is reflected everywhere at once.
+`cascading_spec` and `cascading_data` — is derived from those three at `initialize!(model)`.
 
 # Fields
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
@@ -41,12 +40,8 @@ so a channel added, removed or edited before that call is reflected everywhere a
 - `cascading_data::SpeciesCascadingCache`: cascading transfer matrices, filled in by
     `load_or_compute_cascading!`
 
-!!! note "Mutation happens before `initialize!`"
-    Assigning `channels`, `elastic_cross_section`, `secondary_law` or `density_source` does
-    not mark the model uninitialized, because a species does not know which model holds it.
-    Edit a species of an already-initialized model, then call `initialize!(model)` explicitly
-    to rebuild the derived data. `run!` throws when the derived data no longer matches the
-    channel table.
+Edits made after `initialize!(model)` take effect at the next explicit `initialize!(model)`;
+`run!` throws when the derived data no longer matches the channel table.
 """
 mutable struct NeutralSpecies
     name::Symbol
@@ -150,9 +145,7 @@ channel(sp::NeutralSpecies, name::AbstractString) = channel(sp.channels, name)
 Derive `cross_sections`, `excitation_levels` and the cascading spec of `sp` from its channel
 table, evaluating the cross sections on `E_centers`.
 
-A spec equal to the one the cascading cache already holds leaves that cache object in place,
-for `load_or_compute_cascading!` to refresh against the current energy grid; a spec that
-differs replaces the cache with an empty one built from it.
+The cascading cache is replaced only when the derived spec differs from the current one.
 """
 function rebuild_collision_data!(sp::NeutralSpecies, E_centers::AbstractVector)
     check_channel_names(sp.channels)
@@ -213,8 +206,9 @@ end
     N2Species(msis_file::AbstractString)
 
 Construct the default N₂ species: elastic cross section, collision channels and
-secondary-electron law from [`default_channels`](@ref) and friends, phase function from
-[`phase_fcn_N2`](@ref).
+secondary-electron law from [`default_channels`](@ref),
+[`default_elastic_cross_section`](@ref) and [`default_secondary_law`](@ref), phase function
+from [`phase_fcn_N2`](@ref).
 
 `density_source` can be a [`DensityProfile`](@ref) or any callable `h_atm (m) → density
 (m⁻³)`. Passing a [`NeutralAtmosphere`](@ref) is shorthand for `neutrals[:N2]`. Passing an MSIS

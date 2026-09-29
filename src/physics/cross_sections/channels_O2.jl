@@ -1,8 +1,7 @@
 """
     default_channels_O2() → Vector{CollisionChannel}
 
-The built-in O₂ inelastic collision channels, in the row order of the `cross_sections` and
-`excitation_levels` matrices of an O₂ species.
+Built-in O₂ collision channels.
 """
 function default_channels_O2()
     return CollisionChannel[

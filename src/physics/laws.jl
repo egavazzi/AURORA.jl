@@ -95,14 +95,9 @@ profile_label(l::ExprLaw) = "@law $(l.src)"
 """
     is_fingerprintable(law) -> Bool
 
-Whether [`law_fingerprint`](@ref) can identify `law`.
-
-An [`ExprLaw`](@ref) carries its own source, and a functor carries its parameters in its
-fields. A callable with neither — a plain named function — is only its name here, and two
-different definitions of the same name are indistinguishable, so it has no fingerprint.
-
-The fingerprint covers only what the law object holds. A functor's call method, and any
-global a law reads, are not part of it.
+True for an [`ExprLaw`](@ref) or a functor with fields; false for a plain named function.
+The fingerprint covers only what the law object holds: a functor's call method and any
+global a law reads are not part of it.
 """
 is_fingerprintable(law) = fieldcount(typeof(law)) > 0
 is_fingerprintable(::ExprLaw) = true
@@ -112,8 +107,7 @@ is_fingerprintable(::ExprLaw) = true
 
 String identifying a law, built from everything the law carries: the source of an
 [`ExprLaw`](@ref), or the type of a functor together with the values of all its fields,
-recursively. Two laws whose fingerprints differ may behave differently, so a cache file
-built under one fingerprint is only reused for a law with the same one.
+recursively.
 
 Throws for a law that [`is_fingerprintable`](@ref) rejects.
 """
@@ -127,9 +121,8 @@ function law_fingerprint(law)
     return String(take!(io))
 end
 
-# Type name and field values, read with `getfield` and written with `repr` at the leaves.
-# Going through `show` instead would let a type with a custom display hide the very
-# parameters that make it behave the way it does.
+# Type name and field values, recursively, via `getfield` (not `show`, which a custom
+# display could make lossy).
 function dump_law_value(io::IO, value)
     T = typeof(value)
     if fieldcount(T) == 0
@@ -148,7 +141,7 @@ function dump_law_value(io::IO, value)
     return io
 end
 
-# `repr` round-trips these, so it reproduces e.g. every digit of a Float64 parameter.
+# Leaves: `repr` keeps every digit.
 dump_law_value(io::IO, value::Union{Number, AbstractString, Symbol, Char, Enum, Nothing}) =
     (print(io, repr(value)); io)
 

@@ -48,8 +48,8 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
   model = AuroraModel(..., nothing, ...; species = (O2Species(atm), OSpecies(atm)))
 
   # Four species example, with a custom 4th gas
-  # Every callable (density, cross sections, secondary law, phase function) must be
-  # @law-wrapped, a functor, or a named function so it can be saved to physics_state.jld2:
+  # Laws (density, cross sections, secondary law, phase) must be @law-wrapped, a functor, or
+  # a named function to ensure reproducibility when saved to physics_state.jld2:
   custom_sp = NeutralSpecies(:MyGas, @law(z -> 1e18 .* exp.(-z ./ 30e3));
                              elastic_cross_section = AURORA.e_N2elastic,
                              channels = [CollisionChannel("exc", AURORA.e_N2a3sup, 6.17, 0),
@@ -163,9 +163,7 @@ long as every ionizing collision moves the primary electron out of its energy bi
 (zero whenever `ΔE < E_loss`), while the cascading matrices used in
 `compute_ionization_spectra!` redistribute one full primary (and its secondaries) to
 strictly lower bins. If a bin is wider than an ionization threshold, both paths are
-active at once for that channel: an electron can ionize a second time within the same
-bin, but the cascading matrices are built assuming it cannot (the degraded primary never
-lands back in its own bin), so each ionizing collision produces up to ~2 primary
+active at once for that channel and each ionizing collision produces up to ~2 primary
 electrons (and over-counted secondaries), breaking particle and energy conservation.
 
 The default grid from `make_energy_grid` saturates at ΔE ≈ 11.65 eV, below the default

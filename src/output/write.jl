@@ -50,9 +50,8 @@ end
 """
     write_collision_channels_toml(sim)
 
-Write `inputs/collision_channels.toml`: one table per species listing its inelastic
-collision channels in row order, with the energy loss, the number of secondary electrons,
-and the provenance string carried by each channel.
+Write `inputs/collision_channels.toml`: each species' collision channels (name, energy loss,
+secondary count, source) in row order.
 """
 function write_collision_channels_toml(sim::AuroraSimulation)
     channel_keys = ["name", "energy_loss_eV", "n_secondaries", "source"]

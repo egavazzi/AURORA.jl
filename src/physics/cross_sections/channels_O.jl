@@ -1,8 +1,7 @@
 """
     default_channels_O() → Vector{CollisionChannel}
 
-The built-in atomic-oxygen inelastic collision channels, in the row order of the
-`cross_sections` and `excitation_levels` matrices of an O species.
+Built-in O collision channels.
 
 The ground-state fine-structure transitions (³P₂→³P₀ at 0.0281 eV, ³P₂→³P₁ at 0.0196 eV and
 ³P₁→³P₀ at 0.0085 eV) are absent: no cross section is available for them.

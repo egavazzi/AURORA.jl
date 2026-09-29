@@ -170,25 +170,19 @@ function add_inelastic_collisions!(Q, Ie, z, n, σ, E_levels, B2B_inelastic,
             #    loss is smaller than the bin width (prevents over-depleting the current bin)
             factor = σ[i_level, iE] * min(1, E_loss / ΔE[iE])
 
-            # Energies the electrons that leave the bin arrive at. Shifting the bin down by
-            # E_loss maps it onto [E_edges[iE] - E_loss, E_edges[iE+1] - E_loss]; the part of
-            # that at or above E_edges[iE] belongs to the electrons that stay in the bin,
-            # which update_B! retains, so the leaving range stops at E_edges[iE] and is
-            # min(E_loss, ΔE[iE]) wide — the same fraction of the bin as `factor` carries.
+            # Arrival range of the electrons leaving the bin: the bin shifted down by
+            # E_loss, cut at E_edges[iE] (the rest stays in the bin, see update_B!).
             leaving_lower = E_edges[iE] - E_loss
             leaving_upper = min(E_edges[iE+1] - E_loss, E_edges[iE])
             leaving_width = leaving_upper - leaving_lower
 
             if leaving_width > 0
-                # Bins overlapping the leaving range. The diagonal is excluded: those
-                # electrons are the ones update_B! retains.
+                # Lower bins overlapping the arrival range
                 i_min = searchsortedfirst(@view(E_edges[2:end]), leaving_lower)
                 i_max = min(searchsortedlast(@view(E_edges[1:end-1]), leaving_upper), iE - 1)
 
-                # Each bin takes the share of the leaving range it covers. The shares sum to
-                # one only while the whole leaving range is on the grid; below E_edges[1]
-                # there is no bin to take them, and those electrons leave the suprathermal
-                # population (they thermalise there) rather than being placed in bin 1.
+                # Each bin takes the share of the range it covers; the share below
+                # E_edges[1] is not placed (thermalised).
                 # Q[z,t,E'] += Ie_scatter[z,t] x share[E'] x σ x min(1, E_loss/ΔE)
                 for iE_degrade in i_min:i_max
                     overlap = min(E_edges[iE_degrade + 1], leaving_upper) -
@@ -322,15 +316,9 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            # Both spectra are normalized by the number of ionization events of the row,
-            # not by an on-grid sum of one of them. The secondary law peaks at E_s → 0, and
-            # the degraded primary reaches down to (E_p − E_loss)/2 for single ionization
-            # and (E_p − E_loss)/3 for double ionization, so close to threshold part of both
-            # lands below the lowest grid edge and is absent from the binned matrices.
-            # Dividing by an on-grid sum would move that mass back onto the surviving bins
-            # and create energy; dividing by the event count places only what is on-grid and
-            # leaves the rest out of the suprathermal population, where it shows up in the
-            # energy-budget residual as sub-floor thermalisation.
+            # Normalize by the row's ionization event count, not an on-grid sum: the part
+            # of either spectrum below the lowest grid edge is left out (thermalised)
+            # instead of being moved back onto the grid.
             events = event_count(species_cascading, iE, E_loss)
             if events <= 0
                 σ_level > 0 && throw(ArgumentError(

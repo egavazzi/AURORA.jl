@@ -1,8 +1,7 @@
 """
     default_channels_N2() → Vector{CollisionChannel}
 
-The built-in N₂ inelastic collision channels, in the row order of the `cross_sections` and
-`excitation_levels` matrices of an N₂ species.
+Built-in N₂ collision channels.
 """
 function default_channels_N2()
     return CollisionChannel[

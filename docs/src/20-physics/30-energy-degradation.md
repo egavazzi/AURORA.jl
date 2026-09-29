@@ -56,9 +56,8 @@ lower energy bins.
 
 ## The lowest energy bin
 
-The energy grid starts at a lowest edge of a few eV, and a degraded electron can arrive
-below it. Such an electron leaves the suprathermal population: it is not placed in the
-first bin, and it is not counted anywhere else on the grid.
+A degraded electron that arrives below the lowest grid edge (a few eV) leaves the
+suprathermal population and is not placed anywhere on the grid.
 
 For a non-ionizing channel, the electrons that leave a bin arrive spread over the range
 
@@ -75,6 +74,5 @@ cascading transfer matrices, normalized by the number of ionization events of th
 bin. Close to a threshold the excess energy is small, so part of both distributions falls
 below the lowest edge; again only what is on-grid is placed.
 
-In both cases the energy carried below the grid is real energy deposited in the
-atmosphere, but it is not resolved by the transport equation. The `residual` term of the
-energy budget written by [`make_energy_budget_file`](@ref) therefore contains it.
+In both cases this sub-floor energy appears in the `residual` term of
+[`make_energy_budget_file`](@ref).

@@ -32,8 +32,8 @@ Derive the cascading spec of a species from its collision channels: the ionizati
 thresholds are the distinct energy losses of the ionizing channels, in order of first
 appearance, each with the number of secondary electrons that channel ejects.
 
-Throws an `ArgumentError` when two channels ionize at the same energy loss but eject
-different numbers of secondary electrons, since one threshold cannot describe both.
+Throws an `ArgumentError` when two ionizing channels share an energy loss but not a
+secondary count.
 """
 function cascading_spec_from_channels(name::AbstractString, secondary_law, channels)
     thresholds = Float64[]
@@ -87,10 +87,8 @@ mutable struct SpeciesCascadingCache{S<:CascadingSpec}
     spec::S
     primary_transfer_matrix::Array{Float64, 3}
     secondary_transfer_matrix::Array{Float64, 3}
-    # Number of ionization events per primary bin and threshold, [n_E, n_thresholds]. It is
-    # the integral of the secondary law over the whole kinematically allowed domain of the
-    # row, so it counts the events the two transfer matrices describe including the outgoing
-    # electrons that land below the lowest grid edge and are therefore not binned.
+    # Ionization events per primary bin and threshold [n_E, n_thresholds], including those
+    # whose outgoing electrons fall below the grid.
     event_count::Matrix{Float64}
     E_edges::Vector{Float64}
     ionization_thresholds::Vector{Float64}
@@ -226,11 +224,10 @@ These two integrands add a third integration variable (the partner electron) on 
 E_primary mapping used by the single-ionization integrands. The resulting matrices are built so
 that, summed over their respective output bins, both equal the same event count
     Z₂ = ∬_R secondary_law(E_s1)·secondary_law(E_s2) dE_s1 dE_s2 ,
-exactly like the single-ionization pair. Z₂ is what the row's `event_count` holds, and
-`compute_ionization_spectra!` divides both matrices by it and multiplies the secondary
-spectrum by `n_secondary = 2`. With the secondary matrix carrying the PER-secondary marginal
-(∫ over the partner), this reproduces ⟨E_d⟩ + 2·⟨E_s⟩ = W for the electrons that land on the
-grid, and leaves the ones below its lowest edge out of the placed flux.
+exactly like the single-ionization pair. `compute_ionization_spectra!` divides both matrices
+by the row's `event_count` (= Z₂) and multiplies the secondary spectrum by
+`n_secondary = 2`; with the secondary matrix carrying the per-secondary marginal (∫ over the
+partner), the on-grid electrons reproduce ⟨E_d⟩ + 2·⟨E_s⟩ = W.
 
 Small caveat: `secondary_law` is a SINGLE-ionization fit. The forms used here (the Cauchy/Lorentzian
 (of course I had to place Cauchy) `1 / (a² + E_s²)` for N₂/O₂ and the Opal–Peterson–Beaty form for O)
@@ -481,12 +478,10 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
 end
 
 
-# Number of ionization events in one primary bin: the per-secondary marginal integrated over
-# the whole allowed secondary range [0, `E_upper`], the part below the lowest grid edge
-# included. The grid edges are used as knots, as the binned entries are, because a secondary
-# law sharply peaked at E_s → 0 is under-resolved when the adaptive rule starts from the
-# whole range. `u_bounds` holds the lower and upper limits of the integrand's mapped
-# variables, which follow the outer secondary-energy variable.
+# Ionization events in one primary bin: the per-secondary marginal integrated over
+# [0, E_upper], below-floor part included. The grid edges are knots, as for the binned
+# entries, so a law peaked at E_s → 0 is resolved. `u_bounds` are the limits of the other
+# (mapped) variables.
 function integrate_event_count(integrand, E_edges, E_upper, u_bounds, rtol, buffer)
     total = 0.0
     lower = 0.0
@@ -527,9 +522,8 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
     # energy. Using the lower edge of the primary bin gives the lowest such boundary.
     E_secondary_boundary_lower = (E_primary_bin_min - threshold) / 2
     # First bin that can receive a degraded primary electron (right edge above that boundary).
-    # Clamped to the grid floor, so the part of the degraded range that is on-grid is still
-    # binned when the boundary itself lies below it. The part that is not on-grid is dropped
-    # by `E_degraded_lower` below, which never goes under the bin's own left edge.
+    # Clamped to bin 1 so the on-grid part of a range reaching below the floor is still
+    # binned.
     i_min_degraded = max(1, searchsortedlast(E_left, E_secondary_boundary_lower))
     # Loop over degraded primary electron energy bins
     for i_degraded in i_min_degraded:(i_primary - 1)
@@ -881,10 +875,8 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
                 primary_weight * value
         end
 
-        # Event count contribution of this primary node: the same per-secondary marginal over
-        # the whole range [0, W/2], integrated piecewise over the CDF knots so its quadrature
-        # error matches the binned entries above. By the identity of the two marginals this
-        # is Z₂, the number of double-ionization events, the below-floor part included.
+        # Event count (Z₂) of this primary node: the per-secondary marginal over [0, W/2],
+        # on the same CDF knots as the binned entries.
         total_secondary = 0.0
         for k_knot in firstindex(cdf.edges):(lastindex(cdf.edges) - 1)
             total_secondary += gauss_legendre4(double_secondary_density, (threshold, cdf),
@@ -896,9 +888,7 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
 end
 
 
-# Index of the transfer matrix built for exactly `E_ionization_threshold`. The threshold is
-# the key that ties a channel of `excitation_levels` to its cascading matrix, so an
-# approximate match would silently hand a channel another channel's energy split.
+# Index of the transfer matrix for exactly `E_ionization_threshold`.
 function threshold_index(cache::SpeciesCascadingCache, E_ionization_threshold)
     i_threshold = findfirst(==(E_ionization_threshold), cache.ionization_thresholds)
     isnothing(i_threshold) && throw(ArgumentError(
@@ -948,20 +938,10 @@ function primary_spectrum(cache::SpeciesCascadingCache, E_primary_energy,
 end
 
 
-# Number of ionization events the two spectra above describe, for a given initial primary
-# energy index and ionization threshold. It is the normalization of both spectra: it counts
-# the events of the whole kinematically allowed domain, so the fraction of a spectrum that
-# falls below the lowest grid edge stays missing instead of being redistributed on-grid.
+# Ionization events of a row: the normalization of both spectra above.
 function event_count(cache::SpeciesCascadingCache, i_primary::Integer,
                      E_ionization_threshold)
 
     i_threshold = threshold_index(cache, E_ionization_threshold)
     return cache.event_count[i_primary, i_threshold]
-end
-
-function event_count(cache::SpeciesCascadingCache, E_primary_energy,
-                     E_ionization_threshold)
-
-    return event_count(cache, primary_bin_index(cache, E_primary_energy),
-                       E_ionization_threshold)
 end

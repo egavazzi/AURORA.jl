@@ -207,7 +207,6 @@ from those at `initialize!`, so editing the channel table is enough.
 model.species[:N2].phase_fcn_generator = my_custom_phase_function
 
 # Add a channel: name, cross section σ(E) in m², energy loss in eV, secondaries ejected.
-# `source` is free text; write down where the numbers actually came from.
 push!(model.species[:N2].channels,
       CollisionChannel("mystate", my_sigma, 9.0, 0;
                        source = "own digitization of fig. 3; see lab notebook"))
@@ -220,15 +219,14 @@ model.species[:N2].channels[i] =
 # Drop channels
 filter!(c -> c.name != "ddion", model.species[:N2].channels)
 
-# Secondary-electron distribution f(E_s, E_p) of the ionizing channels. The ionization
-# thresholds are read off the channel table, so only the law itself is set here.
+# Secondary-electron distribution f(E_s, E_p); the thresholds come from the channel table
 model.species[:O2].secondary_law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
 ```
 
 The channel order is the row order of `cross_sections` and `excitation_levels` (row 1 is
-elastic, row `i + 1` is `channels[i]`), so the two matrices can never fall out of step. Look
-up a channel by name with [`AURORA.channel`](@ref), list them with
-[`channel_names`](@ref), and keep the ionizing ones with [`ionizing_channels`](@ref).
+elastic, row `i + 1` is `channels[i]`). Look up a channel by name with
+[`AURORA.channel`](@ref), list them with [`channel_names`](@ref), and keep the ionizing ones
+with [`ionizing_channels`](@ref).
 
 A species edited after `initialize!(model)` needs an explicit `initialize!(model)` to rebuild
 the derived data; editing before the first `run!` needs nothing.
@@ -288,8 +286,7 @@ n2_variant = NeutralSpecies(:N2variant, neutrals[:N2];
 
 !!! tip
     Laws (density profiles, cross sections, phase-function generators, secondary-electron
-    laws) must be reproducible so
-    the model can be saved and reloaded. Use [`@law`](@ref) for closed-form laws, a functor
-    `struct` when the law carries parameters, or a named function. **Bare anonymous functions
-    are rejected**. The chosen law will be stored in `inputs/physics_state.jld2` and possible
-    to restore on load.
+    laws) must be reproducible so the model can be saved and reloaded. Use [`@law`](@ref)
+    for closed-form laws, a functor `struct` when the law carries parameters, or a named
+    function. **Bare anonymous functions are rejected**. The chosen law will be stored in
+    `inputs/physics_state.jld2` and possible to restore on load.

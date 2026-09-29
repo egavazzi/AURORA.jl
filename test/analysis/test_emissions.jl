@@ -103,6 +103,6 @@ end
     @test σ_full .- σ_trimmed ≈ 2 .* ddion.cross_section(E_centers)
 
     # A model without N2/O2/O cannot produce these rates, and says so
-    @test_throws "has no species named" AURORA.ion_production_cross_section(
+    @test_throws "need a species named" AURORA.ion_production_cross_section(
         (; species = (model.species[:O2], model.species[:O])), :N2, E_centers)
 end

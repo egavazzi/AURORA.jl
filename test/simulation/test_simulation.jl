@@ -336,7 +336,7 @@ end
         @test sim.model.species[end].excitation_levels == [0.0 0.0; 6.1688 0.0; 15.581 1.0]
         @test sim.model.species[end].cascading_spec.ionization_thresholds == [15.581]
 
-        # The channel table is echoed in a human-readable TOML file next to config.toml
+        # The channel tables are written to inputs/collision_channels.toml
         channels_toml = TOML.parsefile(joinpath(savedir, "inputs", "collision_channels.toml"))
         @test [c["name"] for c in channels_toml["CustomGas"]["channels"]] == ["exc", "ion"]
         @test channels_toml["CustomGas"]["channels"][2]["n_secondaries"] == 1

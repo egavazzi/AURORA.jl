@@ -91,8 +91,7 @@ end
     energy_grid = AURORA.EnergyGrid(60)
     n2_dir = joinpath(cache_root, "e_cascading", "N2")
 
-    # A spec sharing the species name (and hence the cache directory) with the default N₂ one,
-    # but describing different ionization physics.
+    # Same species name (same cache directory) as default N₂, different physics.
     other_law = @law (E_s, E_p) -> 1.0 / (9.0^2 + E_s^2)
     other_spec = AURORA.CascadingSpec("N2", [99.0], other_law)
     other_cache = AURORA.SpeciesCascadingCache(other_spec)
@@ -100,31 +99,29 @@ end
         policy = AURORA.CachePolicy(; force_recompute = true, save_cache = true, cache_root))
     @test length(cache_files(n2_dir)) == 1
 
-    n2_cache = AURORA.SpeciesCascadingCache(AURORA.default_cascading_spec(:N2))
+    n2_spec = AURORA.default_cascading_spec(:N2)
+    n2_cache = AURORA.SpeciesCascadingCache(n2_spec)
     AURORA.load_or_compute_cascading!(n2_cache, energy_grid; verbose = false,
                                       policy = AURORA.CachePolicy(; cache_root))
 
     @test size(n2_cache.primary_transfer_matrix, 3) == 5
     @test size(n2_cache.secondary_transfer_matrix, 3) == 5
-    @test n2_cache.ionization_thresholds == AURORA.default_cascading_spec(:N2).ionization_thresholds
+    @test n2_cache.ionization_thresholds == n2_spec.ionization_thresholds
     # A compatible file was saved, so a second request loads from disk.
-    found, _ = AURORA.find_cascading_cache(AURORA.default_cascading_spec(:N2), energy_grid.E_edges;
-                                           verbose = false,
+    found, _ = AURORA.find_cascading_cache(n2_spec, energy_grid.E_edges; verbose = false,
                                            policy = AURORA.CachePolicy(; cache_root))
     @test found
 
     # Same thresholds and secondary counts, different law: also incompatible.
-    law_only_spec = AURORA.CascadingSpec("N2", AURORA.default_cascading_spec(:N2).ionization_thresholds,
-                                         other_law;
-                                         n_secondaries = AURORA.default_cascading_spec(:N2).n_secondaries)
+    law_only_spec = AURORA.CascadingSpec("N2", n2_spec.ionization_thresholds, other_law;
+                                         n_secondaries = n2_spec.n_secondaries)
     found, _ = AURORA.find_cascading_cache(law_only_spec, energy_grid.E_edges; verbose = false,
                                            policy = AURORA.CachePolicy(; cache_root))
     @test !found
 
     # Same thresholds and law, different secondary counts: also incompatible.
-    n_sec_spec = AURORA.CascadingSpec("N2", AURORA.default_cascading_spec(:N2).ionization_thresholds,
-                                      AURORA.default_cascading_spec(:N2).secondary_law;
-                                      n_secondaries = [1, 1, 1, 2, 2])
+    n_sec_spec = AURORA.CascadingSpec("N2", n2_spec.ionization_thresholds,
+                                      n2_spec.secondary_law; n_secondaries = [1, 1, 1, 2, 2])
     found, _ = AURORA.find_cascading_cache(n_sec_spec, energy_grid.E_edges; verbose = false,
                                            policy = AURORA.CachePolicy(; cache_root))
     @test !found
@@ -188,8 +185,7 @@ end
     end
     load_policy = AURORA.CachePolicy(; cache_root)
 
-    # Every entry is required, the version string included, so each one alone disqualifies
-    # the file. The others are written unchanged, so nothing else can explain the rejection.
+    # Dropping any single entry disqualifies the file.
     for dropped in AURORA.CASCADING_CACHE_KEYS
         rm(n2_file; force = true)
         jldopen(n2_file, "w") do file
@@ -319,9 +315,9 @@ end
     # Both files are intact and independently loadable.
     reloaded_a = AURORA.SpeciesCascadingCache(AURORA.default_cascading_spec(:N2))
     reloaded_b = AURORA.SpeciesCascadingCache(AURORA.default_cascading_spec(:N2))
-    load_policy_a = AURORA.CachePolicy(; cache_root)
-    AURORA.load_or_compute_cascading!(reloaded_a, grid_a; policy = load_policy_a, verbose = false)
-    AURORA.load_or_compute_cascading!(reloaded_b, grid_b; policy = load_policy_a, verbose = false)
+    load_policy = AURORA.CachePolicy(; cache_root)
+    AURORA.load_or_compute_cascading!(reloaded_a, grid_a; policy = load_policy, verbose = false)
+    AURORA.load_or_compute_cascading!(reloaded_b, grid_b; policy = load_policy, verbose = false)
     @test reloaded_a.E_edges == cache_a.E_edges
     @test reloaded_b.E_edges == cache_b.E_edges
 end
