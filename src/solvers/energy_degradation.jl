@@ -329,8 +329,8 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             # lands below the lowest grid edge and is absent from the binned matrices.
             # Dividing by an on-grid sum would move that mass back onto the surviving bins
             # and create energy; dividing by the event count places only what is on-grid and
-            # leaves the rest out of the suprathermal population, where it shows up in the
-            # energy-budget residual as sub-floor thermalisation.
+            # leaves the rest out of the suprathermal population, where the energy budget
+            # counts it in its `subfloor` term.
             events = event_count(species_cascading, iE, E_loss)
             if events <= 0
                 σ_level > 0 && throw(ArgumentError(

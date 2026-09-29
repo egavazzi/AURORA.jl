@@ -97,6 +97,7 @@ include("analysis/psd.jl")
 include("analysis/emissions.jl")
 include("analysis/fluxes.jl")
 include("analysis/heating.jl")
+include("analysis/subfloor_energy.jl")
 include("analysis/energy_budget.jl")
 export make_volume_excitation_file, make_column_excitation_file,
        make_Ie_top_file, make_current_file,

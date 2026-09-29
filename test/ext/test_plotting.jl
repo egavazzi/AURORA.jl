@@ -187,6 +187,9 @@
         ax = Axis(fig[1, 1])
         @test plot_energy_budget!(ax, budget; x = 1) isa Makie.BarPlot
         @test plot_energy_budget!(ax, budget; x = 2) isa Makie.BarPlot
+        # The segments are every term but the residual, which is the gap to the input line
+        bar = plot_energy_budget!(ax, budget; x = 3)
+        @test sum(last, bar[1][]) ≈ budget.input - budget.residual rtol = 1e-6
 
         # A vanishing term gets no segment label, whether it is zero or merely negligible
         with_bottom(v) = AURORA.EnergyBudget([f === :bottom_escape ? v : getfield(budget, f)
