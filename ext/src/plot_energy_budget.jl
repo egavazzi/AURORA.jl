@@ -117,11 +117,13 @@ function AURORA.plot_energy_budget(budgets::AbstractVector{<:AURORA.EnergyBudget
     return fig
 end
 
+# Two columns of three entries: the six labels do not fit in three columns at the
+# single-budget figure width.
 _budget_legend!(fig) =
     Legend(fig[2, 1],
            [PolyElement(color = c) for c in _ENERGY_BUDGET_SEGMENT_COLORS],
            _ENERGY_BUDGET_SEGMENT_NAMES;
-           orientation = :horizontal, framevisible = true, nbanks = 2)
+           orientation = :horizontal, framevisible = true, nbanks = 3)
 
 function _budget_limits!(ax, budgets, xmin, xmax)
     top = maximum(max(b.input, _budget_accounted(b)) for b in budgets)
