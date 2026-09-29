@@ -140,9 +140,13 @@ function initialize!(model::AuroraModel;
         sp.density = collect(Float64, sp.density_source(h))
         rebuild_collision_data!(sp, eg.E_centers)
         sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
+    end
+    # Before the cascading matrices: they are expensive, and would be cached for a grid that
+    # is then refused.
+    check_bins_narrower_than_ionization_threshold(eg, model.species)
+    for sp in model.species
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)
     end
-    check_bins_narrower_than_ionization_threshold(eg, model.species)
     model.initialized = true
     return nothing
 end
@@ -169,7 +173,8 @@ ionization thresholds of N2, O2 and O, so this only triggers for custom coarse g
 custom species with low ionization thresholds.
 """
 function check_bins_narrower_than_ionization_threshold(energy_grid, species)
-    ΔE_max = maximum(energy_grid.ΔE)
+    i_widest = argmax(energy_grid.ΔE)
+    ΔE_max = energy_grid.ΔE[i_widest]
     offenders = String[]
     for sp in species
         E_levels = sp.excitation_levels
@@ -183,12 +188,11 @@ function check_bins_narrower_than_ionization_threshold(energy_grid, species)
     end
     if !isempty(offenders)
         throw(ArgumentError(
-            "The widest energy bin (ΔE = $(round(ΔE_max; digits = 2)) eV) is wider " *
-            "than the lowest ionization threshold of " * join(offenders, ", ") * ". " *
-            "Ionizing collisions in bins wider than the threshold over-count primary " *
-            "and secondary electrons. Use a finer energy grid, for example by lowering " *
-            "`E_max` or otherwise adjusting the energy-grid parameters so that " *
-            "`maximum(energy_grid.ΔE)` stays below every ionization threshold."
+            "The widest energy bin (bin $(i_widest), ΔE = $(round(ΔE_max; digits = 2)) eV) " *
+            "is wider than the lowest ionization threshold of " * join(offenders, ", ") *
+            ". Ionizing collisions in bins wider than the threshold over-count primary " *
+            "and secondary electrons. Use an energy grid whose bins all stay narrower " *
+            "than every ionization threshold."
         ))
     end
     return nothing

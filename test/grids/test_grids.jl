@@ -98,7 +98,7 @@ end
     # The default grid saturates below all default ionization thresholds → no error
     fine_grid = EnergyGrid(7000)
     @test maximum(fine_grid.ΔE) < 15.581
-    AURORA.check_bins_narrower_than_ionization_threshold(fine_grid, species)
+    @test AURORA.check_bins_narrower_than_ionization_threshold(fine_grid, species) === nothing
 
     # A coarse grid with bins wider than the threshold → throws, listing all offending
     # species with their thresholds
@@ -109,5 +109,5 @@ end
 
     # A wide excitation channel alone (no ionization) must not throw
     species_no_ion = [(; name = :X, excitation_levels = [0.0 0.0; 6.17 0.0])]
-    AURORA.check_bins_narrower_than_ionization_threshold(coarse_grid, species_no_ion)
+    @test AURORA.check_bins_narrower_than_ionization_threshold(coarse_grid, species_no_ion) === nothing
 end
