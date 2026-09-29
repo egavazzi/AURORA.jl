@@ -45,7 +45,8 @@ so a channel added, removed or edited before that call is reflected everywhere a
     Assigning `channels`, `elastic_cross_section`, `secondary_law` or `density_source` does
     not mark the model uninitialized, because a species does not know which model holds it.
     Edit a species of an already-initialized model, then call `initialize!(model)` explicitly
-    to rebuild the derived data.
+    to rebuild the derived data. `run!` throws when the derived data no longer matches the
+    channel table.
 """
 mutable struct NeutralSpecies
     name::Symbol
@@ -68,8 +69,10 @@ mutable struct NeutralSpecies
         require_reproducible(elastic_cross_section, "elastic_cross_section")
         require_reproducible(secondary_law, "secondary_law")
         require_reproducible(phase_fcn_generator, "phase_fcn_generator")
+        channels = collect(CollisionChannel, channels)
+        check_channel_names(channels)
         return new(Symbol(name), density_source, density, elastic_cross_section,
-                   collect(CollisionChannel, channels), secondary_law,
+                   channels, secondary_law,
                    phase_fcn_generator, phase_fcn, cross_sections, excitation_levels,
                    cascading_spec, cascading_data)
     end
@@ -96,7 +99,8 @@ gas = NeutralSpecies(:MyGas, @law(z -> 1e18 .* exp.(-z ./ 30e3));
 function NeutralSpecies(name::Symbol, density_source; elastic_cross_section, channels,
                         secondary_law, phase_fcn_generator)
     empty_mat = Matrix{Float64}(undef, 0, 0)
-    spec = CascadingSpec(String(name), secondary_law; channels)
+    channels = collect(CollisionChannel, channels)
+    spec = cascading_spec_from_channels(String(name), secondary_law, channels)
     return NeutralSpecies(
         name,
         density_source,
@@ -117,10 +121,8 @@ end
 # direct field assignment, which bypasses the constructor. Intercept those assignments to
 # enforce the reproducibility rule there too.
 function Base.setproperty!(sp::NeutralSpecies, name::Symbol, value)
-    if name in (:density_source, :elastic_cross_section, :phase_fcn_generator)
+    if name in (:density_source, :elastic_cross_section, :secondary_law, :phase_fcn_generator)
         require_reproducible(value, String(name))
-    elseif name === :secondary_law
-        require_reproducible(value, "secondary_law")
     end
     ty = fieldtype(typeof(sp), name)
     return setfield!(sp, name, value isa ty ? value : convert(ty, value))
@@ -153,10 +155,11 @@ for `load_or_compute_cascading!` to refresh against the current energy grid; a s
 differs replaces the cache with an empty one built from it.
 """
 function rebuild_collision_data!(sp::NeutralSpecies, E_centers::AbstractVector)
+    check_channel_names(sp.channels)
     sp.cross_sections    = channel_cross_sections(sp.elastic_cross_section, sp.channels,
                                                   E_centers)
     sp.excitation_levels = channel_excitation_levels(sp.channels)
-    spec = CascadingSpec(String(sp.name), sp.secondary_law; sp.channels)
+    spec = cascading_spec_from_channels(String(sp.name), sp.secondary_law, sp.channels)
     if !describes_same_cascading(sp.cascading_spec, spec)
         sp.cascading_spec = spec
         sp.cascading_data = SpeciesCascadingCache(spec)
@@ -164,13 +167,39 @@ function rebuild_collision_data!(sp::NeutralSpecies, E_centers::AbstractVector)
     return nothing
 end
 
+"""
+    check_collision_data_current(sp::NeutralSpecies, E_centers)
+
+Throw an `ArgumentError` when the derived `cross_sections`, `excitation_levels` or
+`cascading_spec` of `sp` no longer follow from its `elastic_cross_section`, `channels` and
+`secondary_law`, i.e. when those were edited after the last `initialize!(model)`.
+"""
+function check_collision_data_current(sp::NeutralSpecies, E_centers)
+    spec = cascading_spec_from_channels(String(sp.name), sp.secondary_law, sp.channels)
+    current = isequal(sp.excitation_levels, channel_excitation_levels(sp.channels)) &&
+              isequal(sp.cross_sections,
+                      channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers)) &&
+              describes_same_cascading(sp.cascading_spec, spec)
+    current || throw(ArgumentError(
+        "the collision channels of $(sp.name) were edited after the model was initialized; \
+         call initialize!(model) to rebuild the derived data before run!"))
+    return nothing
+end
+
 # Two specs build the same transfer matrices when they agree on the thresholds, the secondary
-# counts and the law object itself.
+# counts and the secondary law. Laws compare by fingerprint when they have one: a law reloaded
+# from physics_state.jld2 is a new object.
 function describes_same_cascading(a::CascadingSpec, b::CascadingSpec)
     return a.name == b.name &&
            a.ionization_thresholds == b.ionization_thresholds &&
            a.n_secondaries == b.n_secondaries &&
-           a.secondary_law === b.secondary_law
+           same_law(a.secondary_law, b.secondary_law)
+end
+
+function same_law(a, b)
+    a === b && return true
+    return is_fingerprintable(a) && is_fingerprintable(b) &&
+           law_fingerprint(a) == law_fingerprint(b)
 end
 
 

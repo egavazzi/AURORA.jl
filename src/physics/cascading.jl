@@ -18,13 +18,15 @@ struct CascadingSpec{F}
              (length $(length(thresholds)))"))
         all(n -> 1 <= n <= 2, n_secondaries) || throw(ArgumentError(
             "n_secondaries entries must be 1 (single) or 2 (double ionization); got $(collect(n_secondaries))"))
+        allunique(thresholds) || throw(ArgumentError(
+            "ionization thresholds must be distinct; got $(collect(thresholds))"))
         return new{typeof(law)}(String(name), collect(Float64, thresholds),
                                 collect(Int, n_secondaries), law)
     end
 end
 
 """
-    CascadingSpec(name, secondary_law; channels)
+    cascading_spec_from_channels(name, secondary_law, channels) -> CascadingSpec
 
 Derive the cascading spec of a species from its collision channels: the ionization
 thresholds are the distinct energy losses of the ionizing channels, in order of first
@@ -33,7 +35,7 @@ appearance, each with the number of secondary electrons that channel ejects.
 Throws an `ArgumentError` when two channels ionize at the same energy loss but eject
 different numbers of secondary electrons, since one threshold cannot describe both.
 """
-function CascadingSpec(name::AbstractString, secondary_law; channels)
+function cascading_spec_from_channels(name::AbstractString, secondary_law, channels)
     thresholds = Float64[]
     n_secondaries = Int[]
     for c in channels
@@ -414,9 +416,9 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
         threshold = ionization_thresholds[i_threshold]
         single_secondary = n_secondaries[i_threshold] == 1
 
-        # First primary bin that can ionize: the one holding the threshold. Its left edge is
-        # below the threshold, so only the part of the bin above it contributes; the
-        # integrands return zero for the primary energies below it.
+        # First primary bin that can ionize: the one holding the threshold, or bin 1 when
+        # the threshold lies below the grid. The integrands return zero for primary energies
+        # below the threshold, so only the part of the bin above it contributes.
         i_min_primary = max(1, searchsortedlast(E_left, threshold))
         n_bins = n_E - i_min_primary + 1
         bins_done = Threads.Atomic{Int}(0)

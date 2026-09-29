@@ -34,6 +34,9 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
     if needs_initialization(sim)
         initialize!(sim; verbose)
     end
+    for sp in sim.model.species
+        check_collision_data_current(sp, sim.model.energy_grid.E_centers)
+    end
 
     mkpath(savedir)
     mkpath(joinpath(savedir, "inputs"))

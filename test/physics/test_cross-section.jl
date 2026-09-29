@@ -52,21 +52,21 @@ end
     σ = AURORA.default_elastic_cross_section(:N2)
     clashing = [AURORA.CollisionChannel("a", σ, 20.0, 1),
                 AURORA.CollisionChannel("b", σ, 20.0, 2)]
-    @test_throws "must eject the same number of secondaries" AURORA.CascadingSpec(
-        "Clash", AURORA.default_secondary_law(:N2); channels = clashing)
+    @test_throws "must eject the same number of secondaries" AURORA.cascading_spec_from_channels(
+        "Clash", AURORA.default_secondary_law(:N2), clashing)
 
     # Sharing an energy loss is fine when the secondary counts agree: one threshold
     agreeing = [AURORA.CollisionChannel("a", σ, 20.0, 1),
                 AURORA.CollisionChannel("b", σ, 20.0, 1)]
-    @test AURORA.CascadingSpec("Agree", AURORA.default_secondary_law(:N2);
-                               channels = agreeing).ionization_thresholds == [20.0]
+    @test AURORA.cascading_spec_from_channels("Agree", AURORA.default_secondary_law(:N2),
+                                              agreeing).ionization_thresholds == [20.0]
 end
 
 @testitem "CollisionChannel validates its inputs" begin
     σ = AURORA.default_elastic_cross_section(:N2)
 
     @test_throws "bare anonymous function" AURORA.CollisionChannel("x", E -> E, 1.0, 0)
-    @test_throws "negative energy loss" AURORA.CollisionChannel("x", σ, -1.0, 0)
+    @test_throws "must be finite and non-negative" AURORA.CollisionChannel("x", σ, -1.0, 0)
     @test_throws "0 (excitation)" AURORA.CollisionChannel("x", σ, 1.0, 3)
     @test_throws "positive energy loss" AURORA.CollisionChannel("x", σ, 0.0, 1)
 

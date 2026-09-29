@@ -54,6 +54,6 @@ The cascading spec of `:N2`, `:O2` or `:O`, derived from the built-in channel ta
 secondary-electron law.
 """
 function default_cascading_spec(species::Symbol)
-    return CascadingSpec(String(species), default_secondary_law(species);
-                         channels = default_channels(species))
+    return cascading_spec_from_channels(String(species), default_secondary_law(species),
+                                        default_channels(species))
 end

@@ -50,8 +50,9 @@ struct CollisionChannel{F}
         channel_name = String(name)
         require_reproducible(cross_section, "cross_section of channel $(channel_name)")
         loss = Float64(energy_loss)
-        loss >= 0 || throw(ArgumentError(
-            "channel $(channel_name) has a negative energy loss ($(loss) eV)"))
+        isfinite(loss) && loss >= 0 || throw(ArgumentError(
+            "channel $(channel_name) has an energy loss of $(loss) eV; it must be finite and \
+             non-negative"))
         n_sec = Int(n_secondaries)
         0 <= n_sec <= 2 || throw(ArgumentError(
             "channel $(channel_name) ejects $(n_sec) secondary electrons; a collision \
@@ -79,8 +80,8 @@ function CollisionChannel(c::CollisionChannel;
 end
 
 function Base.show(io::IO, c::CollisionChannel)
-    print(io, "CollisionChannel(\"", c.name, "\", ", c.energy_loss, " eV, ",
-          c.n_secondaries, " secondaries)")
+    print(io, "CollisionChannel(\"", c.name, "\", ", c.energy_loss, " eV, n_secondaries=",
+          c.n_secondaries, ")")
 end
 
 """
@@ -89,7 +90,15 @@ end
 
 Names of the inelastic collision channels, in row order.
 """
-channel_names(channels::AbstractVector{<:CollisionChannel}) = [c.name for c in channels]
+channel_names(channels) = [c.name for c in channels]
+
+# Channel names are lookup keys and output labels, so a species must not repeat one.
+function check_channel_names(channels)
+    names = channel_names(channels)
+    allunique(names) && return nothing
+    duplicated = unique(filter(n -> count(==(n), names) > 1, names))
+    throw(ArgumentError("channel names must be distinct; duplicated: $(duplicated)"))
+end
 
 """
     ionizing_channels(channels)
@@ -97,7 +106,7 @@ channel_names(channels::AbstractVector{<:CollisionChannel}) = [c.name for c in c
 
 The channels that eject at least one secondary electron, in row order.
 """
-function ionizing_channels(channels::AbstractVector{<:CollisionChannel})
+function ionizing_channels(channels)
     return filter(c -> c.n_secondaries > 0, channels)
 end
 
@@ -108,7 +117,7 @@ end
 The channel called `name`. Throws a `KeyError` when there is none, and an `ArgumentError`
 when several channels share the name.
 """
-function channel(channels::AbstractVector{<:CollisionChannel}, name::AbstractString)
+function channel(channels, name::AbstractString)
     found = 0
     for (i, c) in pairs(channels)
         c.name == name || continue
