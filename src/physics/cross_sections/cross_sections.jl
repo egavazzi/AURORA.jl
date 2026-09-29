@@ -7,24 +7,17 @@ on `Ep` regardless of its order. Returns a floating-point array with the axes of
 that `out[j] == f_sorted([Ep[j]])[1]` for every `j` in `eachindex(Ep)`.
 """
 function evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
-    idxs = collect(eachindex(Ep))
-    E = collect(float(eltype(Ep)), Ep) # E[k] is the k-th element of Ep, i.e. Ep[idxs[k]]
-
-    if issorted(E)
-        σ = f_sorted(E)
-        out = similar(Ep, eltype(σ))
-        for k in eachindex(idxs)
-            out[idxs[k]] = σ[k]
-        end
-        return out
-    end
-
-    p = sortperm(E)
-    σ_sorted = f_sorted(E[p])
-    out = similar(Ep, eltype(σ_sorted))
-    for k in eachindex(p)
-        out[idxs[p[k]]] = σ_sorted[k]
-    end
+    # 1-based working copy: the bodies index their input from 1.
+    E = Vector{float(eltype(Ep))}(undef, length(Ep))
+    copyto!(E, Ep)
+    sorted = issorted(E)
+    p = sorted ? nothing : sortperm(E)
+    σ = f_sorted(sorted ? E : E[p])
+    length(σ) == length(E) || throw(DimensionMismatch(
+        "cross-section body returned $(length(σ)) values for $(length(E)) energies"))
+    sorted || invpermute!(σ, p)
+    out = similar(Ep, eltype(σ))
+    copyto!(out, σ)
     return out
 end
 

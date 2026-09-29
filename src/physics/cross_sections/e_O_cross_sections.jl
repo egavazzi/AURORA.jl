@@ -144,7 +144,7 @@ function _e_O3p3P_sorted(Ep)
     cross_section = exp.(cross_section)
 
     if any(Ep .> 60)
-        cross_section = [cross_section; e_O3p3P([59.9]) .* 60 ./ log(60) .* log.(Ep[Ep .> 60]) ./ Ep[Ep .> 60]]
+        cross_section = [cross_section; _e_O3p3P_sorted([59.9]) .* 60 ./ log(60) .* log.(Ep[Ep .> 60]) ./ Ep[Ep .> 60]]
     end
 
     cross_section[.!isfinite.(cross_section)] .= 0
