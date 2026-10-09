@@ -48,14 +48,18 @@ end
     @test spec.ionization_thresholds == [15.581, 16.73, 18.75, 24.0, 42.0]
     @test spec.n_secondaries == [1, 1, 1, 1, 2]
 
-    # Channels sharing an energy loss must agree on the number of secondaries
+    # Channels sharing an energy loss but ejecting different numbers of secondaries get
+    # separate thresholds, e.g. to split single and double ionization by probability
+    # (hypothetical example)
     σ = AURORA.default_elastic_cross_section(:N2)
-    clashing = [AURORA.CollisionChannel("a", σ, 20.0, 1),
-                AURORA.CollisionChannel("b", σ, 20.0, 2)]
-    @test_throws "must eject the same number of secondaries" AURORA.cascading_spec_from_channels(
-        "Clash", AURORA.default_secondary_law(:N2), clashing)
+    split = [AURORA.CollisionChannel("a", σ, 20.0, 1),
+             AURORA.CollisionChannel("b", σ, 20.0, 2)]
+    split_spec = AURORA.cascading_spec_from_channels("Split", AURORA.default_secondary_law(:N2),
+                                                     split)
+    @test split_spec.ionization_thresholds == [20.0, 20.0]
+    @test split_spec.n_secondaries == [1, 2]
 
-    # Sharing an energy loss is fine when the secondary counts agree: one threshold
+    # Sharing both the energy loss and the secondary count: one threshold
     agreeing = [AURORA.CollisionChannel("a", σ, 20.0, 1),
                 AURORA.CollisionChannel("b", σ, 20.0, 1)]
     @test AURORA.cascading_spec_from_channels("Agree", AURORA.default_secondary_law(:N2),

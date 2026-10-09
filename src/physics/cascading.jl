@@ -18,8 +18,9 @@ struct CascadingSpec{F}
              (length $(length(thresholds)))"))
         all(n -> 1 <= n <= 2, n_secondaries) || throw(ArgumentError(
             "n_secondaries entries must be 1 (single) or 2 (double ionization); got $(collect(n_secondaries))"))
-        allunique(thresholds) || throw(ArgumentError(
-            "ionization thresholds must be distinct; got $(collect(thresholds))"))
+        allunique(zip(thresholds, n_secondaries)) || throw(ArgumentError(
+            "(ionization threshold, n_secondaries) pairs must be distinct; got \
+             $(collect(zip(thresholds, n_secondaries)))"))
         return new{typeof(law)}(String(name), collect(Float64, thresholds),
                                 collect(Int, n_secondaries), law)
     end
@@ -28,28 +29,20 @@ end
 """
     cascading_spec_from_channels(name, secondary_law, channels) -> CascadingSpec
 
-Derive the cascading spec of a species from its collision channels: the ionization
-thresholds are the distinct energy losses of the ionizing channels, in order of first
-appearance, each with the number of secondary electrons that channel ejects.
-
-Throws an `ArgumentError` when two ionizing channels share an energy loss but not a
-secondary count.
+Derive the cascading spec of a species from its collision channels: one threshold per
+distinct (energy loss, number of secondaries) pair among the ionizing channels, in order
+of first appearance. Channels at the same energy loss ejecting different numbers of
+secondaries get separate thresholds, since their cascading matrices differ.
 """
 function cascading_spec_from_channels(name::AbstractString, secondary_law, channels)
     thresholds = Float64[]
     n_secondaries = Int[]
     for c in channels
         c.n_secondaries > 0 || continue
-        i = findfirst(==(c.energy_loss), thresholds)
-        if isnothing(i)
-            push!(thresholds, c.energy_loss)
-            push!(n_secondaries, c.n_secondaries)
-        elseif n_secondaries[i] != c.n_secondaries
-            throw(ArgumentError(
-                "$(name) has two ionizing channels at $(c.energy_loss) eV ejecting \
-                 $(n_secondaries[i]) and $(c.n_secondaries) secondary electrons; channels \
-                 sharing an energy loss must eject the same number of secondaries"))
-        end
+        any(i -> thresholds[i] == c.energy_loss && n_secondaries[i] == c.n_secondaries,
+            eachindex(thresholds)) && continue
+        push!(thresholds, c.energy_loss)
+        push!(n_secondaries, c.n_secondaries)
     end
     return CascadingSpec(name, thresholds, secondary_law; n_secondaries)
 end
@@ -889,39 +882,57 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
 end
 
 
-# Index of the transfer matrix for exactly `E_ionization_threshold`.
-function threshold_index(cache::SpeciesCascadingCache, E_ionization_threshold)
-    i_threshold = findfirst(==(E_ionization_threshold), cache.ionization_thresholds)
-    isnothing(i_threshold) && throw(ArgumentError(
-        "no cascading matrix for ionization threshold $(E_ionization_threshold) eV in \
-         $(cache.spec.name); available thresholds are $(cache.ionization_thresholds)"))
-    return i_threshold
-end
 
-# Load the secondary electron distribution, for a given initial primary energy index
-# and ionization threshold.
+# Load the secondary electron distribution, for a given initial primary energy index,
+# ionization threshold and number of ejected secondaries.
 function secondary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
-                            E_ionization_threshold)
+                            E_ionization_threshold, n_secondaries = nothing)
 
-    i_threshold = threshold_index(cache, E_ionization_threshold)
+    i_threshold = threshold_index(cache, E_ionization_threshold, n_secondaries)
     return @view(cache.secondary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 
-# Load the degraded primary electron distribution, for a given initial primary energy index
-# and ionization threshold.
+# Load the degraded primary electron distribution, for a given initial primary energy
+# index, ionization threshold and number of ejected secondaries.
 function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
-                          E_ionization_threshold)
+                          E_ionization_threshold, n_secondaries = nothing)
 
-    i_threshold = threshold_index(cache, E_ionization_threshold)
+    i_threshold = threshold_index(cache, E_ionization_threshold, n_secondaries)
     return @view(cache.primary_transfer_matrix[i_primary, :, i_threshold])
 end
 
 
 # Ionization events of a row: the normalization of both spectra above.
 function event_count(cache::SpeciesCascadingCache, i_primary::Integer,
-                     E_ionization_threshold)
+                     E_ionization_threshold, n_secondaries = nothing)
 
-    i_threshold = threshold_index(cache, E_ionization_threshold)
+    i_threshold = threshold_index(cache, E_ionization_threshold, n_secondaries)
     return cache.event_count[i_primary, i_threshold]
+end
+
+
+# Index of the transfer matrix for exactly `E_ionization_threshold` and `n_secondaries`
+# ejected electrons. Without `n_secondaries`, the threshold energy must identify a single
+# matrix.
+function threshold_index(cache::SpeciesCascadingCache, E_ionization_threshold,
+                         n_secondaries = nothing)
+    thresholds = cache.ionization_thresholds
+    matches = findall(==(E_ionization_threshold), thresholds)
+    isempty(matches) && throw(ArgumentError(
+        "no cascading matrix for ionization threshold $(E_ionization_threshold) eV in \
+         $(cache.spec.name); available thresholds are $(thresholds)"))
+    if isnothing(n_secondaries)
+        length(matches) == 1 || throw(ArgumentError(
+            "ionization threshold $(E_ionization_threshold) eV in $(cache.spec.name) has \
+             matrices for n_secondaries $(cache.spec.n_secondaries[matches]); pass \
+             n_secondaries to select one"))
+        return only(matches)
+    end
+    i_threshold = findfirst(i -> cache.spec.n_secondaries[i] == n_secondaries, matches)
+    isnothing(i_threshold) && throw(ArgumentError(
+        "no cascading matrix for ionization threshold $(E_ionization_threshold) eV with \
+         n_secondaries = $(n_secondaries) in $(cache.spec.name); available secondary counts \
+         at this threshold are $(cache.spec.n_secondaries[matches])"))
+    return matches[i_threshold]
 end
