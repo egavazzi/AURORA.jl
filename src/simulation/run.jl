@@ -43,7 +43,6 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
 
     write_config_toml(sim)
     write_atmosphere_nc(sim)
-    write_collision_channels_toml(sim)
     write_physics_jld2(sim)
 
     ds = create_simulation_nc(sim)

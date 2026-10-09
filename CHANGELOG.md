@@ -8,7 +8,6 @@
   - New functions `default_channels(:N2)`, `default_elastic_cross_section`, `default_secondary_law`, `channel_names` and `ionizing_channels`, and the unexported `AURORA.default_cascading_spec` and `AURORA.channel`. The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and `channels_O.jl`.
   - `AURORA.cascading_spec_from_channels(name, secondary_law, channels)` derives the ionization thresholds and secondary counts from a channel table, and throws when two channels ionize at the same energy loss with different secondary counts.
   - **Breaking** `DefaultCascadingSpecN2` / `O2` / `O`, `load_excitation_threshold`, `load_excitation_threshold_for` and `get_level_names` are removed. `get_cross_section` also accepts a `Symbol` species name.
-  - A run writes its channel tables to `inputs/collision_channels.toml`.
   - `make_volume_excitation_file` takes the ionization cross sections from the run's `inputs/physics_state.jld2`, which it now requires.
   - The cross sections and excitation levels of the built-in N₂, O₂ and O species are unchanged, bit for bit.
 - A cross section is now set to zero in the energy bins whose center is below the channel's energy loss, with a warning [#185](https://github.com/egavazzi/AURORA.jl/pull/185)

@@ -303,7 +303,6 @@ end
 end
 
 @testitem "Custom 4th species from a channel table: run! succeeds" begin
-    import TOML
     mktempdir() do savedir
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
@@ -339,14 +338,6 @@ end
         @test sim.model.species[end].excitation_levels == [0.0 0.0; 8.0 0.0; 20.0 1.0; 35.0 2.0]
         @test sim.model.species[end].cascading_spec.ionization_thresholds == [20.0, 35.0]
         @test sim.model.species[end].cascading_spec.n_secondaries == [1, 2]
-
-        # The channel tables are written to inputs/collision_channels.toml
-        channels_toml = TOML.parsefile(joinpath(savedir, "inputs", "collision_channels.toml"))
-        @test [c["name"] for c in channels_toml["CustomGas"]["channels"]] ==
-              ["exc", "ion", "dion"]
-        @test channels_toml["CustomGas"]["channels"][2]["n_secondaries"] == 1
-        @test channels_toml["CustomGas"]["channels"][2]["source"] == "invented"
-        @test [c["energy_loss_eV"] for c in channels_toml["N2"]["channels"]][end] == 42.0
     end
 end
 

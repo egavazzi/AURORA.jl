@@ -21,8 +21,7 @@ thresholds.
 
 The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and
 `channels_O.jl`, and are returned by [`default_channels`](@ref),
-[`default_elastic_cross_section`](@ref) and [`default_secondary_law`](@ref). A run writes its
-tables to `inputs/collision_channels.toml` for inspection.
+[`default_elastic_cross_section`](@ref) and [`default_secondary_law`](@ref).
 
 ## Data sources
 

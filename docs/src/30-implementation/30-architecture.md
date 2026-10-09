@@ -82,7 +82,7 @@ src/
 │
 ├── output/
 │   ├── output_manager.jl        # AuroraOutputManager (output options)
-│   ├── write.jl                 # config.toml, atmosphere.nc, collision_channels.toml, physics_state.jld2, simulation_data.nc
+│   ├── write.jl                 # config.toml, atmosphere.nc, physics_state.jld2, simulation_data.nc
 │   └── read.jl                  # SimulationResult, load_results, read_atmosphere_nc
 │
 ├── analysis/
