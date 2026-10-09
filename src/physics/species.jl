@@ -112,7 +112,7 @@ function NeutralSpecies(name::Symbol, density_source; elastic_cross_section, cha
     )
 end
 
-# Density profiles, cross sections, secondary laws and phase-function generators are commonly
+# Density profiles, cross sections, secondary laws and phase-function generators can be
 # swapped in via direct field assignment (the interception window before initialize!), which
 # bypasses the constructor. Intercept those assignments to enforce the reproducibility rule
 # there too. The fields derived from the channel table are set by `initialize!` only.

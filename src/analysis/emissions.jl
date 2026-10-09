@@ -6,26 +6,6 @@ using NCDatasets: NCDataset, defDim, defVar
 # ======================================================================================== #
 
 """
-    ion_production_cross_section(model, species_name::Symbol, E_centers) → Vector
-
-Ionization cross section (m²) of `species_name` in `model`: the channel cross sections
-weighted by their number of secondary electrons.
-"""
-function ion_production_cross_section(model, species_name::Symbol, E_centers::AbstractVector)
-    i_species = findfirst(sp -> sp.name === species_name, model.species)
-    isnothing(i_species) && throw(ArgumentError(
-        "Volume excitation rates need a species named $(species_name); the model has \
-         $(join((String(sp.name) for sp in model.species), ", "))."))
-    sp = model.species[i_species]
-    size(sp.cross_sections, 2) == length(E_centers) || throw(ArgumentError(
-        "The $(species_name) cross sections of the saved model cover \
-         $(size(sp.cross_sections, 2)) energy bins, but the results have \
-         $(length(E_centers)); the saved model does not belong to these results."))
-    return sp.cross_sections' * sp.excitation_levels[:, 2]
-end
-
-
-"""
     make_volume_excitation_file(directory_to_process)
 
 Read `simulation_data.nc`, `inputs/atmosphere.nc` and `inputs/physics_state.jld2` from
@@ -151,6 +131,27 @@ function make_volume_excitation_file(directory_to_process; max_bytes::Real = 512
         directory_to_process,
     )
 end
+
+
+"""
+    ion_production_cross_section(model, species_name::Symbol, E_centers) → Vector
+
+Ionization cross section (m²) of `species_name` in `model`: the channel cross sections
+weighted by their number of secondary electrons.
+"""
+function ion_production_cross_section(model, species_name::Symbol, E_centers::AbstractVector)
+    i_species = findfirst(sp -> sp.name === species_name, model.species)
+    isnothing(i_species) && throw(ArgumentError(
+        "Volume excitation rates need a species named $(species_name); the model has \
+         $(join((String(sp.name) for sp in model.species), ", "))."))
+    sp = model.species[i_species]
+    size(sp.cross_sections, 2) == length(E_centers) || throw(ArgumentError(
+        "The $(species_name) cross sections of the saved model cover \
+         $(size(sp.cross_sections, 2)) energy bins, but the results have \
+         $(length(E_centers)); the saved model does not belong to these results."))
+    return sp.cross_sections' * sp.excitation_levels[:, 2]
+end
+
 
 """
     make_volume_excitation_file(sim::AuroraSimulation)

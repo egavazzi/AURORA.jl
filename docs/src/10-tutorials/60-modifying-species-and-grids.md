@@ -197,8 +197,8 @@ is the cached route that reuses the package's own file storage.
 ## Overriding cross-sections, phase functions, or cascading
 
 A species describes its collision physics with three fields: an `elastic_cross_section`, a
-vector of [`CollisionChannel`](@ref)s, and a `secondary_law`. Everything the solvers read —
-the `cross_sections` and `excitation_levels` matrices and the cascading spec — is derived
+vector of [`CollisionChannel`](@ref)s, and a `secondary_law`. Everything the solvers read (such as
+the `cross_sections` and `excitation_levels` matrices and the cascading spec) is derived
 from those at `initialize!`, so editing the channel table is enough.
 
 ```julia
@@ -209,7 +209,7 @@ model.species[:N2].phase_fcn_generator = my_custom_phase_function
 # Add a channel: name, cross section σ(E) in m², energy loss in eV, secondaries ejected.
 push!(model.species[:N2].channels,
       CollisionChannel("mystate", my_sigma, 9.0, 0;
-                       source = "own digitization of fig. 3; see lab notebook"))
+                       source = "own digitization of fig. 3 of paper with doi blabla"))
 
 # Change one field of an existing channel
 i = findfirst(c -> c.name == "a3sup", model.species[:N2].channels)
@@ -225,11 +225,11 @@ model.species[:O2].secondary_law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
 
 The channel order is the row order of `cross_sections` and `excitation_levels` (row 1 is
 elastic, row `i + 1` is `channels[i]`). Look up a channel by name with
-[`AURORA.channel`](@ref), list them with [`channel_names`](@ref), and keep the ionizing ones
+[`AURORA.channel`](@ref), list them with [`channel_names`](@ref), and filter the ionizing ones
 with [`ionizing_channels`](@ref).
 
 A species edited after `initialize!(model)` needs an explicit `initialize!(model)` to rebuild
-the derived data; editing before the first `run!` needs nothing.
+the derived data.
 
 ## Adding, removing, or replacing species
 
