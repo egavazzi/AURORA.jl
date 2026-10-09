@@ -83,13 +83,17 @@ mutable struct SpeciesCascadingCache{S<:CascadingSpec}
     spec::S
     primary_transfer_matrix::Array{Float64, 3}
     secondary_transfer_matrix::Array{Float64, 3}
+    # Ionization events per primary bin and threshold [n_E, n_thresholds], including those
+    # whose outgoing electrons fall below the grid.
+    event_count::Matrix{Float64}
     E_edges::Vector{Float64}
     ionization_thresholds::Vector{Float64}
 end
 
 # Initialization constructor
 function SpeciesCascadingCache(spec::S) where {S<:CascadingSpec}
-    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), zeros(0, 0, 0), Float64[], Float64[])
+    return SpeciesCascadingCache{S}(spec, zeros(0, 0, 0), zeros(0, 0, 0), zeros(0, 0),
+                                    Float64[], Float64[])
 end
 
 
@@ -216,11 +220,10 @@ These two integrands add a third integration variable (the partner electron) on 
 E_primary mapping used by the single-ionization integrands. The resulting matrices are built so
 that, summed over their respective output bins, both equal the same event count
     Z₂ = ∬_R secondary_law(E_s1)·secondary_law(E_s2) dE_s1 dE_s2 ,
-exactly like the single-ionization pair. `compute_ionization_spectra!` then normalizes by
-`sum_primary` (≈ Z₂, the degraded primary being the highest-energy electron and thus on-grid)
-and multiplies the secondary spectrum by `n_secondary = 2`. With the secondary matrix carrying
-the PER-secondary marginal (∫ over the partner), this reproduces ⟨E_d⟩ + 2·⟨E_s⟩ = W exactly,
-so energy is conserved with no change to `compute_ionization_spectra!`.
+exactly like the single-ionization pair. `compute_ionization_spectra!` divides both matrices
+by the row's `event_count` (= Z₂) and multiplies the secondary spectrum by
+`n_secondary = 2`; with the secondary matrix carrying the per-secondary marginal (∫ over the
+partner), the on-grid electrons reproduce ⟨E_d⟩ + 2·⟨E_s⟩ = W.
 
 Small caveat: `secondary_law` is a SINGLE-ionization fit. The forms used here (the Cauchy/Lorentzian
 (of course I had to place Cauchy) `1 / (a² + E_s²)` for N₂/O₂ and the Opal–Peterson–Beaty form for O)
@@ -352,9 +355,10 @@ Double-ionization channels use the numerical-CDF method with fixed Gauss-Legendr
 - `E_edges`: Energy grid edges to match (eV)
 
 # Returns
-- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds)`:
-    degraded-primary transfer matrix [n_E, n_E, n_thresholds], secondary transfer matrix
-    [n_E, n_E, n_thresholds], energy grid edges, and ionization thresholds
+- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds,
+    event_counts)`: degraded-primary transfer matrix [n_E, n_E, n_thresholds], secondary
+    transfer matrix [n_E, n_E, n_thresholds], energy grid edges, ionization thresholds, and
+    the per-row ionization event counts [n_E, n_thresholds]
 """
 function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true,
                                        progress_interval::Real = 10)
@@ -381,6 +385,7 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
     n_thresholds = length(ionization_thresholds)
     primary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
     secondary_transfer_matrix = zeros(n_E, n_E, n_thresholds)
+    event_counts = zeros(n_E, n_thresholds)
 
     verbose && print("Calculating energy-degradation transfer matrices for e⁻ - $(spec.name) ionizing collisions...")
 
@@ -404,8 +409,10 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
         threshold = ionization_thresholds[i_threshold]
         single_secondary = n_secondaries[i_threshold] == 1
 
-        # Find the first primary bin whose left edge is above the threshold and can
-        # therefore contribute to ionization collisions.
+        # First primary bin that can ionize: the first one entirely above the threshold.
+        # TODO: the bin holding the threshold gets no row, so its ionization products are
+        # dropped. On the default grid they all fall below the grid floor anyway; a lower
+        # floor or wider bins would need a row matching the bin-center energy budget.
         i_min_primary = searchsortedfirst(E_left, threshold)
         n_bins = n_E - i_min_primary + 1
         bins_done = Threads.Atomic{Int}(0)
@@ -419,10 +426,12 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
             tid = Threads.threadid()
             if single_secondary
                 fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                            event_counts,
                                             E_edges, E_left, threshold, i_primary, i_threshold,
                                             law, primary_bufs[tid], secondary_bufs[tid])
             else
                 fill_double_ionization_bin_cdf!(primary_transfer_matrix, secondary_transfer_matrix,
+                                                event_counts,
                                                 E_edges, E_left, threshold, i_primary, i_threshold,
                                                 law)
             end
@@ -461,13 +470,40 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
         closing = printed_progress[] ? "  $(spec.name) cascading done" : " done"
         println("$closing ($(round(time() - t_start; digits = 1)) s).")
     end
-    return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds
+    return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds,
+           event_counts
+end
+
+
+# Ionization events in one primary bin: the per-secondary marginal integrated over
+# [0, E_upper], below-floor part included. The grid edges are knots, as for the binned
+# entries, so a law peaked at E_s → 0 is resolved. `u_bounds` are the limits of the other
+# (mapped) variables.
+function integrate_event_count(integrand, E_edges, E_upper, u_bounds, rtol, buffer)
+    total = 0.0
+    lower = 0.0
+    for edge in E_edges
+        lower >= E_upper && break
+        edge <= lower && continue
+        upper = min(edge, E_upper)
+        result, _ = hcubature(integrand, (lower, u_bounds[1]...), (upper, u_bounds[2]...);
+                              rtol, buffer)
+        total += result
+        lower = upper
+    end
+    if lower < E_upper
+        result, _ = hcubature(integrand, (lower, u_bounds[1]...), (E_upper, u_bounds[2]...);
+                              rtol, buffer)
+        total += result
+    end
+    return total
 end
 
 
 # Single-ionization (one secondary) contribution for one primary bin `i_primary` and threshold
 # index `i_threshold`.
 function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                     event_counts,
                                      E_edges, E_left, threshold, i_primary, i_threshold,
                                      secondary_law, primary_buf, secondary_buf)
     E_primary_bin_min = E_edges[i_primary]      # left edge
@@ -483,9 +519,9 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
     # energy. Using the lower edge of the primary bin gives the lowest such boundary.
     E_secondary_boundary_lower = (E_primary_bin_min - threshold) / 2
     # First bin that can receive a degraded primary electron (right edge above that boundary).
-    i_min_degraded = searchsortedlast(E_left, E_secondary_boundary_lower)
-    # If the lowest secondary/degraded boundary lies below the grid minimum, skip this bin.
-    i_min_degraded == 0 && return
+    # Clamped to bin 1 so the on-grid part of a range reaching below the floor is still
+    # binned.
+    i_min_degraded = max(1, searchsortedlast(E_left, E_secondary_boundary_lower))
     # Loop over degraded primary electron energy bins
     for i_degraded in i_min_degraded:(i_primary - 1)
         E_degraded_bin_min = E_edges[i_degraded]
@@ -520,6 +556,12 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
         end
     end
+
+    if E_secondary_boundary_upper > 0
+        event_counts[i_primary, i_threshold] =
+            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper,
+                                  ((0.0,), (1.0,)), 1e-4, secondary_buf)
+    end
     return
 end
 
@@ -535,6 +577,7 @@ end
 # ionization: the degraded primary is the highest-energy electron, so it reaches down only
 # to W/3 (not W/2), while a single secondary still maxes out at W/2.
 function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer_matrix,
+                                     event_counts,
                                      E_edges, E_left, threshold, i_primary, i_threshold,
                                      secondary_law, primary_buf, secondary_buf)
     E_primary_bin_min = E_edges[i_primary]      # left edge
@@ -577,6 +620,12 @@ function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer
                                  rtol = 1e-3, buffer = secondary_buf)
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] = result
         end
+    end
+
+    if E_secondary_boundary_upper > 0
+        event_counts[i_primary, i_threshold] =
+            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper,
+                                  ((0.0, 0.0), (1.0, 1.0)), 1e-3, secondary_buf)
     end
     return
 end
@@ -771,6 +820,7 @@ self-convolution.  Output-bin integrations are also four-point Gauss-Legendre su
 """
 function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
                                          secondary_transfer_matrix,
+                                         event_counts,
                                          E_edges, E_left, threshold,
                                          i_primary, i_threshold, law)
     E_primary_min = E_edges[i_primary]
@@ -821,6 +871,15 @@ function fill_double_ionization_bin_cdf!(primary_transfer_matrix,
             secondary_transfer_matrix[i_primary, i_secondary, i_threshold] +=
                 primary_weight * value
         end
+
+        # Event count (Z₂) of this primary node: the per-secondary marginal over [0, W/2],
+        # on the same CDF knots as the binned entries.
+        total_secondary = 0.0
+        for k_knot in firstindex(cdf.edges):(lastindex(cdf.edges) - 1)
+            total_secondary += gauss_legendre4(double_secondary_density, (threshold, cdf),
+                                               cdf.edges[k_knot], cdf.edges[k_knot + 1])
+        end
+        event_counts[i_primary, i_threshold] += primary_weight * total_secondary
     end
     return
 end
@@ -852,4 +911,13 @@ function primary_spectrum(cache::SpeciesCascadingCache, i_primary::Integer,
 
     i_threshold = threshold_index(cache, E_ionization_threshold)
     return @view(cache.primary_transfer_matrix[i_primary, :, i_threshold])
+end
+
+
+# Ionization events of a row: the normalization of both spectra above.
+function event_count(cache::SpeciesCascadingCache, i_primary::Integer,
+                     E_ionization_threshold)
+
+    i_threshold = threshold_index(cache, E_ionization_threshold)
+    return cache.event_count[i_primary, i_threshold]
 end

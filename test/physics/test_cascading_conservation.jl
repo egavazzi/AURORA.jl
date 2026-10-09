@@ -461,20 +461,26 @@ end
     # Per-event placed-energy ratio for every primary bin above threshold. (push! mutates
     # `ratios` in place — avoids the soft-scope pitfall of `+=` on an outer var inside a loop.)
     ratios = Float64[]
+    on_grid_ratios = Float64[]
     for iE in eachindex(Ec)
-        Ec[iE] - I < 10 && continue                    # skip near-threshold (too few bins to be meaningful)
+        Ec[iE] <= I && continue
         sec  = zeros(nE)
         prim = zeros(nE)
         AURORA.compute_ionization_spectra!(sec, prim, σ, E_levels, cache, iE)
-        sum(prim) <= 0 && continue
         # Energy carried away by the outgoing electrons (degraded primary + secondaries) per event.
         placed = sum(Ec .* (sec .+ prim)) / σ[2, iE]
         push!(ratios, placed / (Ec[iE] - I))
+        # Well above threshold the below-floor secondaries carry a negligible share.
+        if eg.E_edges[iE] >= 10 * I
+            push!(on_grid_ratios, placed / (Ec[iE] - I))
+        end
     end
 
     @test length(ratios) > 50                          # ensure we actually exercised the spectrum
     # The cascade must never create energy: outgoing electrons carry ≤ the available excess.
     @test maximum(ratios) <= 1.005
+    @test length(on_grid_ratios) > 50
+    @test all(r -> 0.99 <= r <= 1.005, on_grid_ratios)
 end
 
 
@@ -500,23 +506,28 @@ end
     σ = zeros(2, nE); σ[2, :] .= 1.0
 
     ratios = Float64[]
+    on_grid_ratios = Float64[]
     for iE in eachindex(Ec)
-        Ec[iE] - I < 10 && continue                    # skip near-threshold (too few bins to be meaningful)
+        Ec[iE] <= I && continue
         sec  = zeros(nE)
         prim = zeros(nE)
         AURORA.compute_ionization_spectra!(sec, prim, σ, E_levels, cache, iE)
-        sum(prim) <= 0 && continue
         # Energy carried away by the three outgoing electrons (degraded primary + 2 secondaries).
         placed = sum(Ec .* (sec .+ prim)) / σ[2, iE]
         push!(ratios, placed / (Ec[iE] - I))
+        # Well above threshold the below-floor secondaries carry a negligible share.
+        if eg.E_edges[iE] >= 10 * I
+            push!(on_grid_ratios, placed / (Ec[iE] - I))
+        end
     end
 
     @test length(ratios) > 50
     # Never create energy: degraded primary + two secondaries carry ≤ the available excess.
     @test maximum(ratios) <= 1.005
-    # And well above threshold (secondaries mostly on-grid) the cascade places ~all of the excess,
-    # confirming the two secondaries are actually deposited rather than dropped.
-    @test maximum(ratios) >= 0.95
+    # And well above threshold the cascade places ~all of the excess, confirming the two
+    # secondaries are actually deposited rather than dropped.
+    @test length(on_grid_ratios) > 50
+    @test all(r -> 0.99 <= r <= 1.005, on_grid_ratios)
 end
 
 # A law rebuilt from its source (as happens when a saved model is reloaded) is evaluated in a
@@ -572,18 +583,25 @@ end
         i_first = searchsortedfirst(E_left, threshold)
 
         # Production path
-        Qp, Qs, _, _ = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+        Qp, Qs, _, _, Z_cdf = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
 
         # Adaptive reference, on every active row
         P = zeros(n_E, n_E, 1)
         S = zeros(n_E, n_E, 1)
+        Z_ref = zeros(n_E, 1)
         pbuf = hcubature_buffer(AURORA.DoublePrimaryCascadingIntegrand(0.0, 1.0, 0.0, law),
                                 (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
         sbuf = hcubature_buffer(AURORA.DoubleSecondaryCascadingIntegrand(0.0, 1.0, 0.0, law),
                                 (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
         for i_p in i_first:n_E
-            AURORA.fill_double_ionization_bin!(P, S, E_edges, E_left, threshold, i_p, 1,
+            AURORA.fill_double_ionization_bin!(P, S, Z_ref, E_edges, E_left, threshold, i_p, 1,
                                                law, pbuf, sbuf)
+        end
+
+        # CDF and adaptive event counts agree.
+        for i in i_first:n_E
+            Z_ref[i, 1] > 0 || continue
+            @test isapprox(Z_cdf[i, 1], Z_ref[i, 1]; rtol = 2e-2)
         end
 
         for (ref, cdf) in ((P, Qp), (S, Qs))
@@ -633,6 +651,67 @@ end
         for i in i_hi:length(E_left0)
             row_p[i] > 0 || continue
             @test isapprox(row_p[i], row_s[i]; rtol = 5e-3)
+        end
+    end
+end
+
+# Every ionizing row places its electrons unless its whole kinematic range lies below the grid
+# floor.
+@testitem "Cascading near-threshold rows are filled" begin
+    using AURORA
+
+    eg = AURORA.EnergyGrid(3000.0)
+    E_edges = eg.E_edges
+    E_floor = E_edges[1]
+    policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
+
+    for spec in (AURORA.DefaultCascadingSpecN2(), AURORA.DefaultCascadingSpecO2(),
+                 AURORA.DefaultCascadingSpecO())
+        cache = AURORA.SpeciesCascadingCache(spec)
+        AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
+
+        for (i_threshold, I) in pairs(spec.ionization_thresholds)
+            for iE in eachindex(eg.E_centers)
+                E_edges[iE] < I && continue
+                # Every bin entirely above the threshold counts events, which normalize the
+                # two spectra.
+                @test AURORA.event_count(cache, iE, I) > 0
+
+                # The degraded primary of this bin reaches at most E_edges[iE+1] − I, and a
+                # secondary at most half of that.
+                degraded_max = E_edges[iE + 1] - I
+                primary_placed = sum(AURORA.primary_spectrum(cache, iE, I)) > 0
+                secondary_placed = sum(AURORA.secondary_spectrum(cache, iE, I)) > 0
+                @test primary_placed == (degraded_max > E_floor)
+                @test secondary_placed == (degraded_max / 2 > E_floor)
+            end
+        end
+    end
+end
+
+# The event count is the row's normalization, so where nothing is lost below the grid floor
+# it must equal the binned degraded-primary weight.
+@testitem "Cascading event count matches the on-grid row sum" begin
+    using AURORA
+
+    eg = AURORA.EnergyGrid(3000.0)
+    policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
+
+    for spec in (AURORA.DefaultCascadingSpecN2(), AURORA.DefaultCascadingSpecO2(),
+                 AURORA.DefaultCascadingSpecO())
+        cache = AURORA.SpeciesCascadingCache(spec)
+        AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
+
+        for I in spec.ionization_thresholds
+            checked = 0
+            for iE in eachindex(eg.E_centers)
+                # Whole degraded range on-grid (lowest is (E − I)/3 for double ionization).
+                (eg.E_edges[iE] - I) / 3 >= eg.E_edges[1] || continue
+                checked += 1
+                @test isapprox(sum(AURORA.primary_spectrum(cache, iE, I)),
+                               AURORA.event_count(cache, iE, I); rtol = 2e-3)
+            end
+            @test checked > 50
         end
     end
 end
