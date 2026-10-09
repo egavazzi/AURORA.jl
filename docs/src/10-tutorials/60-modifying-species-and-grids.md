@@ -229,8 +229,8 @@ model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
 A completely custom species needs its cascading law and a phase-function generator. Because the
 built-in cross-section library only knows N₂/O₂/O, pre-populate the cross-sections and
 excitation levels for a new gas in the interception window. Every ionizing row of the
-excitation levels (second column 1 or 2) must have its threshold and secondary count in the
-cascading spec:
+excitation levels (second column 1 or 2) must have its threshold and secondary count 
+present in the cascading spec:
 
 ```julia
 law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
