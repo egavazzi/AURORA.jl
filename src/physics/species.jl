@@ -112,7 +112,7 @@ end
     validate_ionization_channels(sp::NeutralSpecies)
 
 Throw an `ArgumentError` unless every ionizing row of `sp.excitation_levels` (energy loss,
-secondary count) matches a threshold and secondary count of `sp.cascading_spec` exactly.
+secondary count) is equal to a threshold and secondary count of `sp.cascading_spec`.
 """
 function validate_ionization_channels(sp::NeutralSpecies)
     spec = sp.cascading_spec

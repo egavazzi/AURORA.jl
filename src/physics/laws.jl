@@ -121,7 +121,8 @@ global value a law reads cannot be part of it.
 is_fingerprintable(law) = fieldcount(typeof(law)) > 0
 is_fingerprintable(::ExprLaw) = true
 
-# Type name and field values, recursively, via `getfield`
+# Type name and field values, recursively, via `getfield` (not `show`, which a custom
+# display could make lossy).
 function dump_law_value(io::IO, value)
     T = typeof(value)
     print(io, T)

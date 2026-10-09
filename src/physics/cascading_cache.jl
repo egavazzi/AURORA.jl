@@ -1,7 +1,7 @@
 using Dates: Dates, now
 using JLD2: jldopen
 
-# Entries a cascading cache file must hold. They identify the spec it was built for.
+# Entries a cascading cache file must hold
 const CASCADING_CACHE_KEYS = ("version_AURORA", "Q_primary", "Q_secondary", "E_edges",
                               "E_ionizations", "n_secondaries", "law_fingerprint")
 

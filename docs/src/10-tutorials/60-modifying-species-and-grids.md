@@ -228,7 +228,9 @@ model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
 
 A completely custom species needs its cascading law and a phase-function generator. Because the
 built-in cross-section library only knows N₂/O₂/O, pre-populate the cross-sections and
-excitation levels for a new gas in the interception window:
+excitation levels for a new gas in the interception window. Every ionizing row of the
+excitation levels (second column 1 or 2) must have its threshold and secondary count in the
+cascading spec:
 
 ```julia
 law  = @law (E_s, E_p) -> 1.0 / (12.0^2 + E_s^2)  # we are completely inventing here
@@ -251,4 +253,5 @@ run!(AuroraSimulation(model, flux, savedir; mode))
     the model can be saved and reloaded. Use [`@law`](@ref) for closed-form laws, a functor
     `struct` when the law carries parameters, or a named function. **Bare anonymous functions
     are rejected**. The chosen law will be stored in `inputs/physics_state.jld2` and possible
-    to restore on load.
+    to restore on load. Note that cascading matrices are cached on disk only for `@law` and 
+    functor laws. A named function won't be able to use the caching system.

@@ -1,27 +1,6 @@
 using DelimitedFiles: readdlm
 
 """
-    evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
-
-Helper to evaluate `f_sorted`, a cross-section body that requires energies in ascending
-order, on `Ep` in any order. Returns `out` with `out[j] == f_sorted([Ep[j]])[1]` for every
-`j` in `eachindex(Ep)`.
-"""
-function evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
-    E = Vector{float(eltype(Ep))}(undef, length(Ep))
-    copyto!(E, Ep)
-    sorted = issorted(E)
-    p = sorted ? nothing : sortperm(E)
-    σ = f_sorted(sorted ? E : E[p])
-    length(σ) == length(E) || throw(DimensionMismatch(
-        "cross-section body returned $(length(σ)) values for $(length(E)) energies"))
-    sorted || invpermute!(σ, p)
-    out = similar(Ep, eltype(σ))
-    copyto!(out, σ)
-    return out
-end
-
-"""
     load_excitation_threshold()
 
 Load the excitation thresholds or energy levels of the different states (vibrational,
