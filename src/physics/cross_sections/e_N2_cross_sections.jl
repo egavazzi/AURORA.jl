@@ -60,10 +60,11 @@ function e_N2rot0_2(Ep)
         -15.414539270491499, -15.468521082957746, -15.552841968657781,
         -15.787812395596042]
 
-    cross_section = 10 .^ [
-        PCHIPInterpolation(log10Xs, log10E)(log10.(Ep[Ep .<= 10^log10E[end - 1]]));
-        LinearInterpolation(log10Xs[(end - 1):end], log10E[(end - 1):end]; extrapolation = ExtrapolationType.Linear)(log10.(Ep[Ep .>= 10^log10E[end - 1]]))
-        ]
+    use_pchip = Ep .<= 10^log10E[end - 1]
+    log10_cross_section = similar(Ep, Float64)
+    log10_cross_section[use_pchip] = PCHIPInterpolation(log10Xs, log10E)(log10.(Ep[use_pchip]))
+    log10_cross_section[.!use_pchip] = LinearInterpolation(log10Xs[(end - 1):end], log10E[(end - 1):end]; extrapolation = ExtrapolationType.Linear)(log10.(Ep[.!use_pchip]))
+    cross_section = 10 .^ log10_cross_section
 
     I = findall(.!isfinite.(cross_section))
     cross_section[I] .= 0
@@ -188,10 +189,10 @@ function e_N2vib0_1(Ep)
     E = vcat(E, [5, 7.5, 10, 15, 18, 20, 23, 25, 30, 50, 75])
     s = vcat(s, [6.5e-22, 3.1e-22, 1.4e-22, 4.1e-22, 7.5e-22, 19.4e-22, 12.1e-22, 7.2e-22, 2.4e-22, 1.4e-22, 0.67e-22])
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
 
     I = findall(.!isfinite.(cross_section))
@@ -211,10 +212,10 @@ function e_N2vib0_2(Ep)
     E = vcat(E, [5, 7.5, 10, 15, 18, 20, 23, 25, 30, 50, 75])
     s = vcat(s, [6.5, 3.1, 1.4, 4.1, 7.5, 19.4, 12.1, 7.2, 2.4, 1.4, 0.67] .* 1e-22)
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
 
     I = findall(.!isfinite.(cross_section))
@@ -336,15 +337,15 @@ function e_N2a3sup(Ep)
         end
     end
 
-    XsItikawa = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    XsItikawa = similar(Ep, Float64)
+    XsItikawa[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    XsItikawa[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     XsItikawa = exp.(XsItikawa)
 
     XsItikawa[.!isfinite.(XsItikawa)] .= 0
 
-    Xs = [XsItikawa[Ep .<= 25]; Xs[Ep .> 25] / 1e4]
+    Xs = ifelse.(Ep .<= 25, XsItikawa, Xs ./ 1e4)
     Xs[Ep .< 6.1688] .= 0
 
     return Xs
@@ -354,14 +355,14 @@ function e_N2b3pg(Ep)
     E = [7, 8, 9, 10, 12.5, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 25, 32, 22.5, 18.5, 13, 8, 3] .* 1e-22
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
     for ie in eachindex(Ep)
         if Ep[ie] > 7.35 && Ep[ie] < 15.52
             cross_section_temp[ie] = (1 - 7.35 / Ep[ie]) * exp(-1139.542 + 1583.892 * log(Ep[ie]) - 844.6222 * log(Ep[ie])^2 + 198.2095 * log(Ep[ie])^3 - 17.29356 * log(Ep[ie])^4)
@@ -383,7 +384,7 @@ function e_N2b3pg(Ep)
 end
 
 function e_N2w3du(Ep)
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
 
     for ie in eachindex(Ep)
         if Ep[ie] > 7.36 && Ep[ie] < 100
@@ -398,10 +399,10 @@ function e_N2w3du(Ep)
     E = [7, 8, 9, 10, 12.5, 15, 17, 20, 30, 50]
     s = [.2, 2, 4.5, 7.5, 24.5, 33, 34, 31, 7, 2.2] .* 1e-22
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -412,7 +413,7 @@ function e_N2w3du(Ep)
 end
 
 function e_N2bp3sum(Ep)
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
 
     for ie in eachindex(Ep)
         if Ep[ie] > 8.16 && Ep[ie] < 29.55
@@ -429,10 +430,10 @@ function e_N2bp3sum(Ep)
     E = [8.1647, 12, 15, 18, 20, 30, 50]
     s = [.0001, 8, 13, 8, 4, 3, 2] .* 1e-22
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -443,7 +444,7 @@ function e_N2bp3sum(Ep)
 end
 
 function e_N2ap1sum(Ep)
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
 
     for ie in eachindex(Ep)
         if Ep[ie] > 8.4 && Ep[ie] < 29.937
@@ -460,10 +461,10 @@ function e_N2ap1sum(Ep)
     E = [8.3987, 15, 18, 20, 30, 50]
     s = [.0001, 11, 5, 3.5, 2, .8] .* 1e-22
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -474,7 +475,7 @@ function e_N2ap1sum(Ep)
 end
 
 function e_N2w1du(Ep)
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
 
     for ie in eachindex(Ep)
         if Ep[ie] > 8.89 && Ep[ie] < 20.487
@@ -491,10 +492,10 @@ function e_N2w1du(Ep)
     E = [8.8895, 12, 15, 17, 20, 30, 50]
     s = [.0001, 12, 9.5, 7, 3, 1.75, 0.7] .* 1e-22
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -563,10 +564,10 @@ function e_N2a1pg(Ep)
     E = [10, 12.5, 15, 16.25, 17.5, 20, 22.0, 30.0, 35.0, 40.0, 50, 60, 75, 90, 100]
     s = [0.42, 2.29, 3.67, 4, 3.67, 3.08, 2.67, 2.12, 1.67, 1.5, 1.17, 0.83, 0.75, 0.57, 0.5] .* 1e-21
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -577,7 +578,7 @@ function e_N2a1pg(Ep)
 end
 
 function e_N2c3pu(Ep)
-    cross_section_temp = similar(Ep)
+    cross_section_temp = similar(Ep, Float64)
 
     for ie in eachindex(Ep)
         if Ep[ie] > 11.03 && Ep[ie] < 20.169
@@ -594,10 +595,10 @@ function e_N2c3pu(Ep)
     E = [12.1, 12.67, 13.33, 13.5, 15, 17, 20, 30, 50]
     s = [0.5, 1, 2, 3, 3.75, 2.05, 1.44, 0.54, 0.21] .* 1e-21
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -608,7 +609,7 @@ function e_N2c3pu(Ep)
 end
 
 function e_N2bp1sup(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.85 && Ep[iE] < 152
@@ -626,7 +627,7 @@ function e_N2bp1sup(Ep)
 end
 
 function e_N2cp1sup(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.94 && Ep[iE] < 151
@@ -644,7 +645,7 @@ function e_N2cp1sup(Ep)
 end
 
 function e_N2cp3pu(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.08 && Ep[iE] < 18.36
@@ -664,7 +665,7 @@ function e_N2cp3pu(Ep)
 end
 
 function e_N2d3sup(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.85 && Ep[iE] < 50
@@ -682,7 +683,7 @@ function e_N2d3sup(Ep)
 end
 
 function e_N2f3pu(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.75 && Ep[iE] < 23.28
@@ -702,7 +703,7 @@ function e_N2f3pu(Ep)
 end
 
 function e_N2g3pu(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 12.8 && Ep[iE] < 18.84
@@ -722,7 +723,7 @@ function e_N2g3pu(Ep)
 end
 
 function e_N2M1M2(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 13.15 && Ep[iE] < 24.0
@@ -742,7 +743,7 @@ function e_N2M1M2(Ep)
 end
 
 function e_N2o1pu(Ep)
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 13.1 && Ep[iE] < 150
@@ -763,10 +764,10 @@ function e_N2dissociation(Ep)
     E = [20, 23.6, 27.8, 35, 45, 55, 65, 80, 96, 110, 125, 148, 170, 195, 245, 295, 2985.1, 49183, 55306]
     s = [0.87, 1.13, 1.39, 1.54, 1.7, 1.87, 1.87, 2.04, 2.07, 1.96, 1.9, 1.87, 1.78, 1.74, 1.57, 1.48, 5.0198e-1/3, 4.5953e-2/3, 4.47e-2/3] * 1e-20
 
-    cross_section = [
-        PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[Ep .< E[end]]);
-        LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[Ep .>= E[end]]))
-        ]
+    use_pchip = Ep .< E[end]
+    cross_section = similar(Ep, Float64)
+    cross_section[use_pchip] = PCHIPInterpolation(log.(s), E; extrapolation = ExtrapolationType.Extension)(Ep[use_pchip])
+    cross_section[.!use_pchip] = LinearInterpolation(log.(s), log.(E); extrapolation = ExtrapolationType.Linear)(log.(Ep[.!use_pchip]))
     cross_section = exp.(cross_section)
     cross_section[.!isfinite.(cross_section)] .= 0
 
@@ -782,7 +783,7 @@ end
 function e_N2ionx2sgp(Ep)
     # e_N2ionX2Sg+ - electron ionisation cross section (m^2) to the
     # ground-state  of N2+
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 15.58 && Ep[iE] < 42.71
@@ -804,7 +805,7 @@ end
 function e_N2iona2pu(Ep)
     # e_N2ionA2Pu - electron ionisation cross section (m^2) to the
     # first electronically excited state of N2+
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 16.73 && Ep[iE] < 42.85
@@ -826,7 +827,7 @@ end
 function e_N2ionb2sup(Ep)
     # e_N2ionB2Su+ - electron ionisation cross section (m^2) to the
     # second electronically excited state of N2+
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 18.75 && Ep[iE] < 43.4
@@ -848,7 +849,7 @@ end
 function e_N2dion(Ep)
     # e_N2dion - dissociative ionization cross section (m^2)
 
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 24.00 && Ep[iE] < 42.82
@@ -871,7 +872,7 @@ function e_N2ddion(Ep)
     # e_N2ddion - double dissociative ionization cross section (m^2)
     # i.e. N2 + e** -> e** + 2e* + N^+ + N^+
 
-    cross_section = similar(Ep)
+    cross_section = similar(Ep, Float64)
 
     for iE in length(Ep):-1:1
         if Ep[iE] > 42.00 && Ep[iE] < 44.45

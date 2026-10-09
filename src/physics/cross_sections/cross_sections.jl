@@ -107,4 +107,3 @@ function get_level_names(species_name)
     state_name = readdlm(filename, String, comments=true, comment_char='%')
     return vec(state_name)
 end
-
