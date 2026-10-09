@@ -316,13 +316,13 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             n_secondary = E_levels[i_level, 2]
             σ_level = σ[i_level, iE]
             # Retrieve precomputed, bin-integrated spectra from the cascading cache
-            secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
-            primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
+            secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss, n_secondary)
+            primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss, n_secondary)
 
             # Normalize by the row's ionization event count, not an on-grid sum: the part
             # of either spectrum below the lowest grid edge is left out (thermalised)
             # instead of being moved back onto the grid.
-            events = event_count(species_cascading, iE, E_loss)
+            events = event_count(species_cascading, iE, E_loss, n_secondary)
             if events <= 0
                 σ_level > 0 && throw(ArgumentError(
                     "ionizing channel at $(E_loss) eV has cross section $(σ_level) m² in \

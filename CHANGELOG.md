@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- **Breaking** A neutral species describes its collisions with an in-code channel table instead of the `internal_data/data_neutrals/<species>_levels.dat` / `.name` files [#186](https://github.com/egavazzi/AURORA.jl/pull/186)
+  - New type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)` for one inelastic channel; `CollisionChannel(c; energy_loss = ...)` copies it with fields replaced.
+  - `NeutralSpecies` gains `elastic_cross_section`, `channels` and `secondary_law`; `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are rebuilt from them at every `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`). Assigning one of these four fields throws; `run!` throws when the channel table was edited after `initialize!(model)`.
+  - **Breaking** `NeutralSpecies(name, density_source; ...)` takes `elastic_cross_section`, `channels` and `secondary_law` in place of `cascading_spec`. `NeutralSpecies` is no longer parametric.
+  - New functions `default_channels(:N2)`, `default_elastic_cross_section`, `default_secondary_law`, `channel_names` and `ionizing_channels`, and the unexported `AURORA.default_cascading_spec` and `AURORA.channel`. The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and `channels_O.jl`.
+  - `AURORA.cascading_spec_from_channels(name, secondary_law, channels)` derives the ionization thresholds and secondary counts from a channel table, one per distinct (energy loss, secondary count) pair.
+  - **Breaking** `DefaultCascadingSpecN2` / `O2` / `O`, `load_excitation_threshold`, `load_excitation_threshold_for` and `get_level_names` are removed. `get_cross_section` also accepts a `Symbol` species name.
+  - `make_volume_excitation_file` takes the ionization cross sections from the run's `inputs/physics_state.jld2`, which it now requires.
+  - The cross sections and excitation levels of the built-in N₂, O₂ and O species are unchanged, bit for bit.
 - A cross section is now set to zero in the energy bins whose center is below the channel's energy loss, with a warning [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition over lower bins; electrons degraded below the lowest grid edge thermalise (are removed) instead of being pushed into the first bin [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - **Numerical Breaking (small)** Ionizing collisions near a threshold no longer delete the electron, and both cascading spectra are normalized by the row's ionization event count, so outgoing electrons below the lowest energy bin thermalise (are removed) instead of being redistributed on-grid [#185](https://github.com/egavazzi/AURORA.jl/pull/185)

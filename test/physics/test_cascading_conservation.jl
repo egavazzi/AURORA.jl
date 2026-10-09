@@ -442,7 +442,7 @@ end
 @testitem "Cascading real-law energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.DefaultCascadingSpecN2()             # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
     I = spec.ionization_thresholds[1]                  # 15.581 eV
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
     Ec = eg.E_centers
@@ -488,7 +488,7 @@ end
 @testitem "Cascading double-ionization energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.DefaultCascadingSpecN2()             # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
     @test spec.n_secondaries[end] == 2                 # sanity: last channel is double ionization
     I = spec.ionization_thresholds[end]                # 42.0 eV double-ionization threshold
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
@@ -665,8 +665,8 @@ end
     E_floor = E_edges[1]
     policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
 
-    for spec in (AURORA.DefaultCascadingSpecN2(), AURORA.DefaultCascadingSpecO2(),
-                 AURORA.DefaultCascadingSpecO())
+    for spec in (AURORA.default_cascading_spec(:N2), AURORA.default_cascading_spec(:O2),
+                 AURORA.default_cascading_spec(:O))
         cache = AURORA.SpeciesCascadingCache(spec)
         AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
 
@@ -697,8 +697,8 @@ end
     eg = AURORA.EnergyGrid(3000.0)
     policy = AURORA.CachePolicy(force_recompute = true, save_cache = false)
 
-    for spec in (AURORA.DefaultCascadingSpecN2(), AURORA.DefaultCascadingSpecO2(),
-                 AURORA.DefaultCascadingSpecO())
+    for spec in (AURORA.default_cascading_spec(:N2), AURORA.default_cascading_spec(:O2),
+                 AURORA.default_cascading_spec(:O))
         cache = AURORA.SpeciesCascadingCache(spec)
         AURORA.load_or_compute_cascading!(cache, eg; verbose = false, policy)
 
