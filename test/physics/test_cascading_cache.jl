@@ -220,12 +220,6 @@ end
     @test_throws ArgumentError AURORA.primary_spectrum(cache, 60, 15.6)
     @test_throws ArgumentError AURORA.secondary_spectrum(cache, 60, 15.6)
     @test_throws "available thresholds" AURORA.primary_spectrum(cache, 60, 20.0)
-
-    # The energy-argument methods select the bin that contains the given energy.
-    k = searchsortedlast(cache.E_edges, 40.0)
-    E_center = (cache.E_edges[k] + cache.E_edges[k + 1]) / 2
-    @test AURORA.primary_spectrum(cache, E_center, 15.581) == AURORA.primary_spectrum(cache, k, 15.581)
-    @test AURORA.secondary_spectrum(cache, E_center, 15.581) == AURORA.secondary_spectrum(cache, k, 15.581)
 end
 
 @testitem "Ionizing levels must agree with the cascading spec" begin
