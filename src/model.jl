@@ -133,23 +133,23 @@ function initialize!(model::AuroraModel;
     θ  = model.scattering.θ_scatter
 
     for sp in model.species
-        sp.density           = collect(Float64, sp.density_source(h))
-        name_str             = String(sp.name)
+        sp.density = collect(Float64, sp.density_source(h))
+        name_str   = String(sp.name)
         # Cross sections depend on the energy grid, so (re)load them whenever they are missing
         # or sized for a different grid. This keeps them correct after an energy-grid swap,
         # while leaving user-supplied cross sections that already match the current grid intact.
         if isempty(sp.cross_sections) || size(sp.cross_sections, 2) != length(eg.E_centers)
-            sp.cross_sections    = get_cross_section(name_str, eg.E_centers)
+            sp.cross_sections = get_cross_section(name_str, eg.E_centers)
         end
         # Excitation levels are independent of the energy grid; load once if not supplied.
         if isempty(sp.excitation_levels)
             sp.excitation_levels = load_excitation_threshold_for(name_str)
         end
         validate_ionization_channels(sp)
-        sp.phase_fcn         = sp.phase_fcn_generator(θ, eg.E_centers)
+        sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
     end
-    # Before the cascading matrices: they are expensive, and would be cached for a grid that
-    # is then refused.
+    # Check before the cascading matrices: they are expensive, and would be cached for a
+    # grid that is then refused.
     check_bins_narrower_than_ionization_threshold(eg, model.species)
     for sp in model.species
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)

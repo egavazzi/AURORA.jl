@@ -1,7 +1,7 @@
 using Dates: Dates, now
 using JLD2: jldopen
 
-# Entries a cascading cache file must hold; they identify the spec it was built for.
+# Entries a cascading cache file must hold. They identify the spec it was built for.
 const CASCADING_CACHE_KEYS = ("version_AURORA", "Q_primary", "Q_secondary", "E_edges",
                               "E_ionizations", "n_secondaries", "law_fingerprint")
 
@@ -149,8 +149,8 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
                               policy::CachePolicy = CachePolicy())
     species_dir = cascading_cache_dir(cache.spec, policy)
     mkpath(species_dir)
-    # Matrices can build in under a second, so the timestamp can repeat; a counter suffix
-    # keeps the names distinct.
+    # Matrices can build in under a second, so the timestamp can repeat. We use a counter
+    # suffix to keep the names distinct.
     stem = string("cascading_", cache.spec.name, "_", Dates.format(now(), "yyyymmdd-HHMMSS"))
     filename = joinpath(species_dir, stem * ".jld2")
     counter = 1

@@ -308,10 +308,10 @@ end
         iri_file  = find_iri_file(; verbose=false)
 
         custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
-        # The excitation levels below are N₂'s, so the cascading spec carries N₂'s ionizing
-        # channels: every ionizing level must have a matching threshold and secondary count.
-        custom_spec = AURORA.CascadingSpec("CustomGas", [15.581, 16.73, 18.75, 24.0, 42.0],
-                                           custom_law; n_secondaries = [1, 1, 1, 1, 2])
+        # Invented gas
+        custom_spec = AURORA.CascadingSpec("CustomGas", [20.0, 35.0],
+                                           custom_law; n_secondaries = [1, 2])
+        # Reuse phase function from N₂
         custom_sp   = AURORA.NeutralSpecies(:CustomGas, @law(h -> fill(1e18, length(h)));
                                             cascading_spec      = custom_spec,
                                             phase_fcn_generator = AURORA.phase_fcn_N2)
@@ -321,11 +321,17 @@ end
                                        OSpecies(msis_file), custom_sp))
 
         # Interception window: pre-populate cross sections and excitation levels before
-        # initialize!(model) runs (name-based auto-lookup would fail for :CustomGas)
-        # We just reuse the N2 cross sections and levels here
+        # initialize!(model) runs.
         eg = model.energy_grid
-        model.species[end].cross_sections    = AURORA.get_cross_section("N2", eg.E_centers)
-        model.species[end].excitation_levels = AURORA.load_excitation_threshold_for("N2")
+        E  = eg.E_centers
+        model.species[end].excitation_levels = [ 0.0  0     # elastic
+                                                 8.0  0     # inelastic
+                                                20.0  1     # single ionization
+                                                35.0  2]    # double ionization
+        model.species[end].cross_sections = [fill(1e-20, length(E))';
+                                             [e > 8.0  ? 1e-21 : 0.0 for e in E]';
+                                             [e > 20.0 ? 5e-22 : 0.0 for e in E]';
+                                             [e > 35.0 ? 1e-22 : 0.0 for e in E]']
 
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())

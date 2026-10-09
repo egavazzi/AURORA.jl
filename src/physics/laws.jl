@@ -93,16 +93,6 @@ Base.show(io::IO, l::ExprLaw) = print(io, "@law ", l.src)
 profile_label(l::ExprLaw) = "@law $(l.src)"
 
 """
-    is_fingerprintable(law) -> Bool
-
-True for an [`ExprLaw`](@ref) or a functor with fields; false for a plain named function.
-The fingerprint covers only what the law object holds: a functor's call method and any
-global a law reads are not part of it.
-"""
-is_fingerprintable(law) = fieldcount(typeof(law)) > 0
-is_fingerprintable(::ExprLaw) = true
-
-"""
     law_fingerprint(law) -> String
 
 String identifying a law, built from everything the law carries: the source of an
@@ -121,8 +111,17 @@ function law_fingerprint(law)
     return String(take!(io))
 end
 
-# Type name and field values, recursively, via `getfield` (not `show`, which a custom
-# display could make lossy).
+"""
+    is_fingerprintable(law) -> Bool
+
+True for an [`ExprLaw`](@ref) or a functor with fields. False for a plain named function.
+The fingerprint covers only what the law object holds: a functor's call method or any
+global value a law reads cannot be part of it.
+"""
+is_fingerprintable(law) = fieldcount(typeof(law)) > 0
+is_fingerprintable(::ExprLaw) = true
+
+# Type name and field values, recursively, via `getfield`
 function dump_law_value(io::IO, value)
     T = typeof(value)
     print(io, T)

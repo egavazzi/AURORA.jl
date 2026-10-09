@@ -3,12 +3,11 @@ using DelimitedFiles: readdlm
 """
     evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
 
-Evaluate `f_sorted`, a cross-section body that requires energies in ascending order, on
-`Ep` in any order. Returns `out` with `out[j] == f_sorted([Ep[j]])[1]` for every `j` in
-`eachindex(Ep)`.
+Helper to evaluate `f_sorted`, a cross-section body that requires energies in ascending
+order, on `Ep` in any order. Returns `out` with `out[j] == f_sorted([Ep[j]])[1]` for every
+`j` in `eachindex(Ep)`.
 """
 function evaluate_in_energy_order(f_sorted, Ep::AbstractVector)
-    # 1-based working copy: the bodies index their input from 1.
     E = Vector{float(eltype(Ep))}(undef, length(Ep))
     copyto!(E, Ep)
     sorted = issorted(E)
@@ -129,4 +128,3 @@ function get_level_names(species_name)
     state_name = readdlm(filename, String, comments=true, comment_char='%')
     return vec(state_name)
 end
-
