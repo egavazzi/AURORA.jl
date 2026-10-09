@@ -1,21 +1,20 @@
 @testitem "Cross-section functions are order- and eltype-agnostic" begin
     E_grid = exp10.(range(log10(0.5), log10(1e5); length = 200))
 
-    function_names = String[]
-    for species in ("N2", "O2", "O")
-        for state in AURORA.get_level_names(species)
-            push!(function_names, "e_" * species * state)
+    cross_section_functions = Any[]
+    for species in (:N2, :O2, :O)
+        push!(cross_section_functions, AURORA.default_elastic_cross_section(species))
+        for c in AURORA.default_channels(species)
+            push!(cross_section_functions, c.cross_section)
         end
     end
-    @test length(function_names) == 63
+    @test length(cross_section_functions) == 63
 
     # Deterministic, non-monotonic permutation: evens then odds.
     n = length(E_grid)
     p = vcat(2:2:n, 1:2:n)
 
-    for fname in function_names
-        f = getfield(AURORA, Symbol(fname))
-
+    for f in cross_section_functions
         σ_sorted = f(E_grid)
         @test all(isfinite, σ_sorted)
         @test all(>=(0), σ_sorted)

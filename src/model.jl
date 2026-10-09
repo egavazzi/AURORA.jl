@@ -48,15 +48,19 @@ deferred to `initialize!(model)`, which is called automatically by `run!(sim)`.
   model = AuroraModel(..., nothing, ...; species = (O2Species(atm), OSpecies(atm)))
 
   # Four species example, with a custom 4th gas
-  # Laws (density, cascading, phase) must be @law-wrapped, a functor, or a named function to
-  # ensure reproducibility when saved to physics_state.jld2:
+  # Laws (density, cross sections, secondary law, phase) must be @law-wrapped, a functor, or
+  # a named function to ensure reproducibility when saved to physics_state.jld2:
   custom_sp = NeutralSpecies(:MyGas, @law(z -> 1e18 .* exp.(-z ./ 30e3));
-                             cascading_spec = my_spec, phase_fcn_generator = phase_fcn_N2)
+                             elastic_cross_section = AURORA.e_N2elastic,
+                             channels = [CollisionChannel("exc", AURORA.e_N2a3sup, 6.17, 0),
+                                         CollisionChannel("ion", AURORA.e_N2ionx2sgp, 15.6, 1)],
+                             secondary_law = @law((E_s, E_p) -> 1 / (11.4^2 + E_s^2)),
+                             phase_fcn_generator = phase_fcn_N2)
   model = AuroraModel(..., nothing, ...; species = (N2Species(atm), O2Species(atm),
                                                      OSpecies(atm),   custom_sp))
-  # Interception window: pre-populate custom cross sections before run!/initialize!
-  model.species[end].cross_sections    = my_sigma_matrix   # [n_levels × n_E]
-  model.species[end].excitation_levels = my_levels_matrix  # [n_levels × 2]
+
+  # A species' channel table can be edited before run!/initialize!
+  push!(model.species[:N2].channels, CollisionChannel("mystate", my_sigma, 9.0, 0))
   run!(sim)
   ```
 
@@ -115,9 +119,9 @@ end
 Perform all heavy setup for `model`:
 1. Compute `s_field` and `ionosphere` from the current altitude grid.
 2. Compute (or load from cache) the scattering matrices.
-3. For each species: sample the density profile, load cross sections and excitation levels
-   (skipped if already pre-populated), build phase functions, and load/compute cascading
-   transfer matrices.
+3. For each species: sample the density profile, derive the cross-section, excitation-level
+   and cascading data from the species' collision channels, build phase functions, and
+   load/compute cascading transfer matrices.
 
 Called internally by `initialize!(sim)` and/or `run!(sim)`.
 """
@@ -134,23 +138,7 @@ function initialize!(model::AuroraModel;
 
     for sp in model.species
         sp.density = collect(Float64, sp.density_source(h))
-        name_str   = String(sp.name)
-        # Cross sections depend on the energy grid, so (re)load them whenever they are missing
-        # or sized for a different grid. This keeps them correct after an energy-grid swap,
-        # while leaving user-supplied cross sections that already match the current grid intact.
-        if isempty(sp.cross_sections) || size(sp.cross_sections, 2) != length(eg.E_centers)
-            sp.cross_sections = get_cross_section(name_str, eg.E_centers)
-        end
-        # Excitation levels are independent of the energy grid; load once if not supplied.
-        if isempty(sp.excitation_levels)
-            sp.excitation_levels = load_excitation_threshold_for(name_str)
-        end
-        validate_ionization_channels(sp)
-        for i_level in axes(sp.excitation_levels, 1)
-            zero_below_energy_loss!(@view(sp.cross_sections[i_level, :]), eg.E_centers,
-                                    sp.excitation_levels[i_level, 1],
-                                    "$(sp.name) excitation level $(i_level)")
-        end
+        rebuild_collision_data!(sp, eg.E_centers)
         sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
     end
     # Check before the cascading matrices: they are expensive, and would be cached for a

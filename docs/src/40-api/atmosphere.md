@@ -24,3 +24,19 @@ DensityProfile
 @law
 ExprLaw
 ```
+
+## Neutral species and their collision channels
+```@docs; canonical=false
+NeutralSpecies
+N2Species
+O2Species
+OSpecies
+CollisionChannel
+AURORA.channel
+channel_names
+ionizing_channels
+default_channels
+default_elastic_cross_section
+default_secondary_law
+AURORA.default_cascading_spec
+```
