@@ -3,7 +3,7 @@
 ## Unreleased
 - Two cascading cache saves for one species within the same second no longer overwrite each other [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
-- Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies; they take a vector of energies only [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
+- Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - A cascading cache file is reused only when its thresholds, secondary counts and secondary law match, and matrices are selected by exact threshold; older cache files are recomputed [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - The energy-argument `primary_spectrum` and `secondary_spectrum` accessors of a cascading cache select the bin that contains the given energy (they selected the bin below it) [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
