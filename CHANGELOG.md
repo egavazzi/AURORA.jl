@@ -1,9 +1,9 @@
 # Changelog
 
 ## Unreleased
-- **Numerical Breaking (small)** A cross section is set to zero in the energy bins whose center is below the channel's energy loss, with a warning. On the default grid this affects one bin of the O₂ 16.9 eV ionization channel, whose fit starts at 16.1 eV
-- **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition over lower bins; electrons degraded below the lowest grid edge thermalise instead of being pushed into the first bin
-- **Numerical Breaking (small)** Ionizing collisions near a threshold no longer delete the electron, and both cascading spectra are normalized by the row's ionization event count, so outgoing electrons below the lowest energy bin thermalise (energy-budget residual) instead of being redistributed on-grid
+- **Numerical Breaking (small)** A cross section is set to zero in the energy bins whose center is below the channel's energy loss, with a warning. On the default grid this affects one bin of the O₂ 16.9 eV ionization channel, whose fit starts at 16.1 eV [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
+- **Numerical Breaking (small)** Non-ionizing degradation no longer renormalizes the partition over lower bins; electrons degraded below the lowest grid edge thermalise instead of being pushed into the first bin [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
+- **Numerical Breaking (small)** Ionizing collisions near a threshold no longer delete the electron, and both cascading spectra are normalized by the row's ionization event count, so outgoing electrons below the lowest energy bin thermalise (energy-budget residual) instead of being redistributed on-grid [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
 - A cascading cache file now checks if its thresholds, secondary counts and secondary law match [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
