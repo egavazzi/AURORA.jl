@@ -31,6 +31,24 @@ function load_excitation_threshold()
 end
 
 """
+    zero_below_energy_loss!(σ, E_centers, E_loss, label)
+
+Set `σ` to zero in the energy bins whose center is below `E_loss`, where the collision
+cannot happen, and warn (once per session for each `label`) when any of those values was
+non-zero: it points to a cross-section fit that starts below its energy loss.
+"""
+function zero_below_energy_loss!(σ, E_centers, E_loss, label)
+    below = (E_centers .< E_loss) .& (σ .> 0)
+    if any(below)
+        @warn "$(label) has a non-zero cross section below its energy loss of $(E_loss) eV, \
+               at bin centers $(round.(E_centers[below]; digits = 3)) eV. These values are set \
+               to zero." maxlog = 1 _id = (label, E_loss)
+        σ[below] .= 0
+    end
+    return σ
+end
+
+"""
     load_cross_sections(energy_grid)
     load_cross_sections(E_centers::AbstractVector)
 
@@ -75,16 +93,19 @@ Calculate the cross-section for a given species and their different energy state
 
 # Outputs
 - `σ_species`: A matrix of cross-section values for each energy state, for the defined
-  species
+  species. Each row is zero in the bins whose center is below that state's energy loss.
 """
 function get_cross_section(species_name, E_centers::AbstractVector)
     state_name = get_level_names(species_name)
     function_name = "e_" * species_name .* state_name
+    E_levels = load_excitation_threshold_for(species_name)
 
     σ_species = zeros(size(state_name, 1), length(E_centers))
     for i_state in axes(state_name, 1) # loop over the different energy states
         func = getfield(AURORA, Symbol(function_name[i_state])) # get the corresponding function name
         σ_species[i_state, :] .= func(E_centers) # calculate the corresponding cross-section
+        zero_below_energy_loss!(@view(σ_species[i_state, :]), E_centers, E_levels[i_state, 1],
+                                "$(species_name) channel $(lstrip(state_name[i_state], '_'))")
     end
 
     return σ_species

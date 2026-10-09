@@ -146,6 +146,11 @@ function initialize!(model::AuroraModel;
             sp.excitation_levels = load_excitation_threshold_for(name_str)
         end
         validate_ionization_channels(sp)
+        for i_level in axes(sp.excitation_levels, 1)
+            zero_below_energy_loss!(@view(sp.cross_sections[i_level, :]), eg.E_centers,
+                                    sp.excitation_levels[i_level, 1],
+                                    "$(sp.name) excitation level $(i_level)")
+        end
         sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
     end
     # Check before the cascading matrices: they are expensive, and would be cached for a
