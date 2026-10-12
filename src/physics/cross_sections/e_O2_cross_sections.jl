@@ -184,7 +184,8 @@ function e_O2ion16p9(Ep)
     # Ep electron energy (eV)
     cross_section = similar(Ep, Float64)
     for iE in eachindex(Ep)
-        if Ep[iE] > 16.1 && Ep[iE] < 300
+        # The fit's onset factor uses 16.1 eV; the gate is the channel's 16.9 eV energy loss.
+        if Ep[iE] > 16.9 && Ep[iE] < 300
             cross_section[iE] = (1-16.1/Ep[iE])*exp(-49.02795+6.907601*log(Ep[iE])-1.325630*log(Ep[iE])^2+0.08157475*log(Ep[iE])^3-0.0002650063*log(Ep[iE])^4)
         elseif Ep[iE] >= 300
             cross_section[iE] = 4.911588e-15*log(0.024825*Ep[iE])/Ep[iE]

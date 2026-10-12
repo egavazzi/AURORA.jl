@@ -53,3 +53,15 @@ end
     @test_logs AURORA.zero_below_energy_loss!(σ, E_centers, 2.5, "another test channel")
     @test σ == [0.0, 0.0, 1.0, 2.0]
 end
+
+@testitem "Built-in cross sections are zero below their energy loss" begin
+    # `zero_below_energy_loss!` warns for user-supplied tables; the built-in library must never trigger it.
+    E_centers = AURORA.EnergyGrid(3000.0).E_centers
+    for name in ("N2", "O2", "O")
+        σ = @test_logs AURORA.get_cross_section(name, E_centers)
+        E_levels = AURORA.load_excitation_threshold_for(name)
+        for i in axes(E_levels, 1)
+            @test all(σ[i, E_centers .< E_levels[i, 1]] .== 0)
+        end
+    end
+end
