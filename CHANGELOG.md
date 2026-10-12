@@ -5,7 +5,7 @@
   - Ionizing collisions just above a threshold no longer delete the electron. The degraded primary and the secondaries are placed on the grid, and the part that falls below the lowest bin is removed.
   - Electrons that a non-ionizing collision degrades below the lowest energy bin are removed instead of being placed in the lowest bins.
   - The built-in O₂ ionization cross section with a 16.9 eV energy loss is zero below 16.9 eV; its fit started at 16.1 eV.
-  - **Breaking** `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss, or when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge (the ionization products of that bin are not placed on the grid).
+  - `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss, or when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge (as the ionization products of that bin will not be placed on the grid).
   - Cascading cache files from earlier versions are recomputed, as they lack the ionization event counts.
 - **Breaking** Key the cascading cache on its physics and check the model inputs at `initialize!` [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
   - `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold.
