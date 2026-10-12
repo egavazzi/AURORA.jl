@@ -40,3 +40,16 @@
         @test σ_view == reverse(σ_sorted)
     end
 end
+
+@testitem "Built-in cross sections are zero below their energy loss" begin
+    # initialize! rejects a cross section that is non-zero below its energy loss; the built-in
+    # library must satisfy that.
+    E_centers = AURORA.EnergyGrid(3000.0).E_centers
+    for name in ("N2", "O2", "O")
+        σ = AURORA.get_cross_section(name, E_centers)
+        E_levels = AURORA.load_excitation_threshold_for(name)
+        for i in axes(E_levels, 1)
+            @test all(σ[i, E_centers .< E_levels[i, 1]] .== 0)
+        end
+    end
+end
