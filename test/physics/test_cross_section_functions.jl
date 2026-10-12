@@ -55,7 +55,8 @@ end
 end
 
 @testitem "Built-in cross sections are zero below their energy loss" begin
-    # `zero_below_energy_loss!` warns for user-supplied tables; the built-in library must never trigger it.
+    # `zero_below_energy_loss!` warns for user-supplied tables; the built-in library must
+    # never trigger it.
     E_centers = AURORA.EnergyGrid(3000.0).E_centers
     for name in ("N2", "O2", "O")
         σ = @test_logs AURORA.get_cross_section(name, E_centers)

@@ -218,7 +218,7 @@ Throw an `ArgumentError` if, for any ionizing channel, the energy bin holding th
 reaches higher above it than the lowest grid edge.
 
 The cascading matrices have rows only for the bins entirely above a threshold, while
-`update_A!` still removes the electrons of the bin holding it that ionize. This check
+`update_A!` still removes the ionizing electrons from the bin holding it. This check
 guarantees that the ionization products of that bin would all fall below the lowest grid
 edge anyway, so leaving them off the grid is correct.
 """

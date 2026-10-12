@@ -309,7 +309,8 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
             E_loss = E_levels[i_level, 1]
-            # The bin holding the threshold has no cascading row (see `calculate_cascading_matrices`).
+            # The bin holding the threshold has no cascading row
+            # (see `calculate_cascading_matrices`).
             species_cascading.E_edges[iE] >= E_loss || continue
             # Number of secondary electrons ejected (1 = single, 2 = double ionization)
             n_secondary = E_levels[i_level, 2]

@@ -34,8 +34,8 @@ end
     zero_below_energy_loss!(σ, E_centers, E_loss, label)
 
 Set `σ` to zero in the energy bins whose center is below `E_loss`, where the collision
-cannot happen, and warn (once per session for each `label`) when any of those values was
-non-zero: it points to a cross-section fit that starts below its energy loss.
+cannot happen. Warn once per session for each `label` when any of those values was
+non-zero, since that means the cross-section fit starts below its energy loss.
 """
 function zero_below_energy_loss!(σ, E_centers, E_loss, label)
     below = (E_centers .< E_loss) .& (σ .> 0)
@@ -104,7 +104,8 @@ function get_cross_section(species_name, E_centers::AbstractVector)
     for i_state in axes(state_name, 1) # loop over the different energy states
         func = getfield(AURORA, Symbol(function_name[i_state])) # get the corresponding function name
         σ_species[i_state, :] .= func(E_centers) # calculate the corresponding cross-section
-        # load_cross_sections feeds the emission analysis; zeroing here keeps it consistent with the transport.
+        # `load_cross_sections` feeds the emission analysis; zeroing here keeps it consistent
+        # with the transport.
         zero_below_energy_loss!(@view(σ_species[i_state, :]), E_centers, E_levels[i_state, 1],
                                 "$(species_name) channel $(lstrip(state_name[i_state], '_'))")
     end

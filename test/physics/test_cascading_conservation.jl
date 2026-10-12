@@ -524,8 +524,8 @@ end
     @test length(ratios) > 50
     # Never create energy: degraded primary + two secondaries carry ≤ the available excess.
     @test maximum(ratios) <= 1.005
-    # And well above threshold the cascade places ~all of the excess, confirming the two
-    # secondaries are actually deposited rather than dropped.
+    # Well above threshold the cascade places nearly all of the excess energy, so both
+    # secondaries are deposited.
     @test length(on_grid_ratios) > 50
     @test all(r -> 0.99 <= r <= 1.005, on_grid_ratios)
 end
