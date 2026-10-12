@@ -39,7 +39,8 @@ needs_initialization(sim::AuroraSimulation) =
     !sim.workspace.initialized || model_needs_initialization(sim.model)
 
 # A species whose channel table was edited after initialize!(model) leaves the model flagged
-# as initialized, so its derived data are compared with the table.
+# as initialized. We have this function to check if the model needs to be re-initialized, by
+# checking if the derived data and the table match.
 function model_needs_initialization(model::AuroraModel)
     model.initialized || return true
     E_centers = model.energy_grid.E_centers
