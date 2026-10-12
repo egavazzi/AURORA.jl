@@ -214,7 +214,9 @@ end
 
 function get_workspace(sim::AuroraSimulation)
     workspace = sim.workspace
-    needs_initialization(sim) &&
+    # Flags only: this runs at every energy step, and run! has already rebuilt a stale
+    # channel table before the solve starts.
+    (workspace.initialized && sim.model.initialized) ||
         error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
     return workspace
 end

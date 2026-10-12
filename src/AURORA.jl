@@ -23,7 +23,6 @@ include("physics/cross_sections/e_N2_cross_sections.jl")
 include("physics/cross_sections/e_O2_cross_sections.jl")
 include("physics/cross_sections/e_O_cross_sections.jl")
 include("physics/cross_sections/emission_cross_sections.jl")
-include("physics/cross_sections/cross_sections.jl")
 
 include("physics/cache_policy.jl")
 export CachePolicy
@@ -36,9 +35,14 @@ export phase_fcn_N2, phase_fcn_O2, phase_fcn_O, convert_phase_fcn_to_3D
 include("physics/laws.jl")
 export ExprLaw, @law
 
+include("physics/collision_channel.jl")
+export CollisionChannel
+
 include("physics/cascading.jl")
 include("physics/cascading_cache.jl")
 export clear_cascading_cache!
+
+include("physics/cross_sections/channels.jl")
 
 include("physics/species.jl")
 export NeutralSpecies

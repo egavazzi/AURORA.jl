@@ -1,21 +1,21 @@
 @testitem "Cross-section functions are order- and eltype-agnostic" begin
     E_grid = exp10.(range(log10(0.5), log10(1e5); length = 200))
 
-    function_names = String[]
-    for species in ("N2", "O2", "O")
-        for state in AURORA.get_level_names(species)
-            push!(function_names, "e_" * species * state)
+    cross_section_functions = Any[]
+    for species in (:N2, :O2, :O)
+        d = AURORA.default_collisions(species)
+        push!(cross_section_functions, d.elastic_cross_section)
+        for c in d.channels
+            push!(cross_section_functions, c.cross_section)
         end
     end
-    @test length(function_names) == 63
+    @test length(cross_section_functions) == 63
 
     # Deterministic, non-monotonic permutation: evens then odds.
     n = length(E_grid)
     p = vcat(2:2:n, 1:2:n)
 
-    for fname in function_names
-        f = getfield(AURORA, Symbol(fname))
-
+    for f in cross_section_functions
         σ_sorted = f(E_grid)
         @test all(isfinite, σ_sorted)
         @test all(>=(0), σ_sorted)
@@ -43,13 +43,13 @@ end
 
 @testitem "Built-in cross sections are zero below their energy loss" begin
     # initialize! rejects a cross section that is non-zero below its energy loss; the built-in
-    # library must satisfy that.
+    # tables must satisfy that.
     E_centers = AURORA.EnergyGrid(3000.0).E_centers
-    for name in ("N2", "O2", "O")
-        σ = AURORA.get_cross_section(name, E_centers)
-        E_levels = AURORA.load_excitation_threshold_for(name)
-        for i in axes(E_levels, 1)
-            @test all(σ[i, E_centers .< E_levels[i, 1]] .== 0)
+    for species in (:N2, :O2, :O)
+        d = AURORA.default_collisions(species)
+        σ = AURORA.channel_cross_sections(d.elastic_cross_section, d.channels, E_centers)
+        for (i, c) in enumerate(d.channels)
+            @test all(σ[i + 1, E_centers .< c.energy_loss] .== 0)
         end
     end
 end

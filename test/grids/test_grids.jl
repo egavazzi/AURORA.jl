@@ -135,11 +135,13 @@ end
     σ = zeros(3, eg.n)
     σ[2, eg.E_centers .>= 6.17] .= 1e-20
     σ[3, eg.E_centers .>= 15.581] .= 1e-20
-    sp = (; name = :N2, excitation_levels = E_levels, cross_sections = σ)
+    channels = [AURORA.CollisionChannel("exc", AURORA.e_N2a3sup, 6.17, 0),
+                AURORA.CollisionChannel("ion", AURORA.e_N2ionx2sgp, 15.581, 1)]
+    sp = (; name = :N2, excitation_levels = E_levels, cross_sections = σ, channels)
     @test AURORA.check_cross_sections_zero_below_energy_loss(sp, eg) === nothing
 
     # Bin center below 15.581 eV
     σ[3, searchsortedlast(eg.E_centers, 15.0)] = 1e-20
-    @test_throws "N2 channel 3 has a non-zero cross section below its energy loss of 15.581 eV" AURORA.check_cross_sections_zero_below_energy_loss(
+    @test_throws "N2 channel ion has a non-zero cross section below its energy loss of 15.581 eV" AURORA.check_cross_sections_zero_below_energy_loss(
         sp, eg)
 end
