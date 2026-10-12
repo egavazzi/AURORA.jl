@@ -140,15 +140,15 @@ function load_cascading_cache(filepath, n_E::Integer, spec::CascadingSpec; verbo
         if size(primary_transfer_matrix, 3) != n_thresholds ||
            size(secondary_transfer_matrix, 3) != n_thresholds
             throw(ArgumentError(
-                "cascading cache $(basename(filepath)) holds \
-                 $(size(primary_transfer_matrix, 3)) degraded-primary and \
-                 $(size(secondary_transfer_matrix, 3)) secondary matrices, but \
-                 $(spec.name) has $(n_thresholds) ionization thresholds"))
+                "$(spec.name) has $(n_thresholds) ionization thresholds, but the cascading \
+                 cache $(basename(filepath)) holds $(size(primary_transfer_matrix, 3)) \
+                 degraded-primary and $(size(secondary_transfer_matrix, 3)) secondary \
+                 transfer matrices"))
         end
         if size(event_counts, 2) != n_thresholds
             throw(ArgumentError(
-                "cascading cache $(basename(filepath)) holds event counts for \
-                 $(size(event_counts, 2)) thresholds, but $(spec.name) has $(n_thresholds)"))
+                "$(spec.name) has $(n_thresholds) ionization thresholds, but the cascading \
+                 cache $(basename(filepath)) holds event counts for $(size(event_counts, 2))"))
         end
         (; primary_transfer_matrix, secondary_transfer_matrix, E_edges,
          ionization_thresholds, event_counts)

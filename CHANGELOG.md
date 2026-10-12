@@ -2,19 +2,15 @@
 
 ## Unreleased
 - **Breaking** A neutral species describes its collisions with an in-code channel table instead of the `internal_data/data_neutrals/<species>_levels.dat` / `.name` files [#186](https://github.com/egavazzi/AURORA.jl/pull/186)
-  - New exported type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)` for one inelastic channel; `CollisionChannel(c; energy_loss = ...)` copies it with fields replaced.
-  - `NeutralSpecies` holds `elastic_cross_section`, `channels` and `secondary_law` (which may be `nothing` when no channel ionizes). `NeutralSpecies(name, density_source; ...)` takes these in place of `cascading_spec`, and `NeutralSpecies` is no longer parametric.
-  - `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are derived from the table at `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`); assigning one of them throws.
-  - `run!` rebuilds the derived data when the table was edited after `initialize!`.
-  - New unexported functions `AURORA.default_collisions(:N2)` (the built-in elastic cross section, channels and secondary law of `:N2`, `:O2` or `:O`), `AURORA.replace_channel!`, `AURORA.channel`, `AURORA.channel_names` and `AURORA.ionizing_channels`.
-  - **Breaking** Removed `get_cross_section`, `load_cross_sections`, `load_excitation_threshold`, `load_excitation_threshold_for`, `get_level_names` and `DefaultCascadingSpecN2` / `O2` / `O`.
-  - `make_volume_excitation_file` takes the ion-pair production cross sections from the run's `inputs/physics_state.jld2`, which it now requires.
-  - The cross sections and excitation levels of the built-in N₂, O₂ and O species are unchanged, bit for bit.
+  - New exported type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)`. A `NeutralSpecies` holds a vector of them in `channels`, next to its `elastic_cross_section` and `secondary_law` (`nothing` when no channel ionizes); the constructor takes these three keywords in place of `cascading_spec`.
+  - `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are derived from the table at `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`) and can no longer be assigned. Edit `channels` instead (`push!`, `filter!`, `AURORA.replace_channel!`), or `elastic_cross_section` and `secondary_law`; `run!` picks up edits made after `initialize!`.
+  - `AURORA.default_collisions(:N2)` returns the built-in table of `:N2`, `:O2` or `:O` as those three keywords, for building variants of a species.
+  - Removed `get_cross_section`, `load_cross_sections`, `load_excitation_threshold`, `load_excitation_threshold_for`, `get_level_names` and `DefaultCascadingSpecN2` / `O2` / `O`.
 - **Numerical Breaking (small)** Fix the electron bookkeeping near ionization thresholds and below the lowest energy bin [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
   - Ionizing collisions just above a threshold no longer delete the electron. The degraded primary and the secondaries are placed on the grid, and the part that falls below the lowest bin is removed.
   - Electrons that a non-ionizing collision degrades below the lowest energy bin are removed instead of being placed in the lowest bins.
   - The built-in O₂ ionization cross section with a 16.9 eV energy loss is zero below 16.9 eV; its fit started at 16.1 eV.
-  - `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss, or when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge (as the ionization products of that bin will not be placed on the grid).
+  - `initialize!(model)` throws when a cross section is non-zero below its channel's energy loss, or when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge.
   - Cascading cache files from earlier versions are recomputed, as they lack the ionization event counts.
 - **Breaking** Key the cascading cache on its physics and check the model inputs at `initialize!` [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
   - `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold.
