@@ -146,12 +146,7 @@ function initialize!(model::AuroraModel;
             sp.excitation_levels = load_excitation_threshold_for(name_str)
         end
         validate_ionization_channels(sp)
-        # User-supplied tables; the built-in library is already zeroed in get_cross_section.
-        for i_level in axes(sp.excitation_levels, 1)
-            zero_below_energy_loss!(@view(sp.cross_sections[i_level, :]), eg.E_centers,
-                                    sp.excitation_levels[i_level, 1],
-                                    "$(sp.name) channel $(i_level)")
-        end
+        check_cross_sections_zero_below_energy_loss(sp, eg)
         sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
     end
     # Check before the cascading matrices: they are expensive, and would be cached for a
@@ -207,6 +202,33 @@ function check_bins_narrower_than_ionization_threshold(energy_grid, species)
             "and secondary electrons. Use an energy grid whose bins all stay narrower " *
             "than every ionization threshold."
         ))
+    end
+    return nothing
+end
+
+"""
+    check_cross_sections_zero_below_energy_loss(sp, energy_grid)
+
+Throw an `ArgumentError` if any cross section of `sp` is non-zero at a bin center below
+that channel's energy loss. A collision cannot happen below its energy loss, so such bins
+would remove electrons that are never placed elsewhere on the grid. The built-in
+cross-section library satisfies this.
+"""
+function check_cross_sections_zero_below_energy_loss(sp, energy_grid)
+    E_centers = energy_grid.E_centers
+    for i_level in axes(sp.excitation_levels, 1)
+        E_loss = sp.excitation_levels[i_level, 1]
+        below = findall(i -> E_centers[i] < E_loss && sp.cross_sections[i_level, i] > 0,
+                        eachindex(E_centers))
+        if !isempty(below)
+            throw(ArgumentError(
+                "$(sp.name) channel $(i_level) has a non-zero cross section below its " *
+                "energy loss of $(E_loss) eV, at bin centers " *
+                "$(round.(E_centers[below]; digits = 3)) eV. A cross section must be zero " *
+                "at every bin center below the channel's energy loss, where the collision " *
+                "cannot happen; correct the cross-section table or the energy loss."
+            ))
+        end
     end
     return nothing
 end

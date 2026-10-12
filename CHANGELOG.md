@@ -2,7 +2,7 @@
 
 ## Unreleased
 - **Breaking** `initialize!(model)` throws an `ArgumentError` when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge, because the ionization products of that bin are not placed on the grid [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- A cross section is now set to zero in the energy bins whose center is below the channel's energy loss, with a warning when the fit was non-zero there [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
+- **Breaking** `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - The built-in O₂ ionization cross section with a 16.9 eV energy loss is now zero below 16.9 eV; its fit started at 16.1 eV [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - **Numerical Breaking (small)** Electrons that a non-ionizing collision degrades below the lowest energy bin are now removed instead of being placed in the lowest bins [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
 - **Numerical Breaking (small)** Ionizing collisions just above a threshold no longer delete the electron. The degraded primary and the secondaries are placed on the grid, and the part that falls below the lowest bin is removed [#185](https://github.com/egavazzi/AURORA.jl/pull/185)

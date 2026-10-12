@@ -128,3 +128,18 @@ end
     @test_throws "N2 channel at 15.581 eV" AURORA.check_threshold_bin_products_below_floor(
         low_floor_grid, species)
 end
+
+@testitem "Error when a cross section is non-zero below its energy loss" begin
+    eg = EnergyGrid(100)
+    E_levels = [0.0 0.0; 6.17 0.0; 15.581 1.0]
+    σ = zeros(3, eg.n)
+    σ[2, eg.E_centers .>= 6.17] .= 1e-20
+    σ[3, eg.E_centers .>= 15.581] .= 1e-20
+    sp = (; name = :N2, excitation_levels = E_levels, cross_sections = σ)
+    @test AURORA.check_cross_sections_zero_below_energy_loss(sp, eg) === nothing
+
+    # Bin center below 15.581 eV
+    σ[3, searchsortedlast(eg.E_centers, 15.0)] = 1e-20
+    @test_throws "N2 channel 3 has a non-zero cross section below its energy loss of 15.581 eV" AURORA.check_cross_sections_zero_below_energy_loss(
+        sp, eg)
+end
