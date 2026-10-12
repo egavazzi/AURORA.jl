@@ -111,3 +111,37 @@ end
     species_no_ion = [(; name = :X, excitation_levels = [0.0 0.0; 6.17 0.0])]
     @test AURORA.check_bins_narrower_than_ionization_threshold(coarse_grid, species_no_ion) === nothing
 end
+
+@testitem "Error when the threshold bin products would land on the grid" begin
+    # N2-like species: row 1 is elastic, one excitation channel (no secondaries),
+    # ionization channels have a secondary count > 0 in column 2
+    E_levels_N2 = [0.0 0.0; 6.17 0.0; 15.581 1.0; 42.0 2.0]
+    species = [(; name = :N2, excitation_levels = E_levels_N2)]
+
+    # On the default grid, the bin holding each threshold reaches less than the lowest
+    # edge above it → no error
+    @test AURORA.check_threshold_bin_products_below_floor(EnergyGrid(100), species) === nothing
+
+    # Lowest edge 0.5 eV with 1 eV bins: the bin holding 15.581 eV reaches 0.92 eV above it
+    E_edges = collect(0.5:1.0:60.5)
+    low_floor_grid = (; E_edges, n = length(E_edges) - 1)
+    @test_throws "N2 channel at 15.581 eV" AURORA.check_threshold_bin_products_below_floor(
+        low_floor_grid, species)
+end
+
+@testitem "Error when a cross section is non-zero below its energy loss" begin
+    eg = EnergyGrid(100)
+    E_levels = [0.0 0.0; 6.17 0.0; 15.581 1.0]
+    σ = zeros(3, eg.n)
+    σ[2, eg.E_centers .>= 6.17] .= 1e-20
+    σ[3, eg.E_centers .>= 15.581] .= 1e-20
+    channels = [AURORA.CollisionChannel("exc", AURORA.e_N2a3sup, 6.17, 0),
+                AURORA.CollisionChannel("ion", AURORA.e_N2ionx2sgp, 15.581, 1)]
+    sp = (; name = :N2, excitation_levels = E_levels, cross_sections = σ, channels)
+    @test AURORA.check_cross_sections_zero_below_energy_loss(sp, eg) === nothing
+
+    # Bin center below 15.581 eV
+    σ[3, searchsortedlast(eg.E_centers, 15.0)] = 1e-20
+    @test_throws "N2 channel ion has a non-zero cross section below its energy loss of 15.581 eV" AURORA.check_cross_sections_zero_below_energy_loss(
+        sp, eg)
+end

@@ -280,3 +280,29 @@ end
     @test all(secondary .>= 0)
     @test all(primary   .>= 0)
 end
+
+@testitem "Error when an ionizing row with a cross section has no ionization events" begin
+    msis_file = find_msis_file(; verbose=false)
+
+    σ_one = @law E -> fill(1.0, length(E))
+    channels = [AURORA.CollisionChannel(name, σ_one, I, 1)
+                for (name, I) in zip(("a", "b", "c"), (15.581, 16.73, 18.75))]
+    sp = AURORA.NeutralSpecies(:N2variant, read_msis_file(msis_file)[:N2];
+                               elastic_cross_section = σ_one, channels,
+                               secondary_law = @law((E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)),
+                               phase_fcn_generator = AURORA.phase_fcn_N2)
+
+    energy_grid = AURORA.EnergyGrid(100)
+    AURORA.rebuild_collision_data!(sp, energy_grid.E_centers)
+    AURORA.load_or_compute_cascading!(sp.cascading_data, energy_grid;
+                                      policy=AURORA.CachePolicy(save_cache=false),
+                                      verbose=false)
+    @test AURORA.check_ionizing_rows_have_events(sp, energy_grid) === nothing
+
+    # A bin entirely above the 15.581 eV threshold, where the cross section is positive.
+    i_primary = searchsortedlast(energy_grid.E_edges, 40.0)
+    @test energy_grid.E_edges[i_primary] >= 15.581
+    i_threshold = AURORA.threshold_index(sp.cascading_data, 15.581)
+    sp.cascading_data.event_counts[i_primary, i_threshold] = 0.0
+    @test_throws "no ionization events" AURORA.check_ionizing_rows_have_events(sp, energy_grid)
+end

@@ -23,7 +23,6 @@ include("physics/cross_sections/e_N2_cross_sections.jl")
 include("physics/cross_sections/e_O2_cross_sections.jl")
 include("physics/cross_sections/e_O_cross_sections.jl")
 include("physics/cross_sections/emission_cross_sections.jl")
-include("physics/cross_sections/cross_sections.jl")
 
 include("physics/cache_policy.jl")
 export CachePolicy

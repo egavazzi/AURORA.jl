@@ -2,7 +2,7 @@ using Dates: Dates, now
 using JLD2: jldopen
 
 # Entries a cascading cache file must hold
-const CASCADING_CACHE_KEYS = ("version_AURORA", "Q_primary", "Q_secondary", "event_count",
+const CASCADING_CACHE_KEYS = ("version_AURORA", "Q_primary", "Q_secondary", "event_counts",
                               "E_edges", "E_ionizations", "n_secondaries", "law_fingerprint")
 
 """
@@ -29,11 +29,11 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
 
     if file_found
         cascading_data = load_cascading_cache(filepath, n_E, cache.spec; verbose)
-        cache.primary_transfer_matrix = cascading_data[1]
-        cache.secondary_transfer_matrix = cascading_data[2]
-        cache.E_edges = cascading_data[3]
-        cache.ionization_thresholds = cascading_data[4]
-        cache.event_count = cascading_data[5]
+        cache.primary_transfer_matrix = cascading_data.primary_transfer_matrix
+        cache.secondary_transfer_matrix = cascading_data.secondary_transfer_matrix
+        cache.E_edges = cascading_data.E_edges
+        cache.ionization_thresholds = cascading_data.ionization_thresholds
+        cache.event_counts = cascading_data.event_counts
         return nothing
     end
 
@@ -46,11 +46,11 @@ function load_or_compute_cascading!(cache::SpeciesCascadingCache, energy_grid::E
     end
 
     cascading_data = calculate_cascading_matrices(cache.spec, E_edges; verbose)
-    cache.primary_transfer_matrix = cascading_data[1]
-    cache.secondary_transfer_matrix = cascading_data[2]
-    cache.E_edges = cascading_data[3]
-    cache.ionization_thresholds = cascading_data[4]
-    cache.event_count = cascading_data[5]
+    cache.primary_transfer_matrix = cascading_data.primary_transfer_matrix
+    cache.secondary_transfer_matrix = cascading_data.secondary_transfer_matrix
+    cache.E_edges = cascading_data.E_edges
+    cache.ionization_thresholds = cascading_data.ionization_thresholds
+    cache.event_counts = cascading_data.event_counts
 
     if cacheable
         if policy.save_cache
@@ -132,15 +132,17 @@ function load_cascading_cache(filepath, n_E::Integer, spec::CascadingSpec; verbo
     n_bins = n_E - 1
     n_thresholds = length(spec.ionization_thresholds)
     return jldopen(filepath, "r") do file
-        Q_primary     = file["Q_primary"][1:n_bins, 1:n_bins, :]
-        Q_secondary   = file["Q_secondary"][1:n_bins, 1:n_bins, :]
-        E_edges       = file["E_edges"][1:n_E]
-        E_ionizations = file["E_ionizations"]
-        event_counts  = file["event_count"][1:n_bins, :]
-        if size(Q_primary, 3) != n_thresholds || size(Q_secondary, 3) != n_thresholds
+        primary_transfer_matrix   = file["Q_primary"][1:n_bins, 1:n_bins, :]
+        secondary_transfer_matrix = file["Q_secondary"][1:n_bins, 1:n_bins, :]
+        E_edges                   = file["E_edges"][1:n_E]
+        ionization_thresholds     = file["E_ionizations"]
+        event_counts              = file["event_counts"][1:n_bins, :]
+        if size(primary_transfer_matrix, 3) != n_thresholds ||
+           size(secondary_transfer_matrix, 3) != n_thresholds
             throw(ArgumentError(
-                "cascading cache $(basename(filepath)) holds $(size(Q_primary, 3)) \
-                 degraded-primary and $(size(Q_secondary, 3)) secondary matrices, but \
+                "cascading cache $(basename(filepath)) holds \
+                 $(size(primary_transfer_matrix, 3)) degraded-primary and \
+                 $(size(secondary_transfer_matrix, 3)) secondary matrices, but \
                  $(spec.name) has $(n_thresholds) ionization thresholds"))
         end
         if size(event_counts, 2) != n_thresholds
@@ -148,7 +150,8 @@ function load_cascading_cache(filepath, n_E::Integer, spec::CascadingSpec; verbo
                 "cascading cache $(basename(filepath)) holds event counts for \
                  $(size(event_counts, 2)) thresholds, but $(spec.name) has $(n_thresholds)"))
         end
-        (Q_primary, Q_secondary, E_edges, E_ionizations, event_counts)
+        (; primary_transfer_matrix, secondary_transfer_matrix, E_edges,
+         ionization_thresholds, event_counts)
     end
 end
 
@@ -170,7 +173,7 @@ function save_cascading_cache(cache::SpeciesCascadingCache;
         file["version_AURORA"]  = cache_version_string()
         file["Q_primary"]       = cache.primary_transfer_matrix
         file["Q_secondary"]     = cache.secondary_transfer_matrix
-        file["event_count"]     = cache.event_count
+        file["event_counts"]    = cache.event_counts
         file["E_edges"]         = cache.E_edges
         file["E_ionizations"]   = cache.ionization_thresholds
         file["n_secondaries"]   = cache.spec.n_secondaries

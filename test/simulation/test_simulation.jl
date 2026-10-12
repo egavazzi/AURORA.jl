@@ -702,7 +702,7 @@ end
         sp = model.species[:O2]
         # A channel whose cross section is an @law, and a renamed built-in channel
         push!(sp.channels, AURORA.CollisionChannel("mystate",
-                                                   @law(E -> fill(1e-21, length(E))),
+                                                   @law(E -> 1e-21 .* (E .>= 9.0)),
                                                    9.0, 0; source = "invented"))
         sp.channels[1] = AURORA.CollisionChannel(sp.channels[1]; name = "renamed")
 
@@ -740,13 +740,13 @@ end
 
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
     sp = model.species[:N2]
-    AURORA.replace_channel!(sp, "a3sup"; energy_loss = 14.0)
+    AURORA.replace_channel!(sp, "a3sup"; energy_loss = 6.0)
     filter!(c -> c.name != "ddion", sp.channels)
 
     initialize!(model; verbose=false)
 
     i = findfirst(==("a3sup"), AURORA.channel_names(sp))
-    @test sp.excitation_levels[i + 1, 1] == 14.0
+    @test sp.excitation_levels[i + 1, 1] == 6.0
     @test size(sp.excitation_levels, 1) == length(sp.channels) + 1
     @test size(sp.cross_sections, 1) == length(sp.channels) + 1
     @test 42.0 ∉ sp.cascading_spec.ionization_thresholds

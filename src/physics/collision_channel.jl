@@ -136,22 +136,18 @@ function replace_channel!(channels, name::AbstractString; kwargs...)
 end
 
 """
-    channel_cross_sections(elastic_cross_section, channels, E_centers; species_name = "")
-        → Matrix{Float64}
+    channel_cross_sections(elastic_cross_section, channels, E_centers) → Matrix{Float64}
 
 Build the `[n_levels × n_E]` cross-section matrix of a species: row 1 is the elastic cross
-section, row `i + 1` is `channels[i]`. A channel's row is zero in the bins whose center is
-below its energy loss, where the collision cannot happen.
+section, row `i + 1` is `channels[i]`, each evaluated on `E_centers`. The rows are not
+checked here; `initialize!(model)` rejects a row that is non-zero below its energy loss.
 """
-function channel_cross_sections(elastic_cross_section, channels, E_centers::AbstractVector;
-                                species_name = "")
+function channel_cross_sections(elastic_cross_section, channels, E_centers::AbstractVector)
     Base.require_one_based_indexing(E_centers, channels)
     σ = zeros(length(channels) + 1, length(E_centers))
     σ[1, :] .= elastic_cross_section(E_centers)
     for (i, c) in enumerate(channels)
         σ[i + 1, :] .= c.cross_section(E_centers)
-        zero_below_energy_loss!(@view(σ[i + 1, :]), E_centers, c.energy_loss,
-                                strip("$(species_name) channel $(c.name)"))
     end
     return σ
 end

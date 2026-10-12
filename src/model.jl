@@ -139,13 +139,16 @@ function initialize!(model::AuroraModel;
     for sp in model.species
         sp.density = collect(Float64, sp.density_source(h))
         rebuild_collision_data!(sp, eg.E_centers)
+        check_cross_sections_zero_below_energy_loss(sp, eg)
         sp.phase_fcn = sp.phase_fcn_generator(θ, eg.E_centers)
     end
     # Check before the cascading matrices: they are expensive, and would be cached for a
     # grid that is then refused.
     check_bins_narrower_than_ionization_threshold(eg, model.species)
+    check_threshold_bin_products_below_floor(eg, model.species)
     for sp in model.species
         load_or_compute_cascading!(sp.cascading_data, eg; verbose, policy)
+        check_ionizing_rows_have_events(sp, eg)
     end
     model.initialized = true
     return nothing
@@ -192,6 +195,103 @@ function check_bins_narrower_than_ionization_threshold(energy_grid, species)
             "and secondary electrons. Use an energy grid whose bins all stay narrower " *
             "than every ionization threshold."
         ))
+    end
+    return nothing
+end
+
+"""
+    check_cross_sections_zero_below_energy_loss(sp, energy_grid)
+
+Throw an `ArgumentError` if any cross section of `sp` is non-zero at a bin center below
+that channel's energy loss. A collision cannot happen below its energy loss, so such bins
+would remove electrons that are never placed elsewhere on the grid. The built-in
+cross-section library satisfies this.
+"""
+# Row `i_level` of a species' cross-section matrix, for messages.
+channel_label(sp, i_level) =
+    i_level == 1 ? "elastic cross section" : "channel $(sp.channels[i_level - 1].name)"
+
+function check_cross_sections_zero_below_energy_loss(sp, energy_grid)
+    E_centers = energy_grid.E_centers
+    for i_level in axes(sp.excitation_levels, 1)
+        E_loss = sp.excitation_levels[i_level, 1]
+        below = findall(i -> E_centers[i] < E_loss && sp.cross_sections[i_level, i] > 0,
+                        eachindex(E_centers))
+        if !isempty(below)
+            throw(ArgumentError(
+                "$(sp.name) $(channel_label(sp, i_level)) has a non-zero cross section below its " *
+                "energy loss of $(E_loss) eV, at bin centers " *
+                "$(round.(E_centers[below]; digits = 3)) eV. A cross section must be zero " *
+                "at every bin center below the channel's energy loss, where the collision " *
+                "cannot happen; correct the cross-section table or the energy loss."
+            ))
+        end
+    end
+    return nothing
+end
+
+"""
+    check_threshold_bin_products_below_floor(energy_grid, species)
+
+Throw an `ArgumentError` if, for any ionizing channel, the energy bin holding the threshold
+reaches higher above it than the lowest grid edge.
+
+The cascading matrices have rows only for the bins entirely above a threshold, while
+`update_A!` still removes the ionizing electrons from the bin holding it. This check
+guarantees that the ionization products of that bin would all fall below the lowest grid
+edge anyway, so leaving them off the grid is correct.
+"""
+function check_threshold_bin_products_below_floor(energy_grid, species)
+    E_edges = energy_grid.E_edges
+    offenders = String[]
+    for sp in species
+        E_levels = sp.excitation_levels
+        for i in axes(E_levels, 1)[2:end]
+            E_levels[i, 2] > 0 || continue
+            I = E_levels[i, 1]
+            ib = searchsortedfirst(E_edges, I) - 1
+            (ib < 1 || ib > energy_grid.n) && continue
+            gap = E_edges[ib + 1] - I
+            if !(gap < E_edges[1])
+                push!(offenders, "$(sp.name) channel at $(I) eV (bin $(ib) reaches \
+                                  $(round(gap; digits = 2)) eV above it)")
+            end
+        end
+    end
+    if !isempty(offenders)
+        throw(ArgumentError(
+            "The energy bin holding an ionization threshold has no cascading row, so its " *
+            "ionization products are not placed on the grid. This is only harmless when " *
+            "they would all fall below the lowest grid edge " *
+            "($(round(E_edges[1]; digits = 2)) eV), which fails for " *
+            join(offenders, ", ") * ". Use an energy grid whose bin holding each " *
+            "threshold reaches less than the lowest edge above it."
+        ))
+    end
+    return nothing
+end
+
+"""
+    check_ionizing_rows_have_events(sp, energy_grid)
+
+Throw an `ArgumentError` if a row with ionizing cross section has no cascading events.
+"""
+function check_ionizing_rows_have_events(sp, energy_grid)
+    E_levels = sp.excitation_levels
+    for i_level in axes(E_levels, 1)[2:end]
+        E_levels[i_level, 2] > 0 || continue
+        E_loss = E_levels[i_level, 1]
+        for iE in 1:energy_grid.n
+            energy_grid.E_edges[iE] >= E_loss || continue
+            σ = sp.cross_sections[i_level, iE]
+            σ > 0 || continue
+            if !(event_count(sp.cascading_data, iE, E_loss) > 0)
+                throw(ArgumentError(
+                    "cascading matrices for $(sp.name) hold no ionization events in energy \
+                     bin $(iE) for the channel at $(E_loss) eV, but its cross section there \
+                     is $(σ) m²"))
+            end
+        end
     end
     return nothing
 end

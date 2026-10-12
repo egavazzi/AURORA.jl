@@ -309,8 +309,8 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
     for i_level in axes(E_levels, 1)[2:end]
         if E_levels[i_level, 2] > 0    # ionizing collision → produces secondary electrons
             E_loss = E_levels[i_level, 1]
-            # The bin holding the threshold has no cascading row (see the TODO in
-            # `calculate_cascading_matrices`).
+            # The bin holding the threshold has no cascading row
+            # (see `calculate_cascading_matrices`).
             species_cascading.E_edges[iE] >= E_loss || continue
             # Number of secondary electrons ejected (1 = single, 2 = double ionization)
             n_secondary = E_levels[i_level, 2]
@@ -319,16 +319,12 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
             secondary_e_spectra = secondary_spectrum(species_cascading, iE, E_loss)
             primary_e_spectra = primary_spectrum(species_cascading, iE, E_loss)
 
-            # Normalize by the row's ionization event count, not an on-grid sum: the part
-            # of either spectrum below the lowest grid edge is left out (thermalised)
-            # instead of being moved back onto the grid.
+            # Normalize by the row's ionization event count, which includes the events whose
+            # electrons fall below the lowest grid edge. That part is left out (thermalised)
+            # rather than moved back onto the grid.
             events = event_count(species_cascading, iE, E_loss)
-            if events <= 0
-                σ_level > 0 && throw(ArgumentError(
-                    "ionizing channel at $(E_loss) eV has cross section $(σ_level) m² in \
-                     energy bin $(iE) but no ionization events in its cascading matrices"))
-                continue
-            end
+            # A row with no events has no cross section either (checked at `initialize!`).
+            events > 0 || continue
             secondary_e_spectrum .+= secondary_e_spectra .* (σ_level * n_secondary / events)
             primary_e_spectrum .+= primary_e_spectra .* (σ_level / events)
         end

@@ -41,15 +41,15 @@
     end
 end
 
-@testitem "Cross sections are zero below their energy loss" begin
-    E_centers = [1.0, 2.0, 3.0, 4.0]
-    σ = [1.0, 2.0, 0.0, 4.0]
-    @test_logs (:warn, r"non-zero cross section below its energy loss of 3.5 eV") AURORA.zero_below_energy_loss!(
-        σ, E_centers, 3.5, "test channel")
-    @test σ == [0.0, 0.0, 0.0, 4.0]
-
-    # Nothing to zero: no warning, values unchanged.
-    σ = [0.0, 0.0, 1.0, 2.0]
-    @test_logs AURORA.zero_below_energy_loss!(σ, E_centers, 2.5, "another test channel")
-    @test σ == [0.0, 0.0, 1.0, 2.0]
+@testitem "Built-in cross sections are zero below their energy loss" begin
+    # initialize! rejects a cross section that is non-zero below its energy loss; the built-in
+    # tables must satisfy that.
+    E_centers = AURORA.EnergyGrid(3000.0).E_centers
+    for species in (:N2, :O2, :O)
+        d = AURORA.default_collisions(species)
+        σ = AURORA.channel_cross_sections(d.elastic_cross_section, d.channels, E_centers)
+        for (i, c) in enumerate(d.channels)
+            @test all(σ[i + 1, E_centers .< c.energy_loss] .== 0)
+        end
+    end
 end

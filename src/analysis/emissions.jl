@@ -146,8 +146,7 @@ function ion_pair_production_cross_section(model, species_name::Symbol,
         "Volume excitation rates need a species named $(species_name); the model has \
          $(join((String(sp.name) for sp in model.species), ", "))."))
     sp = model.species[i_species]
-    σ = channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers;
-                               species_name = String(sp.name))
+    σ = channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers)
     return σ' * channel_excitation_levels(sp.channels)[:, 2]
 end
 

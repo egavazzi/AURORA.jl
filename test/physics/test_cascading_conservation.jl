@@ -442,7 +442,7 @@ end
 @testitem "Cascading real-law energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)             # real law 1 / (11.4² + E_s²)
     I = spec.ionization_thresholds[1]                  # 15.581 eV
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
     Ec = eg.E_centers
@@ -488,7 +488,7 @@ end
 @testitem "Cascading double-ionization energy conservation (floored grid)" begin
     using AURORA
 
-    spec = AURORA.default_cascading_spec(:N2)          # real law 1 / (11.4² + E_s²)
+    spec = AURORA.default_cascading_spec(:N2)             # real law 1 / (11.4² + E_s²)
     @test spec.n_secondaries[end] == 2                 # sanity: last channel is double ionization
     I = spec.ionization_thresholds[end]                # 42.0 eV double-ionization threshold
     eg = AURORA.EnergyGrid(3000.0)                     # standard grid, floor ≈ 2 eV
@@ -524,8 +524,8 @@ end
     @test length(ratios) > 50
     # Never create energy: degraded primary + two secondaries carry ≤ the available excess.
     @test maximum(ratios) <= 1.005
-    # And well above threshold the cascade places ~all of the excess, confirming the two
-    # secondaries are actually deposited rather than dropped.
+    # Well above threshold the cascade places nearly all of the excess energy, so both
+    # secondaries are deposited.
     @test length(on_grid_ratios) > 50
     @test all(r -> 0.99 <= r <= 1.005, on_grid_ratios)
 end
@@ -583,7 +583,8 @@ end
         i_first = searchsortedfirst(E_left, threshold)
 
         # Production path
-        Qp, Qs, _, _, Z_cdf = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+        m = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+        Qp, Qs, Z_cdf = m.primary_transfer_matrix, m.secondary_transfer_matrix, m.event_counts
 
         # Adaptive reference, on every active row
         P = zeros(n_E, n_E, 1)

@@ -160,8 +160,7 @@ The cascading cache is replaced only when the derived spec differs from the curr
 function rebuild_collision_data!(sp::NeutralSpecies, E_centers::AbstractVector)
     check_channel_names(sp.channels)
     setfield!(sp, :cross_sections,
-              channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers;
-                                     species_name = String(sp.name)))
+              channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers))
     setfield!(sp, :excitation_levels, channel_excitation_levels(sp.channels))
     spec = cascading_spec_from_channels(String(sp.name), sp.secondary_law, sp.channels)
     if !describes_same_cascading(sp.cascading_spec, spec)
@@ -182,8 +181,7 @@ function collision_data_current(sp::NeutralSpecies, E_centers)
     spec = cascading_spec_from_channels(String(sp.name), sp.secondary_law, sp.channels)
     return isequal(sp.excitation_levels, channel_excitation_levels(sp.channels)) &&
            isequal(sp.cross_sections,
-                   channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers;
-                                          species_name = String(sp.name))) &&
+                   channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers)) &&
            describes_same_cascading(sp.cascading_spec, spec)
 end
 
