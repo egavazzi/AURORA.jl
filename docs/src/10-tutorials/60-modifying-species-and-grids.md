@@ -209,7 +209,7 @@ model.species[:N2].phase_fcn_generator = my_custom_phase_function
 # Add a channel: name, cross section σ(E) in m², energy loss in eV, secondaries ejected.
 push!(model.species[:N2].channels,
       CollisionChannel("mystate", my_sigma, 9.0, 0;
-                       source = "own digitization of fig. 3 of paper with doi blabla"))
+                       source = "digitized from Itikawa (2006), Fig. 3"))
 
 # Change one field of an existing channel
 AURORA.replace_channel!(model.species[:N2], "a3sup"; energy_loss = 6.2)

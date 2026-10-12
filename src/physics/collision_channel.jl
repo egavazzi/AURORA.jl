@@ -17,7 +17,7 @@ In a species, `channels[i]` is row `i + 1` of `cross_sections` and `excitation_l
 - `cross_section`: callable mapping a vector of energies (eV) to cross sections (m²).
     Must be a named function, a functor, or an [`ExprLaw`](@ref).
 - `energy_loss::Float64`: energy removed from the electron per collision (eV).
-- `n_secondaries::Int`: secondary electrons ejected — `0` for excitation, `1` for single
+- `n_secondaries::Int`: secondary electrons ejected: `0` for excitation, `1` for single
     ionization, `2` for double ionization.
 - `source::String`: free-form provenance (reference, table, digitization note). May be empty.
 

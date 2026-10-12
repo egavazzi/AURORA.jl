@@ -8,11 +8,11 @@ in the upper atmosphere: **N₂**, **O₂**, and **atomic O**. For each species,
 inelastic (excitation of rotational, vibrational, electronic states and ionization) 
 cross-sections are included. 
 
-Each species carries its inelastic collisions as a vector of [`CollisionChannel`](@ref)s —
-a name, a cross-section function σ(E) in m², the energy loss in eV, the number of secondary
-electrons ejected (0, 1 or 2), and a free-form `source` string recording where the data come
-from. Its elastic cross section and its secondary-electron energy distribution sit alongside,
-in the `elastic_cross_section` and `secondary_law` fields of [`NeutralSpecies`](@ref).
+Each species lists its inelastic collisions as a vector of [`CollisionChannel`](@ref). A
+channel has a name, a cross-section function σ(E) in m², the energy loss in eV, the number of
+secondary electrons ejected (0, 1 or 2), and a free-form `source` string recording where the
+data come from. The elastic cross section and the secondary-electron energy distribution are
+the `elastic_cross_section` and `secondary_law` fields of [`NeutralSpecies`](@ref).
 
 At `initialize!(model)` the channel table is evaluated on the model energy grid into the
 `cross_sections` `[n_levels × n_E]` and `excitation_levels` `[n_levels × 2]` matrices (row 1

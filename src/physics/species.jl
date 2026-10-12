@@ -8,8 +8,9 @@
 All per-species data needed to advance the transport equation through one neutral species.
 
 The collision physics is described by `elastic_cross_section`, `channels` and
-`secondary_law`. Everything the solvers read — `cross_sections`, `excitation_levels`,
-`cascading_spec` and `cascading_data` — is derived from those three at `initialize!(model)`, and assigning one of them throws.
+`secondary_law`. The fields the solvers read (`cross_sections`, `excitation_levels`,
+`cascading_spec` and `cascading_data`) are derived from those three at `initialize!(model)`;
+assigning one of them throws.
 
 # Fields
 - `name::Symbol`: short identifier (e.g. `:N2`, `:O2`, `:O`)
