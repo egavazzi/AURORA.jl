@@ -73,8 +73,7 @@ thermalises.
 For an ionizing channel, the degraded primary and the secondaries are distributed over the
 lower bins by the cascading transfer matrices. Each row of these matrices is normalized by
 the number of ionization events of that primary bin, counting also the events whose
-electrons fall below the lowest edge, so close to a threshold the placed shares again sum
-to less than one. Only the part above the lowest edge is placed.
+electrons fall below the lowest edge, but only the part above the lowest edge is placed.
 
 In both cases the energy carried below the lowest edge appears in the `residual` term of
 [`make_energy_budget_file`](@ref).
