@@ -1,14 +1,16 @@
 # Changelog
 
 ## Unreleased
-- **Breaking** `initialize!(model)` throws an `ArgumentError` when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge, because the ionization products of that bin are not placed on the grid [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- **Breaking** `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- The built-in O₂ ionization cross section with a 16.9 eV energy loss is now zero below 16.9 eV; its fit started at 16.1 eV [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- **Numerical Breaking (small)** Electrons that a non-ionizing collision degrades below the lowest energy bin are now removed instead of being placed in the lowest bins [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- **Numerical Breaking (small)** Ionizing collisions just above a threshold no longer delete the electron. The degraded primary and the secondaries are placed on the grid, and the part that falls below the lowest bin is removed [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
-- **Breaking** `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
-- Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
-- A cascading cache file now checks if its thresholds, secondary counts and secondary law match [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
+- **Numerical Breaking (small)** Fix the electron bookkeeping near ionization thresholds and below the lowest energy bin [#185](https://github.com/egavazzi/AURORA.jl/pull/185)
+  - Ionizing collisions just above a threshold no longer delete the electron. The degraded primary and the secondaries are placed on the grid, and the part that falls below the lowest bin is removed.
+  - Electrons that a non-ionizing collision degrades below the lowest energy bin are removed instead of being placed in the lowest bins.
+  - The built-in O₂ ionization cross section with a 16.9 eV energy loss is zero below 16.9 eV; its fit started at 16.1 eV.
+  - **Breaking** `initialize!(model)` throws an `ArgumentError` when a cross section is non-zero in an energy bin whose center is below the channel's energy loss, or when the energy bin holding an ionization threshold reaches higher above it than the lowest grid edge (the ionization products of that bin are not placed on the grid).
+  - Cascading cache files from earlier versions are recomputed, as they lack the ionization event counts.
+- **Breaking** Key the cascading cache on its physics and check the model inputs at `initialize!` [#184](https://github.com/egavazzi/AURORA.jl/pull/184)
+  - `initialize!(model)` throws an `ArgumentError` instead of warning when an energy bin is wider than a species' lowest ionization threshold.
+  - A cascading cache file is reused only if its thresholds, secondary counts and secondary law match.
+  - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies.
 - Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.
