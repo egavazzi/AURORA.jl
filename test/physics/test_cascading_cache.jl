@@ -269,7 +269,7 @@ end
     @test all(cache.primary_transfer_matrix   .>= 0)
     # no secondary production below the lowest ionization threshold
     i_threshold = searchsortedlast(cache.E_edges, 15.0)
-    @test all(cache.secondary_transfer_matrix[1:(i_threshold - 1), :, :] .== 0)
+    @test all(cache.secondary_transfer_matrix[1:i_threshold, :, :] .== 0)
 end
 
 @testitem "Custom NeutralSpecies with custom CascadingSpec: spectra are accessible" begin
@@ -300,4 +300,30 @@ end
     @test sum(secondary) >= 0
     @test all(secondary .>= 0)
     @test all(primary   .>= 0)
+end
+
+@testitem "Error when an ionizing row with a cross section has no ionization events" begin
+    msis_file = find_msis_file(; verbose=false)
+
+    custom_law  = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
+    custom_spec = AURORA.CascadingSpec("N2variant", [15.581, 16.73, 18.75], custom_law)
+
+    sp = AURORA.NeutralSpecies(:N2, read_msis_file(msis_file)[:N2];
+                               cascading_spec      = custom_spec,
+                               phase_fcn_generator = AURORA.phase_fcn_N2)
+
+    energy_grid = AURORA.EnergyGrid(100)
+    AURORA.load_or_compute_cascading!(sp.cascading_data, energy_grid;
+                                      policy=AURORA.CachePolicy(save_cache=false),
+                                      verbose=false)
+    sp.excitation_levels = [0.0 0.0; 15.581 1.0; 16.73 1.0; 18.75 1.0]
+    sp.cross_sections = ones(size(sp.excitation_levels, 1), energy_grid.n)
+    @test AURORA.check_ionizing_rows_have_events(sp, energy_grid) === nothing
+
+    # A bin entirely above the 15.581 eV threshold, where the cross section is positive.
+    i_primary = searchsortedlast(energy_grid.E_edges, 40.0)
+    @test energy_grid.E_edges[i_primary] >= 15.581
+    i_threshold = AURORA.threshold_index(sp.cascading_data, 15.581)
+    sp.cascading_data.event_counts[i_primary, i_threshold] = 0.0
+    @test_throws "no ionization events" AURORA.check_ionizing_rows_have_events(sp, energy_grid)
 end

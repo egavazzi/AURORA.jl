@@ -583,7 +583,8 @@ end
         i_first = searchsortedfirst(E_left, threshold)
 
         # Production path
-        Qp, Qs, _, _, Z_cdf = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+        m = AURORA.calculate_cascading_matrices(spec, E_edges; verbose = false)
+        Qp, Qs, Z_cdf = m.primary_transfer_matrix, m.secondary_transfer_matrix, m.event_counts
 
         # Adaptive reference, on every active row
         P = zeros(n_E, n_E, 1)

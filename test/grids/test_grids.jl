@@ -111,3 +111,20 @@ end
     species_no_ion = [(; name = :X, excitation_levels = [0.0 0.0; 6.17 0.0])]
     @test AURORA.check_bins_narrower_than_ionization_threshold(coarse_grid, species_no_ion) === nothing
 end
+
+@testitem "Error when the threshold bin products would land on the grid" begin
+    # N2-like species: row 1 is elastic, one excitation channel (no secondaries),
+    # ionization channels have a secondary count > 0 in column 2
+    E_levels_N2 = [0.0 0.0; 6.17 0.0; 15.581 1.0; 42.0 2.0]
+    species = [(; name = :N2, excitation_levels = E_levels_N2)]
+
+    # On the default grid, the bin holding each threshold reaches less than the lowest
+    # edge above it → no error
+    @test AURORA.check_threshold_bin_products_below_floor(EnergyGrid(100), species) === nothing
+
+    # Lowest edge 0.5 eV with 1 eV bins: the bin holding 15.581 eV reaches 0.92 eV above it
+    E_edges = collect(0.5:1.0:60.5)
+    low_floor_grid = (; E_edges, n = length(E_edges) - 1)
+    @test_throws "N2 channel at 15.581 eV" AURORA.check_threshold_bin_products_below_floor(
+        low_floor_grid, species)
+end

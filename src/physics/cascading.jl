@@ -85,7 +85,7 @@ mutable struct SpeciesCascadingCache{S<:CascadingSpec}
     secondary_transfer_matrix::Array{Float64, 3}
     # Ionization events per primary bin and threshold [n_E, n_thresholds], including those
     # whose outgoing electrons fall below the grid.
-    event_count::Matrix{Float64}
+    event_counts::Matrix{Float64}
     E_edges::Vector{Float64}
     ionization_thresholds::Vector{Float64}
 end
@@ -355,10 +355,13 @@ Double-ionization channels use the numerical-CDF method with fixed Gauss-Legendr
 - `E_edges`: Energy grid edges to match (eV)
 
 # Returns
-- `(primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds,
-    event_counts)`: degraded-primary transfer matrix [n_E, n_E, n_thresholds], secondary
-    transfer matrix [n_E, n_E, n_thresholds], energy grid edges, ionization thresholds, and
-    the per-row ionization event counts [n_E, n_thresholds]
+A `NamedTuple` with fields
+- `primary_transfer_matrix`: degraded-primary transfer matrix [n_E, n_E, n_thresholds]
+- `secondary_transfer_matrix`: secondary transfer matrix [n_E, n_E, n_thresholds]
+- `E_edges`: energy grid edges (eV)
+- `ionization_thresholds`: ionization thresholds (eV)
+- `event_counts`: ionization events per primary bin and threshold [n_E, n_thresholds],
+    including those whose outgoing electrons fall below the lowest grid edge
 """
 function calculate_cascading_matrices(spec::CascadingSpec, E_edges; verbose = true,
                                        progress_interval::Real = 10)
@@ -409,10 +412,11 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
         threshold = ionization_thresholds[i_threshold]
         single_secondary = n_secondaries[i_threshold] == 1
 
-        # First primary bin that can ionize: the first one entirely above the threshold.
-        # TODO: the bin holding the threshold gets no row, so its ionization products are
-        # dropped. On the default grid they all fall below the grid floor anyway; a lower
-        # floor or wider bins would need a row matching the bin-center energy budget.
+        # First primary bin that can ionize: the first one entirely above the threshold. The
+        # bin holding the threshold gets no row, so its ionization products are dropped;
+        # `check_threshold_bin_products_below_floor` guarantees at `initialize!` that they
+        # would all fall below the lowest grid edge anyway.
+        # TODO: fill that row to lift the restriction.
         i_min_primary = searchsortedfirst(E_left, threshold)
         n_bins = n_E - i_min_primary + 1
         bins_done = Threads.Atomic{Int}(0)
@@ -470,29 +474,31 @@ function calculate_cascading_matrices(spec::CascadingSpec, law, E_edges; verbose
         closing = printed_progress[] ? "  $(spec.name) cascading done" : " done"
         println("$closing ($(round(time() - t_start; digits = 1)) s).")
     end
-    return primary_transfer_matrix, secondary_transfer_matrix, E_edges, ionization_thresholds,
-           event_counts
+    return (; primary_transfer_matrix, secondary_transfer_matrix, E_edges,
+            ionization_thresholds, event_counts)
 end
 
 
 # Ionization events in one primary bin: the per-secondary marginal integrated over
 # [0, E_upper], below-floor part included. The grid edges are knots, as for the binned
-# entries, so a law peaked at E_s → 0 is resolved. `u_bounds` are the limits of the other
-# (mapped) variables.
-function integrate_event_count(integrand, E_edges, E_upper, u_bounds, rtol, buffer)
+# entries, so a law peaked at E_s → 0 is resolved. `n_mapped` is the number of the
+# integrand's other (mapped) variables, each over [0, 1].
+function integrate_event_count(integrand, E_edges, E_upper, n_mapped::Integer; rtol, buffer)
+    u_lower = ntuple(_ -> 0.0, n_mapped)
+    u_upper = ntuple(_ -> 1.0, n_mapped)
     total = 0.0
     lower = 0.0
     for edge in E_edges
         lower >= E_upper && break
         edge <= lower && continue
         upper = min(edge, E_upper)
-        result, _ = hcubature(integrand, (lower, u_bounds[1]...), (upper, u_bounds[2]...);
+        result, _ = hcubature(integrand, (lower, u_lower...), (upper, u_upper...);
                               rtol, buffer)
         total += result
         lower = upper
     end
     if lower < E_upper
-        result, _ = hcubature(integrand, (lower, u_bounds[1]...), (E_upper, u_bounds[2]...);
+        result, _ = hcubature(integrand, (lower, u_lower...), (E_upper, u_upper...);
                               rtol, buffer)
         total += result
     end
@@ -559,8 +565,8 @@ function fill_single_ionization_bin!(primary_transfer_matrix, secondary_transfer
 
     if E_secondary_boundary_upper > 0
         event_counts[i_primary, i_threshold] =
-            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper,
-                                  ((0.0,), (1.0,)), 1e-4, secondary_buf)
+            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper, 1;
+                                  rtol = 1e-4, buffer = secondary_buf)
     end
     return
 end
@@ -624,8 +630,8 @@ function fill_double_ionization_bin!(primary_transfer_matrix, secondary_transfer
 
     if E_secondary_boundary_upper > 0
         event_counts[i_primary, i_threshold] =
-            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper,
-                                  ((0.0, 0.0), (1.0, 1.0)), 1e-3, secondary_buf)
+            integrate_event_count(secondary_integrand, E_edges, E_secondary_boundary_upper, 2;
+                                  rtol = 1e-3, buffer = secondary_buf)
     end
     return
 end
@@ -919,5 +925,5 @@ function event_count(cache::SpeciesCascadingCache, i_primary::Integer,
                      E_ionization_threshold)
 
     i_threshold = threshold_index(cache, E_ionization_threshold)
-    return cache.event_count[i_primary, i_threshold]
+    return cache.event_counts[i_primary, i_threshold]
 end
