@@ -96,13 +96,13 @@ end
 
     # The weight the dropped channel carried is exactly 2 σ_ddion
     E_centers = load_coordinates(trimmed).E_centers
-    σ_full = AURORA.ion_production_cross_section(
+    σ_full = AURORA.ion_pair_production_cross_section(
         AURORA.load_model(reference), :N2, E_centers)
-    σ_trimmed = AURORA.ion_production_cross_section(
+    σ_trimmed = AURORA.ion_pair_production_cross_section(
         AURORA.load_model(trimmed), :N2, E_centers)
     @test σ_full .- σ_trimmed ≈ 2 .* ddion.cross_section(E_centers)
 
     # A model without N2/O2/O cannot produce these rates, and says so
-    @test_throws "need a species named" AURORA.ion_production_cross_section(
+    @test_throws "need a species named" AURORA.ion_pair_production_cross_section(
         (; species = (model.species[:O2], model.species[:O])), :N2, E_centers)
 end

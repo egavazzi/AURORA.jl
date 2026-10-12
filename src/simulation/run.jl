@@ -34,9 +34,6 @@ function run!(sim::AuroraSimulation; verbose::Bool = true)
     if needs_initialization(sim)
         initialize!(sim; verbose)
     end
-    for sp in sim.model.species
-        check_collision_data_current(sp, sim.model.energy_grid.E_centers)
-    end
 
     mkpath(savedir)
     mkpath(joinpath(savedir, "inputs"))
@@ -217,7 +214,9 @@ end
 
 function get_workspace(sim::AuroraSimulation)
     workspace = sim.workspace
-    needs_initialization(sim) &&
+    # Flags only: this runs at every energy step, and run! has already rebuilt a stale
+    # channel table before the solve starts.
+    (workspace.initialized && sim.model.initialized) ||
         error("Simulation not initialized. Call initialize!(sim) or run!(sim).")
     return workspace
 end

@@ -32,11 +32,10 @@ N2Species
 O2Species
 OSpecies
 CollisionChannel
+AURORA.channel_names
+AURORA.ionizing_channels
 AURORA.channel
-channel_names
-ionizing_channels
-default_channels
-default_elastic_cross_section
-default_secondary_law
+AURORA.replace_channel!
+AURORA.default_collisions
 AURORA.default_cascading_spec
 ```

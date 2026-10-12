@@ -251,10 +251,11 @@ end
 
     custom_law = @law (E_s, E_p) -> 1.0 / (11.4^2 + E_s^2)
     # Only the first three ionizing channels of N₂
-    channels = filter(c -> c.energy_loss <= 18.75, AURORA.default_channels(:N2))
+    defaults = AURORA.default_collisions(:N2)
+    channels = filter(c -> c.energy_loss <= 18.75, defaults.channels)
 
     sp = AURORA.NeutralSpecies(:N2variant, read_msis_file(msis_file)[:N2];
-                               elastic_cross_section = AURORA.default_elastic_cross_section(:N2),
+                               elastic_cross_section = defaults.elastic_cross_section,
                                channels,
                                secondary_law         = custom_law,
                                phase_fcn_generator   = AURORA.phase_fcn_N2)

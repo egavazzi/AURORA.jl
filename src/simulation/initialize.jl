@@ -23,7 +23,7 @@ function initialize!(sim::AuroraSimulation;
 
     verbose && @info "Initializing simulation..."
     cache_policy = CachePolicy(; force_recompute, save_cache, cache_root)
-    if !sim.model.initialized
+    if model_needs_initialization(sim.model)
         initialize!(sim.model; policy=cache_policy, verbose)
     end
     # Build both replacements before assigning either, so a failed workspace construction
@@ -36,7 +36,15 @@ function initialize!(sim::AuroraSimulation;
 end
 
 needs_initialization(sim::AuroraSimulation) =
-    !sim.workspace.initialized || !sim.model.initialized
+    !sim.workspace.initialized || model_needs_initialization(sim.model)
+
+# A species whose channel table was edited after initialize!(model) leaves the model flagged
+# as initialized, so its derived data are compared with the table.
+function model_needs_initialization(model::AuroraModel)
+    model.initialized || return true
+    E_centers = model.energy_grid.E_centers
+    return !all(sp -> collision_data_current(sp, E_centers), model.species)
+end
 
 function build_dummy_simulation_workspace(model::AuroraModel, time::AbstractTimeConfig)
     N_neutrals = length(model.species)

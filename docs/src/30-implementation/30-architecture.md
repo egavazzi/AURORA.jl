@@ -55,7 +55,7 @@ src/
 │
 ├── physics/
 │   ├── cross_sections/          # e-N₂, e-O₂, e-O cross-section functions
-│   │   ├── channels.jl          # default_channels / _elastic_cross_section / _secondary_law
+│   │   ├── channels.jl          # default_collisions: built-in collision data by species
 │   │   ├── channels_N2.jl       # N₂ collision-channel table
 │   │   ├── channels_O2.jl       # O₂ collision-channel table
 │   │   └── channels_O.jl        # O collision-channel table

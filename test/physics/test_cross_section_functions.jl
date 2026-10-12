@@ -3,8 +3,9 @@
 
     cross_section_functions = Any[]
     for species in (:N2, :O2, :O)
-        push!(cross_section_functions, AURORA.default_elastic_cross_section(species))
-        for c in AURORA.default_channels(species)
+        d = AURORA.default_collisions(species)
+        push!(cross_section_functions, d.elastic_cross_section)
+        for c in d.channels
             push!(cross_section_functions, c.cross_section)
         end
     end

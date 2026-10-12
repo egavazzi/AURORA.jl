@@ -212,9 +212,7 @@ push!(model.species[:N2].channels,
                        source = "own digitization of fig. 3 of paper with doi blabla"))
 
 # Change one field of an existing channel
-i = findfirst(c -> c.name == "a3sup", model.species[:N2].channels)
-model.species[:N2].channels[i] =
-    CollisionChannel(model.species[:N2].channels[i]; energy_loss = 6.2)
+AURORA.replace_channel!(model.species[:N2], "a3sup"; energy_loss = 6.2)
 
 # Drop channels
 filter!(c -> c.name != "ddion", model.species[:N2].channels)
@@ -225,11 +223,10 @@ model.species[:O2].secondary_law = @law (E_s, E_p) -> 1/(15.2^2 + E_s^2)
 
 The channel order is the row order of `cross_sections` and `excitation_levels` (row 1 is
 elastic, row `i + 1` is `channels[i]`). Look up a channel by name with
-[`AURORA.channel`](@ref), list them with [`channel_names`](@ref), and filter the ionizing ones
-with [`ionizing_channels`](@ref).
+[`AURORA.channel`](@ref), list them with [`AURORA.channel_names`](@ref), and filter the
+ionizing ones with [`AURORA.ionizing_channels`](@ref).
 
-A species edited after `initialize!(model)` needs an explicit `initialize!(model)` to rebuild
-the derived data.
+Edits made after `initialize!(model)` are picked up by the next `run!` or `initialize!`.
 
 ## Adding, removing, or replacing species
 
@@ -270,17 +267,15 @@ model = AuroraModel(alt_lims, θ_lims, E_max, nothing, electrons;
 run!(AuroraSimulation(model, flux, savedir; mode))
 ```
 
-The built-in tables for N₂, O₂ and O are available as
-[`default_channels`](@ref), [`default_elastic_cross_section`](@ref) and
-[`default_secondary_law`](@ref), which is the easiest way to build a variant of one of them:
+The built-in tables for N₂, O₂ and O are returned by [`AURORA.default_collisions`](@ref) as
+the keyword arguments `(; elastic_cross_section, channels, secondary_law)`, which is the
+easiest way to build a variant of one of them (a later keyword overrides a splatted one):
 
 ```julia
 # N₂ without dissociative double ionization
-channels = filter(c -> c.name != "ddion", default_channels(:N2))
-n2_variant = NeutralSpecies(:N2variant, neutrals[:N2];
-                            elastic_cross_section = default_elastic_cross_section(:N2),
-                            channels,
-                            secondary_law = default_secondary_law(:N2),
+defaults = AURORA.default_collisions(:N2)
+channels = filter(c -> c.name != "ddion", defaults.channels)
+n2_variant = NeutralSpecies(:N2variant, neutrals[:N2]; defaults..., channels,
                             phase_fcn_generator = phase_fcn_N2)
 ```
 

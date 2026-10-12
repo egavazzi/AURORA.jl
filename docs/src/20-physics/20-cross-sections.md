@@ -20,8 +20,7 @@ elastic, row `i + 1` = `channels[i]`), and the ionizing channels define the casc
 thresholds.
 
 The built-in tables live in `src/physics/cross_sections/channels_N2.jl`, `channels_O2.jl` and
-`channels_O.jl`, and are returned by [`default_channels`](@ref),
-[`default_elastic_cross_section`](@ref) and [`default_secondary_law`](@ref).
+`channels_O.jl`, and are returned by [`AURORA.default_collisions`](@ref).
 
 ## Data sources
 

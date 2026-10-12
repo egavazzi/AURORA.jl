@@ -341,6 +341,40 @@ end
     end
 end
 
+@testitem "A species without ionizing channels needs no secondary law" begin
+    mktempdir() do savedir
+        msis_file = find_msis_file(; verbose=false)
+        iri_file  = find_iri_file(; verbose=false)
+
+        excitation = AURORA.CollisionChannel("exc", @law(E -> 1e-21 .* (E .> 8.0)), 8.0, 0)
+        elastic = @law(E -> fill(1e-20, length(E)))
+        density = @law(h -> fill(1e18, length(h)))
+        custom_sp = AURORA.NeutralSpecies(:ExcitedGas, density;
+                                          elastic_cross_section = elastic,
+                                          channels              = [excitation],
+                                          phase_fcn_generator   = AURORA.phase_fcn_N2)
+        @test isnothing(custom_sp.secondary_law)
+        @test isempty(custom_sp.cascading_spec.ionization_thresholds)
+
+        model = AuroraModel([100, 200], 180:-90:0, 100, nothing, iri_file, 0;
+                            species = (N2Species(msis_file), O2Species(msis_file),
+                                       OSpecies(msis_file), custom_sp))
+        flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
+        sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
+        run!(sim; verbose=false)
+
+        @test sim.model.initialized
+        @test sim.model.species[end].excitation_levels == [0.0 0.0; 8.0 0.0]
+        @test isempty(sim.model.species[end].cascading_data.ionization_thresholds)
+
+        # An ionizing channel needs a law
+        ionizing = AURORA.CollisionChannel("ion", @law(E -> 5e-22 .* (E .> 20.0)), 20.0, 1)
+        @test_throws "has ionizing channels (ion) but no secondary_law" AURORA.NeutralSpecies(
+            :IonizedGas, density; elastic_cross_section = elastic,
+            channels = [excitation, ionizing], phase_fcn_generator = AURORA.phase_fcn_N2)
+    end
+end
+
 @testitem "Custom phase function via interception window: run! succeeds" begin
     mktempdir() do savedir
         msis_file = find_msis_file(; verbose=false)
@@ -521,10 +555,8 @@ end
     msis_file = find_msis_file(; verbose=false)
     iri_file  = find_iri_file(; verbose=false)
 
-    default_kwargs = (; elastic_cross_section = AURORA.default_elastic_cross_section(:N2),
-                        channels              = AURORA.default_channels(:N2),
-                        secondary_law         = AURORA.default_secondary_law(:N2),
-                        phase_fcn_generator   = AURORA.phase_fcn_N2)
+    default_kwargs = (; AURORA.default_collisions(:N2)...,
+                        phase_fcn_generator = AURORA.phase_fcn_N2)
 
     # Bare anonymous functions are rejected
     @test_throws ArgumentError AURORA.CascadingSpec("X", [1.0], (a, b) -> a)
@@ -555,9 +587,10 @@ end
     empty_mat = Matrix{Float64}(undef, 0, 0)
     spec      = AURORA.default_cascading_spec(:N2)
     cache     = AURORA.SpeciesCascadingCache(spec)
-    channels  = AURORA.default_channels(:N2)
-    elastic   = AURORA.default_elastic_cross_section(:N2)
-    law       = AURORA.default_secondary_law(:N2)
+    defaults  = AURORA.default_collisions(:N2)
+    channels  = defaults.channels
+    elastic   = defaults.elastic_cross_section
+    law       = defaults.secondary_law
 
     positional(density_source, elastic_cross_section, secondary_law, phase_fcn_generator) =
         AURORA.NeutralSpecies(:G, density_source, Float64[], elastic_cross_section, channels,
@@ -693,10 +726,10 @@ end
         @test sp2.excitation_levels == sp.excitation_levels
 
         # ... and that the rebuild tracks a further edit of the reloaded table
-        i = findfirst(c -> c.name == "mystate", sp2.channels)
-        sp2.channels[i] = AURORA.CollisionChannel(sp2.channels[i]; energy_loss = 3.0)
+        AURORA.replace_channel!(sp2, "mystate"; energy_loss = 3.0)
         initialize!(model2; verbose=false)
-        @test sp2.excitation_levels[i + 1, 1] == 3.0
+        @test sp2.excitation_levels[2:end, 1] == [c.energy_loss for c in sp2.channels]
+        @test 3.0 in sp2.excitation_levels[:, 1]
         @test sp2.excitation_levels != sp.excitation_levels
     end
 end
@@ -707,12 +740,12 @@ end
 
     model = AuroraModel([100, 200], 180:-90:0, 100, msis_file, iri_file, 0)
     sp = model.species[:N2]
-    i = findfirst(c -> c.name == "a3sup", sp.channels)
-    sp.channels[i] = AURORA.CollisionChannel(sp.channels[i]; energy_loss = 14.0)
+    AURORA.replace_channel!(sp, "a3sup"; energy_loss = 14.0)
     filter!(c -> c.name != "ddion", sp.channels)
 
     initialize!(model; verbose=false)
 
+    i = findfirst(==("a3sup"), AURORA.channel_names(sp))
     @test sp.excitation_levels[i + 1, 1] == 14.0
     @test size(sp.excitation_levels, 1) == length(sp.channels) + 1
     @test size(sp.cross_sections, 1) == length(sp.channels) + 1
@@ -720,7 +753,7 @@ end
     @test sp.cascading_spec.n_secondaries == [1, 1, 1, 1]
 end
 
-@testitem "Editing a channel after initialize! takes effect on the next initialize!" begin
+@testitem "Editing a channel after initialize! takes effect on the next initialize! or run!" begin
     mktempdir() do savedir
         msis_file = find_msis_file(; verbose=false)
         iri_file  = find_iri_file(; verbose=false)
@@ -732,9 +765,9 @@ end
         cache_before = sp.cascading_data
 
         # An excitation channel: the cascading spec is untouched, so the cache object stays
-        i = findfirst(c -> c.name == "a3sup", sp.channels)
-        sp.channels[i] = AURORA.CollisionChannel(sp.channels[i]; energy_loss = 6.0)
+        AURORA.replace_channel!(sp, "a3sup"; energy_loss = 6.0)
         initialize!(model; verbose=false)
+        i = findfirst(==("a3sup"), AURORA.channel_names(sp))
         @test sp.excitation_levels[i + 1, 1] == 6.0
         @test sp.cross_sections[i + 1, :] == AURORA.e_N2a3sup(model.energy_grid.E_centers)
         @test sp.cascading_data === cache_before
@@ -748,10 +781,21 @@ end
         @test sp.cascading_data !== cache_before
         @test size(sp.excitation_levels, 1) == length(sp.channels) + 1
 
-        # The edited model still runs
+        # An edit after initialize!(sim) is picked up by run! without a new initialize!
         flux = InputFlux(FlatSpectrum(1e-2; E_min = 50.0); beams = 1:2)
         sim  = AuroraSimulation(model, flux, savedir; mode = SteadyStateMode())
-        run!(sim; verbose=false)
+        initialize!(sim; verbose=false)
+        @test !AURORA.needs_initialization(sim)
+        filter!(c -> c.name != "ddion", sp.channels)
         @test sim.model.initialized
+        @test AURORA.needs_initialization(sim)
+        run!(sim; verbose=false)
+        @test !AURORA.needs_initialization(sim)
+        @test sp.excitation_levels == AURORA.channel_excitation_levels(sp.channels)
+        @test size(sp.cross_sections, 1) == length(sp.channels) + 1
+        @test sp.cascading_spec.ionization_thresholds == [15.581, 16.73, 18.75]
+        @test sp.cascading_spec.n_secondaries == [1, 1, 1]
+        @test sp.cascading_data.ionization_thresholds == [15.581, 16.73, 18.75]
+        @test size(sp.cascading_data.primary_transfer_matrix, 3) == 3
     end
 end

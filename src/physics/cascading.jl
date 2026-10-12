@@ -32,10 +32,20 @@ Derive the cascading spec of a species from its collision channels: the ionizati
 thresholds are the distinct energy losses of the ionizing channels, in order of first
 appearance, each with the number of secondary electrons that channel ejects.
 
+`secondary_law` may be `nothing` when no channel ionizes; the spec then has no thresholds
+and holds the placeholder law `NO_SECONDARY_LAW`.
+
 Throws an `ArgumentError` when two ionizing channels share an energy loss but not a
-secondary count.
+secondary count, or when a channel ionizes and `secondary_law` is `nothing`.
 """
 function cascading_spec_from_channels(name::AbstractString, secondary_law, channels)
+    if isnothing(secondary_law)
+        ionizing = [c.name for c in channels if c.n_secondaries > 0]
+        isempty(ionizing) || throw(ArgumentError(
+            "$(name) has ionizing channels ($(join(ionizing, ", "))) but no secondary_law; \
+             pass the secondary-electron energy distribution as `secondary_law`"))
+        secondary_law = NO_SECONDARY_LAW
+    end
     thresholds = Float64[]
     n_secondaries = Int[]
     for c in channels
@@ -53,6 +63,10 @@ function cascading_spec_from_channels(name::AbstractString, secondary_law, chann
     end
     return CascadingSpec(name, thresholds, secondary_law; n_secondaries)
 end
+
+# Secondary law of a species without ionizing channels. A spec without thresholds has empty
+# transfer matrices whatever its law; as an ExprLaw this one can be saved and fingerprinted.
+const NO_SECONDARY_LAW = @law (E_s, E_p) -> 0.0
 
 # Secondary-electron distribution for atomic O. It needs external parameters (A and B) so we
 # cannot just wrap it in @law. Instead we build a custom callable struct that contains the

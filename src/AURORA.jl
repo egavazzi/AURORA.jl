@@ -37,14 +37,13 @@ include("physics/laws.jl")
 export ExprLaw, @law
 
 include("physics/collision_channel.jl")
-export CollisionChannel, channel_names, ionizing_channels
+export CollisionChannel
 
 include("physics/cascading.jl")
 include("physics/cascading_cache.jl")
 export clear_cascading_cache!
 
 include("physics/cross_sections/channels.jl")
-export default_channels, default_elastic_cross_section, default_secondary_law
 
 include("physics/species.jl")
 export NeutralSpecies

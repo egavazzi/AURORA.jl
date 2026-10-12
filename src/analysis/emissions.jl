@@ -42,9 +42,9 @@ function make_volume_excitation_file(directory_to_process; max_bytes::Real = 512
 
     ## Load ionization cross-sections
     model = load_model(directory_to_process)
-    σ_N2i = ion_production_cross_section(model, :N2, E_centers)
-    σ_O2i = ion_production_cross_section(model, :O2, E_centers)
-    σ_Oi  = ion_production_cross_section(model, :O,  E_centers)
+    σ_N2i = ion_pair_production_cross_section(model, :N2, E_centers)
+    σ_O2i = ion_pair_production_cross_section(model, :O2, E_centers)
+    σ_Oi  = ion_pair_production_cross_section(model, :O,  E_centers)
 
     ## Allocate volume-excitation-rate arrays [n_z, n_t]
     n_z = length(z)
@@ -134,22 +134,21 @@ end
 
 
 """
-    ion_production_cross_section(model, species_name::Symbol, E_centers) → Vector
+    ion_pair_production_cross_section(model, species_name::Symbol, E_centers) → Vector
 
-Ionization cross section (m²) of `species_name` in `model`: the channel cross sections
-weighted by their number of secondary electrons.
+Ion-pair production cross section (m²) of `species_name` in `model` on the energies
+`E_centers`: each channel's cross section weighted by the number of electrons it ejects.
 """
-function ion_production_cross_section(model, species_name::Symbol, E_centers::AbstractVector)
+function ion_pair_production_cross_section(model, species_name::Symbol,
+                                           E_centers::AbstractVector)
     i_species = findfirst(sp -> sp.name === species_name, model.species)
     isnothing(i_species) && throw(ArgumentError(
         "Volume excitation rates need a species named $(species_name); the model has \
          $(join((String(sp.name) for sp in model.species), ", "))."))
     sp = model.species[i_species]
-    size(sp.cross_sections, 2) == length(E_centers) || throw(ArgumentError(
-        "The $(species_name) cross sections of the saved model cover \
-         $(size(sp.cross_sections, 2)) energy bins, but the results have \
-         $(length(E_centers)); the saved model does not belong to these results."))
-    return sp.cross_sections' * sp.excitation_levels[:, 2]
+    σ = channel_cross_sections(sp.elastic_cross_section, sp.channels, E_centers;
+                               species_name = String(sp.name))
+    return σ' * channel_excitation_levels(sp.channels)[:, 2]
 end
 
 
