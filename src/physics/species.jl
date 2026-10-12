@@ -42,8 +42,8 @@ assigning one of them throws.
 - `cascading_data::SpeciesCascadingCache`: cascading transfer matrices, filled in by
     `load_or_compute_cascading!`
 
-Edits made after `initialize!(model)` take effect at the next `initialize!` or `run!`:
-`run!` rebuilds the derived data when the channel table was edited.
+`run!` and `initialize!` rebuild the derived data when the channel table, elastic cross
+section or secondary law was edited after the last `initialize!`.
 """
 mutable struct NeutralSpecies
     name::Symbol

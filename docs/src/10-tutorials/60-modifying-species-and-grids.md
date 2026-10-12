@@ -268,8 +268,8 @@ run!(AuroraSimulation(model, flux, savedir; mode))
 ```
 
 The built-in tables for N₂, O₂ and O are returned by [`AURORA.default_collisions`](@ref) as
-the keyword arguments `(; elastic_cross_section, channels, secondary_law)`, which is the
-easiest way to build a variant of one of them (a later keyword overrides a splatted one):
+a `NamedTuple` of keyword arguments `(; elastic_cross_section, channels, secondary_law)`.
+You can splat the tuple into the constructor and override the keywords you want to change:
 
 ```julia
 # N₂ without dissociative double ionization

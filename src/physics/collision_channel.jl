@@ -127,8 +127,8 @@ end
     replace_channel!(sp::NeutralSpecies, name::AbstractString; kwargs...) → CollisionChannel
 
 Replace the channel called `name` by a copy with the fields given in `kwargs` changed (see
-the copy constructor of [`CollisionChannel`](@ref)), and return the new channel. Throws like
-[`channel`](@ref) when there is no channel or several channels called `name`.
+the copy constructor of [`CollisionChannel`](@ref)), and return the new channel. Throws when
+no channel or several channels are called `name`, as [`channel`](@ref) does.
 """
 function replace_channel!(channels, name::AbstractString; kwargs...)
     i = channel_index(channels, name)
@@ -139,8 +139,8 @@ end
     channel_cross_sections(elastic_cross_section, channels, E_centers) → Matrix{Float64}
 
 Build the `[n_levels × n_E]` cross-section matrix of a species: row 1 is the elastic cross
-section, row `i + 1` is `channels[i]`, each evaluated on `E_centers`. The rows are not
-checked here; `initialize!(model)` rejects a row that is non-zero below its energy loss.
+section, row `i + 1` is `channels[i]`, each evaluated on `E_centers`. A row must be zero
+below its channel's energy loss; `initialize!(model)` checks this.
 """
 function channel_cross_sections(elastic_cross_section, channels, E_centers::AbstractVector)
     Base.require_one_based_indexing(E_centers, channels)
