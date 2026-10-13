@@ -107,7 +107,7 @@ Calculate the flux of electrons after pitch-angle scattering by inelastic collis
 
 # Physics
 The scattered flux at each altitude and angle is computed as:
-    result[z, μ₁, t] = Σ_μ₂ n(z) x P(μ₁←μ₂) x F(z, μ₁, μ₂) x Ie[z, μ₂, t]
+    result[z, μ₁, t] = Σ_μ₂ n(z) · P(μ₁←μ₂) · F(z, μ₁, μ₂) · Ie[z, μ₂, t]
 
 where:
 - `n(z)` is the neutral density at altitude z

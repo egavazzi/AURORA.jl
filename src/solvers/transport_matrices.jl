@@ -13,7 +13,10 @@ mutable struct TransportMatrices
     B2B_inelastic_neutrals::Vector{Matrix{Float64}}  # inelastic beam-to-beam per species
     phase_fcn_e::Vector{Float64}                     # 3D elastic phase function scratch
     phase_fcn_i::Vector{Float64}                     # 3D inelastic phase function scratch
-    upwind_ratio::Array{Float64, 3}                  # beam-to-beam transfer scaling (n_z × n_angle × n_angle), see `upwind_cell_ratio`
+    # Beam-to-beam transfer scaling (n_z × n_angle × n_angle), see `upwind_cell_ratio`. It has
+    # only two distinct values per node, but is stored in full so that the loops over B, the
+    # scattered flux and the secondaries stay branch-free.
+    upwind_ratio::Array{Float64, 3}
 end
 
 """
