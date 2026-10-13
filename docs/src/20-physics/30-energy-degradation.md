@@ -75,5 +75,6 @@ lower bins by the cascading transfer matrices. Each row of these matrices is nor
 the number of ionization events of that primary bin, counting also the events whose
 electrons fall below the lowest edge, but only the part above the lowest edge is placed.
 
-In both cases the energy carried below the lowest edge appears in the `residual` term of
-[`make_energy_budget_file`](@ref).
+In both cases the energy carried below the lowest edge appears in the `subfloor` term of
+[`make_energy_budget_file`](@ref), together with the electrons that the Coulomb loss takes
+out of the lowest bin.
