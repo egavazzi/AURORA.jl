@@ -7,25 +7,9 @@
 #
 #     E_in  =  E_inelastic  +  E_heating  +  E_subfloor  +  E_escape  +  E_bottom  +  residual
 #
-# where
-#   E_in        vertical energy flux carried by the *downward* beams at the top boundary
-#               (= the imposed precipitation), Σ_beam Σ_E Ie·E·|μ|   [eV m⁻² s⁻¹]
-#   E_escape    vertical energy flux carried by the *upward* beams at the top boundary
-#               (backscattered electrons leaving the domain)
-#   E_bottom    vertical energy flux carried by the *downward* beams into the absorbing
-#               bottom boundary, which the solver discards
-#   E_inelastic energy deposited in neutral excitation + ionization thresholds,
-#               Σ_s w_s Σ_species n(s) Σ_levels threshold·Σ_E Ie_omni·σ
-#   E_heating   energy transferred to the thermal electrons (Coulomb)
-#   E_subfloor  energy of the electrons that inelastic collisions and the Coulomb loss take
-#               below the lowest energy-grid edge, where they thermalise
-#               (see `subfloor_energy_factors` below)
-#   residual    the numerical non-conservation of the scheme: the upwind cell weights on a
-#               non-uniform altitude grid, and the placement of degraded electrons at bin
-#               centers.
-#
-# A single time slice balances only at steady state. Over a time interval that starts and ends
-# at rest the same identity holds for the time-integrated terms, which is what `trange` gives.
+# (the terms are defined in the `EnergyBudget` docstring). A single time slice balances only
+# at steady state. Over a time interval that starts and ends at rest the same identity holds
+# for the time-integrated terms, which is what `trange` gives.
 
 using Printf
 
@@ -53,8 +37,7 @@ Energy terms
 - `subfloor`          energy of the electrons that inelastic collisions and the Coulomb loss
   take below the lowest edge of the energy grid, where they thermalise.
 - `residual`          `input - inelastic - heating - subfloor - escape - bottom_escape`,
-  the numerical non-conservation of the scheme (upwind cell weights on a non-uniform
-  altitude grid, and placement of degraded electrons at bin centers);
+  the numerical non-conservation of the scheme.
   `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
 - `inelastic_by_species`  the inelastic term per species, in model order.
@@ -137,12 +120,10 @@ end
 Compute the energy balance of a finished simulation. Returns an [`EnergyBudget`](@ref); also
 prints a summary unless `verbose=false`.
 
-Two sources are accepted:
-- a saved run directory `sim_dir`.
-- an in-memory `sim`.
+Accepts a saved run directory or an in-memory simulation.
 
 Pass at most one of `tidx`, `t` and `trange`:
-- none of them: the **last** time slice, to be used for steady-state (`n_t == 1`) runs;
+- none: the last saved slice, which is the steady state of a steady-state run;
 - `tidx`: a single time slice;
 - `t`: the single saved slice nearest that time in seconds (the earlier one on a tie);
 - `trange`: several slices, time-integrated. It can take `:` for every saved slice, a
@@ -179,9 +160,8 @@ function energy_budget(sim_dir::AbstractString; tidx = nothing, t = nothing,
     co = load_coordinates(sim_dir)
     t === nothing || (tidx = time_index_nearest(co, t))
     if trange === nothing
-        # One time slice. A 300 keV slice is about 2.5 GiB, above `load_results`' generic
-        # 2 GiB safety default, and the budget needs the whole slice, so the cap is off (set
-        # to Inf) unless the caller already set it.
+        # A slice must be read whole, and a 300 keV slice (about 2.5 GiB) exceeds the 2 GiB
+        # default cap of `load_results`, so the cap is off unless the caller set one.
         return energy_budget_at(model, sim_dir, co, something(tidx, co.n_t),
                                 something(max_bytes, Inf), verbose)
     else
@@ -244,7 +224,7 @@ end
         -> EnergyBudget
 
 Compute the energy budget with [`energy_budget`](@ref) (same keywords) and save it to
-`<savedir>/analysis/energy_budget.toml`. The compact TOML file holds every scalar field of
+`<savedir>/analysis/energy_budget.toml`. The TOML file holds every scalar field of
 [`EnergyBudget`](@ref), the species-resolved inelastic terms in model order, the time
 interval, and the units. Read it back with [`load_energy_budget`](@ref).
 """
@@ -291,7 +271,7 @@ end
 """
     load_energy_budget(sim_or_directory) -> EnergyBudget
 
-Load the compact result written by [`make_energy_budget_file`](@ref). Accepts either a saved
+Load the result written by [`make_energy_budget_file`](@ref). Accepts either a saved
 run directory or an `AuroraSimulation` whose output directory contains the file.
 """
 function load_energy_budget(sim_dir::AbstractString)
@@ -384,8 +364,7 @@ function close_budget(input, escape, bottom_escape, inelastic, ionization, excit
                         inelastic_by_species, interval)
 end
 
-# Budget of one flux snapshot `Ie`, shape [n_z, n_μ, n_E]. `subfloor_factors` is
-# `budget_subfloor_factors(model)`, which a caller budgeting many slices computes once.
+# Budget of one flux snapshot `Ie`, shape [n_z, n_μ, n_E].
 function energy_budget_snapshot(model, Ie; verbose::Bool = true,
                                 subfloor_factors = budget_subfloor_factors(model))
     eg  = model.energy_grid
@@ -398,7 +377,6 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true,
     n_z = length(z)
     n_μ = length(μ)
     n_E = length(E)
-    # The loops below index z, μ, E and Ie with the same indices, so the axes must agree.
     axes(Ie) == (eachindex(z), eachindex(μ), eachindex(E)) ||
         throw(ArgumentError("Ie snapshot $(size(Ie)) does not match the model grid " *
                             "(n_z, n_μ, n_E) = ($n_z, $n_μ, $n_E)"))
@@ -430,9 +408,9 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true,
     end
 
     # ---- Weighted omnidirectional flux for the volumetric (deposition / heating) terms ---
-    # Every volumetric term is linear in the local flux, so folding each beam's quadrature
-    # weight into the flux integrates all of them in one pass: the profiles below are already
-    # weighted, and their plain sums over altitude are the column integrals.
+    # Every volumetric term is linear in the local flux, so each beam's quadrature weight is
+    # folded into `Ie_omni` once. The profiles below are therefore already weighted, and their
+    # plain sums over altitude are the column integrals.
     w = column_weights(s)
     Ie_omni = zeros(n_z, n_E)                              # [n_z, n_E], weight-folded
     for iμ in axes(Ie, 2)
@@ -443,10 +421,8 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true,
     end
 
     # ---- Inelastic energy deposition (∫ along the field line) ----------------------------
-    # Σ_s w_s Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ, split into ionizing (≥1 secondary) and
-    # non-ionizing channels, with the ion-pair production rate alongside. The collisional
-    # part of the sub-floor term is the same sum with the threshold replaced by the energy
-    # one collision takes below the grid, from `subfloor_energy_factors`.
+    # Σ_s w_s Σ_sp n Σ_levels threshold·Σ_E Ie_omni·σ. The sub-floor term is the same sum with
+    # the threshold replaced by `F`, the energy one collision takes below the grid.
     dep_profile_total = zeros(n_z)      # weighted energy deposition [eV m⁻² s⁻¹]
     ion_profile       = zeros(n_z)      # → ionization
     exc_profile       = zeros(n_z)      # → excitation
@@ -490,7 +466,7 @@ function energy_budget_snapshot(model, Ie; verbose::Bool = true,
     excitation = sum(exc_profile)
     ionpairs   = sum(ionpair_profile)
 
-    # ---- Thermal-electron heating (reuse the existing Coulomb-loss routine) --------------
+    # ---- Thermal-electron heating -------------------------------------------------------
     heating_profile = calculate_heating_rate(z, [0.0], reshape(Ie_omni, n_z, 1, n_E),
                                              E, ne, Te)[:, 1]
     heating = sum(heating_profile)
@@ -535,14 +511,10 @@ end
 #                 ENERGY OF THE ELECTRONS DEGRADED BELOW THE ENERGY GRID                    #
 # ======================================================================================== #
 #
-# The energy grid starts at a lowest edge E_edges[1] of a few eV. An inelastic collision or
-# the Coulomb loss can take an electron below that edge; it then leaves the suprathermal
-# population and thermalises. The factors below give the energy those electrons carry, per
-# collision (per unit Le·Ie for the Coulomb loss), from the kinematics of each process: the
-# arrival range of a non-ionizing channel, and the secondary law of an ionizing channel. They
-# do not depend on where the solver places the electrons that stay on the grid, so any
-# difference between the energy the solver removes and the energy these factors, the
-# inelastic losses and the heating account for is left to the budget's residual.
+# An inelastic collision or the Coulomb loss can take an electron below the lowest grid edge
+# E_edges[1], out of the suprathermal population. The factors below give the energy those
+# electrons carry, per collision or per unit Le·Ie, from the kinematics of each process
+# alone.
 
 """
     subfloor_energy_factors(sp, energy_grid) -> Matrix{Float64}
@@ -561,15 +533,13 @@ bin:
   arrivals below zero energy carry none.
 - ionizing channel of threshold `I`: the energy of the secondaries and of the degraded
   primary that end below `E_edges[1]`, integrated over the secondary law and over the
-  primary energies of the bin above `I`, divided by the number of ionization events of the
-  bin (`event_count`), the normalization of the cascading matrices. Double ionization uses
-  the joint densities of the cascading calculation. The bin holding `I` has no cascading
-  row and all of its products fall below the lowest edge, so its factor is the mean excess
-  energy `(E_edges[iE+1] - I)/2` of the primaries above `I`.
+  primary energies of the bin above `I`. The result is divided by the bin's ionization
+  events (`event_count`), as the cascading matrices are. Double ionization uses the joint
+  densities of the cascading calculation. The bin holding `I` has no cascading row and all
+  of its products fall below the lowest edge, so its factor is the mean excess energy
+  `(E_edges[iE+1] - I)/2` of the primaries above `I`.
 
-The two branches follow the solver's two conventions: a non-ionizing collision partitions
-the whole bin at density `1/ΔE[iE]`, an ionizing one is normalized per event over the
-primaries above the threshold.
+These are the solver's own conventions for the two kinds of channel.
 """
 function subfloor_energy_factors(sp, energy_grid)
     E_edges = energy_grid.E_edges
@@ -599,8 +569,8 @@ function subfloor_energy_factors(sp, energy_grid)
             throw(ArgumentError("$(sp.name): channel row $l ejects $(levels[l, 2]) " *
                                 "secondaries; only single and double ionization are modelled"))
     end
-    # The law is evaluated millions of times: unwrap it once and enter the integration
-    # through a single invokelatest, as calculate_cascading_matrices does.
+    # The law is evaluated millions of times, so it is unwrapped once and entered through a
+    # single invokelatest.
     law = runtime_law(cache.spec.secondary_law)
     Base.invokelatest(fill_ionization_subfloor_energy!, factors, law, levels, ionizing_rows,
                       E_edges)
@@ -736,8 +706,7 @@ function coulomb_subfloor_factors(energy_grid)
 end
 
 # The per-model inputs of the budget's `subfloor` term: one factor matrix per species, and
-# the Coulomb factors times the loss function Le, [n_z, n_E]. They depend only on the model,
-# so a time integral computes them once for all its slices.
+# the Coulomb factors times the loss function Le, [n_z, n_E].
 function budget_subfloor_factors(model)
     eg = model.energy_grid
     collisions = [subfloor_energy_factors(sp, eg) for sp in model.species]

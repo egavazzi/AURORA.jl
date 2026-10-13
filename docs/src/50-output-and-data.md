@@ -170,9 +170,7 @@ budget.residual_fraction           # numerical non-conservation of the scheme
 The terms satisfy `input == inelastic + heating + subfloor + escape + bottom_escape +
 residual`. `subfloor` is the energy of the electrons that inelastic collisions and the
 Coulomb loss take below the lowest edge of the energy grid, where they thermalise. The
-`residual` is the numerical non-conservation of the scheme: the upwind cell weights on a
-non-uniform altitude grid, and the placement of degraded electrons at bin centers in the
-energy degradation.
+`residual` is the numerical non-conservation of the scheme.
 
 On a time-dependent run a single slice does not balance, because energy is still in transit.
 Pass `trange` to integrate the balance over time instead, which closes for a transient that
