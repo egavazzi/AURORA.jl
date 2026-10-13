@@ -264,7 +264,6 @@ function write_energy_budget_file(sim_dir::AbstractString, budget::EnergyBudget)
     savefile = joinpath(analysis_dir, "energy_budget.toml")
     values = Dict(String(name) => getfield(budget, name) for name in ENERGY_BUDGET_SCALAR_FIELDS)
     data = Dict{String,Any}(
-        "schema_version" => 1,
         "energy_units" => energy_units(budget),
         "rate_units" => rate_units(budget),
         "values" => values,
@@ -300,8 +299,6 @@ function load_energy_budget(sim_dir::AbstractString)
     isfile(path) || throw(ArgumentError("no energy_budget.toml found under $(dirname(path))"))
     check_analysis_freshness(path, sim_dir)
     data = TOML.parsefile(path)
-    get(data, "schema_version", nothing) == 1 ||
-        throw(ArgumentError("unsupported energy-budget schema in $path"))
     values = data["values"]
     missing_fields = [String(name) for name in ENERGY_BUDGET_SCALAR_FIELDS
                       if !haskey(values, String(name))]
