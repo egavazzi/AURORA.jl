@@ -321,8 +321,7 @@ function compute_ionization_spectra!(secondary_e_spectrum, primary_e_spectrum,
 
             # Normalize by the row's ionization event count, which includes the events whose
             # electrons fall below the lowest grid edge. That part is left out (thermalised)
-            # rather than moved back onto the grid; the energy budget counts it in its
-            # `subfloor` term.
+            # rather than moved back onto the grid.
             events = event_count(species_cascading, iE, E_loss)
             # A row with no events has no cross section either (checked at `initialize!`).
             events > 0 || continue

@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- **Breaking** `EnergyBudget` gains a `subfloor` term, the energy of the electrons that inelastic collisions and the Coulomb loss take below the lowest energy-grid edge, where they thermalise; `residual` is now `input - inelastic - heating - subfloor - escape - bottom_escape` and holds only the numerical non-conservation of the scheme. `load_energy_budget` throws on an `energy_budget.toml` without a `subfloor` value; rewrite such a file with `make_energy_budget_file`. The printed summary and `plot_energy_budget` show the new term [#182](https://github.com/egavazzi/AURORA.jl/pull/182)
+
 - **Breaking** A neutral species describes its collisions with an in-code channel table instead of the `internal_data/data_neutrals/<species>_levels.dat` / `.name` files [#186](https://github.com/egavazzi/AURORA.jl/pull/186)
   - New exported type `CollisionChannel(name, cross_section, energy_loss, n_secondaries; source)`. A `NeutralSpecies` holds a vector of them in `channels`, next to its `elastic_cross_section` and `secondary_law` (`nothing` when no channel ionizes); the constructor takes these three keywords in place of `cascading_spec`.
   - `cross_sections`, `excitation_levels`, `cascading_spec` and `cascading_data` are derived from the table at `initialize!(model)` (row 1 elastic, row `i + 1` = `channels[i]`) and can no longer be assigned. Edit `channels` instead (`push!`, `filter!`, `AURORA.replace_channel!`), or `elastic_cross_section` and `secondary_law`.
@@ -17,6 +17,7 @@
   - A cascading cache file is reused only if its thresholds, secondary counts and secondary law match.
   - Fix the `e_N2*`, `e_O2*` and `e_O*` cross-section functions for unsorted or integer input energies.
 - Add an energy-budget diagnostic (analysis function) which reports how much of the precipitating energy flux goes into neutral excitation and ionization (split per channel and per species), thermal-electron heating, backscatter out of the top and absorption at the bottom of the grid, plus the unaccounted residual [#155](https://github.com/egavazzi/AURORA.jl/pull/155)
+- Add a `subfloor` term to the energy budget, the energy of the electrons ending up below the lowest energy-grid edge, where they thermalise. `residual` should now hold only the numerical non-conservation of the scheme [#182](https://github.com/egavazzi/AURORA.jl/pull/182)
 - **Breaking** `AuroraModel` takes the neutral atmosphere and electron background as data instead of MSIS/IRI file paths [#166](https://github.com/egavazzi/AURORA.jl/pull/166)
   - New types `NeutralAtmosphere` (one `DensityProfile` per species, indexed as `neutrals[:N2]`), `DensityProfile` and `ElectronProfile`. They hold the data itself, so a model saved to `physics_state.jld2` reloads without the original files, and carry a free-form `origin` string written into `inputs/atmosphere.nc`. File paths are still accepted, and read at construction.
   - New functions `run_msis`, `read_msis_file`, `read_ccmc_msis` (returning a `NeutralAtmosphere`) and `run_iri`, `read_iri_file`, `read_ccmc_iri` (returning an `ElectronProfile`).
