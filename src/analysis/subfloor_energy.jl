@@ -30,7 +30,13 @@ bin:
   primary that end below `E_edges[1]`, integrated over the secondary law and over the
   primary energies of the bin above `I`, divided by the number of ionization events of the
   bin (`event_count`), the normalization of the cascading matrices. Double ionization uses
-  the joint densities of the cascading calculation.
+  the joint densities of the cascading calculation. The bin holding `I` has no cascading
+  row and all of its products fall below the lowest edge, so its factor is the mean excess
+  energy `(E_edges[iE+1] - I)/2` of the primaries above `I`.
+
+The two branches follow the solver's two conventions: a non-ionizing collision partitions
+the whole bin at density `1/ΔE[iE]`, an ionizing one is normalized per event over the
+primaries above the threshold.
 """
 function subfloor_energy_factors(sp, energy_grid)
     E_edges = energy_grid.E_edges
@@ -66,18 +72,22 @@ function subfloor_energy_factors(sp, energy_grid)
     Base.invokelatest(fill_ionization_subfloor_energy!, factors, law, levels, ionizing_rows,
                       E_edges)
 
-    # Per ionization event. A bin whose primary energies all lie below the threshold has no
-    # events, and the solver refuses a nonzero cross section there once it ionizes at all.
-    min_ionization_E = minimum(levels[l, 1] for l in ionizing_rows)
+    # Per ionization event. The bin holding the threshold `I` has no cascading row:
+    # `initialize!` guarantees that all of its products fall below the lowest edge, so each
+    # event there carries its whole excess energy `E_p - I` below the floor, on average
+    # half the bin's excess above `I`. A bin above the threshold with a cross section but
+    # no events is rejected at `initialize!` as well.
     for l in ionizing_rows, iE in eachindex(ΔE)
-        events = event_count(cache, iE, levels[l, 1])
+        I = levels[l, 1]
+        events = event_count(cache, iE, I)
         if events > 0
             factors[l, iE] /= events
+        elseif σ[l, iE] > 0
+            E_edges[iE] < I || throw(ArgumentError(
+                "$(sp.name): ionizing channel at $(I) eV has cross section $(σ[l, iE]) m² \
+                 in energy bin $(iE) but no ionization events in its cascading matrices"))
+            factors[l, iE] = max(E_edges[iE + 1] - I, 0.0) / 2
         else
-            σ[l, iE] > 0 && min_ionization_E < E_edges[iE] && throw(ArgumentError(
-                "$(sp.name): ionizing channel at $(levels[l, 1]) eV has cross section \
-                 $(σ[l, iE]) m² in energy bin $(iE) but no ionization events in its \
-                 cascading matrices"))
             factors[l, iE] = 0.0
         end
     end

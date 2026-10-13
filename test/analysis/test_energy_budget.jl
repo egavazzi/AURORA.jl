@@ -315,10 +315,15 @@ end
                     llo, lup = E_edges[iE] - L, min(E_edges[iE + 1] - L, E_edges[iE])
                     hi, lo = min(lup, fl), max(llo, 0.0)
                     per_collision = hi > lo ? (hi^2 - lo^2) / (2ΔE[iE]) : 0.0
-                else
+                elseif AU.event_count(sp.cascading_data, iE, L) > 0
                     raw = n_sec == 1 ? single_ref(law, L, E_edges[iE], E_edges[iE + 1]) :
                                        double_ref(law, L, E_edges[iE], E_edges[iE + 1])
                     per_collision = raw / AU.event_count(sp.cascading_data, iE, L)
+                else
+                    # The bin holding the threshold: no cascading row, every product below
+                    # the lowest edge, per event.
+                    @test E_edges[iE] < L < E_edges[iE + 1]
+                    per_collision = (E_edges[iE + 1] - L) / 2
                 end
                 collisional += σ * sum(sp.density .* Ie_omni[:, iE]) * per_collision
             end
