@@ -22,7 +22,7 @@
 #               (see subfloor_energy.jl)
 #   residual    the numerical non-conservation of the scheme: the upwind cell weights on a
 #               non-uniform altitude grid, and the placement of degraded electrons at bin
-#               centres.
+#               centers.
 #
 # A single time slice balances only at steady state. Over a time interval that starts and ends
 # at rest the same identity holds for the time-integrated terms, which is what `trange` gives.
@@ -54,7 +54,7 @@ Energy terms
   take below the lowest edge of the energy grid, where they thermalise.
 - `residual`          `input - inelastic - heating - subfloor - escape - bottom_escape`,
   the numerical non-conservation of the scheme (upwind cell weights on a non-uniform
-  altitude grid, and placement of degraded electrons at bin centres);
+  altitude grid, and placement of degraded electrons at bin centers);
   `residual_fraction == residual / input`.
 - `albedo`            `escape / input`.
 - `inelastic_by_species`  the inelastic term per species, in model order.

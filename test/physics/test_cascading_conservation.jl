@@ -198,7 +198,7 @@ end
         a = UniformSetup.E_EDGES[i_primary]
         b = UniformSetup.E_EDGES[i_primary + 1]
 
-        # Near threshold, the redistribution occupies too few bins for a bin-centre mean to
+        # Near threshold, the redistribution occupies too few bins for a bin-center mean to
         # be a meaningful conservation diagnostic.
         (b - UniformSetup.THRESHOLD) <= 2 * first_bin_width && continue
 
@@ -227,7 +227,7 @@ end
         a = NonUniformSetup.E_EDGES[i_primary]
         b = NonUniformSetup.E_EDGES[i_primary + 1]
 
-        # Near threshold, the redistribution occupies too few bins for a bin-centre mean to
+        # Near threshold, the redistribution occupies too few bins for a bin-center mean to
         # be a meaningful conservation diagnostic.
         (b - NonUniformSetup.THRESHOLD) <= 2 * first_bin_width && continue
 
