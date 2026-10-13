@@ -1,7 +1,7 @@
 [reference_results]
-git-tree-sha1 = "67353ebf0ecea7d1182e712da78688c35d96949f"
+git-tree-sha1 = "989c099445a0dc37f509707f88753d6b57f4fbb7"
 lazy = true
 
     [[reference_results.download]]
-    url = "https://github.com/egavazzi/AURORA.jl/releases/download/regression-data/reference_results_2026-10-09_67353ebf.tar.gz"
-    sha256 = "0b6a41ad16d8dadc4f01ca1125daef1fffd73d9d9c3e5ada37d7324b78ba296b"
+    url = "https://github.com/egavazzi/AURORA.jl/releases/download/regression-data/reference_results_2026-10-13_989c0994.tar.gz"
+    sha256 = "0d8f0b2ba5e3b40d8c4fb023c8d0bc668cd2cd296a21c05c555cb7afe6f3b20e"

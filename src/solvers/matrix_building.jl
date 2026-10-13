@@ -180,6 +180,9 @@ function update_B!(matrices::TransportMatrices, model::AuroraModel, iE, B2B_kern
             end
         end
     end
+    # Every term of B is a beam-to-beam transfer at one node; scale each by the ratio of the
+    # source and receiving beams' upwind cell lengths so the transfers conserve particles.
+    B .*= matrices.upwind_ratio
     return B2B_inelastic_neutrals
 end
 
@@ -222,6 +225,7 @@ function initialize_transport_matrices(model::AuroraModel, t)
     matrices.B2B_inelastic_neutrals = [zeros(Float64, n_angle, n_angle) for _ in 1:n_species]
     matrices.phase_fcn_e = zeros(Float64, n_θ)
     matrices.phase_fcn_i = zeros(Float64, n_θ)
+    matrices.upwind_ratio = upwind_cell_ratio(model.s_field, model.pitch_angle_grid.μ_center)
 
     return matrices
 end

@@ -172,15 +172,14 @@ function estimate_simulation_memory(n_z::Int, n_μ::Int, n_E::Int, n_t::Int,
     # workspace.degradation working arrays, summed over the N_neutrals species:
     #   secondary_e_flux + primary_e_flux  → 2·N·(n_zμ·n_t)
     #   Ie_scatter                         → n_zμ·n_t
-    #   ionization_source_sum              → n_z·n_t
-    degradation = (2 * N_neutrals + 1) * n_zμ * n_t + n_z * n_t
+    degradation = (2 * N_neutrals + 1) * n_zμ * n_t
     scaling_elems = Ie + Q + Ie_save + degradation
 
     # ── Arrays independent of the loop split ──
     Ie_top   = n_μ * n_t * n_E                  # workspace.Ie_top — full flux, never split
     I0       = n_zμ * n_E                       # workspace.I0
-    # Transport matrices: A (n_z) + B (n_z·n_μ²)
-    matrices = n_z + n_z * n_μ^2
+    # Transport matrices: A (n_z) + B and upwind_ratio (n_z·n_μ² each)
+    matrices = n_z + 2 * n_z * n_μ^2
     # Degradation energy spectra (2·N·n_E) + thermal-loss vector (n_z)
     misc     = 2 * N_neutrals * n_E + n_z
     # Sparse solver (Mlhs, Mrhs and the KLU factorisation). Both matrices share a block
